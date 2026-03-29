@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { CalendarDays, PiggyBank, Gem, TrendingUp, BarChart2, Wallet, User, Settings, CreditCard, Landmark } from 'lucide-react'
+import { CalendarDays, PiggyBank, Gem, TrendingUp, BarChart2, Wallet, User, Settings, CreditCard, Landmark, Banknote } from 'lucide-react'
 import React from 'react'
 
-export type ModuleId = 'monthly' | 'lending' | 'savings' | 'gold' | 'stocks' | 'mutualfunds' | 'emi' | 'jewelLoans' | 'settings'
+export type ModuleId = 'monthly' | 'lending' | 'savings' | 'gold' | 'stocks' | 'mutualfunds' | 'emi' | 'jewelLoans' | 'cashLoans' | 'settings'
 
 interface Props {
   module: ModuleId
@@ -62,24 +62,8 @@ export default function Nav({ module, onModule, lendingSheet, onLendingSheet, ti
           {MODULES_LG.slice(0, 2).map(m => (
             <button
               key={m.id}
+              className={`nav-drawer-item${module === m.id ? ' active' : ''}`}
               onClick={() => { onModule(m.id); setDrawerOpen(false) }}
-              style={{
-                width: '100%',
-                textAlign: 'left',
-                padding: '12px 14px',
-                borderRadius: 0,
-                background: 'transparent',
-                color: '#fff',
-                border: 'none',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                fontSize: 16,
-                fontWeight: 500,
-                transition: 'all .15s',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-              }}
             >
               {m.icon}
               <span>{m.label}</span>
@@ -95,24 +79,8 @@ export default function Nav({ module, onModule, lendingSheet, onLendingSheet, ti
           {MODULES_LG.slice(2).map(m => (
             <button
               key={m.id}
+              className={`nav-drawer-item${module === m.id ? ' active' : ''}`}
               onClick={() => { onModule(m.id); setDrawerOpen(false) }}
-              style={{
-                width: '100%',
-                textAlign: 'left',
-                padding: '12px 14px',
-                borderRadius: 0,
-                background: 'transparent',
-                color: '#fff',
-                border: 'none',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                fontSize: 16,
-                fontWeight: 500,
-                transition: 'all .15s',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-              }}
             >
               {m.icon}
               <span>{m.label}</span>
@@ -132,24 +100,8 @@ export default function Nav({ module, onModule, lendingSheet, onLendingSheet, ti
               {LENDING_SUBMENU.map(sub => (
                 <button
                   key={sub.id}
+                  className={`nav-drawer-item${module === 'lending' && lendingSheet === sub.id ? ' active' : ''}`}
                   onClick={() => { onModule('lending'); onLendingSheet(sub.id); setDrawerOpen(false) }}
-                  style={{
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '12px 14px',
-                    borderRadius: 0,
-                    background: module === 'lending' && lendingSheet === sub.id ? 'rgba(99, 102, 241, 0.2)' : 'transparent',
-                    color: '#fff',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontFamily: 'inherit',
-                    fontSize: 16,
-                    fontWeight: module === 'lending' && lendingSheet === sub.id ? 500 : 400,
-                    transition: 'all .15s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
-                  }}
                 >
                   {sub.icon}
                   <span>{sub.label}</span>
@@ -165,74 +117,33 @@ export default function Nav({ module, onModule, lendingSheet, onLendingSheet, ti
             Loans
           </div>
           <button
+            className={`nav-drawer-item${module === 'emi' ? ' active' : ''}`}
             onClick={() => { onModule('emi'); setDrawerOpen(false) }}
-            style={{
-              width: '100%',
-              textAlign: 'left',
-              padding: '12px 14px',
-              borderRadius: 0,
-              background: module === 'emi' ? 'rgba(99, 102, 241, 0.2)' : 'transparent',
-              color: '#fff',
-              border: 'none',
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              fontSize: 16,
-              fontWeight: module === 'emi' ? 500 : 400,
-              transition: 'all .15s',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-            }}
           >
             <CreditCard size={18} />
             <span>EMI Loans</span>
           </button>
           <button
+            className={`nav-drawer-item${module === 'jewelLoans' ? ' active' : ''}`}
             onClick={() => { onModule('jewelLoans'); setDrawerOpen(false) }}
-            style={{
-              width: '100%',
-              textAlign: 'left',
-              padding: '12px 14px',
-              borderRadius: 0,
-              background: module === 'jewelLoans' ? 'rgba(99, 102, 241, 0.2)' : 'transparent',
-              color: '#fff',
-              border: 'none',
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              fontSize: 16,
-              fontWeight: module === 'jewelLoans' ? 500 : 400,
-              transition: 'all .15s',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-            }}
           >
             <Landmark size={18} />
             <span>Jewel Loans</span>
+          </button>
+          <button
+            className={`nav-drawer-item${module === 'cashLoans' ? ' active' : ''}`}
+            onClick={() => { onModule('cashLoans'); setDrawerOpen(false) }}
+          >
+            <Banknote size={18} />
+            <span>Cash Loans</span>
           </button>
         </div>
 
         {/* Settings Section */}
         <div style={{ paddingTop: 12, paddingBottom: 8 }}>
           <button
+            className={`nav-drawer-item${module === 'settings' ? ' active' : ''}`}
             onClick={() => { onModule('settings'); setDrawerOpen(false) }}
-            style={{
-              width: '100%',
-              textAlign: 'left',
-              padding: '12px 14px',
-              borderRadius: 0,
-              background: 'transparent',
-              color: '#fff',
-              border: 'none',
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              fontSize: 16,
-              fontWeight: 500,
-              transition: 'all .15s',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-            }}
           >
             <Settings size={18} />
             <span>Settings</span>

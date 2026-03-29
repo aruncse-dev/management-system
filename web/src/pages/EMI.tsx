@@ -322,25 +322,25 @@ export default function EMI() {
         </div>
 
         {/* KPI Cards */}
-        <div className="kpis" style={{ marginBottom: '1.5rem' }}>
-          <div className="kpi">
-            <div className="kpi-l">Monthly EMIs</div>
-            <div className="kpi-v">{INR(totalMonthlyEmis)}</div>
+        <div className="kpis">
+          <div className="kpi-card">
+            <div className="kpi-card-l">Monthly EMIs</div>
+            <div className="kpi-card-v">{INR(totalMonthlyEmis)}</div>
           </div>
 
-          <div className="kpi">
-            <div className="kpi-l">Total Loan Paid</div>
-            <div className="kpi-v" style={{ color: '#10B981' }}>{INR(totalPaid)}</div>
+          <div className="kpi-card kpi-card--green">
+            <div className="kpi-card-l">Total Loan Paid</div>
+            <div className="kpi-card-v kpi-card-v--green">{INR(totalPaid)}</div>
           </div>
 
-          <div className="kpi">
-            <div className="kpi-l">Total Loan</div>
-            <div className="kpi-v">{INR(totalLoanValue)}</div>
+          <div className="kpi-card">
+            <div className="kpi-card-l">Total Loan</div>
+            <div className="kpi-card-v">{INR(totalLoanValue)}</div>
           </div>
 
-          <div className="kpi">
-            <div className="kpi-l">Outstanding</div>
-            <div className="kpi-v" style={{ color: '#EF4444' }}>{INR(totalOutstanding)}</div>
+          <div className="kpi-card kpi-card--red">
+            <div className="kpi-card-l">Outstanding</div>
+            <div className="kpi-card-v kpi-card-v--red">{INR(totalOutstanding)}</div>
           </div>
         </div>
 

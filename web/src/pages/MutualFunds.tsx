@@ -217,52 +217,29 @@ export default function MutualFunds() {
 
         {/* Modal */}
         {selectedIndex !== null && enrichedHoldings[selectedIndex] && (
-          <div
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: 'rgba(0, 0, 0, 0.5)',
-              display: 'flex',
-              alignItems: 'flex-end',
-              zIndex: 1000
-            }}
-            onClick={() => setSelectedIndex(null)}
-          >
-            <div
-              style={{
-                background: '#FFFFFF',
-                width: '100%',
-                borderRadius: '1rem 1rem 0 0',
-                padding: '1.5rem',
-                maxHeight: '80vh',
-                overflowY: 'auto',
-                animation: 'slideUp 0.3s ease'
-              }}
-              onClick={e => e.stopPropagation()}
-            >
-              {(() => {
-                const h = enrichedHoldings[selectedIndex];
-                return (
-                  <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                      <div style={{ fontSize: '1rem', fontWeight: 700 }}>{h.company}</div>
-                      <button
-                        onClick={() => setSelectedIndex(null)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          fontSize: '1.5rem',
-                          cursor: 'pointer',
-                          color: 'var(--muted)',
-                          padding: 0
-                        }}
-                      >
-                        ✕
-                      </button>
-                    </div>
+          <div className="modal-bg open" onClick={() => setSelectedIndex(null)}>
+            <div className="sheet-panel" onClick={e => e.stopPropagation()}>
+              <div className="sheet-body">
+                {(() => {
+                  const h = enrichedHoldings[selectedIndex];
+                  return (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                        <div style={{ fontSize: '1rem', fontWeight: 700 }}>{h.company}</div>
+                        <button
+                          onClick={() => setSelectedIndex(null)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            fontSize: '1.5rem',
+                            cursor: 'pointer',
+                            color: 'var(--muted)',
+                            padding: 0
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                       <div>
@@ -310,9 +287,10 @@ export default function MutualFunds() {
                         </div>
                       </div>
                     </div>
-                  </>
-                );
-              })()}
+                    </>
+                  );
+                })()}
+              </div>
             </div>
           </div>
         )}
@@ -323,10 +301,6 @@ export default function MutualFunds() {
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
-        }
-        @keyframes slideUp {
-          from { transform: translateY(100%); }
-          to { transform: translateY(0); }
         }
       `}</style>
     </div>

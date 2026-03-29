@@ -216,36 +216,28 @@ export default function Stocks() {
       )}
 
       {/* Summary strip */}
-      <div className="kpis" style={{ marginBottom: '1.5rem' }}>
-        <div className="card" style={{ padding: '10px 14px' }}>
-          <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 2 }}>
-            Total Invested
-          </div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
+      <div className="kpis">
+        <div className="kpi-card">
+          <div className="kpi-card-l">Total Invested</div>
+          <div className="kpi-card-v">
             ₹{Number(stats.totalInvested.toFixed(2)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
         </div>
-        <div className="card" style={{ padding: '10px 14px' }}>
-          <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 2 }}>
-            Current Value
-          </div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
+        <div className="kpi-card">
+          <div className="kpi-card-l">Current Value</div>
+          <div className="kpi-card-v">
             ₹{Number(stats.currentValue.toFixed(2)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
         </div>
-        <div className="card" style={{ padding: '10px 14px' }}>
-          <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 2 }}>
-            Total P&L
-          </div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: stats.totalPnL >= 0 ? '#10B981' : '#EF4444' }}>
+        <div className={`kpi-card ${stats.totalPnL >= 0 ? 'kpi-card--green' : 'kpi-card--red'}`}>
+          <div className="kpi-card-l">Total P&L</div>
+          <div className={`kpi-card-v ${stats.totalPnL >= 0 ? 'kpi-card-v--green' : 'kpi-card-v--red'}`}>
             {stats.totalPnL >= 0 ? '+' : ''}₹{Number(stats.totalPnL.toFixed(2)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
         </div>
-        <div className="card" style={{ padding: '10px 14px' }}>
-          <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 2 }}>
-            Return %
-          </div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: stats.totalPnLPct >= 0 ? '#10B981' : '#EF4444' }}>
+        <div className={`kpi-card ${stats.totalPnLPct >= 0 ? 'kpi-card--green' : 'kpi-card--red'}`}>
+          <div className="kpi-card-l">Return %</div>
+          <div className={`kpi-card-v ${stats.totalPnLPct >= 0 ? 'kpi-card-v--green' : 'kpi-card-v--red'}`}>
             {stats.totalPnLPct >= 0 ? '+' : ''}{Number(stats.totalPnLPct.toFixed(2))}%
           </div>
         </div>
@@ -333,53 +325,30 @@ export default function Stocks() {
 
         {/* Modal */}
         {selectedIndex !== null && enrichedHoldings[selectedIndex] && (
-          <div
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: 'rgba(0, 0, 0, 0.5)',
-              display: 'flex',
-              alignItems: 'flex-end',
-              zIndex: 1000
-            }}
-            onClick={() => setSelectedIndex(null)}
-          >
-            <div
-              style={{
-                background: '#FFFFFF',
-                width: '100%',
-                borderRadius: '1rem 1rem 0 0',
-                padding: '1.5rem',
-                maxHeight: '80vh',
-                overflowY: 'auto',
-                animation: 'slideUp 0.3s ease'
-              }}
-              onClick={e => e.stopPropagation()}
-            >
-              {(() => {
-                const h = enrichedHoldings[selectedIndex];
-                return (
-                  <>
-                    {/* Close button */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                      <div style={{ fontSize: '1rem', fontWeight: 700 }}>{h.symbol}</div>
-                      <button
-                        onClick={() => setSelectedIndex(null)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          fontSize: '1.5rem',
-                          cursor: 'pointer',
-                          color: 'var(--muted)',
-                          padding: 0
-                        }}
-                      >
-                        ✕
-                      </button>
-                    </div>
+          <div className="modal-bg open" onClick={() => setSelectedIndex(null)}>
+            <div className="sheet-panel" onClick={e => e.stopPropagation()}>
+              <div className="sheet-body">
+                {(() => {
+                  const h = enrichedHoldings[selectedIndex];
+                  return (
+                    <>
+                      {/* Close button */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                        <div style={{ fontSize: '1rem', fontWeight: 700 }}>{h.symbol}</div>
+                        <button
+                          onClick={() => setSelectedIndex(null)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            fontSize: '1.5rem',
+                            cursor: 'pointer',
+                            color: 'var(--muted)',
+                            padding: 0
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
 
                     {/* Company */}
                     <div style={{ marginBottom: '1rem' }}>
@@ -441,6 +410,7 @@ export default function Stocks() {
                   </>
                 );
               })()}
+              </div>
             </div>
           </div>
         )}
@@ -451,10 +421,6 @@ export default function Stocks() {
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
-        }
-        @keyframes slideUp {
-          from { transform: translateY(100%); }
-          to { transform: translateY(0); }
         }
       `}</style>
     </div>
