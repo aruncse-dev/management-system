@@ -382,17 +382,17 @@ export default function JewelLoans() {
         <div className="kpis">
           <div className="kpi-card">
             <div className="kpi-card-l">Total Principal</div>
-            <div className="kpi-card-v">{INR(totalPrincipal)}</div>
+            <div className="kpi-card-v" style={{ color: 'var(--text)' }}>{INR(totalPrincipal)}</div>
           </div>
 
           <div className="kpi-card kpi-card--green">
             <div className="kpi-card-l">Total Paid</div>
-            <div className="kpi-card-v kpi-card-v--green">{INR(totalPaid)}</div>
+            <div className="kpi-card-v" style={{ color: 'var(--text)' }}>{INR(totalPaid)}</div>
           </div>
 
           <div className="kpi-card kpi-card--red">
             <div className="kpi-card-l">Total Outstanding</div>
-            <div className="kpi-card-v kpi-card-v--red">{INR(totalOutstanding)}</div>
+            <div className="kpi-card-v" style={{ color: 'var(--text)' }}>{INR(totalOutstanding)}</div>
           </div>
         </div>
 

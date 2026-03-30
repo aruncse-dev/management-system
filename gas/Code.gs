@@ -8,14 +8,14 @@
  *       Code.gs  ← this file
  *       Index    ← create via File > New > HTML file, name it "Index" (no .html)
  *  4. Paste Index.html content into the Index file
- *  5. Deploy → New deployment → Type: Web app
+ *  5. Deploy → New deployment (first time only) → Type: Web app
  *       Execute as : Me
  *       Who has access : Anyone with Google account  (or Anyone)
  *  6. Click Deploy → Authorize → Copy the /exec URL
  *  7. Open the URL in your browser – that's your app!
  *
- *  Every time you redeploy (after code changes) click "New deployment" again
- *  and update the URL.
+ *  After the first deployment, use `./deploy.sh` to update the same deployment
+ *  so the URL stays stable for OAuth callbacks.
  */
 
 // ── COLUMN INDEX MAP ─────────────────────────────────────────────────────────
@@ -87,7 +87,7 @@ function _handleUpstoxOAuthCallback(params) {
     return HtmlService.createHtmlOutput(
       '<html><body style="font-family: Arial, sans-serif; padding: 2rem; text-align: center;">' +
       '<h2 style="color: #16A34A;">✅ Upstox Connected!</h2>' +
-      '<p>Your access token has been saved.</p>' +
+      '<p>Your tokens have been saved in Apps Script.</p>' +
       '<p>You can now close this tab and return to FinanceTracker.</p>' +
       '<p>Your stocks will sync automatically every day.</p>' +
       '</body></html>'
@@ -113,6 +113,25 @@ function _checkToken(token) {
 function setApiToken(token) {
   PropertiesService.getScriptProperties().setProperty('API_TOKEN', token);
   return 'API_TOKEN set';
+}
+
+// Run this once from the Apps Script editor to force Google to show the
+// required permission dialog for UrlFetchApp and ScriptApp.
+function authorizeFinTracker() {
+  UrlFetchApp.fetch('https://www.google.com', { muteHttpExceptions: true });
+  ScriptApp.getProjectTriggers();
+  const props = PropertiesService.getScriptProperties();
+  const expensesSheetId = props.getProperty('EXPENSES_SHEET_ID');
+  if (expensesSheetId) {
+    SpreadsheetApp.openById(expensesSheetId);
+  } else {
+    SpreadsheetApp.getActiveSpreadsheet();
+  }
+  return 'Authorization check complete';
+}
+
+function resetUpstoxAuth() {
+  return clearUpstoxTokens();
 }
 
 // Run once in the Apps Script editor to store your Gemini key securely:

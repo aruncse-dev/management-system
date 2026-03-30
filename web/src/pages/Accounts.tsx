@@ -1,30 +1,20 @@
-import { useState } from 'react'
+import { useMemo } from 'react'
 import { useStore } from '../store'
 import { acctFlows, INR } from '../utils'
 import { ACCOUNTS, CC_MODES } from '../constants'
-import { api } from '../api'
-import CatIcon from '../components/CatIcon'
 import { Wallet } from 'lucide-react'
+import { decorColor } from '../constants'
 
 interface Props { showStatus: (msg: string) => void }
 
-export default function Accounts({ showStatus }: Props) {
-  const { state, dispatch } = useStore()
+export default function Accounts({ showStatus: _showStatus }: Props) {
+  const { state } = useStore()
   const { rows, openingBal } = state
   const flows = acctFlows(rows, openingBal)
-  const [editBal, setEditBal] = useState<string|null>(null)
-  const [editVal, setEditVal] = useState('')
-
-  async function saveOpeningBal(acc: string) {
-    const val = parseFloat(editVal)
-    if (isNaN(val)) { setEditBal(null); return }
-    const newBal = { ...openingBal, [acc]: val }
-    try {
-      await api.saveOpeningBal(newBal)
-      dispatch({ type:'SET_OPENING_BAL', payload: newBal })
-      showStatus('✓ Balance saved')
-    } catch (e) { showStatus('⚠ ' + (e instanceof Error ? e.message : 'Save failed')) }
-    setEditBal(null)
+  const accountLabel: Record<string, string> = {
+    Cash: 'Cash',
+    'HDFC Bank': 'HDFC',
+    Wallet: 'Wallet',
   }
 
   const ccCatMap: Record<string,{ICICI:number;HDFC:number}> = {}
@@ -33,119 +23,79 @@ export default function Accounts({ showStatus }: Props) {
     if (r.m === 'ICICI') ccCatMap[r.c].ICICI += r.a
     else ccCatMap[r.c].HDFC += r.a
   })
-  const ccRows = Object.entries(ccCatMap).sort((a,b)=>(b[1].ICICI+b[1].HDFC)-(a[1].ICICI+a[1].HDFC))
-  const icTotal = ccRows.reduce((s,[,v])=>s+v.ICICI,0)
-  const hdTotal = ccRows.reduce((s,[,v])=>s+v.HDFC,0)
-
+  const overview = useMemo(() => {
+    const currentTotal = ACCOUNTS.reduce((s, acc) => s + (flows[acc]?.current || 0), 0)
+    const inflowTotal = ACCOUNTS.reduce((s, acc) => s + (flows[acc]?.inflow || 0), 0)
+    const outflowTotal = ACCOUNTS.reduce((s, acc) => s + (flows[acc]?.outflow || 0), 0)
+    const activeAccounts = ACCOUNTS.filter(acc => (flows[acc]?.current || 0) !== 0).length
+    return { currentTotal, inflowTotal, outflowTotal, activeAccounts }
+  }, [flows])
   return (
     <div className="pg">
-      <div className="sec" style={{marginTop:12}}>
-        <span className="sec-h" style={{display:'flex',alignItems:'center',gap:6}}><Wallet size={18} /> Account Balances</span>
-        <div style={{fontSize:11,color:'var(--muted)',marginTop:4}}>Tap opening balance to edit</div>
+      <div className="acct-section-head">
+        <div className="acct-section-title">
+          <Wallet size={14} />
+          <span>Overview</span>
+        </div>
+      </div>
+
+      <div className="kpis" style={{ marginBottom: 14 }}>
+        <div className="kpi-card kpi-card--green">
+          <div className="kpi-card-l">Current Balance</div>
+          <div className="kpi-card-v kpi-card-v-soft" style={{ color: '#111827' }}>
+            {overview.currentTotal < 0 ? '−' : ''}{INR(Math.abs(overview.currentTotal))}
+          </div>
+        </div>
+        <div className="kpi-card">
+          <div className="kpi-card-l">Inflow</div>
+          <div className="kpi-card-v kpi-card-v-soft" style={{ color: '#111827' }}>{INR(overview.inflowTotal)}</div>
+        </div>
+        <div className="kpi-card">
+          <div className="kpi-card-l">Outflow</div>
+          <div className="kpi-card-v kpi-card-v-soft" style={{ color: '#111827' }}>{INR(overview.outflowTotal)}</div>
+        </div>
+        <div className="kpi-card">
+          <div className="kpi-card-l">Accounts</div>
+          <div className="kpi-card-v kpi-card-v-soft" style={{ color: '#111827' }}>{overview.activeAccounts}</div>
+        </div>
+      </div>
+
+      <div className="acct-section-head">
+        <div className="acct-section-title">
+          <Wallet size={14} />
+          <span>Account Balances</span>
+        </div>
       </div>
 
       <div className="acct-g2" style={{marginBottom:14}}>
         {ACCOUNTS.map((acc, i) => {
           const { inflow, outflow, current } = flows[acc] || { inflow:0, outflow:0, current:0 }
-          const net = inflow - outflow
-          const curCol = current>=0 ? 'var(--green)' : 'var(--red)'
-          const borderColors = ['var(--gm)','var(--navy)','var(--amber)']
+          const curCol = current > 0 ? 'var(--green)' : current < 0 ? 'var(--red)' : '#6B7280'
+          const borderColors = [decorColor('Cash'), decorColor('HDFC Bank', 1), decorColor('Wallet', 2)]
           return (
-            <div key={acc} className="acct-card" style={{borderTopColor: borderColors[i]}}>
-              <div className="acct-name">{acc}</div>
-              <div className="acct-rows">
-                <div className="acct-row">
-                  <span className="acct-row-lbl">Opening</span>
-                  {editBal===acc ? (
-                    <input className="form-inp" type="number" style={{width:80,padding:'2px 6px',fontSize:12}} value={editVal} autoFocus
-                      onChange={e=>setEditVal(e.target.value)}
-                      onBlur={()=>saveOpeningBal(acc)}
-                      onKeyDown={e=>{if(e.key==='Enter')saveOpeningBal(acc);if(e.key==='Escape')setEditBal(null)}} />
-                  ) : (
-                    <span className="acct-row-val bamt" onClick={()=>{setEditBal(acc);setEditVal(String(openingBal[acc]||0))}}>{INR(openingBal[acc]||0)}</span>
-                  )}
-                </div>
-                <div className="acct-row">
-                  <span className="acct-row-lbl">↑ In</span>
-                  <span className="acct-row-val" style={{color:'var(--green)'}}>+{INR(inflow)}</span>
-                </div>
-                <div className="acct-row">
-                  <span className="acct-row-lbl">↓ Out</span>
-                  <span className="acct-row-val" style={{color:'var(--red)'}}>−{INR(outflow)}</span>
-                </div>
-                <div className="acct-row">
-                  <span className="acct-row-lbl">Net</span>
-                  <span className="acct-row-val" style={{color:net>=0?'var(--green)':'var(--red)'}}>{net>=0?'+':'−'}{INR(Math.abs(net))}</span>
+            <div key={acc} className="acct-card" style={{borderLeftColor: borderColors[i], borderLeftWidth: 0}}>
+              <div className="acct-card-top">
+                <div className="acct-bank">{accountLabel[acc] ?? acc}</div>
+                <div className="acct-balance-pill" style={{ color: curCol, borderColor: 'transparent' }}>
+                  {current < 0 ? '−' : ''}{INR(Math.abs(current))}
                 </div>
               </div>
-              <div className="acct-balance">
-                <span className="acct-balance-lbl">Balance</span>
-                <span className="acct-balance-val" style={{color:curCol}}>{current<0?'−':''}{INR(Math.abs(current))}</span>
+              <div className="acct-main">
+                <div className="acct-flow-summary">
+                  <div className="acct-flow-summary-item">
+                    <span className="acct-flow-summary-label">In</span>
+                    <span className="acct-flow-summary-value acct-flow-summary-value-in">+{INR(inflow)}</span>
+                  </div>
+                  <div className="acct-flow-summary-item">
+                    <span className="acct-flow-summary-label">Out</span>
+                    <span className="acct-flow-summary-value acct-flow-summary-value-out">−{INR(outflow)}</span>
+                  </div>
+                </div>
               </div>
             </div>
           )
         })}
       </div>
-
-      {ccRows.length > 0 && (
-        <>
-          <div className="sec"><div className="sec-h" style={{display:'flex',alignItems:'center',gap:6}}><Wallet size={16} /> CC Spending by Category</div></div>
-
-          {/* Mobile cards */}
-          <div className="txn-cards" style={{marginBottom:14}}>
-            {ccRows.map(([cat,v]) => (
-              <div key={cat} className="txn-card">
-                <div className="txn-card-top">
-                  <span className="txn-card-desc" style={{display:'flex',alignItems:'center',gap:6}}><CatIcon cat={cat} size={14} />{cat}</span>
-                  <span className="txn-card-amt" style={{fontSize:14,fontWeight:700,color:'var(--red)'}}>{INR(v.ICICI+v.HDFC)}</span>
-                </div>
-                <div className="txn-card-bot">
-                  {v.ICICI > 0 && <span style={{fontSize:11,color:'#2563EB'}}>ICICI {INR(v.ICICI)}</span>}
-                  {v.HDFC  > 0 && <span style={{fontSize:11,color:'var(--navy)'}}>HDFC {INR(v.HDFC)}</span>}
-                </div>
-              </div>
-            ))}
-            <div className="txn-card" style={{background:'var(--navy-lt)'}}>
-              <div className="txn-card-top">
-                <span className="txn-card-desc" style={{fontWeight:700}}>Total</span>
-                <span className="txn-card-amt" style={{fontSize:14,fontWeight:700,color:'var(--red)'}}>{INR(icTotal+hdTotal)}</span>
-              </div>
-              <div className="txn-card-bot">
-                <span style={{fontSize:11,color:'#2563EB'}}>ICICI {INR(icTotal)}</span>
-                <span style={{fontSize:11,color:'var(--navy)'}}>HDFC {INR(hdTotal)}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Desktop table */}
-          <div className="tw txn-table" style={{marginBottom:14}}>
-            <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-              <thead><tr>
-                <th style={{textAlign:'left',padding:'8px 12px',fontSize:11,fontWeight:600,color:'var(--muted)',textTransform:'uppercase',borderBottom:'1px solid var(--border)'}}>Category</th>
-                <th style={{textAlign:'right',padding:'8px 12px',fontSize:11,fontWeight:600,color:'#2563EB',textTransform:'uppercase',borderBottom:'1px solid var(--border)'}}>ICICI</th>
-                <th style={{textAlign:'right',padding:'8px 12px',fontSize:11,fontWeight:600,color:'var(--navy)',textTransform:'uppercase',borderBottom:'1px solid var(--border)'}}>HDFC</th>
-                <th style={{textAlign:'right',padding:'8px 12px',fontSize:11,fontWeight:600,color:'var(--muted)',textTransform:'uppercase',borderBottom:'1px solid var(--border)'}}>Total</th>
-              </tr></thead>
-              <tbody>
-                {ccRows.map(([cat,v])=>(
-                  <tr key={cat}>
-                    <td style={{padding:'9px 12px',borderBottom:'1px solid var(--border)'}}><span className="badge ba" style={{fontSize:12,fontWeight:500,display:'flex',alignItems:'center',gap:6,padding:'6px 10px'}}><CatIcon cat={cat} size={13} />{cat}</span></td>
-                    <td style={{textAlign:'right',padding:'9px 12px',borderBottom:'1px solid var(--border)',fontSize:14,fontWeight:700,color:v.ICICI?'#2563EB':'var(--muted)'}}>{v.ICICI?INR(v.ICICI):'—'}</td>
-                    <td style={{textAlign:'right',padding:'9px 12px',borderBottom:'1px solid var(--border)',fontSize:14,fontWeight:700,color:v.HDFC?'var(--navy)':'var(--muted)'}}>{v.HDFC?INR(v.HDFC):'—'}</td>
-                    <td style={{textAlign:'right',padding:'9px 12px',borderBottom:'1px solid var(--border)',fontSize:14,fontWeight:700,color:'var(--red)'}}>{INR(v.ICICI+v.HDFC)}</td>
-                  </tr>
-                ))}
-                <tr style={{background:'#F8FAFC'}}>
-                  <td style={{padding:'9px 12px',fontWeight:700}}>Total</td>
-                  <td style={{textAlign:'right',padding:'9px 12px',fontSize:14,fontWeight:700,color:'#2563EB'}}>{INR(icTotal)}</td>
-                  <td style={{textAlign:'right',padding:'9px 12px',fontSize:14,fontWeight:700,color:'var(--navy)'}}>{INR(hdTotal)}</td>
-                  <td style={{textAlign:'right',padding:'9px 12px',fontSize:14,fontWeight:700,color:'var(--red)'}}>{INR(icTotal+hdTotal)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
 
     </div>
   )

@@ -5,6 +5,7 @@ import { fd, INR } from '../utils'
 import { ALL_CR } from '../constants'
 import { TXN_PAGE } from '../constants'
 import CatIcon from '../components/CatIcon'
+import { decorColor, withAlpha } from '../constants'
 
 const FILTERS = ['All','Expense','Income','Transfer','Savings','ICICI','HDFC','Bommi','Ramya']
 
@@ -22,10 +23,6 @@ export default function Transactions({ onEdit }: Props) {
 
   return (
     <div className="pg">
-      <div className="sec" style={{marginTop:12}}>
-        <span className="sec-h">{total} entries · {state.month} {state.year}</span>
-      </div>
-
       <div style={{position:'relative',marginBottom:8}}>
         <input
           className="form-inp"
@@ -55,6 +52,10 @@ export default function Transactions({ onEdit }: Props) {
         ))}
       </div>
 
+      <div style={{ fontSize: 11, color: 'var(--muted)', margin: '8px 0 2px' }}>
+        {shown} visible of {total} transactions
+      </div>
+
       {state.loading ? (
         <div className="lb"><div className="spin" style={{display:'inline-block',marginRight:8}} />Loading…</div>
       ) : rows.length === 0 ? (
@@ -67,6 +68,7 @@ export default function Transactions({ onEdit }: Props) {
               const isI = r.t==='Income', isS=r.t==='Savings'
               const col = isI?'var(--green)':isS?'var(--amber)':'var(--red)'
               const isCr = (ALL_CR as readonly string[]).includes(r.m)
+              const catCol = decorColor(r.c)
               return (
                 <div key={r.id} className={`txn-card txn-card-${r.t==='Income'?'inc':r.t==='Transfer'?'trf':r.t==='Savings'?'sav':'exp'}`} onClick={() => onEdit(r)}>
                   <div className="txn-card-top">
@@ -75,7 +77,7 @@ export default function Transactions({ onEdit }: Props) {
                   </div>
                   <div className="txn-card-bot">
                     <span className="txn-card-date">{fd(r.date)}</span>
-                    <span className="badge ba" style={{fontSize:12,fontWeight:500,display:'flex',alignItems:'center',gap:6,padding:'6px 10px'}}><CatIcon cat={r.c} size={13} />{r.c}</span>
+                    <span className="badge" style={{fontSize:12,fontWeight:500,display:'flex',alignItems:'center',gap:6,padding:'6px 10px',background:withAlpha(catCol,0.12),color:catCol}}><CatIcon cat={r.c} size={13} />{r.c}</span>
                     {typeBadge(r.t)}
                     {isCr ? <span className="badge bn" style={{fontSize:10}}>{r.m}</span> : <span style={{fontSize:11,color:'var(--muted)'}}>{r.m}</span>}
                   </div>
@@ -98,11 +100,12 @@ export default function Transactions({ onEdit }: Props) {
                   const isI = r.t==='Income', isS=r.t==='Savings'
                   const col = isI?'var(--green)':isS?'var(--amber)':'var(--red)'
                   const isCr = (ALL_CR as readonly string[]).includes(r.m)
+                  const catCol = decorColor(r.c)
                   return (
                     <tr key={r.id}>
                       <td>{fd(r.date)}</td>
                       <td>{r.desc}</td>
-                      <td><span className="badge ba" style={{fontSize:10,display:'flex',alignItems:'center',gap:4}}><CatIcon cat={r.c} size={11} />{r.c}</span></td>
+                      <td><span className="badge" style={{fontSize:10,display:'flex',alignItems:'center',gap:4,background:withAlpha(catCol,0.12),color:catCol}}><CatIcon cat={r.c} size={11} />{r.c}</span></td>
                       <td>{typeBadge(r.t)}</td>
                       <td>{isCr?<span className="badge bn">{r.m}</span>:r.m}</td>
                       <td style={{textAlign:'right',fontSize:14,fontWeight:700,color:col}}>{(isI||isS)?'+':'−'}{INR(r.a)}</td>

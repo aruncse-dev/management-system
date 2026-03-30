@@ -161,6 +161,7 @@ export default function EMI() {
 
   // Derivations
   const ongoingLoans = useMemo(() => items.filter(l => l.status === 'Ongoing'), [items]);
+  const totalLoanCount = useMemo(() => items.length, [items]);
   const totalOutstanding = useMemo(() => {
     return ongoingLoans.reduce((s, l) => {
       const totalPayable = l.emi_amount * l.tenure_months;
@@ -168,10 +169,6 @@ export default function EMI() {
       return s + (totalPayable - totalPaid);
     }, 0);
   }, [ongoingLoans]);
-
-  const totalPaid = useMemo(() => {
-    return items.reduce((s, l) => s + (l.emi_amount * l.paid_emis), 0);
-  }, [items]);
 
   const totalLoanValue = useMemo(() => {
     return items.reduce((s, l) => s + (l.emi_amount * l.tenure_months), 0);
@@ -324,13 +321,13 @@ export default function EMI() {
         {/* KPI Cards */}
         <div className="kpis">
           <div className="kpi-card">
-            <div className="kpi-card-l">Monthly EMIs</div>
-            <div className="kpi-card-v">{INR(totalMonthlyEmis)}</div>
+            <div className="kpi-card-l">Loans</div>
+            <div className="kpi-card-v">{totalLoanCount}</div>
           </div>
 
-          <div className="kpi-card kpi-card--green">
-            <div className="kpi-card-l">Total Loan Paid</div>
-            <div className="kpi-card-v kpi-card-v--green">{INR(totalPaid)}</div>
+          <div className="kpi-card">
+            <div className="kpi-card-l">Monthly EMIs</div>
+            <div className="kpi-card-v">{INR(totalMonthlyEmis)}</div>
           </div>
 
           <div className="kpi-card">
@@ -465,15 +462,6 @@ export default function EMI() {
                         </div>
                         <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>
                           {fmtDate(loan.start_date)}
-                        </div>
-                      </div>
-
-                      <div>
-                        <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', marginBottom: 4 }}>
-                          Total Paid
-                        </div>
-                        <div style={{ fontSize: 15, fontWeight: 700, color: '#10B981' }}>
-                          {INR(totalPaid)}
                         </div>
                       </div>
                     </div>

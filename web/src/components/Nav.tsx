@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { CalendarDays, PiggyBank, Gem, TrendingUp, BarChart2, Wallet, User, Settings, CreditCard, Landmark, Banknote } from 'lucide-react'
+import { CalendarDays, PiggyBank, Gem, TrendingUp, Wallet, User, Settings, CreditCard, Landmark, Banknote, LayoutGrid, LogOut } from 'lucide-react'
 import React from 'react'
 
-export type ModuleId = 'monthly' | 'lending' | 'savings' | 'gold' | 'stocks' | 'mutualfunds' | 'emi' | 'jewelLoans' | 'cashLoans' | 'settings'
+export type ModuleId = 'monthly' | 'lending' | 'savings' | 'gold' | 'investments' | 'emi' | 'jewelLoans' | 'cashLoans' | 'settings' | 'components'
 
 interface Props {
   module: ModuleId
@@ -10,14 +10,14 @@ interface Props {
   lendingSheet?: string
   onLendingSheet?: (sheet: string) => void
   title?: string
+  onLogout?: () => void
 }
 
 const MODULES_LG: { id: ModuleId; icon: React.ReactNode; label: string }[] = [
   { id: 'monthly',     icon: <CalendarDays size={18} />, label: 'Monthly Expenses' },
   { id: 'savings',     icon: <PiggyBank size={18} />,    label: 'Savings' },
   { id: 'gold',        icon: <Gem size={18} />,          label: 'Gold' },
-  { id: 'stocks',      icon: <TrendingUp size={18} />,   label: 'Stocks' },
-  { id: 'mutualfunds', icon: <BarChart2 size={18} />,    label: 'Mutual Funds' },
+  { id: 'investments', icon: <TrendingUp size={18} />,   label: 'Investments' },
 ]
 
 const LENDING_SUBMENU = [
@@ -25,8 +25,9 @@ const LENDING_SUBMENU = [
   { id: 'Vijaya Amma', label: 'Vijaya Amma', icon: <User size={18} /> },
 ]
 
-export default function Nav({ module, onModule, lendingSheet, onLendingSheet, title }: Props) {
+export default function Nav({ module, onModule, lendingSheet, onLendingSheet, title, onLogout }: Props) {
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
 
   return (
     <>
@@ -148,8 +149,66 @@ export default function Nav({ module, onModule, lendingSheet, onLendingSheet, ti
             <Settings size={18} />
             <span>Settings</span>
           </button>
+          <button
+            className={`nav-drawer-item${module === 'components' ? ' active' : ''}`}
+            onClick={() => { onModule('components' as ModuleId); setDrawerOpen(false) }}
+          >
+            <LayoutGrid size={18} />
+            <span>UI Kit</span>
+          </button>
+          {onLogout && (
+            <button
+              className="nav-drawer-item"
+              onClick={() => setLogoutConfirmOpen(true)}
+            >
+              <LogOut size={18} />
+              <span>Logout</span>
+            </button>
+          )}
         </div>
       </div>
+
+      {logoutConfirmOpen && onLogout && (
+        <div className="modal-bg open" onClick={() => setLogoutConfirmOpen(false)} style={{ alignItems: 'center', padding: '24px 16px' }}>
+          <div
+            className="card"
+            onClick={e => e.stopPropagation()}
+            style={{ width: 'min(100%, 360px)', padding: 16, borderRadius: 16, boxShadow: '0 18px 48px rgba(15, 23, 42, 0.18)' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text)', fontWeight: 700, fontSize: 16 }}>
+                  <LogOut size={18} />
+                  Logout app?
+                </div>
+                <div style={{ marginTop: 6, fontSize: 13, lineHeight: 1.5, color: 'var(--muted)' }}>
+                  This clears only the FinTracker session on this device. It will not log you out of Google.
+                </div>
+              </div>
+              <button className="modal-close" onClick={() => setLogoutConfirmOpen(false)} style={{ background: 'var(--bg)', color: 'var(--text)' }}>×</button>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                className="settings-action-btn"
+                onClick={() => setLogoutConfirmOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="settings-action-btn"
+                onClick={() => {
+                  setLogoutConfirmOpen(false)
+                  onLogout()
+                }}
+                style={{ borderColor: 'rgba(239,68,68,.25)', color: 'var(--red)' }}
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

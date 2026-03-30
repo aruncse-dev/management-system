@@ -184,6 +184,7 @@ export default function Lending({ sheetName, onTabChange }: LendingProps) {
 
   // Memoize aggregated data to prevent unnecessary recalculations
   const people = useMemo(() => aggregateByPerson(entries), [entries])
+  const totalPeople = people.length
 
   const totalLent = useMemo(() =>
     entries.filter(e => e.type === 'LEND').reduce((s, e) => s + e.amount, 0),
@@ -325,17 +326,21 @@ export default function Lending({ sheetName, onTabChange }: LendingProps) {
       {activeTab === 'dashboard' && (
         <>
           <div className="kpis" style={{ marginBottom: 0 }}>
-            <div className="card" style={{ padding: '10px 14px' }}>
-              <div className="lbl">Total Given</div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', marginTop: 2 }}>{INR(totalLent)}</div>
+            <div className="kpi-card">
+              <div className="kpi-card-l">Total Given</div>
+              <div className="kpi-card-v" style={{ color: 'var(--text)' }}>{INR(totalLent)}</div>
             </div>
-            <div className="card" style={{ padding: '10px 14px' }}>
-              <div className="lbl">Received</div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: '#10B981', marginTop: 2 }}>{INR(totalRepaid)}</div>
+            <div className="kpi-card">
+              <div className="kpi-card-l">Received</div>
+              <div className="kpi-card-v" style={{ color: 'var(--text)' }}>{INR(totalRepaid)}</div>
             </div>
-            <div className="card" style={{ padding: '10px 14px', gridColumn: 'span 2' }}>
-              <div className="lbl">Total Outstanding</div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: outstanding > 0 ? '#F59E0B' : 'var(--text)', marginTop: 2 }}>{INR(outstanding)}</div>
+            <div className={`kpi-card ${outstanding > 0 ? 'kpi-card--amber' : 'kpi-card--gray'}`}>
+              <div className="kpi-card-l">Total Outstanding</div>
+              <div className="kpi-card-v" style={{ color: 'var(--text)' }}>{INR(outstanding)}</div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-card-l">People</div>
+              <div className="kpi-card-v" style={{ color: 'var(--text)' }}>{totalPeople}</div>
             </div>
           </div>
         </>
@@ -471,7 +476,7 @@ export default function Lending({ sheetName, onTabChange }: LendingProps) {
               </div>
               <div className="form-row">
                 <label className="form-lbl">Amount (₹)</label>
-                <input className="form-inp mono" type="number" min="0" step="1" placeholder="0" value={form.amount} onChange={e => set('amount', e.target.value)} />
+                <input className="form-inp" type="number" min="0" step="1" placeholder="0" value={form.amount} onChange={e => set('amount', e.target.value)} />
               </div>
               <div className="form-row">
                 <label className="form-lbl">Date</label>
@@ -509,10 +514,6 @@ export default function Lending({ sheetName, onTabChange }: LendingProps) {
           style={{ position: 'fixed', inset: 0, zIndex: 1000 }}
         >
           <div className="sheet-panel" onClick={e => e.stopPropagation()}>
-            <div className="sheet-handle">
-              <div className="sheet-handle-bar" />
-            </div>
-
             <div className="sheet-hd">
               <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', margin: 0 }}>
                 {personModalName}

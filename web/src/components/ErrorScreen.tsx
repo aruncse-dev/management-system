@@ -13,6 +13,17 @@ export default function ErrorScreen({ error, onRetry }: Props) {
   return (
     <div className="login-screen">
       <div style={{ textAlign: 'center', maxWidth: 500 }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
+          <div style={{ width: 84, height: 84, borderRadius: 24, background: 'rgba(255,255,255,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,.14)' }}>
+            <img
+              src="./apple-touch-icon.png"
+              alt="FinTracker"
+              width="48"
+              height="48"
+              style={{ borderRadius: 14, objectFit: 'contain' }}
+            />
+          </div>
+        </div>
         <AlertCircle size={48} style={{ color: '#EF4444', marginBottom: 16 }} />
         <h1 style={{ fontSize: 24, fontWeight: 700, color: '#FFF', marginBottom: 8 }}>Backend Configuration Error</h1>
         <p style={{ fontSize: 14, color: '#A5B4FC', marginBottom: 24 }}>{error}</p>
@@ -22,9 +33,9 @@ export default function ErrorScreen({ error, onRetry }: Props) {
             <div style={{ fontSize: 13, fontWeight: 700, color: '#FFF', marginBottom: 10 }}>Fix: Deploy Google Apps Script</div>
             <ol style={{ fontSize: 12, color: '#A5B4FC', margin: 0, paddingLeft: 20, lineHeight: 1.6 }}>
               <li>Open terminal in the project root</li>
-              <li>Run: <code style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: 4, fontFamily: 'monospace' }}>./deploy.sh</code></li>
+              <li>Run: <code style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: 4, fontFamily: 'inherit' }}>./deploy.sh</code></li>
               <li>Follow the Google authentication prompts</li>
-              <li>Copy the deployment URL into <code style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: 4, fontFamily: 'monospace' }}>VITE_API_URL</code> in <code style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: 4, fontFamily: 'monospace' }}>.env</code></li>
+              <li>Copy the deployment URL into <code style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: 4, fontFamily: 'inherit' }}>VITE_API_URL</code> in <code style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: 4, fontFamily: 'inherit' }}>.env</code></li>
               <li>Refresh this page</li>
             </ol>
           </div>

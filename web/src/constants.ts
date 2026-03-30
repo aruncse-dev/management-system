@@ -20,9 +20,46 @@ export const CATEGORIES = [
 export const INCOME_CATS = ['Salary','Cashback','Other Income'] as const;
 export const ALL_MODES   = [...ACCOUNTS, ...CC_MODES, ...OTHER_CR] as const;
 
+export const THEME_COLORS = [
+  '#009688', // green
+  '#3F51B5', // blue
+  '#FF5722', // orange
+  '#FFC107', // yellow
+  '#E91E63', // purple
+  '#673AB7', // violet
+  '#00BCD4', // cyan
+  '#8BC34A', // lime
+] as const;
+
+export const DECOR_COLORS = THEME_COLORS;
+
+function hashKey(key: string): number {
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) {
+    hash = ((hash << 5) - hash + key.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
+export function decorColor(key: string, offset = 0): string {
+  const idx = (hashKey(key) + offset) % DECOR_COLORS.length;
+  return DECOR_COLORS[idx];
+}
+
+export function withAlpha(hex: string, alpha: number): string {
+  const clean = hex.replace('#', '').trim();
+  if (clean.length !== 6) return hex;
+  const value = Math.max(0, Math.min(1, alpha));
+  const a = Math.round(value * 255).toString(16).padStart(2, '0');
+  return `#${clean}${a}`;
+}
+
 export const CR_COLORS: Record<string, string> = {
-  ICICI:'#2563EB', HDFC:'#1E3A8A',
-  Bommi:'#0891B2', Ramya:'#0E7490', Others:'#4B6080',
+  ICICI: decorColor('ICICI'),
+  HDFC: decorColor('HDFC', 1),
+  Bommi: decorColor('Bommi', 2),
+  Ramya: decorColor('Ramya', 3),
+  Others: decorColor('Others', 4),
 };
 
 // GAS web app URL — update after deploying (used by GAS deploy script)

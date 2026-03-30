@@ -17,10 +17,36 @@ fi
 echo "→ Pushing code to Apps Script..."
 clasp push --force
 
-echo "→ Creating deployment..."
-DEPLOY_OUTPUT=$(clasp deploy --description "Deploy $(date +'%Y-%m-%d %H:%M')" 2>&1)
-# Extract deployment ID from "Deployed [ID] @[number]" format
-DEPLOYMENT_ID=$(echo "$DEPLOY_OUTPUT" | sed -n 's/.*Deployed \([^ ]*\) @.*/\1/p')
+DEPLOY_ID_FILE="gas/.deployment-id"
+DEPLOYMENT_ID=""
+
+if [ -f "$DEPLOY_ID_FILE" ]; then
+  DEPLOYMENT_ID=$(tr -d '[:space:]' < "$DEPLOY_ID_FILE")
+fi
+
+if [ -z "$DEPLOYMENT_ID" ] && [ -f "web/.env" ]; then
+  DEPLOYMENT_URL=$(sed -n 's/^VITE_GAS_URL=//p' "web/.env" | head -n 1)
+  if [[ "$DEPLOYMENT_URL" =~ /macros/s/([^/]+)/exec ]]; then
+    DEPLOYMENT_ID="${BASH_REMATCH[1]}"
+  fi
+fi
+
+if [ -z "$DEPLOYMENT_ID" ]; then
+  LATEST_DEPLOYMENT=$(clasp deployments 2>/dev/null | tail -n +2 | head -n 1 | awk '{print $2}')
+  if [ -n "$LATEST_DEPLOYMENT" ]; then
+    DEPLOYMENT_ID="$LATEST_DEPLOYMENT"
+  fi
+fi
+
+if [ -n "$DEPLOYMENT_ID" ]; then
+  echo "→ Updating existing deployment: $DEPLOYMENT_ID"
+  DEPLOY_OUTPUT=$(clasp deploy --deploymentId "$DEPLOYMENT_ID" --description "Deploy $(date +'%Y-%m-%d %H:%M')" 2>&1)
+else
+  echo "→ Creating deployment..."
+  DEPLOY_OUTPUT=$(clasp deploy --description "Deploy $(date +'%Y-%m-%d %H:%M')" 2>&1)
+  # Extract deployment ID from "Deployed [ID] @[number]" format
+  DEPLOYMENT_ID=$(echo "$DEPLOY_OUTPUT" | sed -n 's/.*Deployed \([^ ]*\) @.*/\1/p')
+fi
 
 if [ -z "$DEPLOYMENT_ID" ]; then
   echo "⚠ Failed to extract deployment ID"
@@ -29,6 +55,7 @@ if [ -z "$DEPLOYMENT_ID" ]; then
 fi
 
 echo "✓ Deployed with ID: $DEPLOYMENT_ID"
+printf '%s\n' "$DEPLOYMENT_ID" > "$DEPLOY_ID_FILE"
 
 if [ -n "$API_TOKEN" ]; then
   echo ""
@@ -48,33 +75,43 @@ if echo "$RESPONSE" | grep -q "ok\|data"; then
   echo "📋 Deployment ID: $DEPLOYMENT_ID"
   echo "🔗 URL: $GAS_URL"
 
-  # Update .env file
-  echo ""
-  echo "→ Updating .env file..."
+  CURRENT_GAS_URL=""
   if [ -f "web/.env" ]; then
-    sed -i '' "s|^VITE_GAS_URL=.*|VITE_GAS_URL=$GAS_URL|" "web/.env"
-    echo "✓ .env updated"
-  else
-    echo "⚠ web/.env not found"
+    CURRENT_GAS_URL=$(sed -n 's/^VITE_GAS_URL=//p' "web/.env" | head -n 1)
   fi
 
-  # Update GitHub secret
-  echo ""
-  echo "→ Updating GitHub secret VITE_GAS_URL..."
-  if gh secret set VITE_GAS_URL --body "$GAS_URL" 2>/dev/null; then
-    echo "✓ GitHub secret updated"
+  if [ "$CURRENT_GAS_URL" != "$GAS_URL" ]; then
+    # Update .env file
     echo ""
-    echo "→ Triggering Worker redeploy to pick up new GAS URL..."
-    if gh workflow run deploy-worker.yml 2>/dev/null; then
-      echo "✓ Worker redeploy triggered (see: gh run list --workflow=deploy-worker.yml)"
+    echo "→ Updating .env file..."
+    if [ -f "web/.env" ]; then
+      sed -i '' "s|^VITE_GAS_URL=.*|VITE_GAS_URL=$GAS_URL|" "web/.env"
+      echo "✓ .env updated"
     else
-      echo "⚠ Worker redeploy trigger failed. Run manually:"
+      echo "⚠ web/.env not found"
+    fi
+
+    # Update GitHub secret
+    echo ""
+    echo "→ Updating GitHub secret VITE_GAS_URL..."
+    if gh secret set VITE_GAS_URL --body "$GAS_URL" 2>/dev/null; then
+      echo "✓ GitHub secret updated"
+      echo ""
+      echo "→ Triggering Worker redeploy to pick up new GAS URL..."
+      if gh workflow run deploy-worker.yml 2>/dev/null; then
+        echo "✓ Worker redeploy triggered (see: gh run list --workflow=deploy-worker.yml)"
+      else
+        echo "⚠ Worker redeploy trigger failed. Run manually:"
+        echo "   gh workflow run deploy-worker.yml"
+      fi
+    else
+      echo "⚠ GitHub secret update skipped. Run these manually:"
+      echo "   gh secret set VITE_GAS_URL --body \"$GAS_URL\""
       echo "   gh workflow run deploy-worker.yml"
     fi
   else
-    echo "⚠ GitHub secret update skipped. Run these manually:"
-    echo "   gh secret set VITE_GAS_URL --body \"$GAS_URL\""
-    echo "   gh workflow run deploy-worker.yml"
+    echo ""
+    echo "✓ GAS URL unchanged; skipping .env, secret, and worker updates"
   fi
 else
   echo "⚠ Deployment returned unexpected response: $RESPONSE"
@@ -89,26 +126,6 @@ else
   echo "7. Save"
 fi
 
-# List and clean old deployments (non-interactive)
-echo ""
-echo "→ Checking for old deployments..."
-DEPLOYMENTS=$(clasp deployments 2>/dev/null | tail -n +2) # Skip header
-if [ -z "$DEPLOYMENTS" ]; then
-  echo "✓ No old deployments found"
-else
-  OLD_COUNT=$(echo "$DEPLOYMENTS" | grep -v "$DEPLOYMENT_ID" | wc -l)
-  if [ "$OLD_COUNT" -gt 0 ]; then
-    echo "Found $OLD_COUNT old deployment(s). Deleting..."
-    echo "$DEPLOYMENTS" | grep -v "$DEPLOYMENT_ID" | awk '{print $2}' | while read old_id; do
-      if [ ! -z "$old_id" ]; then
-        clasp undeploy "$old_id" 2>/dev/null && echo "✓ Deleted: $old_id" || echo "⚠ Failed to delete: $old_id"
-      fi
-    done
-  else
-    echo "✓ No old deployments to clean"
-  fi
-fi
-
 echo ""
 echo "✅ GAS deployment complete!"
 echo ""
@@ -121,7 +138,7 @@ echo "   → Manage deployments → Edit latest → Who has access → Anyone"
 echo ""
 echo "2️⃣  OPTIONAL: Authenticate GitHub CLI for auto-secret updates"
 echo "   → Run: gh auth login"
-echo "   → Redeploy to auto-set GitHub secret: ./deploy.sh"
+echo "   → Redeploy updates the same GAS deployment: ./deploy.sh"
 echo ""
 echo "3️⃣  CREATE: Savings sheet in FinanceTrackerAssets"
 echo "   → Open spreadsheet"

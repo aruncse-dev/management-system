@@ -77,19 +77,19 @@ export default function TransactionModal({ row, month, year, onClose, onSaved, s
 
   return (
     <div className="modal-bg open" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="modal">
+      <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-hd">
           <span className="modal-title">{isEdit ? 'Edit Transaction' : 'Add Transaction'}</span>
           <button className="modal-close" onClick={onClose}><X size={16} /></button>
         </div>
-        <div className="modal-body">
+        <div className="modal-body transaction-modal-body">
           <div className="form-row">
             <label className="form-lbl">Date</label>
             <input className="form-inp" type="date" value={form.date} onChange={e => set('date', e.target.value)} />
           </div>
           <div className="form-row">
             <label className="form-lbl">Amount (₹)</label>
-            <input className="form-inp mono" type="number" min="0" step="1" placeholder="0" value={form.a} onChange={e => set('a', e.target.value)} />
+            <input className="form-inp" type="number" min="0" step="1" placeholder="0" value={form.a} onChange={e => set('a', e.target.value)} />
           </div>
           <div className="form-row">
             <label className="form-lbl">Description</label>

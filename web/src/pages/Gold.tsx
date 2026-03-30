@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
-import { Plus, X, Check, Trash2, AlertTriangle, Loader2, Search, Pencil, LayoutDashboard, List, Settings as SettingsIcon, TrendingUp, Scale, Clock } from 'lucide-react';
+import { Plus, X, Check, Trash2, AlertTriangle, Loader2, Search, Pencil, LayoutDashboard, List, TrendingUp, Scale, Clock, BarChart3, Users, MapPinned, type LucideIcon } from 'lucide-react';
 import { api, RawGoldRow, RawGoldHistoryRow } from '../api';
 import { INR } from '../utils';
+import { THEME_COLORS } from '../constants';
+import { RightLegendDonut } from '../components/RightLegendDonut';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // TYPES & CONSTANTS
@@ -46,6 +48,15 @@ interface GoldHistoryFormState {
 const PEOPLE = ['Ramya', 'Arun', 'Nithran', 'Dhuruvan', 'Amma'];
 const LOCATIONS = ['Home', 'Bank', 'Locker'];
 const PAVAN_CONVERSION = 1 / 8; // 1 pavan = 8 grams
+const KPI_BLUE = 'var(--navy-dark)';
+const KPI_GOLD = '#FCAF38';
+const KPI_VALUE_COLOR = '#111827';
+const PERSON_COLORS: Record<string, string> = Object.fromEntries(
+  PEOPLE.map((person, index) => [person, THEME_COLORS[index]])
+) as Record<string, string>;
+const LOCATION_COLORS: Record<string, string> = Object.fromEntries(
+  LOCATIONS.map((location, index) => [location, THEME_COLORS[PEOPLE.length + index]])
+) as Record<string, string>;
 
 function emptyForm(): GoldFormState {
   return {
@@ -128,10 +139,11 @@ const PersonCard = memo(function PersonCard({
 }) {
   const totalGrams = items.reduce((s, i) => s + i.weight_g, 0);
   const totalPavan = items.reduce((s, i) => s + i.pavan, 0);
+  const accent = PERSON_COLORS[person];
   return (
-    <div className="card" style={{ padding: '12px 14px' }}>
-      <div className="lbl" style={{ marginBottom: 4 }}>{person}</div>
-      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginTop: 2 }}>
+    <div className="kpi-card" style={{ borderLeftColor: accent }}>
+      <div className="kpi-card-l">{person}</div>
+      <div className="kpi-card-v kpi-card-v-soft" style={{ color: KPI_VALUE_COLOR }}>
         {Math.round(totalGrams)}g
       </div>
       <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
@@ -150,10 +162,11 @@ const LocationCard = memo(function LocationCard({
 }) {
   const totalGrams = items.reduce((s, i) => s + i.weight_g, 0);
   const totalPavan = items.reduce((s, i) => s + i.pavan, 0);
+  const accent = LOCATION_COLORS[location];
   return (
-    <div className="card" style={{ padding: '12px 14px' }}>
-      <div className="lbl" style={{ marginBottom: 4 }}>{location}</div>
-      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginTop: 2 }}>
+    <div className="kpi-card" style={{ borderLeftColor: accent }}>
+      <div className="kpi-card-l">{location}</div>
+      <div className="kpi-card-v kpi-card-v-soft" style={{ color: KPI_VALUE_COLOR }}>
         {Math.round(totalGrams)}g
       </div>
       <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
@@ -163,11 +176,20 @@ const LocationCard = memo(function LocationCard({
   );
 });
 
+function SectionTitle({ icon: Icon, children }: { icon: LucideIcon; children: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+      <Icon size={16} style={{ color: 'var(--text)' }} />
+      <div style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--text)' }}>{children}</div>
+    </div>
+  );
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ──────────────────────────────────────────────────────────────────────────────
 
-export default function Gold({ onOpenSettings }: { onOpenSettings: () => void }) {
+export default function Gold() {
   // Tab navigation
   const [activeTab, setActiveTab] = useState<GoldTab>('dashboard');
 
@@ -196,6 +218,8 @@ export default function Gold({ onOpenSettings }: { onOpenSettings: () => void })
   const [historyDelConfirm, setHistoryDelConfirm] = useState(false);
 
   // Derivations
+  const totalItems = items.length;
+  const totalPeople = useMemo(() => new Set(items.map(item => item.person).filter(Boolean)).size, [items]);
   const totalGrams = useMemo(() => items.reduce((s, i) => s + i.weight_g, 0), [items]);
   const totalPavan = useMemo(() => items.reduce((s, i) => s + i.pavan, 0), [items]);
 
@@ -224,6 +248,21 @@ export default function Gold({ onOpenSettings }: { onOpenSettings: () => void })
     });
     return groups;
   }, [items]);
+
+  const personBreakdown = useMemo(() => PEOPLE.map((person) => ({
+    label: person,
+    value: groupedByPerson[person]?.reduce((s, item) => s + item.weight_g, 0) ?? 0,
+    color: PERSON_COLORS[person],
+  })).sort((a, b) => b.value - a.value || a.label.localeCompare(b.label)), [groupedByPerson]);
+
+  const locationBreakdown = useMemo(() => LOCATIONS.map((location) => ({
+    label: location,
+    value: groupedByLocation[location]?.reduce((s, item) => s + item.weight_g, 0) ?? 0,
+    color: LOCATION_COLORS[location],
+  })).sort((a, b) => b.value - a.value || a.label.localeCompare(b.label)), [groupedByLocation]);
+
+  const personTotal = useMemo(() => personBreakdown.reduce((s, item) => s + item.value, 0), [personBreakdown]);
+  const locationTotal = useMemo(() => locationBreakdown.reduce((s, item) => s + item.value, 0), [locationBreakdown]);
 
   const filteredItems = useMemo(() => {
     return items
@@ -423,71 +462,83 @@ export default function Gold({ onOpenSettings }: { onOpenSettings: () => void })
         {/* DASHBOARD TAB */}
         {activeTab === 'dashboard' && (
           <>
-            {/* KPI row with settings button */}
-            <div style={{ marginBottom: 20 }}>
+            {/* Metrics Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
+              <BarChart3 size={20} style={{ color: 'var(--text)' }} />
+              <div style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--text)' }}>Metrics</div>
+              {loading && <Loader2 size={15} className="spin-icon" style={{ color: 'var(--muted)' }} />}
+            </div>
+
+            {/* KPI row */}
+            <div style={{ marginBottom: 14 }}>
               <div className="kpis">
-                <div className="card" style={{ padding: '10px 14px' }}>
-                  <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 2 }}>
-                    Total Gold
-                  </div>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text)' }}>
-                    {Math.round(totalGrams)}g
-                  </div>
+                <div className="kpi-card" style={{ borderLeftColor: KPI_BLUE, borderColor: KPI_BLUE }}>
+                  <div className="kpi-card-l">Total Gold</div>
+                  <div className="kpi-card-v kpi-card-v-soft" style={{ color: KPI_BLUE }}>{Math.round(totalGrams)}g</div>
                   <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
                     <Scale size={11} />
                     {totalPavan.toFixed(3)} pavan
                   </div>
                 </div>
-                <div className="card" style={{ padding: '10px 14px' }}>
-                  <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 2 }}>
-                    Estimated Value
-                  </div>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: '#F59E0B' }}>
-                    {INR(estimatedValue)}
-                  </div>
+                <div className="kpi-card" style={{ borderLeftColor: KPI_GOLD }}>
+                  <div className="kpi-card-l">Estimated Value</div>
+                  <div className="kpi-card-v kpi-card-v-soft" style={{ color: KPI_GOLD }}>{INR(estimatedValue)}</div>
                   <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
                     <TrendingUp size={11} />
                     {Math.round(personalGrams)}g @ ₹{goldRate}/g
                   </div>
                 </div>
-              </div>
-              <button
-                onClick={onOpenSettings}
-                style={{
-                  position: 'absolute',
-                  top: '10px',
-                  right: '10px',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--muted)',
-                  padding: '8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-                title="Gold settings"
-              >
-                <SettingsIcon size={18} />
-              </button>
-            </div>
-
-            {/* Breakdown by person */}
-            <div className="sec" style={{ marginBottom: 20 }}>
-              <div className="sec-h" style={{ marginBottom: 12 }}>By Person</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                {PEOPLE.map(p => (groupedByPerson[p] ? (
-                  <PersonCard key={p} person={p} items={groupedByPerson[p]} />
-                ) : null))}
+                <div className="kpi-card">
+                  <div className="kpi-card-l">Items</div>
+                  <div className="kpi-card-v kpi-card-v-soft">{totalItems}</div>
+                </div>
+                <div className="kpi-card">
+                  <div className="kpi-card-l">People</div>
+                  <div className="kpi-card-v kpi-card-v-soft">{totalPeople}</div>
+                </div>
               </div>
             </div>
 
             {/* Breakdown by location */}
-            <div className="sec">
-              <div className="sec-h" style={{ marginBottom: 12 }}>By Location</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div className="sec" style={{ margin: '10px 0 4px' }}>
+              <SectionTitle icon={MapPinned}>By Location</SectionTitle>
+              <div className="card" style={{ padding: 14 }}>
+                <RightLegendDonut
+                  items={locationBreakdown}
+                  compact
+                  showPct={false}
+                  showCenter
+                  centerLabel="TOTAL"
+                  centerValue={`${Math.round(locationTotal)}g`}
+                  valueFormatter={value => `${Math.round(value)}g`}
+                  legendPosition="bottom"
+                />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
                 {LOCATIONS.map(l => (groupedByLocation[l] ? (
                   <LocationCard key={l} location={l} items={groupedByLocation[l]} />
+                ) : null))}
+              </div>
+            </div>
+
+            {/* Breakdown by person */}
+            <div className="sec" style={{ margin: '10px 0 4px' }}>
+              <SectionTitle icon={Users}>By Person</SectionTitle>
+              <div className="card" style={{ padding: 14 }}>
+                <RightLegendDonut
+                  items={personBreakdown}
+                  compact
+                  showPct={false}
+                  showCenter
+                  centerLabel="TOTAL"
+                  centerValue={`${Math.round(personTotal)}g`}
+                  valueFormatter={value => `${Math.round(value)}g`}
+                  legendPosition="bottom"
+                />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
+                {PEOPLE.map(p => (groupedByPerson[p] ? (
+                  <PersonCard key={p} person={p} items={groupedByPerson[p]} />
                 ) : null))}
               </div>
             </div>
@@ -521,29 +572,32 @@ export default function Gold({ onOpenSettings }: { onOpenSettings: () => void })
             {/* Mobile cards */}
             {!loading && filteredItems.length > 0 && (
               <div className="txn-cards">
-                {filteredItems.map(i => (
-                  <div
-                    key={i.id}
-                    className="txn-card"
-                    style={{
-                      cursor: 'pointer',
-                      borderLeft: '4px solid #F59E0B',
-                    }}
-                    onClick={() => openEditItem(i)}
-                  >
-                    <div className="txn-card-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontWeight: 500, color: 'var(--text)' }}>{i.name}</span>
-                      <span className="mono" style={{ color: '#F59E0B', fontWeight: 700 }}>
-                        {Math.round(i.weight_g)}g
-                      </span>
+                {filteredItems.map(i => {
+                  const accent = PERSON_COLORS[i.person];
+                  return (
+                    <div
+                      key={i.id}
+                      className="txn-card"
+                      style={{
+                        cursor: 'pointer',
+                        borderLeft: `4px solid ${accent}`,
+                      }}
+                      onClick={() => openEditItem(i)}
+                    >
+                      <div className="txn-card-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 500, color: 'var(--text)' }}>{i.name}</span>
+                        <span style={{ color: accent, fontWeight: 700 }}>
+                          {Math.round(i.weight_g)}g
+                        </span>
+                      </div>
+                      <div className="txn-card-bot" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 12, color: 'var(--muted)' }}>{i.pavan.toFixed(3)} pavan</span>
+                        <span style={{ fontSize: 11, color: accent, fontWeight: 600 }}>{i.person}</span>
+                        <span style={{ fontSize: 10, color: 'var(--muted)' }}>📍 {i.location}</span>
+                      </div>
                     </div>
-                    <div className="txn-card-bot" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 12, color: 'var(--muted)' }}>{i.pavan.toFixed(3)} pavan</span>
-                      <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>{i.person}</span>
-                      <span style={{ fontSize: 10, color: 'var(--muted)' }}>📍 {i.location}</span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
@@ -567,10 +621,10 @@ export default function Gold({ onOpenSettings }: { onOpenSettings: () => void })
                       <tr key={i.id}>
                         <td style={{ color: 'var(--muted)', fontSize: 11 }}>{i.id.slice(0, 8)}</td>
                         <td>{i.name}</td>
-                        <td className="mono" style={{ fontWeight: 700 }}>
+                        <td style={{ fontWeight: 700 }}>
                           {Math.round(i.weight_g)}
                         </td>
-                        <td className="mono">
+                        <td>
                           {i.pavan.toFixed(3)}
                         </td>
                         <td>{i.person}</td>
@@ -625,7 +679,7 @@ export default function Gold({ onOpenSettings }: { onOpenSettings: () => void })
                       <div className="txn-card-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontWeight: 500, color: 'var(--text)' }}>{h.name}</span>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span className="mono" style={{ color, fontWeight: 700 }}>
+                          <span style={{ color, fontWeight: 700 }}>
                             {isIn ? '+' : '−'}{Math.round(h.weight_g)}g
                           </span>
                           <button
@@ -737,7 +791,7 @@ export default function Gold({ onOpenSettings }: { onOpenSettings: () => void })
               <div className="form-row">
                 <label className="form-lbl">Weight (g)</label>
                 <input
-                  className="form-inp mono"
+                  className="form-inp"
                   type="number"
                   min="0"
                   step="0.01"
@@ -748,7 +802,7 @@ export default function Gold({ onOpenSettings }: { onOpenSettings: () => void })
               <div className="form-row">
                 <label className="form-lbl">Pavan (auto-calculated)</label>
                 <input
-                  className="form-inp mono"
+                  className="form-inp"
                   type="number"
                   min="0"
                   step="0.001"
@@ -874,7 +928,7 @@ export default function Gold({ onOpenSettings }: { onOpenSettings: () => void })
               <div className="form-row">
                 <label className="form-lbl">Weight (g)</label>
                 <input
-                  className="form-inp mono"
+                  className="form-inp"
                   type="number"
                   min="0"
                   step="0.01"

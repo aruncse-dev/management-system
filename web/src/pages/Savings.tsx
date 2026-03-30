@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback, useMemo, memo } from 'react';
-import { Plus, X, Check, Trash2, AlertTriangle, Loader2, Search, LayoutDashboard, List, Pencil } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Plus, X, Check, Trash2, AlertTriangle, Loader2, Search, LayoutDashboard, List, Pencil, BarChart3, Wallet, type LucideIcon } from 'lucide-react';
 import { api, RawSavingsRow } from '../api';
+import { THEME_COLORS } from '../constants';
 import { INR } from '../utils';
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -33,12 +34,14 @@ interface SavingsFormState {
 const ACCOUNTS: SavingsAccount[] = ['Amma IB', 'Ramya IB', 'Arun IB', 'Amma SBI', 'Cash'];
 
 const ACCOUNT_COLORS: Record<SavingsAccount, string> = {
-  'Amma IB': '#3B82F6',
-  'Ramya IB': '#8B5CF6',
-  'Arun IB': '#10B981',
-  'Amma SBI': '#F59E0B',
-  'Cash': '#6B7280',
+  'Amma IB': THEME_COLORS[1],
+  'Ramya IB': THEME_COLORS[0],
+  'Arun IB': THEME_COLORS[2],
+  'Amma SBI': THEME_COLORS[3],
+  'Cash': THEME_COLORS[5],
 };
+
+const ACCOUNT_VALUE_COLOR = '#111827';
 
 const TYPE_FILTERS = ['All', 'Income', 'Expense', 'Transfer'] as const;
 
@@ -104,24 +107,17 @@ function computeBalances(entries: SavingsEntry[]): Record<SavingsAccount, number
 // SUB-COMPONENTS
 // ──────────────────────────────────────────────────────────────────────────────
 
-const AccountBalanceCard = memo(function AccountBalanceCard({
-  name,
-  balance,
-}: {
-  name: SavingsAccount;
-  balance: number;
-}) {
-  const balanceColor = balance > 0 ? '#10B981' : balance < 0 ? '#EF4444' : 'var(--text)';
+function SectionTitle({ icon: Icon, children }: { icon: LucideIcon; children: string }) {
   return (
-    <div className="card" style={{ padding: '12px 14px' }}>
-      <div className="lbl" style={{ marginBottom: 4 }}>{name}</div>
-      <div style={{ fontSize: 16, fontWeight: 700, color: balanceColor, marginTop: 2 }}>{INR(balance)}</div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+      <Icon size={16} style={{ color: 'var(--text)' }} />
+      <div style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--text)' }}>{children}</div>
     </div>
   );
-});
+}
 
 function TypeBadge({ type }: { type: SavingsType }) {
-  const bgColor = type === 'Income' ? '#10B981' : type === 'Expense' ? '#EF4444' : '#3B82F6';
+  const bgColor = type === 'Income' ? THEME_COLORS[0] : type === 'Expense' ? THEME_COLORS[2] : THEME_COLORS[5];
   return (
     <span style={{
       fontSize: 10,
@@ -138,93 +134,10 @@ function TypeBadge({ type }: { type: SavingsType }) {
 }
 
 function typeColor(type: SavingsType): string {
-  if (type === 'Income') return '#10B981';
-  if (type === 'Expense') return '#EF4444';
-  return '#3B82F6'; // Transfer
+  if (type === 'Income') return THEME_COLORS[0];
+  if (type === 'Expense') return THEME_COLORS[2];
+  return THEME_COLORS[5];
 }
-
-const DonutChart = memo(function DonutChart({ balances }: { balances: Record<SavingsAccount, number> }) {
-  const positiveBalances = ACCOUNTS.map(a => ({ account: a, balance: Math.max(0, balances[a]) }));
-  const total = positiveBalances.reduce((s, x) => s + x.balance, 0);
-
-  const segments = total === 0
-    ? ACCOUNTS.map(a => ({ account: a, pct: 1 / ACCOUNTS.length }))
-    : positiveBalances.map(x => ({ account: x.account, pct: x.balance / total }));
-
-  const CX = 90, CY = 90, OR = 80, IR = 50;
-
-  function polarToXY(cx: number, cy: number, r: number, angleDeg: number) {
-    const rad = (angleDeg - 90) * (Math.PI / 180);
-    return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
-  }
-
-  function describeArc(cx: number, cy: number, outerR: number, innerR: number, startDeg: number, endDeg: number): string {
-    const largeArc = endDeg - startDeg > 180 ? 1 : 0;
-    const o1 = polarToXY(cx, cy, outerR, startDeg);
-    const o2 = polarToXY(cx, cy, outerR, endDeg);
-    const i1 = polarToXY(cx, cy, innerR, endDeg);
-    const i2 = polarToXY(cx, cy, innerR, startDeg);
-    return [
-      `M ${o1.x} ${o1.y}`,
-      `A ${outerR} ${outerR} 0 ${largeArc} 1 ${o2.x} ${o2.y}`,
-      `L ${i1.x} ${i1.y}`,
-      `A ${innerR} ${innerR} 0 ${largeArc} 0 ${i2.x} ${i2.y}`,
-      'Z'
-    ].join(' ');
-  }
-
-  let cursor = 0;
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-      <svg viewBox="0 0 180 180" width={180} height={180}>
-        {segments.map(({ account, pct }) => {
-          const startDeg = cursor * 360;
-          cursor += pct;
-          const endDeg = cursor * 360;
-
-          if (pct >= 0.9999) {
-            // Full circle: use <circle> elements instead of arc
-            return (
-              <g key={account}>
-                <circle cx={CX} cy={CY} r={OR} fill={total === 0 ? '#E5E7EB' : ACCOUNT_COLORS[account]} opacity={total === 0 ? 0.4 : 1} />
-                <circle cx={CX} cy={CY} r={IR} fill="var(--bg)" />
-              </g>
-            );
-          }
-
-          const path = describeArc(CX, CY, OR, IR, startDeg, endDeg - 0.3);
-          return (
-            <path
-              key={account}
-              d={path}
-              fill={total === 0 ? '#E5E7EB' : ACCOUNT_COLORS[account]}
-              opacity={total === 0 ? 0.4 : 1}
-            />
-          );
-        })}
-        {/* Centre label */}
-        <text x={CX} y={CY - 5} textAnchor="middle" fontSize={10} fill="var(--muted)" fontWeight={600}>
-          TOTAL
-        </text>
-        <text x={CX} y={CY + 10} textAnchor="middle" fontSize={13} fill="var(--text)" fontWeight={700}>
-          {INR(Math.max(0, total))}
-        </text>
-      </svg>
-
-      {/* Legend */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px', width: '100%' }}>
-        {ACCOUNTS.map(a => (
-          <div key={a} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ width: 10, height: 10, borderRadius: 2, background: ACCOUNT_COLORS[a], flexShrink: 0 }} />
-            <span style={{ fontSize: 11, color: 'var(--muted)', flex: 1 }}>{a}</span>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>{INR(balances[a])}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-});
 
 // ──────────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
@@ -253,6 +166,14 @@ export default function Savings() {
   const totalBalance = useMemo(() => ACCOUNTS.reduce((s, a) => s + balances[a], 0), [balances]);
   const totalIncome = useMemo(() => entries.filter(e => e.type === 'Income').reduce((s, e) => s + e.amount, 0), [entries]);
   const totalExpenses = useMemo(() => entries.filter(e => e.type === 'Expense').reduce((s, e) => s + e.amount, 0), [entries]);
+  const accountSummary = useMemo(
+    () => ACCOUNTS.map(account => ({
+      account,
+      balance: balances[account],
+      color: ACCOUNT_COLORS[account],
+    })),
+    [balances],
+  );
 
   const filteredEntries = useMemo(() => {
     return entries
@@ -370,49 +291,44 @@ export default function Savings() {
         {/* DASHBOARD TAB */}
         {activeTab === 'dashboard' && (
           <>
+            {/* Metrics Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
+              <BarChart3 size={20} style={{ color: 'var(--text)' }} />
+              <div style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--text)' }}>Metrics</div>
+              {loading && <Loader2 size={15} className="spin-icon" style={{ color: 'var(--muted)' }} />}
+            </div>
+
             {/* KPI row */}
             <div className="kpis" style={{ marginBottom: 20 }}>
-              <div className="card" style={{ padding: '10px 14px' }}>
-                <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 2 }}>
-                  Total Balance
-                </div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
-                  {INR(totalBalance)}
-                </div>
+              <div className="kpi-card kpi-card--blue">
+                <div className="kpi-card-l">Total Balance</div>
+                <div className="kpi-card-v kpi-card-v-soft">{INR(totalBalance)}</div>
               </div>
-              <div className="card" style={{ padding: '10px 14px' }}>
-                <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 2 }}>
-                  Total Income
-                </div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: '#10B981' }}>
-                  {INR(totalIncome)}
-                </div>
+              <div className="kpi-card kpi-card--green" style={{ borderLeftColor: 'rgb(34, 197, 94)', borderColor: 'rgb(34, 197, 94)' }}>
+                <div className="kpi-card-l">Total Income</div>
+                <div className="kpi-card-v kpi-card-v-soft">{INR(totalIncome)}</div>
               </div>
-              <div className="card" style={{ padding: '10px 14px' }}>
-                <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 2 }}>
-                  Total Expenses
-                </div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: '#EF4444' }}>
-                  {INR(totalExpenses)}
-                </div>
+              <div className="kpi-card kpi-card--red">
+                <div className="kpi-card-l">Total Expenses</div>
+                <div className="kpi-card-v kpi-card-v-soft">{INR(totalExpenses)}</div>
               </div>
             </div>
 
             {/* Account balance cards */}
-            <div className="sec" style={{ marginBottom: 20 }}>
-              <div className="sec-h" style={{ marginBottom: 12 }}>Accounts</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                {ACCOUNTS.map(acc => (
-                  <AccountBalanceCard key={acc} name={acc} balance={balances[acc]} />
+            <div className="sec" style={{ margin: '10px 0 4px' }}>
+              <SectionTitle icon={Wallet}>Accounts</SectionTitle>
+              <div style={{ display: 'grid', gap: 8 }}>
+                {accountSummary.map(({ account, balance, color }) => (
+                  <div key={account} className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 12px', borderLeft: `4px solid ${color}` }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{account}</div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>Simple balance summary</div>
+                    </div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: ACCOUNT_VALUE_COLOR, whiteSpace: 'nowrap' }}>
+                      {INR(balance)}
+                    </div>
+                  </div>
                 ))}
-              </div>
-            </div>
-
-            {/* Donut chart */}
-            <div className="sec">
-              <div className="sec-h" style={{ marginBottom: 12 }}>Balance Distribution</div>
-              <div className="card" style={{ padding: 16 }}>
-                <DonutChart balances={balances} />
               </div>
             </div>
           </>
@@ -464,7 +380,7 @@ export default function Savings() {
                   >
                     <div className="txn-card-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontWeight: 500, color: 'var(--text)' }}>{e.desc || e.account}</span>
-                      <span className="mono" style={{ color: typeColor(e.type), fontWeight: 700 }}>
+                      <span style={{ color: typeColor(e.type), fontWeight: 700 }}>
                         {e.type === 'Income' ? '+' : '−'}{INR(e.amount)}
                       </span>
                     </div>
@@ -504,7 +420,7 @@ export default function Savings() {
                           <td>
                             <span style={{ color: ACCOUNT_COLORS[e.account], fontWeight: 500 }}>{e.account}</span>
                           </td>
-                          <td className="mono" style={{ color: typeColor(e.type), fontWeight: 700 }}>
+                          <td style={{ color: typeColor(e.type), fontWeight: 700 }}>
                             {INR(e.amount)}
                           </td>
                           <td>{e.desc}</td>
@@ -531,7 +447,7 @@ export default function Savings() {
 
         {/* Error message */}
         {error && (
-          <p style={{ color: '#EF4444', fontSize: 13, padding: '12px 10px', marginTop: 12 }}>
+          <p style={{ color: THEME_COLORS[5], fontSize: 13, padding: '12px 10px', marginTop: 12 }}>
             ⚠ {error}
           </p>
         )}
@@ -599,7 +515,7 @@ export default function Savings() {
               <div className="form-row">
                 <label className="form-lbl">Amount (₹)</label>
                 <input
-                  className="form-inp mono"
+                  className="form-inp"
                   type="number"
                   min="0"
                   step="1"

@@ -164,7 +164,7 @@ export default function AIPanel({ open, onClose, onSaved }: Props) {
           const rowsHtml = filtered.map(r =>
             `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(0,0,0,.07);font-size:12px">` +
             `<span>${r.date} · ${r.desc}</span>` +
-            `<span style="font-weight:700;font-family:monospace;margin-left:8px">${INR(r.a)}</span></div>`
+            `<span style="font-weight:700;margin-left:8px">${INR(r.a)}</span></div>`
           ).join('')
           const total = filtered.reduce((s, r) => s + r.a, 0)
           setMsgs(m => [...m, { role: 'a', text:

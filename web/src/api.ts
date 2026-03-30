@@ -7,6 +7,7 @@ type ApiResponse<T> = { ok: true; data: T; traceId?: string; debug?: Record<stri
 const BASE = API_URL;
 const TOKEN = import.meta.env.VITE_API_TOKEN as string | undefined;
 const DEBUG = import.meta.env.VITE_DEBUG === 'true';
+const GET_CACHE = new Map<string, unknown>();
 
 function generateTraceId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -34,7 +35,29 @@ async function parseResponse<T>(res: Response): Promise<T> {
   return json.data;
 }
 
-async function get<T>(action: string, params: Record<string, string> = {}): Promise<T> {
+function makeCacheKey(action: string, params: Record<string, string>) {
+  const query = Object.keys(params)
+    .sort()
+    .map((key) => `${key}=${params[key]}`)
+    .join('&');
+  return `${BASE}|${action}|${TOKEN ?? ''}|${query}`;
+}
+
+function invalidateCache() {
+  GET_CACHE.clear();
+}
+
+async function get<T>(
+  action: string,
+  params: Record<string, string> = {},
+  options: { cache?: boolean } = {}
+): Promise<T> {
+  const shouldCache = options.cache !== false;
+  const cacheKey = makeCacheKey(action, params);
+  if (shouldCache && GET_CACHE.has(cacheKey)) {
+    return GET_CACHE.get(cacheKey) as T;
+  }
+
   const url = new URL(BASE, window.location.origin);
   const traceId = generateTraceId();
   url.searchParams.set('action', action);
@@ -43,7 +66,11 @@ async function get<T>(action: string, params: Record<string, string> = {}): Prom
   if (TOKEN) url.searchParams.set('token', TOKEN);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   const res = await fetch(url.toString(), { redirect: 'follow' });
-  return parseResponse<T>(res);
+  const data = await parseResponse<T>(res);
+  if (shouldCache) {
+    GET_CACHE.set(cacheKey, data);
+  }
+  return data;
 }
 
 async function post<T>(body: Record<string, unknown>): Promise<T> {
@@ -62,7 +89,9 @@ async function post<T>(body: Record<string, unknown>): Promise<T> {
     body: JSON.stringify(payload),
     redirect: 'follow',
   });
-  return parseResponse<T>(res);
+  const data = await parseResponse<T>(res);
+  invalidateCache();
+  return data;
 }
 
 export interface InitData {
@@ -178,6 +207,7 @@ export interface RawHolding {
 }
 
 export const api = {
+  invalidateCache,
   init:          ()                              => get<InitData>('init'),
   getData:       (month: string, year: string)  => get<Transaction[]>('getData', { month, year }),
   addRow:        (p: Record<string, unknown>)   => post<string>({ action: 'addRow', ...p }),
@@ -224,9 +254,10 @@ export const api = {
   deleteCashLoanHistory: (id: string)                 => post<boolean>({ module: 'loans', action: 'deleteHistory', type: 'cash', id }),
   getSettings:   ()                            => get<GoldSettings>('get', { module: 'settings' }),
   saveSettings:  (p: Record<string, unknown>) => post<boolean>({ module: 'settings', action: 'save', ...p }),
-  getTokenStatus: ()                           => get<{ hasToken: boolean }>('getTokenStatus', { module: 'stocks' }),
-  getUpstoxAuthUrl: ()                         => get<{ authUrl: string }>('getAuthUrl', { module: 'stocks' }),
+  getTokenStatus: ()                           => get<{ hasToken: boolean; tokenType?: string; hasAccessToken?: boolean; hasExtendedToken?: boolean; hasRefreshToken?: boolean }>('getTokenStatus', { module: 'stocks' }, { cache: false }),
+  getUpstoxAuthUrl: ()                         => get<{ authUrl: string }>('getAuthUrl', { module: 'stocks' }, { cache: false }),
   setUpstoxToken: (token: string)              => post<boolean>({ module: 'stocks', action: 'setToken', token }),
+  clearUpstoxAuth: ()                          => post<boolean>({ module: 'stocks', action: 'resetAuth' }),
   getStocks:      ()                           => get<RawHolding[]>('getHoldings', { module: 'stocks' }),
   syncStocks:     ()                           => post<{ count: number }>({ module: 'stocks', action: 'sync' }),
   getMutualFunds: ()                           => get<RawHolding[]>('getHoldings', { module: 'mutualfunds' }),

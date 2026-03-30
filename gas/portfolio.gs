@@ -1,6 +1,6 @@
 /**
  * Portfolio sync for Stocks & Mutual Funds via Upstox API
- * Static token mode — no OAuth, user provides access token directly
+ * OAuth mode — GAS handles the callback and stores tokens in Script Properties
  */
 
 const UPSTOX_API_BASE = 'https://api.upstox.com/v2';
@@ -8,17 +8,13 @@ const UPSTOX_API_BASE = 'https://api.upstox.com/v2';
 // ===== TEST FUNCTION — Run this in Apps Script editor to verify token =====
 function testUpstoxToken() {
   try {
-    const token = PropertiesService.getScriptProperties().getProperty('UPSTOX_ACCESS_TOKEN');
+    const token = _upstox_getToken();
 
     Logger.log('=== UPSTOX TOKEN TEST ===');
+    Logger.log('Token type: ' + _upstox_getTokenType());
     Logger.log('Token exists: ' + !!token);
     Logger.log('Token length: ' + (token ? token.length : 'N/A'));
     Logger.log('Token (first 50 chars): ' + (token ? token.substring(0, 50) : 'NO TOKEN'));
-
-    if (!token) {
-      Logger.log('ERROR: No token found in Script Properties');
-      return;
-    }
 
     // Test API call
     const url = UPSTOX_API_BASE + '/portfolio/long-term-holdings';
@@ -71,6 +67,8 @@ function _portfolioHandlePost(module, action, body) {
     return _portfolio_sync(module);
   } else if (action === 'setToken') {
     return _portfolio_setToken(body.token);
+  } else if (action === 'resetAuth') {
+    return clearUpstoxTokens();
   }
   throw new Error(`Unknown action: ${action}`);
 }
@@ -81,6 +79,25 @@ function setUpstoxCredentials(clientId, clientSecret) {
   PropertiesService.getScriptProperties().setProperty('UPSTOX_CLIENT_ID', clientId);
   PropertiesService.getScriptProperties().setProperty('UPSTOX_CLIENT_SECRET', clientSecret);
   return 'Upstox OAuth credentials set';
+}
+
+function _upstox_storeTokenResult(result) {
+  const props = PropertiesService.getScriptProperties();
+  if (result.access_token) {
+    props.setProperty('UPSTOX_ACCESS_TOKEN', String(result.access_token).trim());
+  }
+  if (result.extended_token) {
+    props.setProperty('UPSTOX_EXTENDED_TOKEN', String(result.extended_token).trim());
+  }
+  if (result.refresh_token) {
+    props.setProperty('UPSTOX_REFRESH_TOKEN', String(result.refresh_token).trim());
+  }
+  if (result.access_token_expiry) {
+    props.setProperty('UPSTOX_ACCESS_TOKEN_EXPIRY', String(result.access_token_expiry));
+  }
+  if (result.extended_token_expiry) {
+    props.setProperty('UPSTOX_EXTENDED_TOKEN_EXPIRY', String(result.extended_token_expiry));
+  }
 }
 
 function _upstox_getAuthUrl() {
@@ -130,7 +147,7 @@ function _upstox_exchangeCode(code) {
 
   const result = JSON.parse(responseText);
   if (result.access_token) {
-    props.setProperty('UPSTOX_ACCESS_TOKEN', result.access_token);
+    _upstox_storeTokenResult(result);
     Logger.log('Upstox token stored successfully');
     _ensureDailySyncTrigger();
     return true;
@@ -168,15 +185,34 @@ function portfolioSyncStocks() {
 }
 
 function _upstox_getToken() {
-  // Try both Script Properties and User Properties (fallback)
-  let token = PropertiesService.getScriptProperties().getProperty('UPSTOX_ACCESS_TOKEN');
-  if (!token) {
-    token = PropertiesService.getUserProperties().getProperty('UPSTOX_ACCESS_TOKEN');
-  }
+  const props = PropertiesService.getScriptProperties();
+  let token = props.getProperty('UPSTOX_ACCESS_TOKEN');
+  if (!token) token = props.getProperty('UPSTOX_EXTENDED_TOKEN');
+  if (!token) token = props.getProperty('UPSTOX_REFRESH_TOKEN');
   if (!token) {
     throw new Error('TOKEN_NOT_SET');
   }
   return token;
+}
+
+function _upstox_getTokenType() {
+  const props = PropertiesService.getScriptProperties();
+  if (props.getProperty('UPSTOX_ACCESS_TOKEN')) return 'access';
+  if (props.getProperty('UPSTOX_EXTENDED_TOKEN')) return 'extended';
+  if (props.getProperty('UPSTOX_REFRESH_TOKEN')) return 'refresh';
+  return 'none';
+}
+
+function clearUpstoxTokens() {
+  const props = PropertiesService.getScriptProperties();
+  [
+    'UPSTOX_ACCESS_TOKEN',
+    'UPSTOX_EXTENDED_TOKEN',
+    'UPSTOX_REFRESH_TOKEN',
+    'UPSTOX_ACCESS_TOKEN_EXPIRY',
+    'UPSTOX_EXTENDED_TOKEN_EXPIRY',
+  ].forEach(key => props.deleteProperty(key));
+  return 'Upstox tokens cleared';
 }
 
 // ===== API calls =====
@@ -288,9 +324,25 @@ function _portfolio_ensureSheet(sheetName) {
 function _portfolio_writeHoldings(sheetName, rows) {
   const sheet = _portfolio_ensureSheet(sheetName);
 
-  // STRICT: NEVER delete existing data. Only update existing synced rows or append new ones.
   const lastRow = sheet.getLastRow();
   Logger.log('_portfolio_writeHoldings: sheet=' + sheetName + ', lastRow=' + lastRow + ', new rows=' + rows.length);
+
+  // Stocks should always be a fresh snapshot so sync never duplicates rows.
+  if (sheetName === 'Stocks') {
+    if (rows.length === 0) {
+      Logger.log('_portfolio_writeHoldings: empty Stocks response, preserving existing rows');
+      return 0;
+    }
+
+    if (lastRow > 1) {
+      sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).clearContent();
+      Logger.log('_portfolio_writeHoldings: cleared previous Stocks rows');
+    }
+
+    sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
+    Logger.log('_portfolio_writeHoldings: wrote fresh Stocks snapshot with ' + rows.length + ' row(s)');
+    return rows.length;
+  }
 
   if (rows.length === 0) {
     Logger.log('_portfolio_writeHoldings: no new rows to write, preserving existing data');
@@ -404,19 +456,26 @@ function _portfolio_sync(module) {
 }
 
 function _portfolio_getTokenStatus() {
-  // Check both Script Properties and User Properties
-  let token = PropertiesService.getScriptProperties().getProperty('UPSTOX_ACCESS_TOKEN');
-  if (!token) {
-    token = PropertiesService.getUserProperties().getProperty('UPSTOX_ACCESS_TOKEN');
-  }
-  return { hasToken: !!token };
+  const props = PropertiesService.getScriptProperties();
+  const accessToken = props.getProperty('UPSTOX_ACCESS_TOKEN');
+  const extendedToken = props.getProperty('UPSTOX_EXTENDED_TOKEN');
+  const refreshToken = props.getProperty('UPSTOX_REFRESH_TOKEN');
+  return {
+    hasToken: !!(extendedToken || accessToken || refreshToken),
+    hasAccessToken: !!accessToken,
+    hasExtendedToken: !!extendedToken,
+    hasRefreshToken: !!refreshToken,
+    tokenType: _upstox_getTokenType(),
+  };
 }
 
 function _portfolio_setToken(token) {
   if (!token || !String(token).trim()) {
     throw new Error('Token cannot be empty');
   }
-  // Store in Script Properties for consistency with existing deployment pattern
-  PropertiesService.getScriptProperties().setProperty('UPSTOX_ACCESS_TOKEN', String(token).trim());
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty('UPSTOX_ACCESS_TOKEN', String(token).trim());
+  props.deleteProperty('UPSTOX_EXTENDED_TOKEN');
+  props.deleteProperty('UPSTOX_REFRESH_TOKEN');
   return true;
 }

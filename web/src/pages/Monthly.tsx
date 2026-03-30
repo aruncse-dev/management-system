@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
+import { ChevronLeft, ChevronRight, RefreshCw, Package, X as XIcon, Check } from 'lucide-react'
 import { useStore } from '../store'
 import { api } from '../api'
 import BottomNav from '../components/BottomNav'
@@ -9,6 +9,7 @@ import Budget from './Budget'
 import Credits from './Credits'
 import Accounts from './Accounts'
 import TransactionModal from '../components/TransactionModal'
+import { CATEGORIES } from '../constants'
 import { MNS } from '../constants'
 
 type TabId = 'dash' | 'txns' | 'bud' | 'cc' | 'acct'
@@ -26,6 +27,10 @@ export default function Monthly() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editRow, setEditRow] = useState<typeof state.rows[0] | null>(null)
   const [status, setStatus] = useState('')
+  const [budgetAddOpen, setBudgetAddOpen] = useState(false)
+  const [budgetCat, setBudgetCat] = useState<string>(CATEGORIES[0])
+  const [budgetVal, setBudgetVal] = useState('')
+  const [budgetSaving, setBudgetSaving] = useState(false)
 
   const showStatus = useCallback((msg: string) => {
     setStatus(msg)
@@ -71,6 +76,26 @@ export default function Monthly() {
     await loadMonth(newMonth, String(newYear))
   }, [state.month, state.year, dispatch, loadMonth])
 
+  const addBudget = useCallback(async () => {
+    const val = parseFloat(budgetVal)
+    if (!budgetCat || isNaN(val) || val <= 0) {
+      showStatus('⚠ Enter category and amount')
+      return
+    }
+    setBudgetSaving(true)
+    try {
+      await api.updateBudgetEntry(budgetCat, val)
+      dispatch({ type: 'SET_BUDGET', payload: { ...state.budget, [budgetCat]: val } })
+      showStatus('✓ Budget saved')
+      setBudgetAddOpen(false)
+      setBudgetVal('')
+    } catch (e) {
+      showStatus('⚠ ' + (e instanceof Error ? e.message : 'Save failed'))
+    } finally {
+      setBudgetSaving(false)
+    }
+  }, [budgetCat, budgetVal, dispatch, showStatus, state.budget])
+
   return (
     <div className="monthly-wrap">
       {/* Month nav sub-header */}
@@ -99,12 +124,51 @@ export default function Monthly() {
         {tab === 'acct' && <Accounts showStatus={showStatus} />}
       </main>
 
-      {/* FAB — Add transaction */}
+      {/* FAB */}
       <button
-        onClick={() => { setEditRow(null); setModalOpen(true) }}
+        onClick={() => {
+          if (tab === 'bud') {
+            setBudgetAddOpen(true)
+            return
+          }
+          setEditRow(null)
+          setModalOpen(true)
+        }}
         style={{ position:'fixed', bottom:24, right:20, width:52, height:52, borderRadius:'50%', background:'var(--navy-dark)', color:'#fff', fontSize:24, border:'none', boxShadow:'0 4px 16px rgba(0,0,0,.2)', cursor:'pointer', zIndex:100, display:'flex', alignItems:'center', justifyContent:'center' }}
-        title="Add transaction"
+        title={tab === 'bud' ? 'Add budget' : 'Add transaction'}
       >+</button>
+
+      {budgetAddOpen && (
+        <div className="modal-bg open" onClick={() => setBudgetAddOpen(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-hd">
+              <span className="modal-title" style={{display:'flex',alignItems:'center',gap:6}}>
+                <Package size={15} /> Add Budget
+              </span>
+              <button className="modal-close" onClick={() => setBudgetAddOpen(false)}><XIcon size={16} /></button>
+            </div>
+            <div className="modal-body">
+              <div>
+                <div style={{fontSize:12,fontWeight:600,color:'var(--muted)',marginBottom:5,textTransform:'uppercase',letterSpacing:.4}}>Category</div>
+                <select className="form-sel" value={budgetCat} onChange={e => setBudgetCat(e.target.value)}>
+                  {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <div style={{fontSize:12,fontWeight:600,color:'var(--muted)',marginBottom:5,textTransform:'uppercase',letterSpacing:.4}}>Budget Amount (₹)</div>
+                <input className="form-inp" type="number" placeholder="0" value={budgetVal} onChange={e => setBudgetVal(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addBudget() }} autoFocus />
+              </div>
+            </div>
+            <div className="modal-foot">
+              <div className="modal-foot-l" />
+              <button className="btn btn-sm" style={{background:'var(--border)',color:'var(--text)'}} onClick={() => setBudgetAddOpen(false)}><XIcon size={13} />Cancel</button>
+              <button className="btn btn-sm btn-green" onClick={addBudget} disabled={budgetSaving}>
+                <Check size={13} />{budgetSaving ? '…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {modalOpen && (
         <TransactionModal
