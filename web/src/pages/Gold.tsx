@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
-import { Plus, X, Check, Trash2, AlertTriangle, Loader2, Search, Pencil, LayoutDashboard, List, TrendingUp, Scale, Clock, BarChart3, Users, MapPinned, type LucideIcon } from 'lucide-react';
+import { Plus, Loader2, Pencil, LayoutDashboard, List, Clock, BarChart3, Shield, Gem, Package, Users, Home, Building2, Lock, ArrowDownRight, ArrowUpRight } from 'lucide-react';
 import { api, RawGoldRow, RawGoldHistoryRow } from '../api';
 import { INR } from '../utils';
 import { THEME_COLORS } from '../constants';
 import { RightLegendDonut } from '../components/RightLegendDonut';
+import { FormField, HoldingCard, KpiCard, ListStack, ModalActions, ModalShell, SearchField, SectionBlock, Spacer, TabBar } from '../ui-kit';
+import '../ui-kit/ui-kit.css';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // TYPES & CONSTANTS
@@ -48,8 +50,6 @@ interface GoldHistoryFormState {
 const PEOPLE = ['Ramya', 'Arun', 'Nithran', 'Dhuruvan', 'Amma'];
 const LOCATIONS = ['Home', 'Bank', 'Locker'];
 const PAVAN_CONVERSION = 1 / 8; // 1 pavan = 8 grams
-const KPI_BLUE = 'var(--navy-dark)';
-const KPI_GOLD = '#FCAF38';
 const KPI_VALUE_COLOR = '#111827';
 const PERSON_COLORS: Record<string, string> = Object.fromEntries(
   PEOPLE.map((person, index) => [person, THEME_COLORS[index]])
@@ -57,6 +57,16 @@ const PERSON_COLORS: Record<string, string> = Object.fromEntries(
 const LOCATION_COLORS: Record<string, string> = Object.fromEntries(
   LOCATIONS.map((location, index) => [location, THEME_COLORS[PEOPLE.length + index]])
 ) as Record<string, string>;
+const LOCATION_ICONS: Record<string, React.ReactNode> = {
+  Home: <Home size={12} />,
+  Bank: <Building2 size={12} />,
+  Locker: <Lock size={12} />,
+};
+const GOLD_TABS: Array<{ id: GoldTab; label: string; icon: React.ReactNode }> = [
+  { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={19} /> },
+  { id: 'items', label: 'Items', icon: <List size={19} /> },
+  { id: 'history', label: 'History', icon: <Clock size={19} /> },
+];
 
 function emptyForm(): GoldFormState {
   return {
@@ -142,7 +152,10 @@ const PersonCard = memo(function PersonCard({
   const accent = PERSON_COLORS[person];
   return (
     <div className="kpi-card" style={{ borderLeftColor: accent }}>
-      <div className="kpi-card-l">{person}</div>
+      <div className="kpi-card-l" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <Users size={12} />
+        <span>{person}</span>
+      </div>
       <div className="kpi-card-v kpi-card-v-soft" style={{ color: KPI_VALUE_COLOR }}>
         {Math.round(totalGrams)}g
       </div>
@@ -165,7 +178,10 @@ const LocationCard = memo(function LocationCard({
   const accent = LOCATION_COLORS[location];
   return (
     <div className="kpi-card" style={{ borderLeftColor: accent }}>
-      <div className="kpi-card-l">{location}</div>
+      <div className="kpi-card-l" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        {LOCATION_ICONS[location] ?? <Home size={12} />}
+        <span>{location}</span>
+      </div>
       <div className="kpi-card-v kpi-card-v-soft" style={{ color: KPI_VALUE_COLOR }}>
         {Math.round(totalGrams)}g
       </div>
@@ -176,14 +192,63 @@ const LocationCard = memo(function LocationCard({
   );
 });
 
-function SectionTitle({ icon: Icon, children }: { icon: LucideIcon; children: string }) {
+const ItemCard = memo(function ItemCard({
+  item,
+  onClick,
+}: {
+  item: GoldItem;
+  onClick: () => void;
+}) {
+  const accentTone = item.location === 'Bank' ? 'red' : item.location === 'Locker' ? 'green' : 'navy';
+  const icon = LOCATION_ICONS[item.location] ?? <Home size={12} />;
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-      <Icon size={16} style={{ color: 'var(--text)' }} />
-      <div style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--text)' }}>{children}</div>
-    </div>
+    <HoldingCard
+      title={item.name}
+      subtitle={item.person}
+      leftLabel="Weight"
+      leftValue={`${Math.round(item.weight_g)}g`}
+      centerLabel="Location"
+      centerValue={item.location}
+      rightLabel="Pavan"
+      rightValue={item.pavan.toFixed(2)}
+      accentTone={accentTone}
+      icon={icon}
+      iconPosition="right"
+      iconBackground
+      onClick={onClick}
+      className="lending-entry-card"
+    />
   );
-}
+});
+
+const HistoryCard = memo(function HistoryCard({
+  item,
+  onClick,
+}: {
+  item: GoldHistoryItem;
+  onClick: () => void;
+}) {
+  const isIn = item.type === 'IN';
+  const icon = isIn ? <ArrowDownRight size={14} /> : <ArrowUpRight size={14} />;
+  return (
+    <HoldingCard
+      title={item.name}
+      subtitle={item.note}
+      leftLabel="Weight"
+      leftValue={`${isIn ? '+' : '−'}${Math.round(item.weight_g)}g`}
+      centerLabel="Type"
+      centerValue={item.type}
+      rightLabel="Date"
+      rightValue={item.date}
+      accentTone={isIn ? 'green' : 'red'}
+      icon={icon}
+      iconPosition="right"
+      iconBackground
+      onClick={onClick}
+      className="lending-entry-card"
+    />
+  );
+});
 
 // ──────────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
@@ -202,20 +267,21 @@ export default function Gold() {
 
   // Items filter
   const [itemsSearch, setItemsSearch] = useState('');
+  const [historySearch, setHistorySearch] = useState('');
 
   // Items modal
   const [itemsModalOpen, setItemsModalOpen] = useState(false);
   const [editItem, setEditItem] = useState<GoldItem | null>(null);
   const [form, setForm] = useState<GoldFormState>(emptyForm());
-  const [saving, setSaving] = useState(false);
-  const [delConfirm, setDelConfirm] = useState(false);
+  const [savingItem, setSavingItem] = useState(false);
+  const [deletingItem, setDeletingItem] = useState(false);
 
   // History modal
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [historyForm, setHistoryForm] = useState<GoldHistoryFormState>(emptyHistoryForm());
-  const [historySaving, setHistorySaving] = useState(false);
   const [editHistory, setEditHistory] = useState<GoldHistoryItem | null>(null);
-  const [historyDelConfirm, setHistoryDelConfirm] = useState(false);
+  const [savingHistory, setSavingHistory] = useState(false);
+  const [deletingHistory, setDeletingHistory] = useState(false);
 
   // Derivations
   const totalItems = items.length;
@@ -275,6 +341,17 @@ export default function Gold() {
       .sort((a, b) => b.weight_g - a.weight_g);
   }, [items, itemsSearch]);
 
+  const filteredHistory = useMemo(() => {
+    return history
+      .filter(h => {
+        const q = historySearch.toLowerCase();
+        return !q || h.name.toLowerCase().includes(q)
+          || h.type.toLowerCase().includes(q)
+          || h.note?.toLowerCase().includes(q);
+      })
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [history, historySearch]);
+
   // Load all data
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -309,8 +386,23 @@ export default function Gold() {
       person: i.person,
       location: i.location,
     });
-    setDelConfirm(false);
     setItemsModalOpen(true);
+  }
+
+  function openAddItem() {
+    setEditItem(null);
+    setForm(emptyForm());
+    setSavingItem(false);
+    setDeletingItem(false);
+    setItemsModalOpen(true);
+  }
+
+  function closeItemModal() {
+    setItemsModalOpen(false);
+    setEditItem(null);
+    setForm(emptyForm());
+    setSavingItem(false);
+    setDeletingItem(false);
   }
 
   function setField<K extends keyof GoldFormState>(k: K, v: GoldFormState[K]) {
@@ -327,7 +419,9 @@ export default function Gold() {
 
   async function saveItem() {
     if (!form.name.trim() || !form.weight_g) return;
-    setSaving(true);
+    if (savingItem || deletingItem) return;
+    setSavingItem(true);
+    setError('');
     const payload = {
       name: form.name.trim(),
       weight_g: parseFloat(form.weight_g),
@@ -341,33 +435,28 @@ export default function Gold() {
       } else {
         await api.addGold(payload);
       }
-      setItemsModalOpen(false);
-      setEditItem(null);
-      setForm(emptyForm());
-      setDelConfirm(false);
+      closeItemModal();
       await loadData();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed');
     } finally {
-      setSaving(false);
+      setSavingItem(false);
     }
   }
 
   async function deleteItem() {
-    if (!delConfirm) {
-      setDelConfirm(true);
-      return;
-    }
     if (!editItem) return;
-    setSaving(true);
+    if (savingItem || deletingItem) return;
+    setDeletingItem(true);
+    setError('');
     try {
       await api.deleteGold(editItem.id);
-      setItemsModalOpen(false);
+      closeItemModal();
       await loadData();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Delete failed');
     } finally {
-      setSaving(false);
+      setDeletingItem(false);
     }
   }
 
@@ -376,9 +465,19 @@ export default function Gold() {
     setHistoryForm(f => ({ ...f, [k]: v }));
   }
 
+  function closeHistoryModal() {
+    setHistoryModalOpen(false);
+    setEditHistory(null);
+    setHistoryForm(emptyHistoryForm());
+    setSavingHistory(false);
+    setDeletingHistory(false);
+  }
+
   async function saveHistory() {
     if (!historyForm.name.trim() || !historyForm.weight_g) return;
-    setHistorySaving(true);
+    if (savingHistory || deletingHistory) return;
+    setSavingHistory(true);
+    setError('');
     const payload = {
       date: historyForm.date,
       type: historyForm.type,
@@ -392,15 +491,12 @@ export default function Gold() {
       } else {
         await api.addGoldHistory(payload);
       }
-      setHistoryModalOpen(false);
-      setEditHistory(null);
-      setHistoryForm(emptyHistoryForm());
-      setHistoryDelConfirm(false);
+      closeHistoryModal();
       await loadData();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed');
     } finally {
-      setHistorySaving(false);
+      setSavingHistory(false);
     }
   }
 
@@ -413,25 +509,30 @@ export default function Gold() {
       weight_g: String(h.weight_g),
       note: h.note || '',
     });
-    setHistoryDelConfirm(false);
+    setHistoryModalOpen(true);
+  }
+
+  function openAddHistory() {
+    setEditHistory(null);
+    setHistoryForm(emptyHistoryForm());
+    setSavingHistory(false);
+    setDeletingHistory(false);
     setHistoryModalOpen(true);
   }
 
   async function deleteHistory() {
-    if (!historyDelConfirm) {
-      setHistoryDelConfirm(true);
-      return;
-    }
     if (!editHistory) return;
-    setHistorySaving(true);
+    if (savingHistory || deletingHistory) return;
+    setDeletingHistory(true);
+    setError('');
     try {
       await api.deleteGoldHistory(editHistory.id);
-      setHistoryModalOpen(false);
+      closeHistoryModal();
       await loadData();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Delete failed');
     } finally {
-      setHistorySaving(false);
+      setDeletingHistory(false);
     }
   }
 
@@ -440,69 +541,32 @@ export default function Gold() {
   // ────────────────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ paddingBottom: 80 }}>
+    <div className="ui-kit-page-shell">
       {/* Tab bar */}
-      <nav className="tab-bar">
-        <button className={`tab-item${activeTab === 'dashboard' ? ' active' : ''}`} onClick={() => setActiveTab('dashboard')}>
-          <span className="tab-icon"><LayoutDashboard size={19} /></span>
-          <span>Dashboard</span>
-        </button>
-        <button className={`tab-item${activeTab === 'items' ? ' active' : ''}`} onClick={() => setActiveTab('items')}>
-          <span className="tab-icon"><List size={19} /></span>
-          <span>Items</span>
-        </button>
-        <button className={`tab-item${activeTab === 'history' ? ' active' : ''}`} onClick={() => setActiveTab('history')}>
-          <span className="tab-icon"><Clock size={19} /></span>
-          <span>History</span>
-        </button>
-      </nav>
+      <TabBar tabs={GOLD_TABS} active={activeTab} onChange={id => setActiveTab(id as GoldTab)} />
 
-      <div className="pg">
+      <div className="pg ui-kit-page-stack ui-kit-page-stack--tight" style={{ padding: 0 }}>
+        <Spacer size={8} />
 
         {/* DASHBOARD TAB */}
         {activeTab === 'dashboard' && (
           <>
-            {/* Metrics Header */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
-              <BarChart3 size={20} style={{ color: 'var(--text)' }} />
-              <div style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--text)' }}>Metrics</div>
-              {loading && <Loader2 size={15} className="spin-icon" style={{ color: 'var(--muted)' }} />}
-            </div>
-
-            {/* KPI row */}
-            <div style={{ marginBottom: 14 }}>
-              <div className="kpis">
-                <div className="kpi-card" style={{ borderLeftColor: KPI_BLUE, borderColor: KPI_BLUE }}>
-                  <div className="kpi-card-l">Total Gold</div>
-                  <div className="kpi-card-v kpi-card-v-soft" style={{ color: KPI_BLUE }}>{Math.round(totalGrams)}g</div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <Scale size={11} />
-                    {totalPavan.toFixed(3)} pavan
-                  </div>
-                </div>
-                <div className="kpi-card" style={{ borderLeftColor: KPI_GOLD }}>
-                  <div className="kpi-card-l">Estimated Value</div>
-                  <div className="kpi-card-v kpi-card-v-soft" style={{ color: KPI_GOLD }}>{INR(estimatedValue)}</div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <TrendingUp size={11} />
-                    {Math.round(personalGrams)}g @ ₹{goldRate}/g
-                  </div>
-                </div>
-                <div className="kpi-card">
-                  <div className="kpi-card-l">Items</div>
-                  <div className="kpi-card-v kpi-card-v-soft">{totalItems}</div>
-                </div>
-                <div className="kpi-card">
-                  <div className="kpi-card-l">People</div>
-                  <div className="kpi-card-v kpi-card-v-soft">{totalPeople}</div>
-                </div>
+            <SectionBlock
+              title="Metrics"
+              icon={<BarChart3 size={14} />}
+              right={loading ? <Loader2 size={15} className="spin-icon" style={{ color: 'var(--muted)' }} /> : null}
+            >
+              <div className="dash-grid">
+                <KpiCard label="Total Gold" value={`${Math.round(totalGrams)}g`} tone="navy" icon={<Gem size={14} />} subtitle={`${Math.round(totalPavan)} pavan`} />
+                <KpiCard label="Estimated Value" value={INR(estimatedValue)} tone="amber" icon={<Shield size={14} />} subtitle={`${Math.round(personalGrams)}g @ ₹${goldRate}/g`} />
+                <KpiCard label="Items" value={totalItems} tone="muted" icon={<Package size={14} />} subtitle="Tracked pieces" />
+                <KpiCard label="People" value={totalPeople} tone="muted" icon={<Users size={14} />} subtitle="Ownership groups" />
               </div>
-            </div>
+            </SectionBlock>
 
-            {/* Breakdown by location */}
-            <div className="sec" style={{ margin: '10px 0 4px' }}>
-              <SectionTitle icon={MapPinned}>By Location</SectionTitle>
-              <div className="card" style={{ padding: 14 }}>
+            <Spacer size={8} />
+            <SectionBlock title="By Location" icon={<BarChart3 size={14} />}>
+              <div className="ui-kit-card" style={{ padding: 12 }}>
                 <RightLegendDonut
                   items={locationBreakdown}
                   compact
@@ -511,20 +575,19 @@ export default function Gold() {
                   centerLabel="TOTAL"
                   centerValue={`${Math.round(locationTotal)}g`}
                   valueFormatter={value => `${Math.round(value)}g`}
-                  legendPosition="bottom"
+                  showLegend={false}
                 />
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 8 }}>
                 {LOCATIONS.map(l => (groupedByLocation[l] ? (
                   <LocationCard key={l} location={l} items={groupedByLocation[l]} />
                 ) : null))}
               </div>
-            </div>
+            </SectionBlock>
 
-            {/* Breakdown by person */}
-            <div className="sec" style={{ margin: '10px 0 4px' }}>
-              <SectionTitle icon={Users}>By Person</SectionTitle>
-              <div className="card" style={{ padding: 14 }}>
+            <Spacer size={8} />
+            <SectionBlock title="By Person" icon={<BarChart3 size={14} />}>
+              <div className="ui-kit-card" style={{ padding: 12 }}>
                 <RightLegendDonut
                   items={personBreakdown}
                   compact
@@ -533,30 +596,30 @@ export default function Gold() {
                   centerLabel="TOTAL"
                   centerValue={`${Math.round(personTotal)}g`}
                   valueFormatter={value => `${Math.round(value)}g`}
-                  legendPosition="bottom"
+                  showLegend={false}
                 />
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 8 }}>
                 {PEOPLE.map(p => (groupedByPerson[p] ? (
                   <PersonCard key={p} person={p} items={groupedByPerson[p]} />
                 ) : null))}
               </div>
-            </div>
+            </SectionBlock>
           </>
         )}
 
         {/* ITEMS TAB */}
         {activeTab === 'items' && (
           <>
-            {/* Search bar */}
-            <div style={{position:'relative',marginBottom:16}}>
-              <input className="form-inp" type="text" placeholder="Search name, person, location…" value={itemsSearch} onChange={e => setItemsSearch(e.target.value)} style={{paddingLeft:36,paddingRight:32,fontSize:14}} />
-              <Search size={15} style={{position:'absolute',left:11,top:'50%',transform:'translateY(-50%)',color:'var(--muted)',pointerEvents:'none'}} />
-              {itemsSearch && (
-                <button className="icon-btn" style={{position:'absolute',right:6,top:'50%',transform:'translateY(-50%)'}} onClick={() => setItemsSearch('')}><X size={14} /></button>
-              )}
-            </div>
+            <SectionBlock
+              title="Entries"
+              icon={<List size={14} />}
+              right={<span className="ui-kit-section-chip ui-tone-muted">{filteredItems.length}</span>}
+            >
+              <SearchField value={itemsSearch} placeholder="Search name, person, location…" onChange={setItemsSearch} onClear={() => setItemsSearch('')} />
+            </SectionBlock>
 
+            {/* Search bar */}
             {/* Loading */}
             {loading && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '1rem 0', color: 'var(--muted)', fontSize: 14 }}>
@@ -571,34 +634,17 @@ export default function Gold() {
 
             {/* Mobile cards */}
             {!loading && filteredItems.length > 0 && (
-              <div className="txn-cards">
+              <ListStack>
                 {filteredItems.map(i => {
-                  const accent = PERSON_COLORS[i.person];
                   return (
-                    <div
+                    <ItemCard
                       key={i.id}
-                      className="txn-card"
-                      style={{
-                        cursor: 'pointer',
-                        borderLeft: `4px solid ${accent}`,
-                      }}
+                      item={i}
                       onClick={() => openEditItem(i)}
-                    >
-                      <div className="txn-card-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontWeight: 500, color: 'var(--text)' }}>{i.name}</span>
-                        <span style={{ color: accent, fontWeight: 700 }}>
-                          {Math.round(i.weight_g)}g
-                        </span>
-                      </div>
-                      <div className="txn-card-bot" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: 12, color: 'var(--muted)' }}>{i.pavan.toFixed(3)} pavan</span>
-                        <span style={{ fontSize: 11, color: accent, fontWeight: 600 }}>{i.person}</span>
-                        <span style={{ fontSize: 10, color: 'var(--muted)' }}>📍 {i.location}</span>
-                      </div>
-                    </div>
+                    />
                   );
                 })}
-              </div>
+              </ListStack>
             )}
 
             {/* Desktop table */}
@@ -650,6 +696,14 @@ export default function Gold() {
         {/* HISTORY TAB */}
         {activeTab === 'history' && (
           <>
+            <SectionBlock
+              title="Entries"
+              icon={<Clock size={14} />}
+              right={<span className="ui-kit-section-chip ui-tone-muted">{filteredHistory.length}</span>}
+            >
+              <SearchField value={historySearch} placeholder="Search name, type, note…" onChange={setHistorySearch} onClear={() => setHistorySearch('')} />
+            </SectionBlock>
+
             {/* Loading */}
             {loading && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '1rem 0', color: 'var(--muted)', fontSize: 14 }}>
@@ -658,74 +712,23 @@ export default function Gold() {
             )}
 
             {/* Empty state */}
-            {!loading && history.length === 0 && (
+            {!loading && filteredHistory.length === 0 && (
               <p style={{ color: 'var(--muted)', padding: '1rem 0', fontSize: 14 }}>No history entries yet.</p>
             )}
 
             {/* History cards */}
-            {!loading && history.length > 0 && (
-              <div className="txn-cards">
-                {history.map(h => {
-                  const isIn = h.type === 'IN';
-                  const color = isIn ? '#10B981' : '#EF4444';
+            {!loading && filteredHistory.length > 0 && (
+              <ListStack>
+                {filteredHistory.map(h => {
                   return (
-                    <div
+                    <HistoryCard
                       key={h.id}
-                      className="txn-card"
-                      style={{
-                        borderLeft: `4px solid ${color}`,
-                      }}
-                    >
-                      <div className="txn-card-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontWeight: 500, color: 'var(--text)' }}>{h.name}</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ color, fontWeight: 700 }}>
-                            {isIn ? '+' : '−'}{Math.round(h.weight_g)}g
-                          </span>
-                          <button
-                            className="icon-btn"
-                            onClick={() => openEditHistory(h)}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: '4px' }}
-                            title="Edit"
-                          >
-                            <Pencil size={14} />
-                          </button>
-                          <button
-                            className="icon-btn"
-                            onClick={() => {
-                              setEditHistory(h);
-                              setHistoryForm({
-                                date: h.date,
-                                type: h.type,
-                                name: h.name,
-                                weight_g: String(h.weight_g),
-                                note: h.note || '',
-                              });
-                              setHistoryDelConfirm(false);
-                              setHistoryModalOpen(true);
-                            }}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: '4px' }}
-                            title="Delete"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </div>
-                      <div className="txn-card-bot" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: 12, color: 'var(--muted)' }}>{h.date}</span>
-                        <span style={{ fontSize: 10, color: isIn ? '#10B981' : '#EF4444', fontWeight: 600, textTransform: 'uppercase' }}>
-                          {h.type}
-                        </span>
-                        {h.note && (
-                          <span style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4, width: '100%' }}>
-                            {h.note}
-                          </span>
-                        )}
-                      </div>
-                    </div>
+                      item={h}
+                      onClick={() => openEditHistory(h)}
+                    />
                   );
                 })}
-              </div>
+              </ListStack>
             )}
           </>
         )}
@@ -743,13 +746,9 @@ export default function Gold() {
         <button
           onClick={() => {
             if (activeTab === 'items') {
-              setEditItem(null);
-              setForm(emptyForm());
-              setDelConfirm(false);
-              setItemsModalOpen(true);
+              openAddItem();
             } else {
-              setHistoryForm(emptyHistoryForm());
-              setHistoryModalOpen(true);
+              openAddHistory();
             }
           }}
           style={{
@@ -769,231 +768,93 @@ export default function Gold() {
 
       {/* ITEMS MODAL */}
       {itemsModalOpen && (
-        <div className="modal-bg open" onClick={ev => { if (ev.target === ev.currentTarget) setItemsModalOpen(false); }}>
-          <div className="modal">
-            <div className="modal-hd">
-              <span className="modal-title">{editItem ? 'Edit Gold Item' : 'Add Gold Item'}</span>
-              <button className="modal-close" onClick={() => setItemsModalOpen(false)}>
-                <X size={16} />
-              </button>
-            </div>
-            <div className="modal-body">
-              <div className="form-row">
-                <label className="form-lbl">Item Name</label>
-                <input
-                  className="form-inp"
-                  type="text"
-                  placeholder="e.g., Necklace, Bangles…"
-                  value={form.name}
-                  onChange={e => setField('name', e.target.value)}
-                />
-              </div>
-              <div className="form-row">
-                <label className="form-lbl">Weight (g)</label>
-                <input
-                  className="form-inp"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.weight_g}
-                  onChange={e => setField('weight_g', e.target.value)}
-                />
-              </div>
-              <div className="form-row">
-                <label className="form-lbl">Pavan (auto-calculated)</label>
-                <input
-                  className="form-inp"
-                  type="number"
-                  min="0"
-                  step="0.001"
-                  value={form.pavan}
-                  disabled
-                />
-              </div>
-              <div className="form-row">
-                <label className="form-lbl">Person</label>
-                <select
-                  className="form-sel"
-                  value={form.person}
-                  onChange={e => setField('person', e.target.value)}
-                >
-                  {PEOPLE.map(p => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-row">
-                <label className="form-lbl">Location</label>
-                <select
-                  className="form-sel"
-                  value={form.location}
-                  onChange={e => setField('location', e.target.value)}
-                >
-                  {LOCATIONS.map(l => (
-                    <option key={l} value={l}>{l}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="modal-foot">
-              <div className="modal-foot-l">
-                {editItem && (
-                  <button
-                    className="btn btn-red btn-sm"
-                    onClick={deleteItem}
-                    disabled={saving}
-                  >
-                    {delConfirm ? (
-                      <>
-                        <AlertTriangle size={14} /> Confirm?
-                      </>
-                    ) : (
-                      <>
-                        <Trash2 size={14} /> Delete
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
-              <button
-                className="btn btn-sm"
-                style={{ background: 'var(--border)', color: 'var(--text)' }}
-                onClick={() => setItemsModalOpen(false)}
-              >
-                <X size={14} /> Cancel
-              </button>
-              <button
-                className="btn btn-sm btn-green"
-                onClick={saveItem}
-                disabled={saving || !form.name.trim() || !form.weight_g}
-              >
-                {saving ? (
-                  <Loader2 size={14} className="spin-icon" />
-                ) : editItem ? (
-                  <>
-                    <Check size={14} /> Save
-                  </>
-                ) : (
-                  <>
-                    <Plus size={14} /> Add
-                  </>
-                )}
-              </button>
-            </div>
+        <ModalShell
+          title={editItem ? 'Edit Gold Item' : 'Add Gold Item'}
+          onClose={closeItemModal}
+          footer={
+            <ModalActions
+              secondaryLabel="Cancel"
+              primaryLabel={savingItem ? 'Saving…' : editItem ? 'Save' : 'Add'}
+              leading={editItem ? (
+                <button type="button" className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={deleteItem} disabled={savingItem || deletingItem}>
+                  {deletingItem && <Loader2 size={14} className="spin-icon" />}
+                  {deletingItem ? 'Deleting…' : 'Delete'}
+                </button>
+              ) : null}
+              primaryPrefix={savingItem ? <Loader2 size={14} className="spin-icon" /> : null}
+              disabled={savingItem || deletingItem}
+              onSecondary={closeItemModal}
+              onPrimary={saveItem}
+            />
+          }
+        >
+          <div className="ui-stack">
+            <FormField label="Item Name">
+              <input className="form-inp" type="text" placeholder="Necklace, Bangles…" value={form.name} onChange={e => setField('name', e.target.value)} />
+            </FormField>
+            <FormField label="Weight (g)">
+              <input className="form-inp" type="number" min="0" step="0.01" placeholder="0" value={form.weight_g} onChange={e => setField('weight_g', e.target.value)} />
+            </FormField>
+            <FormField label="Pavan">
+              <input className="form-inp" type="number" min="0" step="0.001" placeholder="0.000" value={form.pavan} disabled />
+            </FormField>
+            <FormField label="Person">
+              <select className="form-sel" value={form.person} onChange={e => setField('person', e.target.value)}>
+                {PEOPLE.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </FormField>
+            <FormField label="Location">
+              <select className="form-sel" value={form.location} onChange={e => setField('location', e.target.value)}>
+                {LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
+              </select>
+            </FormField>
           </div>
-        </div>
+        </ModalShell>
       )}
 
       {/* HISTORY MODAL */}
       {historyModalOpen && (
-        <div className="modal-bg open" onClick={ev => { if (ev.target === ev.currentTarget) setHistoryModalOpen(false); }}>
-          <div className="modal">
-            <div className="modal-hd">
-              <span className="modal-title">{editHistory ? 'Edit Gold Movement' : 'Add Gold Movement'}</span>
-              <button className="modal-close" onClick={() => setHistoryModalOpen(false)}>
-                <X size={16} />
-              </button>
-            </div>
-            <div className="modal-body">
-              <div className="form-row">
-                <label className="form-lbl">Date</label>
-                <input
-                  className="form-inp"
-                  type="date"
-                  value={historyForm.date}
-                  onChange={e => setHistoryField('date', e.target.value)}
-                />
-              </div>
-              <div className="form-row">
-                <label className="form-lbl">Type</label>
-                <select
-                  className="form-sel"
-                  value={historyForm.type}
-                  onChange={e => setHistoryField('type', e.target.value as 'IN' | 'OUT')}
-                >
-                  <option value="IN">In (↓ received)</option>
-                  <option value="OUT">Out (↑ given)</option>
-                </select>
-              </div>
-              <div className="form-row">
-                <label className="form-lbl">Item Name</label>
-                <input
-                  className="form-inp"
-                  type="text"
-                  placeholder="e.g., Gold received from…"
-                  value={historyForm.name}
-                  onChange={e => setHistoryField('name', e.target.value)}
-                />
-              </div>
-              <div className="form-row">
-                <label className="form-lbl">Weight (g)</label>
-                <input
-                  className="form-inp"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={historyForm.weight_g}
-                  onChange={e => setHistoryField('weight_g', e.target.value)}
-                />
-              </div>
-              <div className="form-row">
-                <label className="form-lbl">Note (optional)</label>
-                <input
-                  className="form-inp"
-                  type="text"
-                  placeholder="e.g., Wedding gift, resale…"
-                  value={historyForm.note}
-                  onChange={e => setHistoryField('note', e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="modal-foot">
-              <div className="modal-foot-l">
-                {editHistory && (
-                  <button
-                    className="btn btn-red btn-sm"
-                    onClick={deleteHistory}
-                    disabled={historySaving}
-                  >
-                    {historyDelConfirm ? (
-                      <>
-                        <AlertTriangle size={14} /> Confirm?
-                      </>
-                    ) : (
-                      <>
-                        <Trash2 size={14} /> Delete
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
-              <button
-                className="btn btn-sm"
-                style={{ background: 'var(--border)', color: 'var(--text)' }}
-                onClick={() => setHistoryModalOpen(false)}
-              >
-                <X size={14} /> Cancel
-              </button>
-              <button
-                className="btn btn-sm btn-green"
-                onClick={saveHistory}
-                disabled={historySaving || !historyForm.name.trim() || !historyForm.weight_g}
-              >
-                {historySaving ? (
-                  <Loader2 size={14} className="spin-icon" />
-                ) : editHistory ? (
-                  <>
-                    <Check size={14} /> Save
-                  </>
-                ) : (
-                  <>
-                    <Plus size={14} /> Add
-                  </>
-                )}
-              </button>
-            </div>
+        <ModalShell
+          title={editHistory ? 'Edit Gold Movement' : 'Add Gold Movement'}
+          onClose={closeHistoryModal}
+          footer={
+            <ModalActions
+              secondaryLabel="Cancel"
+              primaryLabel={savingHistory ? 'Saving…' : editHistory ? 'Save' : 'Add'}
+              leading={editHistory ? (
+                <button type="button" className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={deleteHistory} disabled={savingHistory || deletingHistory}>
+                  {deletingHistory && <Loader2 size={14} className="spin-icon" />}
+                  {deletingHistory ? 'Deleting…' : 'Delete'}
+                </button>
+              ) : null}
+              primaryPrefix={savingHistory ? <Loader2 size={14} className="spin-icon" /> : null}
+              disabled={savingHistory || deletingHistory}
+              onSecondary={closeHistoryModal}
+              onPrimary={saveHistory}
+            />
+          }
+        >
+          <div className="ui-stack">
+            <FormField label="Date">
+              <input className="form-inp" type="date" value={historyForm.date} onChange={e => setHistoryField('date', e.target.value)} />
+            </FormField>
+            <FormField label="Type">
+              <select className="form-sel" value={historyForm.type} onChange={e => setHistoryField('type', e.target.value as 'IN' | 'OUT')}>
+                <option value="IN">In</option>
+                <option value="OUT">Out</option>
+              </select>
+            </FormField>
+            <FormField label="Item Name">
+              <input className="form-inp" type="text" placeholder="Gold received from…" value={historyForm.name} onChange={e => setHistoryField('name', e.target.value)} />
+            </FormField>
+            <FormField label="Weight (g)">
+              <input className="form-inp" type="number" min="0" step="0.01" placeholder="0" value={historyForm.weight_g} onChange={e => setHistoryField('weight_g', e.target.value)} />
+            </FormField>
+            <FormField label="Note">
+              <input className="form-inp" type="text" placeholder="Wedding gift, resale…" value={historyForm.note} onChange={e => setHistoryField('note', e.target.value)} />
+            </FormField>
           </div>
-        </div>
+        </ModalShell>
       )}
     </div>
   );

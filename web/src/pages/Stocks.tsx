@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { BarChart3, Loader2, RefreshCw, TrendingUp } from 'lucide-react';
 import { api } from '../api';
+import { HoldingCard, HoldingModal, SectionBlock, SectionChip, Spacer } from '../ui-kit';
 
 interface Holding {
   symbol: string;
@@ -156,41 +157,68 @@ export default function Stocks({ embedded = false }: { embedded?: boolean } = {}
   }
 
   return (
-    <div className="pg">
+    <div className="pg" style={{ paddingTop: embedded ? 0 : 16 }}>
+      <Spacer size={8} />
       {!embedded && (
         <>
-          {/* Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-            <div className="section-title">
-              <BarChart3 size={20} className="section-title-icon" />
-              <div>Metrics</div>
-            </div>
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <button
-                onClick={handleSync}
-                disabled={syncing || !hasToken}
-                style={{
-                  padding: '0.5rem 1rem',
-                  border: '1px solid var(--border)',
-                  background: '#FFFFFF',
-                  borderRadius: '0.375rem',
-                  cursor: syncing ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  opacity: syncing || !hasToken ? 0.6 : 1
-                }}
-              >
-                <RefreshCw size={16} style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }} />
-                {syncing ? 'Syncing...' : 'Sync'}
-              </button>
-              {loading && !syncing && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--muted)', fontSize: '0.875rem' }}>
-                  <div style={{ width: 16, height: 16, border: '2px solid var(--border)', borderTop: '2px solid var(--text)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+          <SectionBlock
+            title="Metrics"
+            icon={<BarChart3 size={14} />}
+            right={
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <button
+                  onClick={handleSync}
+                  disabled={syncing || !hasToken}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    border: '1px solid var(--border)',
+                    background: '#FFFFFF',
+                    borderRadius: '0.375rem',
+                    cursor: syncing ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    opacity: syncing || !hasToken ? 0.6 : 1
+                  }}
+                >
+                  <RefreshCw size={16} style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }} />
+                  {syncing ? 'Syncing...' : 'Sync'}
+                </button>
+                {loading && !syncing && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--muted)', fontSize: '0.875rem' }}>
+                    <div style={{ width: 16, height: 16, border: '2px solid var(--border)', borderTop: '2px solid var(--text)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                  </div>
+                )}
+              </div>
+            }
+          >
+            <div className="kpis">
+              <div className="kpi-card">
+                <div className="kpi-card-l">Total Invested</div>
+                <div className="kpi-card-v kpi-card-v-soft">
+                  {formatRupees(stats.totalInvested)}
                 </div>
-              )}
+              </div>
+              <div className="kpi-card">
+                <div className="kpi-card-l">Current Value</div>
+                <div className="kpi-card-v kpi-card-v-soft">
+                  {formatRupees(stats.currentValue)}
+                </div>
+              </div>
+              <div className={`kpi-card ${stats.totalPnL >= 0 ? 'kpi-card--green' : 'kpi-card--red'}`}>
+                <div className="kpi-card-l">Total P&L</div>
+                <div className={`kpi-card-v kpi-card-v-soft ${stats.totalPnL >= 0 ? 'kpi-card-v--green' : 'kpi-card-v--red'}`}>
+                  {stats.totalPnL >= 0 ? '+' : ''}{formatRupees(stats.totalPnL)}
+                </div>
+              </div>
+              <div className={`kpi-card ${stats.totalPnLPct >= 0 ? 'kpi-card--green' : 'kpi-card--red'}`}>
+                <div className="kpi-card-l">Return %</div>
+                <div className={`kpi-card-v kpi-card-v-soft ${stats.totalPnLPct >= 0 ? 'kpi-card-v--green' : 'kpi-card-v--red'}`}>
+                  {stats.totalPnLPct >= 0 ? '+' : ''}{Number(stats.totalPnLPct.toFixed(2))}%
+                </div>
+              </div>
             </div>
-          </div>
+          </SectionBlock>
 
           {/* Error message */}
           {error && (
@@ -205,34 +233,6 @@ export default function Stocks({ embedded = false }: { embedded?: boolean } = {}
               {error}
             </div>
           )}
-
-          {/* Summary strip */}
-          <div className="kpis">
-            <div className="kpi-card">
-              <div className="kpi-card-l">Total Invested</div>
-              <div className="kpi-card-v kpi-card-v-soft">
-                {formatRupees(stats.totalInvested)}
-              </div>
-            </div>
-            <div className="kpi-card">
-              <div className="kpi-card-l">Current Value</div>
-              <div className="kpi-card-v kpi-card-v-soft">
-                {formatRupees(stats.currentValue)}
-              </div>
-            </div>
-            <div className={`kpi-card ${stats.totalPnL >= 0 ? 'kpi-card--green' : 'kpi-card--red'}`}>
-              <div className="kpi-card-l">Total P&L</div>
-              <div className={`kpi-card-v kpi-card-v-soft ${stats.totalPnL >= 0 ? 'kpi-card-v--green' : 'kpi-card-v--red'}`}>
-                {stats.totalPnL >= 0 ? '+' : ''}{formatRupees(stats.totalPnL)}
-              </div>
-            </div>
-            <div className={`kpi-card ${stats.totalPnLPct >= 0 ? 'kpi-card--green' : 'kpi-card--red'}`}>
-              <div className="kpi-card-l">Return %</div>
-              <div className={`kpi-card-v kpi-card-v-soft ${stats.totalPnLPct >= 0 ? 'kpi-card-v--green' : 'kpi-card-v--red'}`}>
-                {stats.totalPnLPct >= 0 ? '+' : ''}{Number(stats.totalPnLPct.toFixed(2))}%
-              </div>
-            </div>
-          </div>
 
           {/* Last synced */}
           {lastSynced && (
@@ -255,154 +255,80 @@ export default function Stocks({ embedded = false }: { embedded?: boolean } = {}
         </div>
       ) : (
         <>
-        {/* Holdings section header */}
-        <div className="section-title" style={{ marginBottom: '1.5rem' }}>
-          <TrendingUp size={20} className="section-title-icon" />
-          <div>Stocks</div>
-        </div>
+        <SectionBlock
+          title="Stocks"
+          icon={<TrendingUp size={14} />}
+          rightChip={<SectionChip tone="muted">{enrichedHoldings.length} items</SectionChip>}
+        >
 
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-          gap: '1rem'
-        }}>
-          {enrichedHoldings.map((h, i) => {
-            return (
-              <div
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+            gap: '8px'
+          }}>
+            {enrichedHoldings.map((h, i) => (
+              <HoldingCard
                 key={i}
+                title={h.symbol}
+                subtitle={h.company}
+                leftLabel="QTY"
+                leftValue={Math.round(h.qty).toLocaleString('en-IN')}
+                centerLabel="INVESTED"
+                centerValue={formatRupees(h.invested)}
+                rightLabel="CURRENT"
+                rightValue={formatRupees(h.current)}
+                pnlLabel={h.pnl >= 0 ? 'PROFIT' : 'LOSS'}
+                pnlValue={`${h.pnl >= 0 ? '+' : ''}${formatRupees(h.pnl)}`}
+                accentTone={h.pnl >= 0 ? 'green' : 'red'}
                 onClick={() => setSelectedIndex(i)}
-                style={{
-                  padding: '0.875rem',
-                  background: '#FFFFFF',
-                  border: '1px solid var(--border)',
-                  borderRadius: '0.375rem',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.5rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                {/* Header - Symbol & Qty */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', alignItems: 'flex-start' }}>
-                  <div>
-                    <div className="holding-label" style={{ marginBottom: '0.1rem' }}>SYMBOL</div>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{h.symbol}</div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div className="holding-label" style={{ marginBottom: '0.1rem' }}>QTY</div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{Math.round(h.qty).toLocaleString('en-IN')}</div>
-                  </div>
-                </div>
-
-                {/* P&L - Always visible */}
-                <div style={{
-                  padding: '0.5rem 0.625rem',
-                  background: h.pnl >= 0 ? 'rgba(22, 163, 74, 0.1)' : 'rgba(220, 38, 38, 0.1)',
-                  borderRadius: '0.375rem',
-                  borderLeft: `3px solid ${h.pnl >= 0 ? '#16A34A' : '#DC2626'}`
-                }}>
-                  <div className="holding-label" style={{ marginBottom: '0.1rem' }}>PROFIT / LOSS</div>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: h.pnl >= 0 ? '#16A34A' : '#DC2626' }}>
-                    {h.pnl >= 0 ? '+' : ''}{formatRupees(h.pnl)}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                className="stock-entry-card"
+              />
+            ))}
+          </div>
 
         {/* Modal */}
         {selectedIndex !== null && enrichedHoldings[selectedIndex] && (
-          <div className="modal-bg open" onClick={() => setSelectedIndex(null)}>
-            <div className="sheet-panel" onClick={e => e.stopPropagation()}>
-              <div className="sheet-body">
-                {(() => {
-                  const h = enrichedHoldings[selectedIndex];
-                  return (
-                    <>
-                      {/* Close button */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                        <div style={{ fontSize: '1rem', fontWeight: 700 }}>{h.symbol}</div>
-                        <button
-                          onClick={() => setSelectedIndex(null)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            fontSize: '1.5rem',
-                            cursor: 'pointer',
-                            color: 'var(--muted)',
-                            padding: 0
-                          }}
-                        >
-                          ✕
-                        </button>
-                      </div>
-
-                    {/* Company */}
-                    <div style={{ marginBottom: '1rem' }}>
-                        <div className="holding-label" style={{ marginBottom: '0.1rem' }}>Company</div>
-                      <div style={{ fontSize: '0.95rem' }}>{h.company}</div>
-                    </div>
-
-                    {/* Grid details */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                      <div>
-                        <div className="holding-label" style={{ marginBottom: '0.1rem' }}>Qty</div>
-                        <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{Math.round(h.qty).toLocaleString('en-IN')}</div>
-                      </div>
-                      <div>
-                        <div className="holding-label" style={{ marginBottom: '0.1rem' }}>Avg Price</div>
-                        <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{formatRupees(h.avgPrice)}</div>
-                      </div>
-                      <div>
-                        <div className="holding-label" style={{ marginBottom: '0.1rem' }}>CMP</div>
-                        <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{formatRupees(h.lastPrice)}</div>
-                      </div>
-                      <div>
-                        <div className="holding-label" style={{ marginBottom: '0.1rem' }}>Day Change</div>
-                        <div style={{ fontSize: '0.9rem', fontWeight: 600, color: h.dayChangePct >= 0 ? '#10B981' : '#EF4444' }}>
-                          {h.dayChangePct >= 0 ? '+' : ''}{Number(h.dayChangePct.toFixed(2))}%
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Invested & Current */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                      <div>
-                        <div className="holding-label" style={{ marginBottom: '0.1rem' }}>Invested</div>
-                        <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{formatRupees(h.invested)}</div>
-                      </div>
-                      <div>
-                        <div className="holding-label" style={{ marginBottom: '0.1rem' }}>Current Value</div>
-                        <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{formatRupees(h.current)}</div>
-                      </div>
-                    </div>
-
-                    {/* P&L */}
-                    <div style={{
-                      padding: '0.75rem',
-                      background: h.pnl >= 0 ? 'rgba(22, 163, 74, 0.1)' : 'rgba(220, 38, 38, 0.1)',
-                      borderRadius: '0.375rem',
-                      borderLeft: `4px solid ${h.pnl >= 0 ? '#16A34A' : '#DC2626'}`
-                    }}>
-                      <div className="holding-label" style={{ marginBottom: '0.1rem' }}>Profit / Loss</div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem' }}>
-                        <div style={{ fontSize: '1.1rem', fontWeight: 700, color: h.pnl >= 0 ? '#16A34A' : '#DC2626' }}>
-                          {h.pnl >= 0 ? '+' : ''}{formatRupees(h.pnl)}
-                        </div>
-                        <div style={{ fontSize: '0.9rem', fontWeight: 600, color: h.pnlPct >= 0 ? '#16A34A' : '#DC2626' }}>
-                          ({h.pnlPct >= 0 ? '+' : ''}{Number(h.pnlPct.toFixed(2))}%)
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                );
-              })()}
+          <HoldingModal
+            title={enrichedHoldings[selectedIndex].symbol}
+            onClose={() => setSelectedIndex(null)}
+            pnlLabel={enrichedHoldings[selectedIndex].pnl >= 0 ? 'Profit' : 'Loss'}
+            pnlValue={`${enrichedHoldings[selectedIndex].pnl >= 0 ? '+' : ''}${formatRupees(enrichedHoldings[selectedIndex].pnl)}`}
+            pnlPct={`(${enrichedHoldings[selectedIndex].pnlPct >= 0 ? '+' : ''}${Number(enrichedHoldings[selectedIndex].pnlPct.toFixed(2))}%)`}
+            accentTone={enrichedHoldings[selectedIndex].pnl >= 0 ? 'green' : 'red'}
+          >
+            <div className="ui-kit-holding-detail">
+              <div className="ui-kit-holding-detail-label">ISIN</div>
+              <div className="ui-kit-holding-detail-value">{enrichedHoldings[selectedIndex].isin}</div>
+            </div>
+            <div className="ui-kit-holding-detail">
+              <div className="ui-kit-holding-detail-label">Qty</div>
+              <div className="ui-kit-holding-detail-value">{Math.round(enrichedHoldings[selectedIndex].qty).toLocaleString('en-IN')}</div>
+            </div>
+            <div className="ui-kit-holding-detail">
+              <div className="ui-kit-holding-detail-label">Avg Price</div>
+              <div className="ui-kit-holding-detail-value">{formatRupees(enrichedHoldings[selectedIndex].avgPrice)}</div>
+            </div>
+            <div className="ui-kit-holding-detail">
+              <div className="ui-kit-holding-detail-label">CMP</div>
+              <div className="ui-kit-holding-detail-value">{formatRupees(enrichedHoldings[selectedIndex].lastPrice)}</div>
+            </div>
+            <div className="ui-kit-holding-detail">
+              <div className="ui-kit-holding-detail-label">Invested</div>
+              <div className="ui-kit-holding-detail-value">{formatRupees(enrichedHoldings[selectedIndex].invested)}</div>
+            </div>
+            <div className="ui-kit-holding-detail">
+              <div className="ui-kit-holding-detail-label">Current Value</div>
+              <div className="ui-kit-holding-detail-value">{formatRupees(enrichedHoldings[selectedIndex].current)}</div>
+            </div>
+            <div className="ui-kit-holding-detail">
+              <div className="ui-kit-holding-detail-label">Day Change</div>
+              <div className="ui-kit-holding-detail-value" style={{ color: enrichedHoldings[selectedIndex].dayChangePct >= 0 ? '#16A34A' : '#DC2626' }}>
+                {enrichedHoldings[selectedIndex].dayChangePct >= 0 ? '+' : ''}{Number(enrichedHoldings[selectedIndex].dayChangePct.toFixed(2))}%
               </div>
             </div>
-          </div>
+          </HoldingModal>
         )}
+        </SectionBlock>
         </>
       )}
 

@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react'
-import { Plus, X, Check, Trash2, AlertTriangle, Loader2, Search, LayoutDashboard, Handshake, ArrowDownLeft } from 'lucide-react'
+import { Trash2, AlertTriangle, Loader2, Search, LayoutDashboard, Handshake, ArrowDownLeft, BarChart3, Shield, User, ArrowUpRight } from 'lucide-react'
 import { api, RawLendingRow } from '../api'
 import { INR } from '../utils'
+import { FormField, HoldingCard, KpiCard, ModalActions, ModalShell, SearchField, SectionBlock, SectionChip, Spacer, TabBar } from '../ui-kit'
 
 type LendType = 'LEND' | 'RECEIVED'
 type LendTab = 'dashboard' | 'lended' | 'received'
@@ -88,66 +89,59 @@ interface PersonCardProps {
 }
 
 const PersonCard = memo(function PersonCard({ person, onClick }: PersonCardProps) {
+  const tone = person.outstanding > 0 ? 'red' : person.outstanding < 0 ? 'green' : 'navy'
   return (
-    <div
+    <HoldingCard
+      title={person.name}
+      leftLabel="Lent"
+      leftValue={INR(person.totalLent)}
+      rightLabel="Received"
+      rightValue={INR(person.totalRepaid)}
+      centerLabel="Status"
+      centerValue={person.outstanding > 0 ? 'GIVEN' : person.outstanding < 0 ? 'CLEAR' : 'SETTLED'}
+      pnlLabel="Outstanding"
+      pnlValue={INR(Math.abs(person.outstanding))}
+      accentTone={tone}
+      icon={person.outstanding > 0 ? <ArrowUpRight size={14} /> : person.outstanding < 0 ? <ArrowDownLeft size={14} /> : <Shield size={14} />}
+      iconPosition="right"
+      iconBackground
+      className="stock-entry-card"
       onClick={onClick}
-      className="card"
-      style={{
-        padding: '16px 14px',
-        cursor: 'pointer',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 8,
-        transition: 'all 0.15s ease',
-      }}
-      onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.98)'}
-      onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
-      onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-    >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>
-            {person.name}
-          </div>
-        </div>
-        <div className={`sbadge ${person.outstanding > 0 ? 'sbadge-red' : person.outstanding < 0 ? 'sbadge-green' : 'sbadge-gray'}`}>
-          {person.outstanding > 0 ? 'LENT' : person.outstanding < 0 ? 'CLEAR' : 'SETTLED'}
-        </div>
-      </div>
+    />
+  )
+})
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <div className="stat-block">
-          <div className="lbl">Lent</div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>
-            {INR(person.totalLent)}
-          </div>
-        </div>
-        <div className="stat-block">
-          <div className="lbl">Received</div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>
-            {INR(person.totalRepaid)}
-          </div>
-        </div>
-      </div>
-
-      <div style={{
-        padding: '10px 12px',
-        background: person.outstanding > 0 ? 'rgba(239, 68, 68, 0.08)' : person.outstanding < 0 ? 'rgba(16, 185, 129, 0.08)' : 'rgba(107, 114, 128, 0.05)',
-        borderRadius: 8,
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-      }}>
-        <div className="lbl">Outstanding</div>
-        <div style={{
-          fontSize: 16,
-          fontWeight: 700,
-          color: person.outstanding > 0 ? '#EF4444' : person.outstanding < 0 ? '#10B981' : 'var(--text)',
-        }}>
-          {INR(Math.abs(person.outstanding))}
-        </div>
-      </div>
-    </div>
+const EntryCard = memo(function EntryCard({
+  entry,
+  label,
+  useDescriptionAsTitle = false,
+  onClick,
+}: {
+  entry: LendingEntry
+  label: 'Given' | 'Received'
+  useDescriptionAsTitle?: boolean
+  onClick: () => void
+}) {
+  const title = useDescriptionAsTitle ? (entry.description || entry.name) : entry.name
+  const tone = label === 'Given' ? 'red' : 'green'
+  return (
+    <HoldingCard
+      title={title}
+      subtitle={useDescriptionAsTitle ? undefined : entry.description}
+      compactTitle={useDescriptionAsTitle}
+      leftLabel="Amount"
+      leftValue={INR(entry.amount)}
+      centerLabel=" "
+      centerValue=" "
+      rightLabel="Date"
+      rightValue={entry.date}
+      accentTone={tone}
+      icon={label === 'Given' ? <ArrowUpRight size={14} /> : <ArrowDownLeft size={14} />}
+      iconPosition="right"
+      iconBackground
+      className="stock-entry-card"
+      onClick={onClick}
+    />
   )
 })
 
@@ -196,13 +190,6 @@ export default function Lending({ sheetName, onTabChange }: LendingProps) {
     [entries]
   )
 
-  const personModalEntries = useMemo(() => {
-    if (!personModalName) return []
-    return entries.filter(e => e.name === personModalName).sort((a, b) =>
-      new Date(b.date).getTime() - new Date(a.date).getTime()
-    )
-  }, [entries, personModalName])
-
   function set(k: keyof FormState, v: string) {
     setForm(f => ({ ...f, [k]: v }))
   }
@@ -219,6 +206,14 @@ export default function Lending({ sheetName, onTabChange }: LendingProps) {
     setForm({ type: e.type, name: e.name, amount: String(e.amount), date: toDateInput(e.date), description: e.description })
     setDelConfirm(false)
     setModalOpen(true)
+  }
+
+  function closeModal() {
+    setModalOpen(false)
+    setEditEntry(null)
+    setForm(emptyForm())
+    setDelConfirm(false)
+    setSaving(false)
   }
 
   async function save() {
@@ -257,22 +252,10 @@ export default function Lending({ sheetName, onTabChange }: LendingProps) {
   const outstanding = totalLent - totalRepaid
 
   // Filter people based on search
+  const searchQuery = search.trim().toLowerCase()
   const filteredPeople = useMemo(() => {
-    return people.filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
-  }, [people, search])
-
-  // Get people/entries based on active tab
-  const displayedPeople = useMemo(() => {
-    if (activeTab === 'dashboard') return filteredPeople
-    if (activeTab === 'lended') return filteredPeople.filter(p => p.outstanding > 0)
-    if (activeTab === 'received') {
-      return entries.filter(e => e.type === 'RECEIVED').map(e => e.name)
-        .filter((name, idx, arr) => arr.indexOf(name) === idx) // unique names
-        .map(name => filteredPeople.find(p => p.name === name))
-        .filter((p): p is PersonDetails => p !== undefined)
-    }
-    return filteredPeople
-  }, [filteredPeople, activeTab, entries])
+    return people.filter(p => p.name.toLowerCase().includes(searchQuery))
+  }, [people, searchQuery])
 
   // Flat transaction lists for lended/received tabs
   const lendedEntries = useMemo(() =>
@@ -287,8 +270,20 @@ export default function Lending({ sheetName, onTabChange }: LendingProps) {
     [entries]
   )
 
+  const filteredLendedEntries = useMemo(() => {
+    return lendedEntries.filter(e => !searchQuery || e.name.toLowerCase().includes(searchQuery) || e.description.toLowerCase().includes(searchQuery))
+  }, [lendedEntries, searchQuery])
+
+  const filteredReceivedEntries = useMemo(() => {
+    return receivedEntries.filter(e => !searchQuery || e.name.toLowerCase().includes(searchQuery) || e.description.toLowerCase().includes(searchQuery))
+  }, [receivedEntries, searchQuery])
+
   // Get person details for the bottom sheet
   const personDetails = personModalName ? people.find(p => p.name === personModalName) : null
+  const personModalEntries = useMemo(() => {
+    if (!personModalName) return []
+    return entries.filter(e => e.name === personModalName).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  }, [entries, personModalName])
 
   const TAB_CONFIG = [
     { id: 'dashboard' as const, icon: <LayoutDashboard size={19} />, label: 'Dashboard' },
@@ -296,309 +291,214 @@ export default function Lending({ sheetName, onTabChange }: LendingProps) {
     { id: 'received' as const, icon: <ArrowDownLeft size={19} />, label: 'Received' },
   ]
 
+  const shouldUseDescriptionAsTitle = (entry: LendingEntry) =>
+    !entry.name.trim() || entry.name.trim().toLowerCase() === 'vijaya amma'
+
+  const isVijayaAmma = sheetName.trim().toLowerCase() === 'vijaya amma'
+  const sheetTone = isVijayaAmma ? 'amber' : 'navy'
+
   return (
-    <div style={{ paddingBottom: 80 }}>
-      {/* Tab Navigation - BottomNav style */}
-      <nav className="tab-bar" style={{ marginBottom: 0 }}>
-        {TAB_CONFIG.map(tab => (
-          <button
-            key={tab.id}
-            className={`tab-item${activeTab === tab.id ? ' active' : ''}`}
-            onClick={() => setActiveTab(tab.id)}
-          >
-            <span className="tab-icon">{tab.icon}</span>
-            <span>{tab.label}</span>
-          </button>
-        ))}
-      </nav>
+      <div className="ui-kit-page-shell ui-kit-page-stack" style={{ paddingLeft: 8, paddingRight: 8 }}>
+      <TabBar
+        tabs={TAB_CONFIG}
+        active={activeTab}
+        onChange={id => setActiveTab(id as LendTab)}
+      />
 
-      <div className="pg" style={{paddingTop:8}}>
-        {/* Search Bar */}
-        <div style={{position:'relative',marginBottom:8}}>
-          <input className="form-inp" type="text" placeholder="Search people..." value={search} onChange={e => setSearch(e.target.value)} style={{paddingLeft:36,paddingRight:32,fontSize:14}} />
-          <Search size={15} style={{position:'absolute',left:11,top:'50%',transform:'translateY(-50%)',color:'var(--muted)',pointerEvents:'none'}} />
-          {search && (
-            <button className="icon-btn" style={{position:'absolute',right:6,top:'50%',transform:'translateY(-50%)'}} onClick={() => setSearch('')}><X size={14} /></button>
-          )}
-        </div>
+    <div className="pg ui-kit-page-stack ui-kit-page-stack--tight" style={{ paddingTop: 0, paddingBottom: 0 }}>
+        {activeTab === 'dashboard' ? (
+          <>
+            <SectionBlock
+              title="Metrics"
+              icon={<BarChart3 size={14} />}
+              right={<SectionChip tone={sheetTone}>{sheetName}</SectionChip>}
+            >
+              <div className="dash-grid">
+                <KpiCard label="Given" value={INR(totalLent)} tone="navy" icon={<ArrowUpRight size={14} />} />
+                <KpiCard label="Received" value={INR(totalRepaid)} tone="green" icon={<ArrowDownLeft size={14} />} />
+                <KpiCard label="Outstanding" value={INR(Math.abs(outstanding))} tone="amber" icon={<Shield size={14} />} />
+                <KpiCard label="People" value={totalPeople} tone="muted" icon={<User size={14} />} />
+              </div>
+            </SectionBlock>
 
-      {/* Dashboard Tab */}
-      {activeTab === 'dashboard' && (
-        <>
-          <div className="kpis" style={{ marginBottom: 0 }}>
-            <div className="kpi-card">
-              <div className="kpi-card-l">Total Given</div>
-              <div className="kpi-card-v" style={{ color: 'var(--text)' }}>{INR(totalLent)}</div>
-            </div>
-            <div className="kpi-card">
-              <div className="kpi-card-l">Received</div>
-              <div className="kpi-card-v" style={{ color: 'var(--text)' }}>{INR(totalRepaid)}</div>
-            </div>
-            <div className={`kpi-card ${outstanding > 0 ? 'kpi-card--amber' : 'kpi-card--gray'}`}>
-              <div className="kpi-card-l">Total Outstanding</div>
-              <div className="kpi-card-v" style={{ color: 'var(--text)' }}>{INR(outstanding)}</div>
-            </div>
-            <div className="kpi-card">
-              <div className="kpi-card-l">People</div>
-              <div className="kpi-card-v" style={{ color: 'var(--text)' }}>{totalPeople}</div>
-            </div>
-          </div>
-        </>
-      )}
-
-      {error && <p style={{ color: '#EF4444', fontSize: 13, padding: '12px 10px' }}>⚠ {error}</p>}
-
-      {/* Person Cards / Flat Transaction Lists */}
-      <div className="sec">
-        <div className="sec-h" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span>
-            {activeTab === 'dashboard' ? 'People' : activeTab === 'lended' ? 'Given' : 'Received'} ({activeTab === 'lended' ? lendedEntries.length : activeTab === 'received' ? receivedEntries.length : displayedPeople.length})
-          </span>
-        </div>
-
-        {loading ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '1rem 0', color: 'var(--muted)', fontSize: 14 }}>
-            <Loader2 size={16} className="spin-icon" /> Loading…
-          </div>
-        ) : activeTab === 'dashboard' ? (
-          displayedPeople.length === 0 ? (
-            <p style={{ color: 'var(--muted)', padding: '1rem 0', fontSize: 14 }}>
-              {search ? 'No matches found.' : 'No data to display.'}
-            </p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
-              {displayedPeople.map(person => (
-                <PersonCard
-                  key={person.name}
-                  person={person}
-                  onClick={() => {
-                    setPersonModalName(person.name)
-                    setPersonModalOpen(true)
-                  }}
+            <Spacer size={8} />
+            <SectionBlock
+              title="People"
+              icon={<Handshake size={14} />}
+              right={<SectionChip tone={sheetTone}>{filteredPeople.length}</SectionChip>}
+            >
+              <div className="ui-stack">
+                <SearchField
+                  value={search}
+                  placeholder="Search people..."
+                  onChange={setSearch}
+                  onClear={() => setSearch('')}
+                  prefix={<Search size={15} />}
                 />
-              ))}
-            </div>
-          )
-        ) : activeTab === 'lended' ? (
-          lendedEntries.length === 0 ? (
-            <p style={{ color: 'var(--muted)', padding: '1rem 0', fontSize: 14 }}>No transactions yet.</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-              {lendedEntries.map(e => (
-                <div
-                  key={e.id}
-                  className="card"
-                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', cursor: 'pointer' }}
-                  onClick={() => openEdit(e)}
-                >
-                  <span style={{
-                    fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 5,
-                    background: e.type === 'LEND' ? 'rgba(239,68,68,.12)' : 'rgba(16,185,129,.12)',
-                    color: e.type === 'LEND' ? '#EF4444' : '#10B981',
-                    flexShrink: 0,
-                  }}>
-                    {e.type}
-                  </span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>
-                      {e.name}
-                    </div>
-                    {e.description && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 1 }}>{e.description}</div>}
+                <Spacer size={8} />
+                {loading ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '1rem 0', color: 'var(--muted)', fontSize: 14 }}>
+                    <Loader2 size={16} className="spin-icon" /> Loading…
                   </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: '#EF4444' }}>
-                      {INR(e.amount)}
-                    </div>
-                    <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 1 }}>{e.date}</div>
+                ) : error ? (
+                  <p style={{ color: '#EF4444', fontSize: 13, padding: '0.5rem 0' }}>⚠ {error}</p>
+                ) : filteredPeople.length === 0 ? (
+                  <p style={{ color: 'var(--muted)', padding: '0.5rem 0', fontSize: 14 }}>
+                    {search ? 'No matches found.' : 'No data to display.'}
+                  </p>
+                ) : (
+                  <div style={{ display: 'grid', rowGap: 8, columnGap: 0 }}>
+                    {filteredPeople.map(person => (
+                      <PersonCard
+                        key={person.name}
+                        person={person}
+                        onClick={() => {
+                          setPersonModalName(person.name)
+                          setPersonModalOpen(true)
+                        }}
+                      />
+                    ))}
                   </div>
-                </div>
-              ))}
-            </div>
-          )
+                )}
+              </div>
+            </SectionBlock>
+          </>
         ) : (
-          receivedEntries.length === 0 ? (
-            <p style={{ color: 'var(--muted)', padding: '1rem 0', fontSize: 14 }}>No transactions yet.</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-              {receivedEntries.map(e => (
-                <div
-                  key={e.id}
-                  className="card"
-                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', cursor: 'pointer' }}
-                  onClick={() => openEdit(e)}
-                >
-                  <span style={{
-                    fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 5,
-                    background: e.type === 'LEND' ? 'rgba(239,68,68,.12)' : 'rgba(16,185,129,.12)',
-                    color: e.type === 'LEND' ? '#EF4444' : '#10B981',
-                    flexShrink: 0,
-                  }}>
-                    {e.type}
-                  </span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>
-                      {e.name}
-                    </div>
-                    {e.description && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 1 }}>{e.description}</div>}
-                  </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: '#10B981' }}>
-                      {INR(e.amount)}
-                    </div>
-                    <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 1 }}>{e.date}</div>
-                  </div>
+          <>
+            <SectionBlock
+              title="Entries"
+              icon={<Search size={14} />}
+              right={<SectionChip tone={sheetTone}>{activeTab === 'lended' ? filteredLendedEntries.length : filteredReceivedEntries.length}</SectionChip>}
+            >
+            <SearchField
+              value={search}
+              placeholder="Search people..."
+              onChange={setSearch}
+              onClear={() => setSearch('')}
+              prefix={<Search size={15} />}
+            />
+            <Spacer size={8} />
+            {loading ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '1rem 0', color: 'var(--muted)', fontSize: 14 }}>
+                <Loader2 size={16} className="spin-icon" /> Loading…
+              </div>
+            ) : error ? (
+              <p style={{ color: '#EF4444', fontSize: 13, padding: '0.5rem 0' }}>⚠ {error}</p>
+            ) : activeTab === 'lended' ? (
+              filteredLendedEntries.length === 0 ? (
+                <p style={{ color: 'var(--muted)', padding: '0.5rem 0', fontSize: 14 }}>No transactions yet.</p>
+              ) : (
+                <div style={{ display: 'grid', rowGap: 8, columnGap: 0 }}>
+                  {filteredLendedEntries.map(e => (
+                    <EntryCard
+                      key={e.id}
+                      entry={e}
+                      label="Given"
+                      useDescriptionAsTitle={shouldUseDescriptionAsTitle(e)}
+                      onClick={() => openEdit(e)}
+                    />
+                  ))}
                 </div>
-              ))}
-            </div>
-          )
+              )
+            ) : (
+              filteredReceivedEntries.length === 0 ? (
+                <p style={{ color: 'var(--muted)', padding: '0.5rem 0', fontSize: 14 }}>No transactions yet.</p>
+              ) : (
+                <div style={{ display: 'grid', rowGap: 8, columnGap: 0 }}>
+                  {filteredReceivedEntries.map(e => (
+                    <EntryCard
+                      key={e.id}
+                      entry={e}
+                      label="Received"
+                      useDescriptionAsTitle={shouldUseDescriptionAsTitle(e)}
+                      onClick={() => openEdit(e)}
+                    />
+                  ))}
+                </div>
+              )
+            )}
+          </SectionBlock>
+          </>
         )}
       </div>
 
-      {/* Add/Edit Modal */}
       {modalOpen && (
-        <div className="modal-bg open" onClick={ev => { if (ev.target === ev.currentTarget) setModalOpen(false) }}>
-          <div className="modal">
-            <div className="modal-hd">
-              <span className="modal-title">{editEntry ? 'Edit Entry' : 'Add Entry'}</span>
-              <button className="modal-close" onClick={() => setModalOpen(false)}><X size={16} /></button>
-            </div>
-            <div className="modal-body">
-              <div className="form-row">
-                <label className="form-lbl">Type</label>
-                <select className="form-sel" value={form.type} onChange={e => set('type', e.target.value as LendType)}>
-                  <option value="LEND">LEND</option>
-                  <option value="RECEIVED">RECEIVED</option>
-                </select>
-              </div>
-              <div className="form-row">
-                <label className="form-lbl">Name</label>
-                <input className="form-inp" type="text" placeholder="Who?" value={form.name} onChange={e => set('name', e.target.value)} />
-              </div>
-              <div className="form-row">
-                <label className="form-lbl">Amount (₹)</label>
-                <input className="form-inp" type="number" min="0" step="1" placeholder="0" value={form.amount} onChange={e => set('amount', e.target.value)} />
-              </div>
-              <div className="form-row">
-                <label className="form-lbl">Date</label>
-                <input className="form-inp" type="date" value={form.date} onChange={e => set('date', e.target.value)} />
-              </div>
-              <div className="form-row">
-                <label className="form-lbl">Description</label>
-                <input className="form-inp" type="text" placeholder="Optional" value={form.description} onChange={e => set('description', e.target.value)} />
-              </div>
-            </div>
-            <div className="modal-foot">
-              <div className="modal-foot-l">
-                {editEntry && (
-                  <button className="btn btn-red btn-sm" onClick={del} disabled={saving}>
-                    {delConfirm ? <><AlertTriangle size={14} />Confirm?</> : <><Trash2 size={14} />Delete</>}
-                  </button>
-                )}
-              </div>
-              <button className="btn btn-sm" style={{ background: 'var(--border)', color: 'var(--text)' }} onClick={() => setModalOpen(false)}>
-                <X size={14} /> Cancel
-              </button>
-              <button className="btn btn-sm btn-green" onClick={save} disabled={saving || !form.name.trim() || !form.amount}>
-                {saving ? <Loader2 size={14} className="spin-icon" /> : editEntry ? <><Check size={14} />Save</> : <><Plus size={14} />Add</>}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Person Details Bottom Sheet Modal */}
-      {personModalOpen && personModalName && personDetails && (
-        <div
-          className="modal-bg open"
-          onClick={ev => { if (ev.target === ev.currentTarget) setPersonModalOpen(false) }}
-          style={{ position: 'fixed', inset: 0, zIndex: 1000 }}
+        <ModalShell
+          title={editEntry ? 'Edit Entry' : 'Add Entry'}
+          onClose={closeModal}
+          footer={
+            <ModalActions
+              primaryLabel={saving ? 'Saving…' : editEntry ? 'Save' : 'Add'}
+              secondaryLabel="Cancel"
+              onPrimary={save}
+              onSecondary={closeModal}
+              leading={editEntry ? (
+                <button className="btn btn-red btn-sm" onClick={del} disabled={saving}>
+                  {delConfirm ? <><AlertTriangle size={14} />Confirm?</> : <><Trash2 size={14} />Delete</>}
+                </button>
+              ) : null}
+              disabled={saving}
+            />
+          }
         >
-          <div className="sheet-panel" onClick={e => e.stopPropagation()}>
-            <div className="sheet-hd">
-              <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', margin: 0 }}>
-                {personModalName}
-              </h3>
-              <button
-                className="modal-close"
-                onClick={() => setPersonModalOpen(false)}
-                style={{ padding: 0 }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Person Stats */}
-            <div className="sheet-stats" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
-              <div className="card" style={{ padding: '10px 12px' }}>
-                <div className="lbl">Lent</div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginTop: 4 }}>
-                  {INR(personDetails.totalLent)}
-                </div>
-              </div>
-              <div className="card" style={{ padding: '10px 12px' }}>
-                <div className="lbl">Received</div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginTop: 4 }}>
-                  {INR(personDetails.totalRepaid)}
-                </div>
-              </div>
-              <div className="card" style={{ padding: '10px 12px', background: personDetails.outstanding > 0 ? 'rgba(239, 68, 68, 0.08)' : personDetails.outstanding < 0 ? 'rgba(16, 185, 129, 0.08)' : 'rgba(107, 114, 128, 0.05)' }}>
-                <div className="lbl">Outstanding</div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: personDetails.outstanding > 0 ? '#EF4444' : personDetails.outstanding < 0 ? '#10B981' : 'var(--text)', marginTop: 4 }}>
-                  {INR(Math.abs(personDetails.outstanding))}
-                </div>
-              </div>
-            </div>
-
-            {/* Transactions List */}
-            <div className="sheet-body">
-              {personModalEntries.length === 0 ? (
-                <p style={{ color: 'var(--muted)', padding: '1rem 0', fontSize: 14, textAlign: 'center' }}>
-                  No entries for this person.
-                </p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {personModalEntries.map(e => (
-                    <div
-                      key={e.id}
-                      className="card"
-                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', cursor: 'pointer' }}
-                      onClick={() => {
-                        openEdit(e)
-                        setPersonModalOpen(false)
-                      }}
-                    >
-                      <span style={{
-                        fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 5,
-                        background: e.type === 'LEND' ? 'rgba(239,68,68,.12)' : 'rgba(16,185,129,.12)',
-                        color: e.type === 'LEND' ? '#EF4444' : '#10B981',
-                        flexShrink: 0,
-                      }}>
-                        {e.type}
-                      </span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>
-                          {e.type === 'LEND' ? 'Lent' : 'Received'}
-                        </div>
-                        {e.description && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 1 }}>{e.description}</div>}
-                      </div>
-                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <div style={{ fontWeight: 700, fontSize: 14, color: e.type === 'LEND' ? '#EF4444' : '#10B981' }}>
-                          {INR(e.amount)}
-                        </div>
-                        <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 1 }}>{e.date}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
+          <div style={{ display: 'grid', rowGap: 8, columnGap: 0 }}>
+            <FormField label="Type">
+              <select className="form-sel" value={form.type} onChange={e => set('type', e.target.value as LendType)}>
+                <option value="LEND">LEND</option>
+                <option value="RECEIVED">RECEIVED</option>
+              </select>
+            </FormField>
+            <FormField label="Name">
+              <input className="form-inp" type="text" placeholder="Who?" value={form.name} onChange={e => set('name', e.target.value)} />
+            </FormField>
+            <FormField label="Amount (₹)">
+              <input className="form-inp" type="number" min="0" step="1" placeholder="0" value={form.amount} onChange={e => set('amount', e.target.value)} />
+            </FormField>
+            <FormField label="Date">
+              <input className="form-inp" type="date" value={form.date} onChange={e => set('date', e.target.value)} />
+            </FormField>
+            <FormField label="Description">
+              <input className="form-inp" type="text" placeholder="Optional" value={form.description} onChange={e => set('description', e.target.value)} />
+            </FormField>
           </div>
-        </div>
+        </ModalShell>
       )}
-      </div>
 
-      {/* FAB — Add entry */}
+      {personModalOpen && personModalName && personDetails && (
+        <ModalShell
+          title={personModalName}
+          onClose={() => setPersonModalOpen(false)}
+        >
+          <div style={{ display: 'grid', rowGap: 8, columnGap: 0 }}>
+            <div className="dash-grid">
+              <KpiCard label="Lent" value={INR(personDetails.totalLent)} tone="red" icon={<Handshake size={14} />} />
+              <KpiCard label="Received" value={INR(personDetails.totalRepaid)} tone="green" icon={<ArrowDownLeft size={14} />} />
+              <KpiCard label="Outstanding" value={INR(Math.abs(personDetails.outstanding))} tone="muted" icon={<Shield size={14} />} />
+            </div>
+            {personModalEntries.length === 0 ? (
+              <p style={{ color: 'var(--muted)', padding: '0.5rem 0', fontSize: 14, textAlign: 'center' }}>
+                No entries for this person.
+              </p>
+            ) : (
+              <div style={{ display: 'grid', rowGap: 8, columnGap: 0 }}>
+                {personModalEntries.map(e => (
+                  <EntryCard
+                    key={e.id}
+                    entry={e}
+                    label={e.type === 'LEND' ? 'Given' : 'Received'}
+                    useDescriptionAsTitle={shouldUseDescriptionAsTitle(e)}
+                    onClick={() => {
+                      openEdit(e)
+                      setPersonModalOpen(false)
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </ModalShell>
+      )}
+
       <button
         onClick={openAdd}
         style={{ position:'fixed', bottom:24, right:20, width:52, height:52, borderRadius:'50%', background:'var(--navy-dark)', color:'#fff', fontSize:24, border:'none', boxShadow:'0 4px 16px rgba(0,0,0,.2)', cursor:'pointer', zIndex:100, display:'flex', alignItems:'center', justifyContent:'center' }}

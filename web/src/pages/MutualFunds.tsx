@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { BarChart3, PieChart, Loader2 } from 'lucide-react';
 import { api } from '../api';
+import { HoldingCard, HoldingModal, SectionBlock, SectionChip, Spacer } from '../ui-kit';
 
 interface Holding {
   symbol: string;
@@ -98,23 +99,48 @@ export default function MutualFunds({ embedded = false }: { embedded?: boolean }
   }
 
   return (
-    <div className="pg">
+    <div className="pg" style={{ paddingTop: embedded ? 0 : undefined }}>
       {!embedded && (
         <>
-          {/* Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-            <div className="section-title">
-              <BarChart3 size={20} className="section-title-icon" />
-              <div>Metrics</div>
-            </div>
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              {loading && (
+          <Spacer size={8} />
+          <SectionBlock
+            title="Metrics"
+            icon={<BarChart3 size={14} />}
+            right={
+              loading ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--muted)', fontSize: '0.875rem' }}>
                   <Loader2 size={16} className="spin-icon" />
                 </div>
-              )}
+              ) : null
+            }
+          >
+            <div className="kpis">
+              <div className="kpi-card">
+                <div className="kpi-card-l">Total Invested</div>
+                <div className="kpi-card-v kpi-card-v-soft">
+                  {formatRupees(stats.totalInvested)}
+                </div>
+              </div>
+              <div className="kpi-card">
+                <div className="kpi-card-l">Current Value</div>
+                <div className="kpi-card-v kpi-card-v-soft">
+                  {formatRupees(stats.currentValue)}
+                </div>
+              </div>
+              <div className={`kpi-card ${stats.totalPnL >= 0 ? 'kpi-card--green' : 'kpi-card--red'}`}>
+                <div className="kpi-card-l">Total P&L</div>
+                <div className={`kpi-card-v kpi-card-v-soft ${stats.totalPnL >= 0 ? 'kpi-card-v--green' : 'kpi-card-v--red'}`}>
+                  {stats.totalPnL >= 0 ? '+' : ''}{formatRupees(stats.totalPnL)}
+                </div>
+              </div>
+              <div className={`kpi-card ${stats.totalPnLPct >= 0 ? 'kpi-card--green' : 'kpi-card--red'}`}>
+                <div className="kpi-card-l">Return %</div>
+                <div className={`kpi-card-v kpi-card-v-soft ${stats.totalPnLPct >= 0 ? 'kpi-card-v--green' : 'kpi-card-v--red'}`}>
+                  {stats.totalPnLPct >= 0 ? '+' : ''}{Number(stats.totalPnLPct.toFixed(2))}%
+                </div>
+              </div>
             </div>
-          </div>
+          </SectionBlock>
 
           {/* Error message */}
           {error && (
@@ -130,33 +156,6 @@ export default function MutualFunds({ embedded = false }: { embedded?: boolean }
             </div>
           )}
 
-          {/* Summary strip - KPIs */}
-          <div className="kpis" style={{ marginBottom: '1.5rem' }}>
-            <div className="kpi-card">
-              <div className="kpi-card-l">Total Invested</div>
-              <div className="kpi-card-v kpi-card-v-soft">
-                {formatRupees(stats.totalInvested)}
-              </div>
-            </div>
-            <div className="kpi-card">
-              <div className="kpi-card-l">Current Value</div>
-              <div className="kpi-card-v kpi-card-v-soft">
-                {formatRupees(stats.currentValue)}
-              </div>
-            </div>
-            <div className="kpi-card">
-              <div className="kpi-card-l">Total P&L</div>
-              <div className={`kpi-card-v kpi-card-v-soft ${stats.totalPnL >= 0 ? 'kpi-card-v--green' : 'kpi-card-v--red'}`}>
-                {stats.totalPnL >= 0 ? '+' : ''}{formatRupees(stats.totalPnL)}
-              </div>
-            </div>
-            <div className="kpi-card">
-              <div className="kpi-card-l">Return %</div>
-              <div className={`kpi-card-v kpi-card-v-soft ${stats.totalPnLPct >= 0 ? 'kpi-card-v--green' : 'kpi-card-v--red'}`}>
-                {stats.totalPnLPct >= 0 ? '+' : ''}{Number(stats.totalPnLPct.toFixed(2))}%
-              </div>
-            </div>
-          </div>
         </>
       )}
 
@@ -180,140 +179,82 @@ export default function MutualFunds({ embedded = false }: { embedded?: boolean }
         </div>
       ) : (
         <>
-          {/* Holdings section header */}
-          <div className="section-title" style={{ marginBottom: '1.5rem' }}>
-            <PieChart size={20} className="section-title-icon" />
-            <div>Mutual Funds</div>
-          </div>
+          <Spacer size={8} />
+          <SectionBlock
+            title="Mutual Funds"
+            icon={<PieChart size={14} />}
+            rightChip={<SectionChip tone="muted">{enrichedHoldings.length} items</SectionChip>}
+          >
 
           {/* Holdings as cards */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-            gap: '1rem'
+            gap: '0.75rem'
           }}>
             {enrichedHoldings.map((h, i) => (
-              <div
+              <HoldingCard
                 key={i}
+                title={h.company}
+                subtitle={h.symbol}
+                leftLabel="UNITS"
+                leftValue={Math.round(h.qty).toLocaleString('en-IN')}
+                centerLabel="INVESTED"
+                centerValue={formatRupees(h.invested)}
+                rightLabel="CURRENT"
+                rightValue={formatRupees(h.current)}
+                pnlLabel={h.pnl >= 0 ? 'PROFIT' : 'LOSS'}
+                pnlValue={`${h.pnl >= 0 ? '+' : ''}${formatRupees(h.pnl)}`}
+                accentTone={h.pnl >= 0 ? 'green' : 'red'}
                 onClick={() => setSelectedIndex(i)}
-                style={{
-                  padding: '0.875rem',
-                  background: '#FFFFFF',
-                  border: '1px solid var(--border)',
-                  borderRadius: '0.375rem',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.5rem',
-                  cursor: 'pointer'
-                }}
-              >
-                {/* Fund name */}
-                <div>
-                  <div className="holding-label" style={{ marginBottom: '0.1rem' }}>FUND NAME</div>
-                  <div style={{ fontSize: '0.9rem', fontWeight: 600, lineHeight: '1.3' }}>{h.company}</div>
-                </div>
-
-                {/* Units & P&L */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                  <div>
-                    <div className="holding-label" style={{ marginBottom: '0.1rem' }}>UNITS</div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{Math.round(h.qty).toLocaleString('en-IN')}</div>
-                  </div>
-                  <div style={{
-                    padding: '0.5rem 0.625rem',
-                    background: h.pnl >= 0 ? 'rgba(22, 163, 74, 0.1)' : 'rgba(220, 38, 38, 0.1)',
-                    borderRadius: '0.375rem',
-                    borderLeft: `3px solid ${h.pnl >= 0 ? '#16A34A' : '#DC2626'}`
-                  }}>
-                    <div className="holding-label" style={{ marginBottom: '0.1rem' }}>P&L</div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: h.pnl >= 0 ? '#16A34A' : '#DC2626' }}>
-                      {h.pnl >= 0 ? '+' : ''}{formatRupees(h.pnl)}
-                    </div>
-                  </div>
-                </div>
-              </div>
+                className="stock-entry-card"
+              />
             ))}
           </div>
 
         {/* Modal */}
         {selectedIndex !== null && enrichedHoldings[selectedIndex] && (
-          <div className="modal-bg open" onClick={() => setSelectedIndex(null)}>
-            <div className="sheet-panel" onClick={e => e.stopPropagation()}>
-              <div className="sheet-body">
-                {(() => {
-                  const h = enrichedHoldings[selectedIndex];
-                  return (
-                    <>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                        <div style={{ fontSize: '1rem', fontWeight: 700 }}>{h.company}</div>
-                        <button
-                          onClick={() => setSelectedIndex(null)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            fontSize: '1.5rem',
-                            cursor: 'pointer',
-                            color: 'var(--muted)',
-                            padding: 0
-                          }}
-                        >
-                          ✕
-                        </button>
-                      </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                      <div>
-                        <div className="holding-label" style={{ marginBottom: '0.1rem' }}>Folio</div>
-                        <div style={{ fontSize: '0.9rem' }}>{h.isin}</div>
-                      </div>
-                      <div>
-                        <div className="holding-label" style={{ marginBottom: '0.1rem' }}>Code</div>
-                        <div style={{ fontSize: '0.9rem' }}>{h.symbol}</div>
-                      </div>
-                      <div>
-                        <div className="holding-label" style={{ marginBottom: '0.1rem' }}>Units</div>
-                        <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{Math.round(h.qty).toLocaleString('en-IN')}</div>
-                      </div>
-                      <div>
-                        <div className="holding-label" style={{ marginBottom: '0.1rem' }}>Avg Price</div>
-                        <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{formatRupees(h.avgPrice)}</div>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                      <div>
-                        <div className="holding-label" style={{ marginBottom: '0.1rem' }}>Invested</div>
-                        <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{formatRupees(h.invested)}</div>
-                      </div>
-                      <div>
-                        <div className="holding-label" style={{ marginBottom: '0.1rem' }}>Current</div>
-                        <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{formatRupees(h.current)}</div>
-                      </div>
-                    </div>
-
-                    <div style={{
-                      padding: '0.75rem',
-                      background: h.pnl >= 0 ? 'rgba(22, 163, 74, 0.1)' : 'rgba(220, 38, 38, 0.1)',
-                      borderRadius: '0.375rem',
-                      borderLeft: `4px solid ${h.pnl >= 0 ? '#16A34A' : '#DC2626'}`
-                    }}>
-                      <div className="holding-label" style={{ marginBottom: '0.1rem' }}>Profit / Loss</div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem' }}>
-                        <div style={{ fontSize: '1.1rem', fontWeight: 700, color: h.pnl >= 0 ? '#16A34A' : '#DC2626' }}>
-                          {h.pnl >= 0 ? '+' : ''}{formatRupees(h.pnl)}
-                        </div>
-                        <div style={{ fontSize: '0.9rem', fontWeight: 600, color: h.pnlPct >= 0 ? '#16A34A' : '#DC2626' }}>
-                          ({h.pnlPct >= 0 ? '+' : ''}{Number(h.pnlPct.toFixed(2))}%)
-                        </div>
-                      </div>
-                    </div>
-                    </>
-                  );
-                })()}
+          <HoldingModal
+            title={enrichedHoldings[selectedIndex].company}
+            onClose={() => setSelectedIndex(null)}
+            pnlLabel={enrichedHoldings[selectedIndex].pnl >= 0 ? 'Profit' : 'Loss'}
+            pnlValue={`${enrichedHoldings[selectedIndex].pnl >= 0 ? '+' : ''}${formatRupees(enrichedHoldings[selectedIndex].pnl)}`}
+            pnlPct={`(${enrichedHoldings[selectedIndex].pnlPct >= 0 ? '+' : ''}${Number(enrichedHoldings[selectedIndex].pnlPct.toFixed(2))}%)`}
+            accentTone={enrichedHoldings[selectedIndex].pnl >= 0 ? 'green' : 'red'}
+          >
+            <div className="ui-kit-holding-detail">
+              <div className="ui-kit-holding-detail-label">Folio</div>
+              <div className="ui-kit-holding-detail-value">{enrichedHoldings[selectedIndex].isin}</div>
+            </div>
+            <div className="ui-kit-holding-detail">
+              <div className="ui-kit-holding-detail-label">Code</div>
+              <div className="ui-kit-holding-detail-value">{enrichedHoldings[selectedIndex].symbol}</div>
+            </div>
+            <div className="ui-kit-holding-detail">
+              <div className="ui-kit-holding-detail-label">Units</div>
+              <div className="ui-kit-holding-detail-value">{Math.round(enrichedHoldings[selectedIndex].qty).toLocaleString('en-IN')}</div>
+            </div>
+            <div className="ui-kit-holding-detail">
+              <div className="ui-kit-holding-detail-label">Avg Price</div>
+              <div className="ui-kit-holding-detail-value">{formatRupees(enrichedHoldings[selectedIndex].avgPrice)}</div>
+            </div>
+            <div className="ui-kit-holding-detail">
+              <div className="ui-kit-holding-detail-label">Invested</div>
+              <div className="ui-kit-holding-detail-value">{formatRupees(enrichedHoldings[selectedIndex].invested)}</div>
+            </div>
+            <div className="ui-kit-holding-detail">
+              <div className="ui-kit-holding-detail-label">Current</div>
+              <div className="ui-kit-holding-detail-value">{formatRupees(enrichedHoldings[selectedIndex].current)}</div>
+            </div>
+            <div className="ui-kit-holding-detail">
+              <div className="ui-kit-holding-detail-label">Day Change</div>
+              <div className="ui-kit-holding-detail-value" style={{ color: enrichedHoldings[selectedIndex].dayChangePct >= 0 ? '#16A34A' : '#DC2626' }}>
+                {enrichedHoldings[selectedIndex].dayChangePct >= 0 ? '+' : ''}{Number(enrichedHoldings[selectedIndex].dayChangePct.toFixed(2))}%
               </div>
             </div>
-          </div>
+          </HoldingModal>
         )}
+        </SectionBlock>
         </>
       )}
 

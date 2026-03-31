@@ -1,8 +1,10 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Plus, X, Check, Trash2, AlertTriangle, Loader2, Search, LayoutDashboard, List, Pencil, BarChart3, Wallet, type LucideIcon } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import { Plus, Loader2, LayoutDashboard, List, Pencil, BarChart3, Wallet, Search, TrendingUp, AlertTriangle, ArrowUpRight, ArrowDownRight, Repeat2 } from 'lucide-react';
 import { api, RawSavingsRow } from '../api';
 import { THEME_COLORS } from '../constants';
 import { INR } from '../utils';
+import { BalanceRow, FilterChips, FormField, HoldingCard, KpiCard, ModalActions, ModalShell, SearchField, SectionBlock, Spacer, TabBar } from '../ui-kit';
+import '../ui-kit/ui-kit.css';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // TYPES & CONSTANTS
@@ -40,8 +42,6 @@ const ACCOUNT_COLORS: Record<SavingsAccount, string> = {
   'Amma SBI': THEME_COLORS[3],
   'Cash': THEME_COLORS[5],
 };
-
-const ACCOUNT_VALUE_COLOR = '#111827';
 
 const TYPE_FILTERS = ['All', 'Income', 'Expense', 'Transfer'] as const;
 
@@ -107,15 +107,6 @@ function computeBalances(entries: SavingsEntry[]): Record<SavingsAccount, number
 // SUB-COMPONENTS
 // ──────────────────────────────────────────────────────────────────────────────
 
-function SectionTitle({ icon: Icon, children }: { icon: LucideIcon; children: string }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-      <Icon size={16} style={{ color: 'var(--text)' }} />
-      <div style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--text)' }}>{children}</div>
-    </div>
-  );
-}
-
 function TypeBadge({ type }: { type: SavingsType }) {
   const bgColor = type === 'Income' ? THEME_COLORS[0] : type === 'Expense' ? THEME_COLORS[2] : THEME_COLORS[5];
   return (
@@ -139,6 +130,40 @@ function typeColor(type: SavingsType): string {
   return THEME_COLORS[5];
 }
 
+function typeIcon(type: SavingsType) {
+  if (type === 'Income') return <ArrowUpRight size={14} />;
+  if (type === 'Expense') return <ArrowDownRight size={14} />;
+  return <Repeat2 size={14} />;
+}
+
+const SavingsEntryCard = memo(function SavingsEntryCard({
+  entry,
+  onClick,
+}: {
+  entry: SavingsEntry;
+  onClick: () => void;
+}) {
+  const tone = entry.type === 'Income' ? 'green' : entry.type === 'Transfer' ? 'amber' : 'red';
+  return (
+    <HoldingCard
+      title={entry.desc || entry.account}
+      subtitle={entry.account}
+      leftLabel="Amount"
+      leftValue={`${entry.type === 'Income' ? '+' : entry.type === 'Transfer' ? '↔' : '−'}${INR(entry.amount)}`}
+      centerLabel="Type"
+      centerValue={entry.type}
+      rightLabel="Date"
+      rightValue={entry.date}
+      accentTone={tone}
+      icon={typeIcon(entry.type)}
+      iconPosition="right"
+      iconBackground
+      className="lending-entry-card"
+      onClick={onClick}
+    />
+  );
+});
+
 // ──────────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ──────────────────────────────────────────────────────────────────────────────
@@ -159,7 +184,7 @@ export default function Savings() {
   const [editEntry, setEditEntry] = useState<SavingsEntry | null>(null);
   const [form, setForm] = useState<SavingsFormState>(emptyForm());
   const [saving, setSaving] = useState(false);
-  const [delConfirm, setDelConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Derivations
   const balances = useMemo(() => computeBalances(entries), [entries]);
@@ -167,12 +192,19 @@ export default function Savings() {
   const totalIncome = useMemo(() => entries.filter(e => e.type === 'Income').reduce((s, e) => s + e.amount, 0), [entries]);
   const totalExpenses = useMemo(() => entries.filter(e => e.type === 'Expense').reduce((s, e) => s + e.amount, 0), [entries]);
   const accountSummary = useMemo(
-    () => ACCOUNTS.map(account => ({
-      account,
-      balance: balances[account],
-      color: ACCOUNT_COLORS[account],
-    })),
-    [balances],
+    () => ACCOUNTS.map(account => {
+      const accountEntries = entries.filter(e => e.account === account);
+      const income = accountEntries.filter(e => e.type === 'Income').reduce((s, e) => s + e.amount, 0);
+      const expense = accountEntries.filter(e => e.type === 'Expense').reduce((s, e) => s + e.amount, 0);
+      return {
+        account,
+        balance: balances[account],
+        income,
+        expense,
+        net: income - expense,
+      };
+    }),
+    [balances, entries],
   );
 
   const filteredEntries = useMemo(() => {
@@ -206,8 +238,28 @@ export default function Savings() {
   }, [loadData]);
 
   // Handlers
+  function resetModal() {
+    setEditEntry(null);
+    setForm(emptyForm());
+  }
+
+  function closeModal() {
+    setError('');
+    setModalOpen(false);
+    resetModal();
+    setSaving(false);
+    setDeleting(false);
+  }
+
+  function openAdd() {
+    resetModal();
+    setError('');
+    setModalOpen(true);
+  }
+
   function openEdit(e: SavingsEntry) {
     setEditEntry(e);
+    setError('');
     setForm({
       date: toDateInput(e.date),
       account: e.account,
@@ -216,7 +268,6 @@ export default function Savings() {
       type: e.type,
       toAccount: e.toAccount ?? 'Amma IB',
     });
-    setDelConfirm(false);
     setModalOpen(true);
   }
 
@@ -226,7 +277,9 @@ export default function Savings() {
 
   async function save() {
     if (!form.amount || parseFloat(form.amount) <= 0) return;
+    if (saving || deleting) return;
     setSaving(true);
+    setError('');
     const payload: Record<string, unknown> = {
       date: form.date,
       account: form.account,
@@ -241,7 +294,7 @@ export default function Savings() {
       } else {
         await api.addSavings(payload);
       }
-      setModalOpen(false);
+      closeModal();
       await loadData();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed');
@@ -251,20 +304,18 @@ export default function Savings() {
   }
 
   async function del() {
-    if (!delConfirm) {
-      setDelConfirm(true);
-      return;
-    }
     if (!editEntry) return;
-    setSaving(true);
+    if (deleting || saving) return;
+    setDeleting(true);
+    setError('');
     try {
       await api.deleteSavings(editEntry.id);
-      setModalOpen(false);
+      closeModal();
       await loadData();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Delete failed');
     } finally {
-      setSaving(false);
+      setDeleting(false);
     }
   }
 
@@ -273,134 +324,99 @@ export default function Savings() {
   // ────────────────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ paddingBottom: 80 }}>
-      {/* Tab bar */}
-      <nav className="tab-bar">
-        <button className={`tab-item${activeTab === 'dashboard' ? ' active' : ''}`} onClick={() => setActiveTab('dashboard')}>
-          <span className="tab-icon"><LayoutDashboard size={19} /></span>
-          <span>Dashboard</span>
-        </button>
-        <button className={`tab-item${activeTab === 'transactions' ? ' active' : ''}`} onClick={() => setActiveTab('transactions')}>
-          <span className="tab-icon"><List size={19} /></span>
-          <span>Transactions</span>
-        </button>
-      </nav>
+    <div className="ui-kit-page-shell">
+      {/* Nav bar */}
+      <TabBar
+        tabs={[
+          { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={19} /> },
+          { id: 'transactions', label: 'Transactions', icon: <List size={19} /> },
+        ]}
+        active={activeTab}
+        onChange={id => setActiveTab(id as SavingsTab)}
+      />
 
-      <div className="pg">
+      <div className="pg ui-kit-page-stack ui-kit-page-stack--tight" style={{ padding: 0 }}>
+        <Spacer size={8} />
 
         {/* DASHBOARD TAB */}
         {activeTab === 'dashboard' && (
           <>
-            {/* Metrics Header */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
-              <BarChart3 size={20} style={{ color: 'var(--text)' }} />
-              <div style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--text)' }}>Metrics</div>
-              {loading && <Loader2 size={15} className="spin-icon" style={{ color: 'var(--muted)' }} />}
-            </div>
+            <SectionBlock
+              title="Metrics"
+              icon={<BarChart3 size={14} />}
+              right={loading ? <Loader2 size={15} className="spin-icon" style={{ color: 'var(--muted)' }} /> : null}
+            >
+              <div className="dash-grid">
+                <KpiCard label="Total Balance" value={INR(totalBalance)} tone="navy" icon={<Wallet size={14} />} />
+                <KpiCard label="Total Income" value={INR(totalIncome)} tone="green" icon={<TrendingUp size={14} />} />
+                <KpiCard label="Total Expenses" value={INR(totalExpenses)} tone="red" icon={<AlertTriangle size={14} />} />
+              </div>
+            </SectionBlock>
 
-            {/* KPI row */}
-            <div className="kpis" style={{ marginBottom: 20 }}>
-              <div className="kpi-card kpi-card--blue">
-                <div className="kpi-card-l">Total Balance</div>
-                <div className="kpi-card-v kpi-card-v-soft">{INR(totalBalance)}</div>
-              </div>
-              <div className="kpi-card kpi-card--green" style={{ borderLeftColor: 'rgb(34, 197, 94)', borderColor: 'rgb(34, 197, 94)' }}>
-                <div className="kpi-card-l">Total Income</div>
-                <div className="kpi-card-v kpi-card-v-soft">{INR(totalIncome)}</div>
-              </div>
-              <div className="kpi-card kpi-card--red">
-                <div className="kpi-card-l">Total Expenses</div>
-                <div className="kpi-card-v kpi-card-v-soft">{INR(totalExpenses)}</div>
-              </div>
-            </div>
-
-            {/* Account balance cards */}
-            <div className="sec" style={{ margin: '10px 0 4px' }}>
-              <SectionTitle icon={Wallet}>Accounts</SectionTitle>
-              <div style={{ display: 'grid', gap: 8 }}>
-                {accountSummary.map(({ account, balance, color }) => (
-                  <div key={account} className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 12px', borderLeft: `4px solid ${color}` }}>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{account}</div>
-                      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>Simple balance summary</div>
-                    </div>
-                    <div style={{ fontSize: 16, fontWeight: 800, color: ACCOUNT_VALUE_COLOR, whiteSpace: 'nowrap' }}>
-                      {INR(balance)}
-                    </div>
+            <Spacer size={8} />
+            <SectionBlock title="Accounts" icon={<Wallet size={14} />}>
+              <div className="ui-stack">
+                {accountSummary.map(({ account, balance, income, expense }) => (
+                  <div key={account}>
+                    <Spacer size={8} />
+                    <BalanceRow
+                      title={account}
+                      value={INR(balance)}
+                      income={INR(income)}
+                      expense={INR(expense)}
+                      incomeIcon={<ArrowUpRight size={11} strokeWidth={2.4} />}
+                      expenseIcon={<ArrowDownRight size={11} strokeWidth={2.4} />}
+                    />
                   </div>
                 ))}
               </div>
-            </div>
+            </SectionBlock>
           </>
         )}
 
         {/* TRANSACTIONS TAB */}
         {activeTab === 'transactions' && (
           <>
-            {/* Search bar */}
-            <div style={{position:'relative',marginBottom:16}}>
-              <input className="form-inp" type="text" placeholder="Search desc, account, type…" value={search} onChange={e => setSearch(e.target.value)} style={{paddingLeft:36,paddingRight:32,fontSize:14}} />
-              <Search size={15} style={{position:'absolute',left:11,top:'50%',transform:'translateY(-50%)',color:'var(--muted)',pointerEvents:'none'}} />
-              {search && (
-                <button className="icon-btn" style={{position:'absolute',right:6,top:'50%',transform:'translateY(-50%)'}} onClick={() => setSearch('')}><X size={14} /></button>
+            <SectionBlock
+              title="Entries"
+              icon={<LayoutDashboard size={14} />}
+              right={<span className="ui-kit-section-chip ui-tone-muted">{filteredEntries.length}</span>}
+            >
+              <Spacer size={8} />
+              <SearchField
+                value={search}
+                placeholder="Search desc, account, type…"
+                onChange={setSearch}
+                onClear={() => setSearch('')}
+                prefix={<Search size={15} />}
+              />
+              <Spacer size={8} />
+              <FilterChips items={[...TYPE_FILTERS]} active={typeFilter} onChange={setTypeFilter} />
+              {loading && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.25rem 0', color: 'var(--muted)', fontSize: 14 }}>
+                  <Loader2 size={16} className="spin-icon" /> Loading…
+                </div>
               )}
-            </div>
 
-            {/* Filter pills */}
-            <div className="pills" style={{marginBottom:16}}>
-              {TYPE_FILTERS.map(f => (
-                <button key={f} className={`pill ${typeFilter===f?'active':''}`} onClick={() => setTypeFilter(f)}>{f}</button>
-              ))}
-            </div>
+              {!loading && filteredEntries.length === 0 && (
+                <p style={{ color: 'var(--muted)', padding: '0.25rem 0', fontSize: 14 }}>No entries to display.</p>
+              )}
 
-            {/* Loading */}
-            {loading && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '1rem 0', color: 'var(--muted)', fontSize: 14 }}>
-                <Loader2 size={16} className="spin-icon" /> Loading…
-              </div>
-            )}
-
-            {/* Empty state */}
-            {!loading && filteredEntries.length === 0 && (
-              <p style={{ color: 'var(--muted)', padding: '1rem 0', fontSize: 14 }}>No entries to display.</p>
-            )}
-
-            {/* Mobile cards */}
-            {!loading && filteredEntries.length > 0 && (
-              <div className="txn-cards">
-                {filteredEntries.map(e => (
-                  <div
-                    key={e.id}
-                    className="txn-card"
-                    style={{
-                      cursor: 'pointer',
-                      borderLeft: `4px solid ${typeColor(e.type)}`,
-                    }}
-                    onClick={() => openEdit(e)}
-                  >
-                    <div className="txn-card-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontWeight: 500, color: 'var(--text)' }}>{e.desc || e.account}</span>
-                      <span style={{ color: typeColor(e.type), fontWeight: 700 }}>
-                        {e.type === 'Income' ? '+' : '−'}{INR(e.amount)}
-                      </span>
-                    </div>
-                    <div className="txn-card-bot" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 12, color: 'var(--muted)' }}>{e.date}</span>
-                      <span style={{ fontSize: 11, color: ACCOUNT_COLORS[e.account], fontWeight: 600 }}>{e.account}</span>
-                      <TypeBadge type={e.type} />
-                      {e.type === 'Transfer' && e.toAccount && (
-                        <span style={{ fontSize: 10, color: 'var(--muted)' }}>→ {e.toAccount}</span>
-                      )}
-                    </div>
+              {!loading && filteredEntries.length > 0 && (
+                <>
+                  <div className="txn-cards">
+                    {filteredEntries.map(e => (
+                      <div key={e.id}>
+                        <Spacer size={8} />
+                        <SavingsEntryCard
+                          entry={e}
+                          onClick={() => openEdit(e)}
+                        />
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
-
-            {/* Desktop table */}
-            {!loading && filteredEntries.length > 0 && (
-              <div className="tw txn-table">
-                <table>
+                  <div className="tw txn-table">
+                    <table>
                     <thead>
                       <tr>
                         <th>ID</th>
@@ -439,10 +455,12 @@ export default function Savings() {
                         </tr>
                       ))}
                     </tbody>
-                  </table>
-                </div>
+                    </table>
+                  </div>
+                </>
               )}
-            </>
+            </SectionBlock>
+          </>
           )}
 
         {/* Error message */}
@@ -455,7 +473,7 @@ export default function Savings() {
 
       {/* FAB — Add Savings Entry */}
       <button
-        onClick={() => setModalOpen(true)}
+        onClick={openAdd}
         style={{
           position: 'fixed', bottom: 24, right: 20,
           width: 52, height: 52, borderRadius: '50%',
@@ -472,143 +490,65 @@ export default function Savings() {
 
       {/* MODAL */}
       {modalOpen && (
-        <div className="modal-bg open" onClick={ev => { if (ev.target === ev.currentTarget) setModalOpen(false); }}>
-          <div className="modal">
-            <div className="modal-hd">
-              <span className="modal-title">{editEntry ? 'Edit Transaction' : 'Add Transaction'}</span>
-              <button className="modal-close" onClick={() => setModalOpen(false)}>
-                <X size={16} />
-              </button>
-            </div>
-            <div className="modal-body">
-              <div className="form-row">
-                <label className="form-lbl">Date</label>
-                <input
-                  className="form-inp"
-                  type="date"
-                  value={form.date}
-                  onChange={e => setField('date', e.target.value)}
-                />
-              </div>
-              <div className="form-row">
-                <label className="form-lbl">Account</label>
-                <select
-                  className="form-sel"
-                  value={form.account}
-                  onChange={e => {
-                    const newAccount = e.target.value as SavingsAccount;
-                    setField('account', newAccount);
-                    // Auto-reset toAccount if it matches the new account
-                    if (form.toAccount === newAccount) {
-                      const newToAcct = ACCOUNTS.find(a => a !== newAccount);
-                      if (newToAcct) setField('toAccount', newToAcct);
-                    }
-                  }}
-                >
-                  {ACCOUNTS.map(a => (
-                    <option key={a} value={a}>
-                      {a}
-                    </option>
-                  ))}
+        <ModalShell
+          title={editEntry ? 'Edit Transaction' : 'Add Transaction'}
+          onClose={closeModal}
+          footer={
+            <ModalActions
+              secondaryLabel="Cancel"
+              primaryLabel={saving ? 'Saving…' : editEntry ? 'Save' : 'Add'}
+              destructive={false}
+              leading={editEntry ? (
+                <button type="button" className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={del} disabled={saving || deleting}>
+                  {deleting && <Loader2 size={14} className="spin-icon" />}
+                  {deleting ? 'Deleting…' : 'Delete'}
+                </button>
+              ) : null}
+              primaryPrefix={saving ? <Loader2 size={14} className="spin-icon" /> : null}
+              disabled={saving || deleting}
+              onSecondary={closeModal}
+              onPrimary={save}
+            />
+          }
+        >
+          <div className="ui-stack">
+            <FormField label="Date">
+              <input className="form-inp" type="date" value={form.date} onChange={e => setField('date', e.target.value)} />
+            </FormField>
+            <FormField label="Account">
+              <select className="form-sel" value={form.account} onChange={e => {
+                const newAccount = e.target.value as SavingsAccount;
+                setField('account', newAccount);
+                if (form.toAccount === newAccount) {
+                  const newToAcct = ACCOUNTS.find(a => a !== newAccount);
+                  if (newToAcct) setField('toAccount', newToAcct);
+                }
+              }}>
+                {ACCOUNTS.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </FormField>
+            <FormField label="Amount">
+              <input className="form-inp" type="number" min="0" step="1" placeholder="₹0" value={form.amount} onChange={e => setField('amount', e.target.value)} />
+            </FormField>
+            <FormField label="Description">
+              <input className="form-inp" type="text" placeholder="Add note" value={form.desc} onChange={e => setField('desc', e.target.value)} />
+            </FormField>
+            <FormField label="Type">
+              <select className="form-sel" value={form.type} onChange={e => setField('type', e.target.value as SavingsType)}>
+                <option value="Income">Income</option>
+                <option value="Expense">Expense</option>
+                <option value="Transfer">Transfer</option>
+              </select>
+            </FormField>
+            {form.type === 'Transfer' && (
+              <FormField label="To Account">
+                <select className="form-sel" value={form.toAccount} onChange={e => setField('toAccount', e.target.value as SavingsAccount)}>
+                  {ACCOUNTS.filter(a => a !== form.account).map(a => <option key={a} value={a}>{a}</option>)}
                 </select>
-              </div>
-              <div className="form-row">
-                <label className="form-lbl">Amount (₹)</label>
-                <input
-                  className="form-inp"
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={form.amount}
-                  onChange={e => setField('amount', e.target.value)}
-                />
-              </div>
-              <div className="form-row">
-                <label className="form-lbl">Description</label>
-                <input
-                  className="form-inp"
-                  type="text"
-                  placeholder="Optional"
-                  value={form.desc}
-                  onChange={e => setField('desc', e.target.value)}
-                />
-              </div>
-              <div className="form-row">
-                <label className="form-lbl">Type</label>
-                <select
-                  className="form-sel"
-                  value={form.type}
-                  onChange={e => setField('type', e.target.value as SavingsType)}
-                >
-                  <option value="Income">Income</option>
-                  <option value="Expense">Expense</option>
-                  <option value="Transfer">Transfer</option>
-                </select>
-              </div>
-              {form.type === 'Transfer' && (
-                <div className="form-row">
-                  <label className="form-lbl">To Account</label>
-                  <select
-                    className="form-sel"
-                    value={form.toAccount}
-                    onChange={e => setField('toAccount', e.target.value as SavingsAccount)}
-                  >
-                    {ACCOUNTS.filter(a => a !== form.account).map(a => (
-                      <option key={a} value={a}>
-                        {a}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
-            <div className="modal-foot">
-              <div className="modal-foot-l">
-                {editEntry && (
-                  <button
-                    className="btn btn-red btn-sm"
-                    onClick={del}
-                    disabled={saving}
-                  >
-                    {delConfirm ? (
-                      <>
-                        <AlertTriangle size={14} /> Confirm?
-                      </>
-                    ) : (
-                      <>
-                        <Trash2 size={14} /> Delete
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
-              <button
-                className="btn btn-sm"
-                style={{ background: 'var(--border)', color: 'var(--text)' }}
-                onClick={() => setModalOpen(false)}
-              >
-                <X size={14} /> Cancel
-              </button>
-              <button
-                className="btn btn-sm btn-green"
-                onClick={save}
-                disabled={saving || !form.amount || parseFloat(form.amount) <= 0}
-              >
-                {saving ? (
-                  <Loader2 size={14} className="spin-icon" />
-                ) : editEntry ? (
-                  <>
-                    <Check size={14} /> Save
-                  </>
-                ) : (
-                  <>
-                    <Plus size={14} /> Add
-                  </>
-                )}
-              </button>
-            </div>
+              </FormField>
+            )}
           </div>
-        </div>
+        </ModalShell>
       )}
     </div>
   );

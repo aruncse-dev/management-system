@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
-import { BarChart3, LayoutDashboard, Loader2, PieChart, RefreshCw, TrendingUp, type LucideIcon } from 'lucide-react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { BarChart3, LayoutDashboard, Loader2, PieChart, RefreshCw, Shield, TrendingUp, Wallet } from 'lucide-react';
 import { api, type RawHolding } from '../api';
+import { KpiCard, SectionBlock, Spacer, TabBar, UiCard } from '../ui-kit';
 import Stocks from './Stocks';
 import MutualFunds from './MutualFunds';
 
@@ -31,48 +32,35 @@ function sumHoldingValues(holdings: RawHolding[]) {
   return { totalInvested, currentValue, pnl };
 }
 
-function SectionTitle({ icon: Icon, children }: { icon: LucideIcon; children: string }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-      <Icon size={16} style={{ color: 'var(--text)' }} />
-      <div style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--text)' }}>{children}</div>
-    </div>
-  );
-}
-
 function MetricsSection({
   title,
   holdings,
+  icon,
 }: {
   title: string;
   holdings: RawHolding[];
+  icon: ReactNode;
 }) {
   const stats = sumHoldingValues(holdings);
 
   return (
-    <div className="sec" style={{ margin: '10px 0 4px' }}>
-      <SectionTitle icon={TrendingUp}>{title}</SectionTitle>
-      <div className="kpis" style={{ gap: 4, marginBottom: 0 }}>
-        <div className="kpi-card" style={{ borderRadius: 10 }}>
-          <div className="kpi-card-l">Invested</div>
-          <div className="kpi-card-v kpi-card-v-soft" style={{ color: 'var(--text)' }}>{formatRupees(stats.totalInvested)}</div>
+    <>
+      <Spacer size={8} />
+      <SectionBlock title={title} icon={icon}>
+        <div className="dash-grid">
+          <KpiCard label="Invested" value={formatRupees(stats.totalInvested)} icon={<Wallet size={14} />} tone="muted" />
+          <KpiCard label="Current" value={formatRupees(stats.currentValue)} icon={<TrendingUp size={14} />} tone="muted" />
+          <KpiCard
+            label="P&L"
+            value={`${stats.pnl >= 0 ? '+' : ''}${formatRupees(stats.pnl)}`}
+            icon={<Shield size={14} />}
+            tone="muted"
+            accentTone={stats.pnl >= 0 ? 'green' : 'red'}
+          />
+          <KpiCard label="Holdings" value={holdings.length} icon={<PieChart size={14} />} tone="muted" />
         </div>
-        <div className="kpi-card" style={{ borderRadius: 10 }}>
-          <div className="kpi-card-l">Current</div>
-          <div className="kpi-card-v kpi-card-v-soft" style={{ color: 'var(--text)' }}>{formatRupees(stats.currentValue)}</div>
-        </div>
-        <div className={`kpi-card ${stats.pnl >= 0 ? 'kpi-card--green' : 'kpi-card--red'}`} style={{ borderRadius: 10 }}>
-          <div className="kpi-card-l">P&L</div>
-          <div className="kpi-card-v kpi-card-v-soft" style={{ color: 'var(--text)' }}>
-            {stats.pnl >= 0 ? '+' : ''}{formatRupees(stats.pnl)}
-          </div>
-        </div>
-        <div className="kpi-card" style={{ borderRadius: 10 }}>
-          <div className="kpi-card-l">Holdings</div>
-          <div className="kpi-card-v kpi-card-v-soft" style={{ color: 'var(--text)' }}>{holdings.length}</div>
-        </div>
-      </div>
-    </div>
+      </SectionBlock>
+    </>
   );
 }
 
@@ -154,24 +142,38 @@ function DashboardView() {
   }, [data]);
 
   return (
-    <div className="pg">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-        <div className="section-title">
-          <BarChart3 size={20} className="section-title-icon" />
-          <div>Metrics</div>
+    <div className="ui-kit-page-shell">
+      <Spacer size={8} />
+      <SectionBlock
+        title="Metrics"
+        icon={<BarChart3 size={14} />}
+        right={
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {loading && <Loader2 size={16} className="spin-icon" style={{ color: 'var(--muted)' }} />}
+            <button
+              className="settings-action-btn"
+              onClick={syncAll}
+              disabled={syncing || !hasToken}
+            >
+              <RefreshCw size={14} className={syncing ? 'spin-icon' : ''} />
+              {syncing ? 'Syncing' : 'Sync'}
+            </button>
+          </div>
+        }
+      >
+        <div className="dash-grid">
+          <KpiCard label="Total Invested" value={formatRupees(stats.totalInvested)} icon={<Wallet size={14} />} tone="muted" />
+          <KpiCard label="Current Value" value={formatRupees(stats.currentValue)} icon={<TrendingUp size={14} />} tone="muted" />
+          <KpiCard
+            label="Total P&L"
+            value={`${stats.totalPnL >= 0 ? '+' : ''}${formatRupees(stats.totalPnL)}`}
+            icon={<Shield size={14} />}
+            tone="muted"
+            accentTone={stats.totalPnL >= 0 ? 'green' : 'red'}
+          />
+          <KpiCard label="Return %" value={`${stats.totalPnLPct >= 0 ? '+' : ''}${Math.round(stats.totalPnLPct)}%`} icon={<PieChart size={14} />} tone="muted" />
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {loading && <Loader2 size={16} className="spin-icon" style={{ color: 'var(--muted)' }} />}
-          <button
-            className="settings-action-btn"
-            onClick={syncAll}
-            disabled={syncing || !hasToken}
-          >
-            <RefreshCw size={14} className={syncing ? 'spin-icon' : ''} />
-            {syncing ? 'Syncing' : 'Sync'}
-          </button>
-        </div>
-      </div>
+      </SectionBlock>
 
       {error && <div className="settings-alert">⚠ {error}</div>}
 
@@ -181,36 +183,13 @@ function DashboardView() {
         </div>
       ) : hasToken ? (
         <>
-          <div className="kpis">
-            <div className="kpi-card">
-              <div className="kpi-card-l">Total Invested</div>
-              <div className="kpi-card-v kpi-card-v-soft">{formatRupees(stats.totalInvested)}</div>
-            </div>
-            <div className="kpi-card">
-              <div className="kpi-card-l">Current Value</div>
-              <div className="kpi-card-v kpi-card-v-soft">{formatRupees(stats.currentValue)}</div>
-            </div>
-            <div className={`kpi-card ${stats.totalPnL >= 0 ? 'kpi-card--green' : 'kpi-card--red'}`}>
-              <div className="kpi-card-l">Total P&L</div>
-              <div className={`kpi-card-v kpi-card-v-soft ${stats.totalPnL >= 0 ? 'kpi-card-v--green' : 'kpi-card-v--red'}`}>
-                {stats.totalPnL >= 0 ? '+' : ''}{formatRupees(stats.totalPnL)}
-              </div>
-            </div>
-            <div className={`kpi-card ${stats.totalPnLPct >= 0 ? 'kpi-card--green' : 'kpi-card--red'}`}>
-              <div className="kpi-card-l">Return %</div>
-              <div className={`kpi-card-v kpi-card-v-soft ${stats.totalPnLPct >= 0 ? 'kpi-card-v--green' : 'kpi-card-v--red'}`}>
-                {stats.totalPnLPct >= 0 ? '+' : ''}{Math.round(stats.totalPnLPct)}%
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gap: 2 }}>
-            <MetricsSection title="Stocks" holdings={data.stocks} />
-            <MetricsSection title="Mutual Funds" holdings={data.mutualFunds} />
+          <div>
+            <MetricsSection title="Stocks" holdings={data.stocks} icon={<TrendingUp size={14} />} />
+            <MetricsSection title="Mutual Funds" holdings={data.mutualFunds} icon={<PieChart size={14} />} />
           </div>
         </>
       ) : (
-        <div className="sec">
+        <UiCard>
           <div style={{
             padding: '1.5rem',
             background: '#EFF6FF',
@@ -225,7 +204,7 @@ function DashboardView() {
               Connect Upstox in Settings to load your portfolio.
             </p>
           </div>
-        </div>
+        </UiCard>
       )}
     </div>
   );
@@ -235,32 +214,18 @@ export default function Investments() {
   const [activeTab, setActiveTab] = useState<InvestmentTab>('dashboard');
 
   return (
-    <div style={{ paddingBottom: 64 }}>
-      <nav className="tab-bar">
-        <button
-          className={`tab-item${activeTab === 'dashboard' ? ' active' : ''}`}
-          onClick={() => setActiveTab('dashboard')}
-        >
-          <span className="tab-icon"><LayoutDashboard size={19} /></span>
-          <span>Dashboard</span>
-        </button>
-        <button
-          className={`tab-item${activeTab === 'stocks' ? ' active' : ''}`}
-          onClick={() => setActiveTab('stocks')}
-        >
-          <span className="tab-icon"><TrendingUp size={19} /></span>
-          <span>Stocks</span>
-        </button>
-        <button
-          className={`tab-item${activeTab === 'mutualFunds' ? ' active' : ''}`}
-          onClick={() => setActiveTab('mutualFunds')}
-        >
-          <span className="tab-icon"><PieChart size={19} /></span>
-          <span>Mutual Funds</span>
-        </button>
-      </nav>
+    <div className="ui-kit-page-shell" style={{ paddingLeft: 0, paddingRight: 0 }}>
+      <TabBar
+        tabs={[
+          { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={19} /> },
+          { id: 'stocks', label: 'Stocks', icon: <TrendingUp size={19} /> },
+          { id: 'mutualFunds', label: 'Mutual Funds', icon: <PieChart size={19} /> },
+        ]}
+        active={activeTab}
+        onChange={id => setActiveTab(id as InvestmentTab)}
+      />
 
-      <div className="pg" style={{ padding: '8px 8px 24px' }}>
+      <div className="pg ui-kit-page-stack ui-kit-page-stack--tight" style={{ padding: 0 }}>
         {activeTab === 'dashboard' && <DashboardView />}
         {activeTab === 'stocks' && <Stocks embedded />}
         {activeTab === 'mutualFunds' && <MutualFunds embedded />}

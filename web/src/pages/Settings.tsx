@@ -252,10 +252,6 @@ export default function Settings() {
                 </div>
 
                 <div className="settings-actions">
-                  <button className="settings-action-btn" onClick={resetBudgetDefaults} disabled={resetBusy}>
-                    {resetBusy ? <Loader2 size={14} className="spin-icon" /> : <RotateCcw size={14} />}
-                    Reset Budgets
-                  </button>
                   <button className="settings-action-btn" onClick={connectUpstox} disabled={upstoxBusy}>
                     <Link2 size={14} />
                     {primaryUpstoxLabel}
@@ -267,6 +263,27 @@ export default function Settings() {
                   <button className="settings-action-btn" onClick={refreshUpstoxStatus} disabled={upstoxBusy}>
                     {upstoxBusy ? <Loader2 size={14} className="spin-icon" /> : <RefreshCw size={14} />}
                     Refresh
+                  </button>
+                </div>
+              </div>
+
+              <div className="settings-card">
+                <div className="settings-card-hd" style={{ marginBottom: 10 }}>
+                  <div>
+                    <div className="section-title" style={{ marginBottom: 4 }}>
+                      <RotateCcw size={18} className="section-title-icon" />
+                      <div>Budget Reset</div>
+                    </div>
+                    <div className="settings-card-sub">
+                      Restore all budget amounts to their default values.
+                    </div>
+                  </div>
+                </div>
+
+                <div className="settings-actions">
+                  <button className="settings-action-btn" onClick={resetBudgetDefaults} disabled={resetBusy}>
+                    {resetBusy ? <Loader2 size={14} className="spin-icon" /> : <RotateCcw size={14} />}
+                    Reset Budgets
                   </button>
                 </div>
               </div>

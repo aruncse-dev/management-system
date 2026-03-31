@@ -54,7 +54,7 @@ export default function Dashboard() {
           <div className="dash-overview-top">
             <div>
               <div className="kpi-card-l">Net Balance</div>
-              <div className="kpi-card-v kpi-card-v-soft" style={{ color: totalSavings >= 0 ? 'var(--gm)' : 'var(--rm)' }}>
+              <div className="kpi-card-v kpi-card-v-soft dash-net-balance" style={{ color: totalSavings >= 0 ? 'var(--gm)' : 'var(--rm)' }}>
                 {totalSavings < 0 ? '−' : ''}{INR(Math.abs(totalSavings))}
               </div>
             </div>
@@ -63,7 +63,7 @@ export default function Dashboard() {
             <div className="dash-flow-top">
               <div className="dash-flow-label">Net Cashflow</div>
             </div>
-            <div className={`dash-flow-value ${surplus >= 0 ? 'positive' : 'negative'}`}>
+            <div className={`dash-flow-value dash-net-cashflow-value ${surplus >= 0 ? 'positive' : 'negative'}`}>
               {surplus >= 0 ? '+' : '−'}{INR(Math.abs(surplus))}
             </div>
             <div className="dash-flow-chips">
