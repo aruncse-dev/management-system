@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
-import { BarChart3, Loader2, RefreshCw, TrendingUp } from 'lucide-react';
+import { BarChart3, RefreshCw, TrendingUp } from 'lucide-react';
 import { api } from '../api';
-import { HoldingCard, HoldingModal, SectionBlock, SectionChip, Spacer } from '../ui-kit';
+import { HoldingCard, HoldingModal, InfoCallout, KpiCard, LoadingState, SectionBlock, SectionChip, Spacer } from '../ui-kit';
 
 interface Holding {
   symbol: string;
@@ -25,6 +25,10 @@ function setCachedStocks(data: Holding[]) {
   STOCKS_CACHE = [...data];
 }
 
+export function clearStocksCache() {
+  STOCKS_CACHE = null;
+}
+
 export default function Stocks({ embedded = false }: { embedded?: boolean } = {}) {
   const [holdings, setHoldings] = useState<Holding[]>(() => getCachedStocks() ?? []);
   const [loading, setLoading] = useState(() => getCachedStocks() === null);
@@ -35,42 +39,39 @@ export default function Stocks({ embedded = false }: { embedded?: boolean } = {}
 
   // Load token status and holdings on mount
   useEffect(() => {
+    loadHoldings();
     loadTokenStatus();
-
-    // Detect when user returns from OAuth in another tab
-    const handleFocus = () => {
-      loadTokenStatus();
-    };
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
   const loadTokenStatus = async (forceRefresh = false) => {
     try {
-      setError('');
       if (forceRefresh) {
-        api.invalidateCache();
+        api.invalidateCache({ action: 'getTokenStatus', params: { module: 'stocks' } });
       }
       const status = await api.getTokenStatus();
-      setHasToken(status.hasToken);
-      const cached = getCachedStocks();
-      if (status.hasToken && (!cached || forceRefresh)) {
-        await loadHoldings();
-      } else {
-        if (cached) setHoldings(cached);
-        setLoading(false);
-      }
+      const connected = Boolean((status.hasToken || status.hasAccessToken || status.hasExtendedToken) && !status.expired);
+      setHasToken(connected);
     } catch (err) {
       console.error('Failed to load token status:', err);
       setError('Failed to check token');
-      setLoading(false);
     }
   };
 
-  const loadHoldings = async () => {
+  const loadHoldings = async (forceRefresh = false) => {
     try {
       setLoading(true);
       setError('');
+      if (forceRefresh) {
+        clearStocksCache();
+        api.invalidateCache({ action: 'getHoldings', params: { module: 'stocks' } });
+      } else {
+        const cached = getCachedStocks();
+        if (cached) {
+          setHoldings(cached);
+          setLoading(false);
+          return;
+        }
+      }
       const data = await api.getStocks();
       const next = data as Holding[];
       setHoldings(next);
@@ -92,9 +93,10 @@ export default function Stocks({ embedded = false }: { embedded?: boolean } = {}
     try {
       setSyncing(true);
       setError('');
+      api.invalidateCache({ action: 'getHoldings', params: { module: 'stocks' } });
       await api.syncStocks();
-      api.invalidateCache();
-      await loadHoldings();
+      await loadHoldings(true);
+      await loadTokenStatus(true);
     } catch (err: any) {
       console.error('Sync failed:', err);
       if (err.message === 'REAUTH_REQUIRED') {
@@ -148,11 +150,7 @@ export default function Stocks({ embedded = false }: { embedded?: boolean } = {}
 
   if (embedded && loading) {
     return (
-      <div className="pg">
-        <div style={{ padding: '2rem', display: 'flex', justifyContent: 'center' }}>
-          <Loader2 size={18} className="spin-icon" style={{ color: 'var(--muted)' }} />
-        </div>
-      </div>
+      <div className="pg"><LoadingState /></div>
     );
   }
 
@@ -165,74 +163,36 @@ export default function Stocks({ embedded = false }: { embedded?: boolean } = {}
             title="Metrics"
             icon={<BarChart3 size={14} />}
             right={
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                <button
-                  onClick={handleSync}
-                  disabled={syncing || !hasToken}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    border: '1px solid var(--border)',
-                    background: '#FFFFFF',
-                    borderRadius: '0.375rem',
-                    cursor: syncing ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    opacity: syncing || !hasToken ? 0.6 : 1
-                  }}
-                >
-                  <RefreshCw size={16} style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }} />
-                  {syncing ? 'Syncing...' : 'Sync'}
-                </button>
-                {loading && !syncing && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--muted)', fontSize: '0.875rem' }}>
-                    <div style={{ width: 16, height: 16, border: '2px solid var(--border)', borderTop: '2px solid var(--text)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-                  </div>
-                )}
-              </div>
+              <button
+                onClick={handleSync}
+                disabled={syncing || !hasToken}
+                className="ui-kit-btn ui-kit-btn--soft"
+              >
+                <RefreshCw size={14} style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }} />
+                {syncing ? 'Syncing…' : 'Sync'}
+              </button>
             }
           >
-            <div className="kpis">
-              <div className="kpi-card">
-                <div className="kpi-card-l">Total Invested</div>
-                <div className="kpi-card-v kpi-card-v-soft">
-                  {formatRupees(stats.totalInvested)}
-                </div>
-              </div>
-              <div className="kpi-card">
-                <div className="kpi-card-l">Current Value</div>
-                <div className="kpi-card-v kpi-card-v-soft">
-                  {formatRupees(stats.currentValue)}
-                </div>
-              </div>
-              <div className={`kpi-card ${stats.totalPnL >= 0 ? 'kpi-card--green' : 'kpi-card--red'}`}>
-                <div className="kpi-card-l">Total P&L</div>
-                <div className={`kpi-card-v kpi-card-v-soft ${stats.totalPnL >= 0 ? 'kpi-card-v--green' : 'kpi-card-v--red'}`}>
-                  {stats.totalPnL >= 0 ? '+' : ''}{formatRupees(stats.totalPnL)}
-                </div>
-              </div>
-              <div className={`kpi-card ${stats.totalPnLPct >= 0 ? 'kpi-card--green' : 'kpi-card--red'}`}>
-                <div className="kpi-card-l">Return %</div>
-                <div className={`kpi-card-v kpi-card-v-soft ${stats.totalPnLPct >= 0 ? 'kpi-card-v--green' : 'kpi-card-v--red'}`}>
-                  {stats.totalPnLPct >= 0 ? '+' : ''}{Number(stats.totalPnLPct.toFixed(2))}%
-                </div>
-              </div>
+            <div className="dash-grid">
+              <KpiCard label="Total Invested" value={formatRupees(stats.totalInvested)} tone="navy" />
+              <KpiCard label="Current Value" value={formatRupees(stats.currentValue)} tone="navy" />
+              <KpiCard
+                label="Total P&L"
+                value={`${stats.totalPnL >= 0 ? '+' : ''}${formatRupees(stats.totalPnL)}`}
+                tone={stats.totalPnL >= 0 ? 'green' : 'red'}
+                accentTone={stats.totalPnL >= 0 ? 'green' : 'red'}
+              />
+              <KpiCard
+                label="Return %"
+                value={`${stats.totalPnLPct >= 0 ? '+' : ''}${Number(stats.totalPnLPct.toFixed(2))}%`}
+                tone={stats.totalPnLPct >= 0 ? 'green' : 'red'}
+                accentTone={stats.totalPnLPct >= 0 ? 'green' : 'red'}
+              />
             </div>
           </SectionBlock>
 
           {/* Error message */}
-          {error && (
-            <div style={{
-              padding: '1rem',
-              background: '#FEE2E2',
-              color: '#991B1B',
-              borderRadius: '0.375rem',
-              marginBottom: '1rem',
-              fontSize: '0.875rem'
-            }}>
-              {error}
-            </div>
-          )}
+          {error && <InfoCallout title="Error" tone="red">{error}</InfoCallout>}
 
           {/* Last synced */}
           {lastSynced && (
@@ -251,7 +211,9 @@ export default function Stocks({ embedded = false }: { embedded?: boolean } = {}
           color: 'var(--muted)',
           fontSize: '0.875rem'
         }}>
-          {hasToken ? 'No holdings found. Click "Sync" to fetch your portfolio.' : 'No portfolio data available yet.'}
+          {hasToken
+            ? 'No stock holdings found in the Stocks sheet. Your token is being used to sync fresh portfolio data.'
+            : 'No stock holdings found in the Stocks sheet. Connect Upstox in Settings so your token can sync fresh portfolio data.'}
         </div>
       ) : (
         <>

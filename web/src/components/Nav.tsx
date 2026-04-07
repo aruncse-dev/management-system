@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { CalendarDays, PiggyBank, Gem, TrendingUp, Wallet, User, Settings, CreditCard, Landmark, Banknote, LayoutGrid, LogOut } from 'lucide-react'
+import { CalendarDays, PiggyBank, Gem, TrendingUp, Wallet, User, Settings, LayoutGrid, LogOut, Layers3 } from 'lucide-react'
 import React from 'react'
 
-export type ModuleId = 'monthly' | 'lending' | 'savings' | 'gold' | 'investments' | 'emi' | 'jewelLoans' | 'cashLoans' | 'settings' | 'components'
+export type ModuleId = 'monthly' | 'lending' | 'savings' | 'gold' | 'investments' | 'loans' | 'settings' | 'components'
 
 interface Props {
   module: ModuleId
@@ -118,25 +118,11 @@ export default function Nav({ module, onModule, lendingSheet, onLendingSheet, ti
             Loans
           </div>
           <button
-            className={`nav-drawer-item${module === 'emi' ? ' active' : ''}`}
-            onClick={() => { onModule('emi'); setDrawerOpen(false) }}
+            className={`nav-drawer-item${module === 'loans' ? ' active' : ''}`}
+            onClick={() => { onModule('loans'); setDrawerOpen(false) }}
           >
-            <CreditCard size={18} />
-            <span>EMI Loans</span>
-          </button>
-          <button
-            className={`nav-drawer-item${module === 'jewelLoans' ? ' active' : ''}`}
-            onClick={() => { onModule('jewelLoans'); setDrawerOpen(false) }}
-          >
-            <Landmark size={18} />
-            <span>Jewel Loans</span>
-          </button>
-          <button
-            className={`nav-drawer-item${module === 'cashLoans' ? ' active' : ''}`}
-            onClick={() => { onModule('cashLoans'); setDrawerOpen(false) }}
-          >
-            <Banknote size={18} />
-            <span>Cash Loans</span>
+            <Layers3 size={18} />
+            <span>All Loans</span>
           </button>
         </div>
 

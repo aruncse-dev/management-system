@@ -18,6 +18,9 @@ Open http://localhost:5173/fintracker/
 # Required - Google Apps Script deployment URL
 VITE_GAS_URL=https://script.google.com/macros/s/{DEPLOYMENT_ID}/exec
 
+# Frontend app URL used after Upstox OAuth redirects
+VITE_APP_URL=http://localhost:5173/fintracker/
+
 # Optional - Direct API URL (overrides GAS_URL in dev)
 VITE_API_URL=
 
@@ -48,6 +51,12 @@ VITE_GAS_URL=https://script.google.com/macros/s/{DEPLOYMENT_ID}/exec
 ```
 
 The app will directly call the production GAS URL (CORS enabled).
+
+Set `VITE_APP_URL` to your frontend URL so the OAuth callback returns to the app after GAS stores the token:
+
+```env
+VITE_APP_URL=https://aruncse-dev.github.io/fintracker/
+```
 
 **Pros:**
 - Works reliably

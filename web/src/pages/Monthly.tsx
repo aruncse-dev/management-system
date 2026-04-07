@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { ChevronLeft, ChevronRight, RefreshCw, Package, X as XIcon, Check } from 'lucide-react'
+import { ChevronLeft, ChevronRight, RefreshCw, X as XIcon, Check } from 'lucide-react'
 import { useStore } from '../store'
 import { api } from '../api'
 import BottomNav from '../components/BottomNav'
@@ -37,9 +37,12 @@ export default function Monthly() {
     setTimeout(() => setStatus(''), 3000)
   }, [])
 
-  const loadMonth = useCallback(async (month: string, year: string) => {
+  const loadMonth = useCallback(async (month: string, year: string, forceRefresh = false) => {
     dispatch({ type: 'SET_LOADING', payload: true })
     try {
+      if (forceRefresh) {
+        api.invalidateCache({ action: 'getData', params: { month, year } })
+      }
       const rows = await api.getData(month, year)
       dispatch({ type: 'SET_ROWS', payload: rows })
       showStatus('✓ ' + month + ' ' + year)
@@ -141,10 +144,8 @@ export default function Monthly() {
       {budgetAddOpen && (
         <div className="modal-bg open" onClick={() => setBudgetAddOpen(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-hd">
-              <span className="modal-title" style={{display:'flex',alignItems:'center',gap:6}}>
-                <Package size={15} /> Add Budget
-              </span>
+            <div className="modal-hd modal-hd--blue">
+              <span className="modal-title">Add Budget</span>
               <button className="modal-close" onClick={() => setBudgetAddOpen(false)}><XIcon size={16} /></button>
             </div>
             <div className="modal-body">
@@ -161,7 +162,7 @@ export default function Monthly() {
             </div>
             <div className="modal-foot">
               <div className="modal-foot-l" />
-              <button className="btn btn-sm" style={{background:'var(--border)',color:'var(--text)'}} onClick={() => setBudgetAddOpen(false)}><XIcon size={13} />Cancel</button>
+              <button className="btn btn-sm btn-cancel" onClick={() => setBudgetAddOpen(false)}>Cancel</button>
               <button className="btn btn-sm btn-green" onClick={addBudget} disabled={budgetSaving}>
                 <Check size={13} />{budgetSaving ? '…' : 'Save'}
               </button>
@@ -177,7 +178,7 @@ export default function Monthly() {
           onClose={() => setModalOpen(false)}
           onSaved={async () => {
             setModalOpen(false)
-            await loadMonth(state.month, state.year)
+            await loadMonth(state.month, state.year, true)
             showStatus('✓ Saved')
           }}
           showStatus={showStatus}

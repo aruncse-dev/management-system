@@ -3,11 +3,62 @@ import { API_URL } from './constants';
 
 type ApiResponse<T> = { ok: true; data: T; traceId?: string; debug?: Record<string, unknown> } | { ok: false; error: string; traceId?: string };
 
+type CacheEntry = {
+  action: string;
+  params: Record<string, string>;
+  data: unknown;
+  savedAt: number;
+};
+
 // Dev: Vite proxy (/gas-proxy), Prod: Cloudflare Worker (via VITE_API_URL)
 const BASE = API_URL;
 const TOKEN = import.meta.env.VITE_API_TOKEN as string | undefined;
 const DEBUG = import.meta.env.VITE_DEBUG === 'true';
-const GET_CACHE = new Map<string, unknown>();
+const GET_CACHE = new Map<string, CacheEntry>();
+const PERSIST_KEY = `fintracker:get-cache:${BASE}:${TOKEN ?? 'anon'}`;
+
+function clearPersistedStorage() {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(PERSIST_KEY);
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+function loadPersistedCache() {
+  if (typeof window === 'undefined') return;
+  const navEntry = window.performance?.getEntriesByType?.('navigation')?.[0] as PerformanceNavigationTiming | undefined;
+  const navType = navEntry?.type;
+  if (navType === 'reload') {
+    clearPersistedStorage();
+    return;
+  }
+  try {
+    const raw = window.localStorage.getItem(PERSIST_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as Record<string, CacheEntry>;
+    Object.entries(parsed).forEach(([key, entry]) => {
+      if (entry && typeof entry.savedAt === 'number') {
+        GET_CACHE.set(key, entry);
+      }
+    });
+  } catch {
+    // Ignore malformed cache; we'll rebuild it lazily.
+  }
+}
+
+function persistCache() {
+  if (typeof window === 'undefined') return;
+  try {
+    const serializable = Object.fromEntries(GET_CACHE.entries());
+    window.localStorage.setItem(PERSIST_KEY, JSON.stringify(serializable));
+  } catch {
+    // Best effort only.
+  }
+}
+
+loadPersistedCache();
 
 function generateTraceId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -43,8 +94,31 @@ function makeCacheKey(action: string, params: Record<string, string>) {
   return `${BASE}|${action}|${TOKEN ?? ''}|${query}`;
 }
 
-function invalidateCache() {
+function isSameParams(a: Record<string, string>, b: Record<string, string>) {
+  const aKeys = Object.keys(a).sort();
+  const bKeys = Object.keys(b).sort();
+  if (aKeys.length !== bKeys.length) return false;
+  return aKeys.every((key) => b[key] === a[key]);
+}
+
+function invalidateCache(matcher?: { action?: string; params?: Record<string, string> }) {
+  if (!matcher) {
+    GET_CACHE.clear();
+    persistCache();
+    return;
+  }
+
+  for (const [key, entry] of GET_CACHE.entries()) {
+    if (matcher.action && entry.action !== matcher.action) continue;
+    if (matcher.params && !isSameParams(entry.params, matcher.params)) continue;
+    GET_CACHE.delete(key);
+  }
+  persistCache();
+}
+
+function clearPersistentCache() {
   GET_CACHE.clear();
+  clearPersistedStorage();
 }
 
 async function get<T>(
@@ -55,7 +129,7 @@ async function get<T>(
   const shouldCache = options.cache !== false;
   const cacheKey = makeCacheKey(action, params);
   if (shouldCache && GET_CACHE.has(cacheKey)) {
-    return GET_CACHE.get(cacheKey) as T;
+    return GET_CACHE.get(cacheKey)?.data as T;
   }
 
   const url = new URL(BASE, window.location.origin);
@@ -68,7 +142,8 @@ async function get<T>(
   const res = await fetch(url.toString(), { redirect: 'follow' });
   const data = await parseResponse<T>(res);
   if (shouldCache) {
-    GET_CACHE.set(cacheKey, data);
+    GET_CACHE.set(cacheKey, { action, params, data, savedAt: Date.now() });
+    persistCache();
   }
   return data;
 }
@@ -90,7 +165,6 @@ async function post<T>(body: Record<string, unknown>): Promise<T> {
     redirect: 'follow',
   });
   const data = await parseResponse<T>(res);
-  invalidateCache();
   return data;
 }
 
@@ -208,6 +282,7 @@ export interface RawHolding {
 
 export const api = {
   invalidateCache,
+  clearPersistentCache,
   init:          ()                              => get<InitData>('init'),
   getData:       (month: string, year: string)  => get<Transaction[]>('getData', { month, year }),
   addRow:        (p: Record<string, unknown>)   => post<string>({ action: 'addRow', ...p }),
@@ -254,7 +329,7 @@ export const api = {
   deleteCashLoanHistory: (id: string)                 => post<boolean>({ module: 'loans', action: 'deleteHistory', type: 'cash', id }),
   getSettings:   ()                            => get<GoldSettings>('get', { module: 'settings' }),
   saveSettings:  (p: Record<string, unknown>) => post<boolean>({ module: 'settings', action: 'save', ...p }),
-  getTokenStatus: ()                           => get<{ hasToken: boolean; tokenType?: string; hasAccessToken?: boolean; hasExtendedToken?: boolean; hasRefreshToken?: boolean }>('getTokenStatus', { module: 'stocks' }, { cache: false }),
+  getTokenStatus: ()                           => get<{ hasToken: boolean; tokenType?: string; hasAccessToken?: boolean; hasExtendedToken?: boolean; hasRefreshToken?: boolean; accessTokenExpiry?: string; extendedTokenExpiry?: string; expired?: boolean }>('getTokenStatus', { module: 'stocks' }, { cache: false }),
   getUpstoxAuthUrl: ()                         => get<{ authUrl: string }>('getAuthUrl', { module: 'stocks' }, { cache: false }),
   setUpstoxToken: (token: string)              => post<boolean>({ module: 'stocks', action: 'setToken', token }),
   clearUpstoxAuth: ()                          => post<boolean>({ module: 'stocks', action: 'resetAuth' }),

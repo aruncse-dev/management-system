@@ -1,9 +1,10 @@
 import { useMemo } from 'react'
 import { useStore } from '../store'
 import { INR } from '../utils'
-import { CC_MODES, OTHER_CR, ALL_CR, CR_COLORS, MNS } from '../constants'
-import { CreditCard, Users, CircleDollarSign } from 'lucide-react'
-import { UiPill, UiSection } from '../components/FinanceUI'
+import { CC_MODES, OTHER_CR, ALL_CR, MNS } from '../constants'
+import { CreditCard, Users, CircleDollarSign, Banknote, Layers3, Users2 } from 'lucide-react'
+import { UiPill } from '../components/FinanceUI'
+import { KpiCard, SectionBlock } from '../ui-kit'
 
 const CC_CYCLE_DAY = 19 // billing cycle: 19th → 18th next month
 
@@ -35,51 +36,49 @@ export default function Credits() {
   )
 
   return (
-    <div className="pg">
-      <UiSection
+    <div className="pg ui-kit-page-shell monthly-subpage">
+      <SectionBlock
         title="Credit Summary"
         icon={<CircleDollarSign size={14} />}
         right={<UiPill tone="muted">{cycleLabel(month, year)}</UiPill>}
-      />
+      >
+        <div className="kpis">
+          <KpiCard label="Overall" value={INR(overall)} tone="red" icon={<Banknote size={14} />} />
+          <KpiCard label="Credit Cards" value={INR(ccNet)} tone="navy" icon={<CreditCard size={14} />} />
+          <KpiCard label="Other Credits" value={INR(otherTotal)} tone="amber" icon={<Users2 size={14} />} />
+          <KpiCard label="Sources" value={String(activeSources)} tone="green" icon={<Layers3 size={14} />} />
+        </div>
+      </SectionBlock>
 
-      <div className="kpis" style={{ marginBottom: 14 }}>
-        <div className="kpi-card kpi-card--red">
-          <div className="kpi-card-l">Overall</div>
-          <div className="kpi-card-v kpi-card-v-soft" style={{ color: '#111827' }}>{INR(overall)}</div>
-        </div>
-        <div className="kpi-card">
-          <div className="kpi-card-l">Credit Cards</div>
-          <div className="kpi-card-v kpi-card-v-soft" style={{ color: '#111827' }}>{INR(ccNet)}</div>
-        </div>
-        <div className="kpi-card">
-          <div className="kpi-card-l">Other Credits</div>
-          <div className="kpi-card-v kpi-card-v-soft" style={{ color: '#111827' }}>{INR(otherTotal)}</div>
-        </div>
-        <div className="kpi-card">
-          <div className="kpi-card-l">Sources</div>
-          <div className="kpi-card-v kpi-card-v-soft" style={{ color: '#111827' }}>{activeSources}</div>
-        </div>
-      </div>
-
-      <UiSection title="Credit Cards" icon={<CreditCard size={14} />} />
-      <div className="cc-g" style={{ marginBottom: 14 }}>
+      <SectionBlock title="Credit Cards" icon={<CreditCard size={14} />}>
+        <div className="cc-g">
         {CC_MODES.map(m => (
-          <div key={m} className="card cp" style={{ borderTop: `3px solid ${CR_COLORS[m]}` }}>
-            <div className="cc-n">{m}</div>
-            <div className="cc-a" style={{ fontSize: 16, fontWeight: 700, color: CR_COLORS[m] }}>{INR(totals[m])}</div>
-          </div>
+          <KpiCard
+            key={m}
+            label={m}
+            value={INR(totals[m])}
+            tone="navy"
+            accentTone="red"
+            icon={<CreditCard size={14} />}
+          />
         ))}
-      </div>
+        </div>
+      </SectionBlock>
 
-      <UiSection title="Other Credits" icon={<Users size={14} />} />
-      <div className="cr-g3" style={{ marginBottom: 14 }}>
+      <SectionBlock title="Other Credits" icon={<Users size={14} />}>
+        <div className="cr-g3">
         {OTHER_CR.map(m => (
-          <div key={m} className="card cp" style={{ borderTop: `3px solid ${CR_COLORS[m]}` }}>
-            <div className="cc-n">{m}</div>
-            <div className="cc-a" style={{ fontSize: 16, fontWeight: 700, color: CR_COLORS[m] }}>{INR(Math.max(0, totals[m]))}</div>
-          </div>
+          <KpiCard
+            key={m}
+            label={m}
+            value={INR(Math.max(0, totals[m]))}
+            tone="navy"
+            accentTone="green"
+            icon={<Users2 size={14} />}
+          />
         ))}
-      </div>
+        </div>
+      </SectionBlock>
 
     </div>
   )

@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
-import { BarChart3, PieChart, Loader2 } from 'lucide-react';
+import { BarChart3, PieChart } from 'lucide-react';
 import { api } from '../api';
-import { HoldingCard, HoldingModal, SectionBlock, SectionChip, Spacer } from '../ui-kit';
+import { HoldingCard, HoldingModal, KpiCard, LoadingState, SectionBlock, SectionChip, Spacer } from '../ui-kit';
 
 interface Holding {
   symbol: string;
@@ -25,6 +25,10 @@ function setCachedHoldings(data: Holding[]) {
   MF_CACHE = [...data];
 }
 
+export function clearMutualFundsCache() {
+  MF_CACHE = null;
+}
+
 export default function MutualFunds({ embedded = false }: { embedded?: boolean } = {}) {
   const [holdings, setHoldings] = useState<Holding[]>(() => getCachedHoldings() ?? []);
   const [loading, setLoading] = useState(() => getCachedHoldings() === null);
@@ -36,11 +40,15 @@ export default function MutualFunds({ embedded = false }: { embedded?: boolean }
     loadHoldings();
   }, []);
 
-  const loadHoldings = async () => {
+  const loadHoldings = async (forceRefresh = false) => {
     try {
       setError('');
+      if (forceRefresh) {
+        clearMutualFundsCache();
+        api.invalidateCache({ action: 'getHoldings', params: { module: 'mutualfunds' } });
+      }
       const cached = getCachedHoldings();
-      if (cached) {
+      if (cached && !forceRefresh) {
         setHoldings(cached);
         setLoading(false);
         return;
@@ -90,11 +98,7 @@ export default function MutualFunds({ embedded = false }: { embedded?: boolean }
 
   if (embedded && loading) {
     return (
-      <div className="pg">
-        <div style={{ padding: '2rem', display: 'flex', justifyContent: 'center' }}>
-          <Loader2 size={18} className="spin-icon" style={{ color: 'var(--muted)' }} />
-        </div>
-      </div>
+      <div className="pg"><LoadingState /></div>
     );
   }
 
@@ -107,38 +111,24 @@ export default function MutualFunds({ embedded = false }: { embedded?: boolean }
             title="Metrics"
             icon={<BarChart3 size={14} />}
             right={
-              loading ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--muted)', fontSize: '0.875rem' }}>
-                  <Loader2 size={16} className="spin-icon" />
-                </div>
-              ) : null
+              loading ? <LoadingState variant="inline" /> : null
             }
           >
-            <div className="kpis">
-              <div className="kpi-card">
-                <div className="kpi-card-l">Total Invested</div>
-                <div className="kpi-card-v kpi-card-v-soft">
-                  {formatRupees(stats.totalInvested)}
-                </div>
-              </div>
-              <div className="kpi-card">
-                <div className="kpi-card-l">Current Value</div>
-                <div className="kpi-card-v kpi-card-v-soft">
-                  {formatRupees(stats.currentValue)}
-                </div>
-              </div>
-              <div className={`kpi-card ${stats.totalPnL >= 0 ? 'kpi-card--green' : 'kpi-card--red'}`}>
-                <div className="kpi-card-l">Total P&L</div>
-                <div className={`kpi-card-v kpi-card-v-soft ${stats.totalPnL >= 0 ? 'kpi-card-v--green' : 'kpi-card-v--red'}`}>
-                  {stats.totalPnL >= 0 ? '+' : ''}{formatRupees(stats.totalPnL)}
-                </div>
-              </div>
-              <div className={`kpi-card ${stats.totalPnLPct >= 0 ? 'kpi-card--green' : 'kpi-card--red'}`}>
-                <div className="kpi-card-l">Return %</div>
-                <div className={`kpi-card-v kpi-card-v-soft ${stats.totalPnLPct >= 0 ? 'kpi-card-v--green' : 'kpi-card-v--red'}`}>
-                  {stats.totalPnLPct >= 0 ? '+' : ''}{Number(stats.totalPnLPct.toFixed(2))}%
-                </div>
-              </div>
+            <div className="dash-grid">
+              <KpiCard label="Total Invested" value={formatRupees(stats.totalInvested)} tone="navy" />
+              <KpiCard label="Current Value" value={formatRupees(stats.currentValue)} tone="navy" />
+              <KpiCard
+                label="Total P&L"
+                value={`${stats.totalPnL >= 0 ? '+' : ''}${formatRupees(stats.totalPnL)}`}
+                tone={stats.totalPnL >= 0 ? 'green' : 'red'}
+                accentTone={stats.totalPnL >= 0 ? 'green' : 'red'}
+              />
+              <KpiCard
+                label="Return %"
+                value={`${stats.totalPnLPct >= 0 ? '+' : ''}${Number(stats.totalPnLPct.toFixed(2))}%`}
+                tone={stats.totalPnLPct >= 0 ? 'green' : 'red'}
+                accentTone={stats.totalPnLPct >= 0 ? 'green' : 'red'}
+              />
             </div>
           </SectionBlock>
 
@@ -173,7 +163,7 @@ export default function MutualFunds({ embedded = false }: { embedded?: boolean }
               No mutual fund holdings found.
             </p>
             <p style={{ marginBottom: 0, color: 'var(--muted)', fontSize: '0.75rem' }}>
-              Update the MutualFunds sheet in your Assets spreadsheet to load your data.
+              Add Mutual Funds data in your Assets spreadsheet to load it here.
             </p>
           </div>
         </div>

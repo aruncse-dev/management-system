@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X, Trash2, Check, Plus, AlertTriangle, Loader2 } from 'lucide-react'
+import { X } from 'lucide-react'
 import { Transaction, TransactionForm } from '../types'
 import { api } from '../api'
 import { CATEGORIES, INCOME_CATS, ACCOUNTS, CC_MODES, OTHER_CR } from '../constants'
@@ -78,7 +78,7 @@ export default function TransactionModal({ row, month, year, onClose, onSaved, s
   return (
     <div className="modal-bg open" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="modal" onClick={e => e.stopPropagation()}>
-        <div className="modal-hd">
+        <div className="modal-hd modal-hd--blue">
           <span className="modal-title">{isEdit ? 'Edit Transaction' : 'Add Transaction'}</span>
           <button className="modal-close" onClick={onClose}><X size={16} /></button>
         </div>
@@ -130,17 +130,17 @@ export default function TransactionModal({ row, month, year, onClose, onSaved, s
             <input className="form-inp" type="text" placeholder="Optional notes" value={form.notes} onChange={e => set('notes', e.target.value)} />
           </div>
         </div>
-        <div className="modal-foot">
-          <div className="modal-foot-l">
-            {isEdit && (
-              <button className="btn btn-red btn-sm" onClick={del} disabled={deleting}>
-                {deleting ? <Loader2 size={14} className="spin-icon" /> : delConfirm ? <><AlertTriangle size={14} />Confirm?</> : <><Trash2 size={14} />Delete</>}
-              </button>
-            )}
-          </div>
-          <button className="btn btn-sm" style={{background:'var(--border)',color:'var(--text)'}} onClick={onClose}><X size={14} />Cancel</button>
-          <button className="btn btn-sm btn-green" onClick={save} disabled={saving}>
-            {saving ? <Loader2 size={14} className="spin-icon" /> : isEdit ? <><Check size={14} />Save</> : <><Plus size={14} />Add</>}
+          <div className="modal-foot">
+            <div className="modal-foot-l">
+              {isEdit && (
+                <button className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={del} disabled={deleting}>
+                {deleting ? 'Deleting…' : delConfirm ? 'Confirm delete?' : 'Delete'}
+                </button>
+              )}
+            </div>
+          <button className="ui-kit-btn ui-kit-btn--soft ui-kit-btn--cancel" onClick={onClose}>Cancel</button>
+          <button className="ui-kit-btn ui-kit-btn--solid" onClick={save} disabled={saving}>
+            {saving ? 'Saving…' : isEdit ? 'Save' : 'Add'}
           </button>
         </div>
       </div>

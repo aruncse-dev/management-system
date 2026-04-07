@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
-import { Plus, Loader2, LayoutDashboard, List, Pencil, BarChart3, Wallet, Search, TrendingUp, AlertTriangle, ArrowUpRight, ArrowDownRight, Repeat2 } from 'lucide-react';
+import { Plus, LayoutDashboard, List, BarChart3, Wallet, Search, TrendingUp, AlertTriangle, ArrowUpRight, ArrowDownRight, Repeat2 } from 'lucide-react';
 import { api, RawSavingsRow } from '../api';
 import { THEME_COLORS } from '../constants';
 import { INR } from '../utils';
-import { BalanceRow, FilterChips, FormField, HoldingCard, KpiCard, ModalActions, ModalShell, SearchField, SectionBlock, Spacer, TabBar } from '../ui-kit';
+import { BalanceRow, FilterChips, FormField, HoldingCard, KpiCard, LoadingState, ModalActions, ModalShell, SearchField, SectionBlock, Spacer, TabBar } from '../ui-kit';
 import '../ui-kit/ui-kit.css';
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -34,14 +34,6 @@ interface SavingsFormState {
 }
 
 const ACCOUNTS: SavingsAccount[] = ['Amma IB', 'Ramya IB', 'Arun IB', 'Amma SBI', 'Cash'];
-
-const ACCOUNT_COLORS: Record<SavingsAccount, string> = {
-  'Amma IB': THEME_COLORS[1],
-  'Ramya IB': THEME_COLORS[0],
-  'Arun IB': THEME_COLORS[2],
-  'Amma SBI': THEME_COLORS[3],
-  'Cash': THEME_COLORS[5],
-};
 
 const TYPE_FILTERS = ['All', 'Income', 'Expense', 'Transfer'] as const;
 
@@ -103,36 +95,9 @@ function computeBalances(entries: SavingsEntry[]): Record<SavingsAccount, number
   return balances;
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// SUB-COMPONENTS
-// ──────────────────────────────────────────────────────────────────────────────
-
-function TypeBadge({ type }: { type: SavingsType }) {
-  const bgColor = type === 'Income' ? THEME_COLORS[0] : type === 'Expense' ? THEME_COLORS[2] : THEME_COLORS[5];
-  return (
-    <span style={{
-      fontSize: 10,
-      fontWeight: 700,
-      background: bgColor,
-      color: '#fff',
-      padding: '4px 8px',
-      borderRadius: 4,
-      whiteSpace: 'nowrap',
-    }}>
-      {type}
-    </span>
-  );
-}
-
-function typeColor(type: SavingsType): string {
-  if (type === 'Income') return THEME_COLORS[0];
-  if (type === 'Expense') return THEME_COLORS[2];
-  return THEME_COLORS[5];
-}
-
 function typeIcon(type: SavingsType) {
-  if (type === 'Income') return <ArrowUpRight size={14} />;
-  if (type === 'Expense') return <ArrowDownRight size={14} />;
+  if (type === 'Income') return <ArrowDownRight size={14} />;
+  if (type === 'Expense') return <ArrowUpRight size={14} />;
   return <Repeat2 size={14} />;
 }
 
@@ -143,7 +108,6 @@ const SavingsEntryCard = memo(function SavingsEntryCard({
   entry: SavingsEntry;
   onClick: () => void;
 }) {
-  const tone = entry.type === 'Income' ? 'green' : entry.type === 'Transfer' ? 'amber' : 'red';
   return (
     <HoldingCard
       title={entry.desc || entry.account}
@@ -154,7 +118,7 @@ const SavingsEntryCard = memo(function SavingsEntryCard({
       centerValue={entry.type}
       rightLabel="Date"
       rightValue={entry.date}
-      accentTone={tone}
+      accentTone={entry.type === 'Income' ? 'green' : entry.type === 'Transfer' ? 'amber' : 'red'}
       icon={typeIcon(entry.type)}
       iconPosition="right"
       iconBackground
@@ -294,6 +258,7 @@ export default function Savings() {
       } else {
         await api.addSavings(payload);
       }
+      api.invalidateCache({ action: 'getEntries', params: { module: 'savings' } });
       closeModal();
       await loadData();
     } catch (e) {
@@ -310,6 +275,7 @@ export default function Savings() {
     setError('');
     try {
       await api.deleteSavings(editEntry.id);
+      api.invalidateCache({ action: 'getEntries', params: { module: 'savings' } });
       closeModal();
       await loadData();
     } catch (e) {
@@ -324,7 +290,7 @@ export default function Savings() {
   // ────────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="ui-kit-page-shell">
+    <div className="ui-kit-page-shell savings-page">
       {/* Nav bar */}
       <TabBar
         tabs={[
@@ -335,16 +301,14 @@ export default function Savings() {
         onChange={id => setActiveTab(id as SavingsTab)}
       />
 
-      <div className="pg ui-kit-page-stack ui-kit-page-stack--tight" style={{ padding: 0 }}>
-        <Spacer size={8} />
-
+      <div className="pg savings-page">
         {/* DASHBOARD TAB */}
         {activeTab === 'dashboard' && (
           <>
             <SectionBlock
               title="Metrics"
               icon={<BarChart3 size={14} />}
-              right={loading ? <Loader2 size={15} className="spin-icon" style={{ color: 'var(--muted)' }} /> : null}
+              right={loading ? <LoadingState variant="inline" /> : null}
             >
               <div className="dash-grid">
                 <KpiCard label="Total Balance" value={INR(totalBalance)} tone="navy" icon={<Wallet size={14} />} />
@@ -353,19 +317,18 @@ export default function Savings() {
               </div>
             </SectionBlock>
 
-            <Spacer size={8} />
+            <Spacer size={6} />
             <SectionBlock title="Accounts" icon={<Wallet size={14} />}>
               <div className="ui-stack">
                 {accountSummary.map(({ account, balance, income, expense }) => (
                   <div key={account}>
-                    <Spacer size={8} />
                     <BalanceRow
                       title={account}
                       value={INR(balance)}
                       income={INR(income)}
                       expense={INR(expense)}
-                      incomeIcon={<ArrowUpRight size={11} strokeWidth={2.4} />}
-                      expenseIcon={<ArrowDownRight size={11} strokeWidth={2.4} />}
+                      incomeIcon={<ArrowDownRight size={11} strokeWidth={2.4} />}
+                      expenseIcon={<ArrowUpRight size={11} strokeWidth={2.4} />}
                     />
                   </div>
                 ))}
@@ -382,7 +345,6 @@ export default function Savings() {
               icon={<LayoutDashboard size={14} />}
               right={<span className="ui-kit-section-chip ui-tone-muted">{filteredEntries.length}</span>}
             >
-              <Spacer size={8} />
               <SearchField
                 value={search}
                 placeholder="Search desc, account, type…"
@@ -392,11 +354,7 @@ export default function Savings() {
               />
               <Spacer size={8} />
               <FilterChips items={[...TYPE_FILTERS]} active={typeFilter} onChange={setTypeFilter} />
-              {loading && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.25rem 0', color: 'var(--muted)', fontSize: 14 }}>
-                  <Loader2 size={16} className="spin-icon" /> Loading…
-                </div>
-              )}
+              {loading && <LoadingState variant="section" />}
 
               {!loading && filteredEntries.length === 0 && (
                 <p style={{ color: 'var(--muted)', padding: '0.25rem 0', fontSize: 14 }}>No entries to display.</p>
@@ -407,55 +365,12 @@ export default function Savings() {
                   <div className="txn-cards">
                     {filteredEntries.map(e => (
                       <div key={e.id}>
-                        <Spacer size={8} />
                         <SavingsEntryCard
                           entry={e}
                           onClick={() => openEdit(e)}
                         />
                       </div>
                     ))}
-                  </div>
-                  <div className="tw txn-table">
-                    <table>
-                    <thead>
-                      <tr>
-                        <th>ID</th>
-                        <th>Date</th>
-                        <th>Account</th>
-                        <th>Amount</th>
-                        <th>Desc</th>
-                        <th>Type</th>
-                        <th></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredEntries.map(e => (
-                        <tr key={e.id}>
-                          <td style={{ color: 'var(--muted)', fontSize: 11 }}>{e.id.slice(0, 8)}</td>
-                          <td>{e.date}</td>
-                          <td>
-                            <span style={{ color: ACCOUNT_COLORS[e.account], fontWeight: 500 }}>{e.account}</span>
-                          </td>
-                          <td style={{ color: typeColor(e.type), fontWeight: 700 }}>
-                            {INR(e.amount)}
-                          </td>
-                          <td>{e.desc}</td>
-                          <td>
-                            <TypeBadge type={e.type} />
-                          </td>
-                          <td>
-                            <button
-                              className="icon-btn"
-                              onClick={() => openEdit(e)}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)' }}
-                            >
-                              <Pencil size={14} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    </table>
                   </div>
                 </>
               )}
@@ -500,11 +415,9 @@ export default function Savings() {
               destructive={false}
               leading={editEntry ? (
                 <button type="button" className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={del} disabled={saving || deleting}>
-                  {deleting && <Loader2 size={14} className="spin-icon" />}
                   {deleting ? 'Deleting…' : 'Delete'}
                 </button>
               ) : null}
-              primaryPrefix={saving ? <Loader2 size={14} className="spin-icon" /> : null}
               disabled={saving || deleting}
               onSecondary={closeModal}
               onPrimary={save}

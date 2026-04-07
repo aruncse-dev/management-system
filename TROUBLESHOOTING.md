@@ -41,6 +41,37 @@ Then check the access setting as described above.
 
 ---
 
+## ⚠ Apps Script permission error: `SpreadsheetApp.openById`
+
+### Symptom
+Loan, savings, gold, or lending APIs fail with:
+> `You do not have permission to call SpreadsheetApp.openById...`
+
+### Cause
+Apps Script authorization can drift over time even if the data and code are fine. This usually happens after:
+- a long period without deployment changes
+- a redeploy or version switch
+- a fresh consent check from Google
+- a spreadsheet scope or settings change
+
+The backend is still correct, but the script needs to be re-authorized against the spreadsheet.
+
+### Fix
+1. Open the Apps Script project.
+2. Run `authorizeFinTracker()` once from the editor.
+3. Approve the permissions prompt.
+4. Re-deploy the web app if needed.
+
+### Also verify
+- `LOANS_SPREADSHEET_ID` is set correctly in script properties.
+- The deployment runs as the correct account.
+- The `/exec` URL points to the latest deployment version.
+
+### Notes
+If this fixed itself once after running `authorizeFinTracker()`, it will usually stay stable until the next deployment or auth state change.
+
+---
+
 ## ⚠ CORS error in local dev
 
 ### Symptom

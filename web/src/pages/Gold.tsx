@@ -4,7 +4,7 @@ import { api, RawGoldRow, RawGoldHistoryRow } from '../api';
 import { INR } from '../utils';
 import { THEME_COLORS } from '../constants';
 import { RightLegendDonut } from '../components/RightLegendDonut';
-import { FormField, HoldingCard, KpiCard, ListStack, ModalActions, ModalShell, SearchField, SectionBlock, Spacer, TabBar } from '../ui-kit';
+import { FormField, HoldingCard, KpiCard, LoadingState, ListStack, ModalActions, ModalShell, SearchField, SectionBlock, TabBar } from '../ui-kit';
 import '../ui-kit/ui-kit.css';
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -50,7 +50,6 @@ interface GoldHistoryFormState {
 const PEOPLE = ['Ramya', 'Arun', 'Nithran', 'Dhuruvan', 'Amma'];
 const LOCATIONS = ['Home', 'Bank', 'Locker'];
 const PAVAN_CONVERSION = 1 / 8; // 1 pavan = 8 grams
-const KPI_VALUE_COLOR = '#111827';
 const PERSON_COLORS: Record<string, string> = Object.fromEntries(
   PEOPLE.map((person, index) => [person, THEME_COLORS[index]])
 ) as Record<string, string>;
@@ -149,20 +148,14 @@ const PersonCard = memo(function PersonCard({
 }) {
   const totalGrams = items.reduce((s, i) => s + i.weight_g, 0);
   const totalPavan = items.reduce((s, i) => s + i.pavan, 0);
-  const accent = PERSON_COLORS[person];
   return (
-    <div className="kpi-card" style={{ borderLeftColor: accent }}>
-      <div className="kpi-card-l" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <Users size={12} />
-        <span>{person}</span>
-      </div>
-      <div className="kpi-card-v kpi-card-v-soft" style={{ color: KPI_VALUE_COLOR }}>
-        {Math.round(totalGrams)}g
-      </div>
-      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-        {totalPavan.toFixed(3)} pavan
-      </div>
-    </div>
+    <KpiCard
+      label={person}
+      value={`${Math.round(totalGrams)}g`}
+      subtitle={`${totalPavan.toFixed(3)} pavan`}
+      tone="muted"
+      icon={<Users size={14} />}
+    />
   );
 });
 
@@ -175,20 +168,14 @@ const LocationCard = memo(function LocationCard({
 }) {
   const totalGrams = items.reduce((s, i) => s + i.weight_g, 0);
   const totalPavan = items.reduce((s, i) => s + i.pavan, 0);
-  const accent = LOCATION_COLORS[location];
   return (
-    <div className="kpi-card" style={{ borderLeftColor: accent }}>
-      <div className="kpi-card-l" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        {LOCATION_ICONS[location] ?? <Home size={12} />}
-        <span>{location}</span>
-      </div>
-      <div className="kpi-card-v kpi-card-v-soft" style={{ color: KPI_VALUE_COLOR }}>
-        {Math.round(totalGrams)}g
-      </div>
-      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-        {totalPavan.toFixed(3)} pavan
-      </div>
-    </div>
+    <KpiCard
+      label={location}
+      value={`${Math.round(totalGrams)}g`}
+      subtitle={`${totalPavan.toFixed(3)} pavan`}
+      tone="muted"
+      icon={LOCATION_ICONS[location] ?? <Home size={14} />}
+    />
   );
 });
 
@@ -353,10 +340,15 @@ export default function Gold() {
   }, [history, historySearch]);
 
   // Load all data
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (forceRefresh = false) => {
     setLoading(true);
     setError('');
     try {
+      if (forceRefresh) {
+        api.invalidateCache({ action: 'getEntries', params: { module: 'gold' } });
+        api.invalidateCache({ action: 'getHistory', params: { module: 'gold' } });
+        api.invalidateCache({ action: 'get', params: { module: 'settings' } });
+      }
       const [rows, settings, historyRows] = await Promise.all([
         api.getGold(),
         api.getSettings(),
@@ -436,7 +428,7 @@ export default function Gold() {
         await api.addGold(payload);
       }
       closeItemModal();
-      await loadData();
+      await loadData(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed');
     } finally {
@@ -452,7 +444,7 @@ export default function Gold() {
     try {
       await api.deleteGold(editItem.id);
       closeItemModal();
-      await loadData();
+      await loadData(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Delete failed');
     } finally {
@@ -492,7 +484,7 @@ export default function Gold() {
         await api.addGoldHistory(payload);
       }
       closeHistoryModal();
-      await loadData();
+      await loadData(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed');
     } finally {
@@ -528,7 +520,7 @@ export default function Gold() {
     try {
       await api.deleteGoldHistory(editHistory.id);
       closeHistoryModal();
-      await loadData();
+      await loadData(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Delete failed');
     } finally {
@@ -541,20 +533,18 @@ export default function Gold() {
   // ────────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="ui-kit-page-shell">
+    <div className="ui-kit-page-shell gold-page">
       {/* Tab bar */}
       <TabBar tabs={GOLD_TABS} active={activeTab} onChange={id => setActiveTab(id as GoldTab)} />
 
-      <div className="pg ui-kit-page-stack ui-kit-page-stack--tight" style={{ padding: 0 }}>
-        <Spacer size={8} />
-
+      <div className="pg" style={{ padding: 0 }}>
         {/* DASHBOARD TAB */}
         {activeTab === 'dashboard' && (
           <>
             <SectionBlock
               title="Metrics"
               icon={<BarChart3 size={14} />}
-              right={loading ? <Loader2 size={15} className="spin-icon" style={{ color: 'var(--muted)' }} /> : null}
+              right={loading ? <LoadingState variant="inline" /> : null}
             >
               <div className="dash-grid">
                 <KpiCard label="Total Gold" value={`${Math.round(totalGrams)}g`} tone="navy" icon={<Gem size={14} />} subtitle={`${Math.round(totalPavan)} pavan`} />
@@ -564,7 +554,6 @@ export default function Gold() {
               </div>
             </SectionBlock>
 
-            <Spacer size={8} />
             <SectionBlock title="By Location" icon={<BarChart3 size={14} />}>
               <div className="ui-kit-card" style={{ padding: 12 }}>
                 <RightLegendDonut
@@ -585,7 +574,6 @@ export default function Gold() {
               </div>
             </SectionBlock>
 
-            <Spacer size={8} />
             <SectionBlock title="By Person" icon={<BarChart3 size={14} />}>
               <div className="ui-kit-card" style={{ padding: 12 }}>
                 <RightLegendDonut
@@ -621,11 +609,7 @@ export default function Gold() {
 
             {/* Search bar */}
             {/* Loading */}
-            {loading && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '1rem 0', color: 'var(--muted)', fontSize: 14 }}>
-                <Loader2 size={16} className="spin-icon" /> Loading…
-              </div>
-            )}
+            {loading && <LoadingState variant="section" />}
 
             {/* Empty state */}
             {!loading && filteredItems.length === 0 && (
@@ -705,11 +689,7 @@ export default function Gold() {
             </SectionBlock>
 
             {/* Loading */}
-            {loading && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '1rem 0', color: 'var(--muted)', fontSize: 14 }}>
-                <Loader2 size={16} className="spin-icon" /> Loading…
-              </div>
-            )}
+            {loading && <LoadingState variant="section" />}
 
             {/* Empty state */}
             {!loading && filteredHistory.length === 0 && (

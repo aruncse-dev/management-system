@@ -1,6 +1,22 @@
-import { type ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
+import { Loader2 } from 'lucide-react'
 
 export type UiTone = 'navy' | 'green' | 'red' | 'amber' | 'muted'
+
+export function LoadingState({
+  label = 'Loading…',
+  variant = 'page',
+}: {
+  label?: string
+  variant?: 'page' | 'inline' | 'section'
+}) {
+  return (
+    <div className={`ui-kit-loading ui-kit-loading--${variant}`} role="status" aria-live="polite" aria-busy="true">
+      <Loader2 size={variant === 'inline' ? 15 : 16} className="spin-icon ui-kit-loading-icon" />
+      <span>{label}</span>
+    </div>
+  )
+}
 
 export function SectionTitle({
   title,
@@ -51,9 +67,11 @@ export function SectionBlock({
 }) {
   return (
     <section className="ui-kit-section-block">
+      <Spacer size={8} />
       <SectionTitle title={title} subtitle={subtitle} icon={icon} right={right} rightChip={rightChip} />
-      <Spacer size={4} />
+      <Spacer size={8} />
       <div className="ui-kit-section-body">{children}</div>
+      <Spacer size={8} />
     </section>
   )
 }
@@ -66,6 +84,71 @@ export function Spacer({
   return <div style={{ height: size, flexShrink: 0 }} />
 }
 
+function SummaryMetricCard({
+  label,
+  value,
+  color,
+}: {
+  label: string
+  value: ReactNode
+  color: string
+}) {
+  return (
+    <div className="ui-kit-summary-metric">
+      <span className="ui-kit-summary-metric-bar" style={{ background: color }} />
+      <span className="ui-kit-summary-metric-label">{label}</span>
+      <strong className="ui-kit-summary-metric-value">{value}</strong>
+    </div>
+  )
+}
+
+export function DonutSummaryCard({
+  totalLabel,
+  totalValue,
+  slices,
+  items,
+}: {
+  totalLabel: string
+  totalValue: ReactNode
+  slices: Array<{ label: string; color: string; strokeDasharray: string; strokeDashoffset: number }>
+  items: Array<{ label: string; value: ReactNode; color: string }>
+}) {
+  return (
+    <UiCard>
+      <div className="ui-kit-donut-summary">
+        <div className="ui-kit-donut-summary-ring">
+          <svg viewBox="0 0 120 120" width="100%" height="100%" aria-label="Summary donut chart">
+            <circle cx="60" cy="60" r="44" fill="none" stroke="rgba(59,130,246,.22)" strokeWidth="16" />
+            {slices.map(slice => (
+              <circle
+                key={slice.label}
+                cx="60"
+                cy="60"
+                r="44"
+                fill="none"
+                stroke={slice.color}
+                strokeWidth="16"
+                strokeLinecap="butt"
+                strokeDasharray={slice.strokeDasharray}
+                strokeDashoffset={slice.strokeDashoffset}
+                transform="rotate(-90 60 60)"
+              />
+            ))}
+            <circle cx="60" cy="60" r="24" fill="#fff" />
+            <text x="60" y="55" textAnchor="middle" fontSize="9" fontWeight="700" fill="var(--muted)">{totalLabel}</text>
+            <text x="60" y="72" textAnchor="middle" fontSize="15" fontWeight="800" fill="var(--text)">{totalValue}</text>
+          </svg>
+        </div>
+        <div className="ui-kit-donut-summary-items">
+          {items.map(item => (
+            <SummaryMetricCard key={item.label} label={item.label} value={item.value} color={item.color} />
+          ))}
+        </div>
+      </div>
+    </UiCard>
+  )
+}
+
 export function KpiCard({
   label,
   value,
@@ -74,6 +157,7 @@ export function KpiCard({
   tone = 'navy',
   accentTone,
   full = false,
+  onClick,
 }: {
   label: string
   value: ReactNode
@@ -82,9 +166,10 @@ export function KpiCard({
   tone?: UiTone
   accentTone?: Extract<UiTone, 'green' | 'red'>
   full?: boolean
+  onClick?: () => void
 }) {
   return (
-    <div className={`ui-kit-card ui-kit-kpi ui-tone-${tone}${accentTone ? ` ui-kit-kpi--accent-${accentTone}` : ''}${full ? ' ui-kit-kpi--full' : ''}`}>
+    <div className={`ui-kit-card ui-kit-kpi ui-tone-${tone}${accentTone ? ` ui-kit-kpi--accent-${accentTone}` : ''}${full ? ' ui-kit-kpi--full' : ''}`} onClick={onClick} role={onClick ? 'button' : undefined} tabIndex={onClick ? 0 : undefined}>
       <div className="ui-kit-kpi-hd">
         <div className={`ui-kit-kpi-head${icon ? ' has-icon' : ' no-icon'}`}>
           {icon && <div className="ui-kit-kpi-icon">{icon}</div>}
@@ -95,36 +180,6 @@ export function KpiCard({
       {subtitle && <div className="ui-kit-kpi-sub">{subtitle}</div>}
     </div>
   )
-}
-
-export function MetricGroup({
-  title,
-  icon,
-  right,
-  subtitle,
-  children,
-}: {
-  title: string
-  icon?: ReactNode
-  right?: ReactNode
-  subtitle?: string
-  children: ReactNode
-}) {
-  return (
-    <UiCard title={title} icon={icon} right={right} subtitle={subtitle}>
-      <div className="ui-kit-metric-group">{children}</div>
-    </UiCard>
-  )
-}
-
-export function SectionBadge({
-  children,
-  tone = 'muted',
-}: {
-  children: ReactNode
-  tone?: UiTone
-}) {
-  return <span className={`ui-kit-badge ui-tone-${tone}`}>{children}</span>
 }
 
 export function SectionChip({
@@ -211,7 +266,7 @@ export function UiCard({
   right,
   children,
 }: {
-  title?: string
+  title?: ReactNode
   subtitle?: string
   icon?: ReactNode
   right?: ReactNode
@@ -225,7 +280,7 @@ export function UiCard({
             {title && (
               <div className="ui-kit-card-title">
                 {icon && <span className="ui-kit-section-icon">{icon}</span>}
-                <span>{title}</span>
+                {title}
               </div>
             )}
             {subtitle && <div className="ui-kit-card-subtitle">{subtitle}</div>}
@@ -272,18 +327,6 @@ export function TabBar({
       ))}
     </nav>
   )
-}
-
-export function MonthlyNavBar({
-  tabs,
-  active,
-  onChange,
-}: {
-  tabs: Array<{ id: string; label: string; icon?: ReactNode }>
-  active: string
-  onChange: (id: string) => void
-}) {
-  return <TabBar tabs={tabs} active={active} onChange={onChange} />
 }
 
 export function InternalTabBar({
@@ -371,6 +414,19 @@ export function ModalShell({
   children: ReactNode
   footer?: ReactNode
 }) {
+  useEffect(() => {
+    const body = document.body
+    const html = document.documentElement
+    const prevBodyOverflow = body.style.overflow
+    const prevHtmlOverflow = html.style.overflow
+    body.style.overflow = 'hidden'
+    html.style.overflow = 'hidden'
+    return () => {
+      body.style.overflow = prevBodyOverflow
+      html.style.overflow = prevHtmlOverflow
+    }
+  }, [])
+
   return (
     <div className="modal-bg open">
       <div className="modal-shell" onClick={e => e.stopPropagation()}>
@@ -383,31 +439,6 @@ export function ModalShell({
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-foot">{footer}</div>}
       </div>
-    </div>
-  )
-}
-
-export function GroupBlock({
-  title,
-  subtitle,
-  right,
-  children,
-}: {
-  title: string
-  subtitle?: string
-  right?: ReactNode
-  children: ReactNode
-}) {
-  return (
-    <div className="ui-kit-group-block">
-      <div className="ui-kit-group-block-hd">
-        <div>
-          <div className="ui-kit-group-block-title">{title}</div>
-          {subtitle && <div className="ui-kit-group-block-subtitle">{subtitle}</div>}
-        </div>
-        {right}
-      </div>
-      <div className="ui-kit-group-block-body">{children}</div>
     </div>
   )
 }
@@ -450,19 +481,21 @@ export function ModalActions({
 }) {
   return (
     <div className="ui-kit-modal-actions">
-      {leading}
-      <button type="button" className="ui-kit-btn ui-kit-btn--soft" onClick={onSecondary} disabled={disabled}>
-        {secondaryLabel}
-      </button>
-      <button
-        type="button"
-        className={`ui-kit-btn ui-kit-btn--solid${destructive ? ' btn-red' : ''}`}
-        onClick={onPrimary}
-        disabled={disabled}
-      >
-        {primaryPrefix}
-        {primaryLabel}
-      </button>
+      <div className="ui-kit-modal-actions-left">{leading}</div>
+      <div className="ui-kit-modal-actions-right">
+        <button type="button" className="ui-kit-btn ui-kit-btn--soft" onClick={onSecondary} disabled={disabled}>
+          {secondaryLabel}
+        </button>
+        <button
+          type="button"
+          className={`ui-kit-btn ui-kit-btn--solid${destructive ? ' btn-red' : ''}`}
+          onClick={onPrimary}
+          disabled={disabled}
+        >
+          {primaryPrefix}
+          {primaryLabel}
+        </button>
+      </div>
     </div>
   )
 }
@@ -559,8 +592,12 @@ export function BalanceRow({
   left,
   incomeIcon,
   expenseIcon,
+  incomeLabel = 'Income',
+  expenseLabel = 'Expense',
+  incomeTone = 'green',
+  expenseTone = 'red',
 }: {
-  title: string
+  title?: string
   value: ReactNode
   subtitle?: string
   income?: ReactNode
@@ -568,34 +605,41 @@ export function BalanceRow({
   left?: ReactNode
   incomeIcon?: ReactNode
   expenseIcon?: ReactNode
+  incomeLabel?: string
+  expenseLabel?: string
+  incomeTone?: 'green' | 'red'
+  expenseTone?: 'green' | 'red'
 }) {
   return (
     <div className="ui-kit-card ui-kit-balance-card">
-      <div className="ui-kit-balance-header">
-        <div className="ui-kit-balance-main">
-          <div className="ui-kit-balance-title-row">
-            <div className="ui-kit-balance-title">{title}</div>
-            {left && <div className="ui-kit-balance-left">{left}</div>}
+      {(title || subtitle || left) && (
+        <div className="ui-kit-balance-header">
+          <div className="ui-kit-balance-main">
+            <div className="ui-kit-balance-title-row">
+              {title ? <div className="ui-kit-balance-title">{title}</div> : <div />}
+              {left && <div className="ui-kit-balance-left">{left}</div>}
+            </div>
+            {subtitle && <div className="ui-kit-balance-subtitle">{subtitle}</div>}
           </div>
-          {subtitle && <div className="ui-kit-balance-subtitle">{subtitle}</div>}
+          <div className="ui-kit-balance-value">{value}</div>
         </div>
-        <div className="ui-kit-balance-value">{value}</div>
-      </div>
+      )}
+      {!title && !subtitle && !left && <div className="ui-kit-balance-value">{value}</div>}
       {(income !== undefined || expense !== undefined) && (
         <div className="ui-kit-balance-flow-row">
           {income !== undefined && (
-            <div className="ui-kit-balance-flow-item ui-tone-green">
+            <div className={`ui-kit-balance-flow-item ui-tone-${incomeTone}`}>
               <div className="ui-kit-balance-flow-head">
-                <span>Income</span>
+                <span>{incomeLabel}</span>
                 {incomeIcon && <span className="ui-kit-balance-flow-icon">{incomeIcon}</span>}
               </div>
               <strong>{income}</strong>
             </div>
           )}
           {expense !== undefined && (
-            <div className="ui-kit-balance-flow-item ui-tone-red">
+            <div className={`ui-kit-balance-flow-item ui-tone-${expenseTone}`}>
               <div className="ui-kit-balance-flow-head">
-                <span>Expense</span>
+                <span>{expenseLabel}</span>
                 {expenseIcon && <span className="ui-kit-balance-flow-icon">{expenseIcon}</span>}
               </div>
               <strong>{expense}</strong>
@@ -613,52 +657,6 @@ export function ListStack({
   children: ReactNode
 }) {
   return <div className="ui-kit-list-stack">{children}</div>
-}
-
-export function CompactRow({
-  title,
-  value,
-  metaLeft,
-  metaRight,
-  chips,
-  onClick,
-}: {
-  title: string
-  value: ReactNode
-  metaLeft?: ReactNode
-  metaRight?: ReactNode
-  chips?: ReactNode
-  onClick?: () => void
-}) {
-  const className = `ui-kit-compact-row${onClick ? ' ui-kit-compact-row--btn' : ''}`
-  if (onClick) {
-    return (
-      <button type="button" className={className} onClick={onClick}>
-        <div className="ui-kit-compact-row-top">
-          <div className="ui-kit-compact-row-title">{title}</div>
-          <div className="ui-kit-compact-row-value">{value}</div>
-        </div>
-        <div className="ui-kit-compact-row-bottom">
-          <div className="ui-kit-compact-row-meta">{metaLeft}</div>
-          <div className="ui-kit-compact-row-meta ui-kit-compact-row-meta--right">{metaRight}</div>
-        </div>
-        {chips && <div className="ui-kit-compact-row-chips">{chips}</div>}
-      </button>
-    )
-  }
-  return (
-    <div className={className}>
-      <div className="ui-kit-compact-row-top">
-        <div className="ui-kit-compact-row-title">{title}</div>
-        <div className="ui-kit-compact-row-value">{value}</div>
-      </div>
-      <div className="ui-kit-compact-row-bottom">
-        <div className="ui-kit-compact-row-meta">{metaLeft}</div>
-        <div className="ui-kit-compact-row-meta ui-kit-compact-row-meta--right">{metaRight}</div>
-      </div>
-      {chips && <div className="ui-kit-compact-row-chips">{chips}</div>}
-    </div>
-  )
 }
 
 export function HoldingCard({
@@ -791,36 +789,4 @@ export function HoldingModal({
       </div>
     </ModalShell>
   )
-}
-
-export function SheetShell({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string
-  subtitle?: string
-  children: ReactNode
-}) {
-  return (
-    <div className="sheet-panel">
-      <div className="sheet-body">
-        <div className="ui-kit-sheet-hd">
-          <div>
-            <div className="modal-title">{title}</div>
-            {subtitle && <div className="modal-subtitle">{subtitle}</div>}
-          </div>
-        </div>
-        {children}
-      </div>
-    </div>
-  )
-}
-
-export function FormActions({
-  children,
-}: {
-  children: ReactNode
-}) {
-  return <div className="ui-kit-form-actions">{children}</div>
 }

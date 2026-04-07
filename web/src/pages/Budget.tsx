@@ -1,12 +1,11 @@
 import { useState } from 'react'
-import { Pencil, Trash2, Plus, Check, X as XIcon, AlertTriangle, Package } from 'lucide-react'
+import { Pencil, Trash2, X as XIcon, AlertTriangle, Package } from 'lucide-react'
 import { useStore } from '../store'
 import { catMap, budgetSummary, INR } from '../utils'
 import { api } from '../api'
 import { CATEGORIES } from '../constants'
 import CatIcon from '../components/CatIcon'
-import { decorColor } from '../constants'
-import { UiSection } from '../components/FinanceUI'
+import { KpiCard, SectionBlock, UiCard } from '../ui-kit'
 
 interface Props { showStatus: (msg: string) => void; onCategoryClick: (cat: string) => void }
 
@@ -34,6 +33,8 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
     setSaving(true)
     try {
       await api.updateBudgetEntry(modal.cat, val)
+      api.invalidateCache({ action: 'getBudget' })
+      api.invalidateCache({ action: 'init' })
       dispatch({ type:'SET_BUDGET', payload: { ...budget, [modal.cat]: val } })
       showStatus('✓ Budget saved')
       closeModal()
@@ -47,6 +48,8 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
     setSaving(true)
     try {
       await api.updateBudgetEntry(modal.cat, val)
+      api.invalidateCache({ action: 'getBudget' })
+      api.invalidateCache({ action: 'init' })
       dispatch({ type:'SET_BUDGET', payload: { ...budget, [modal.cat]: val } })
       showStatus('✓ Budget updated')
       closeModal()
@@ -58,6 +61,8 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
     setSaving(true)
     try {
       await api.deleteBudgetEntry(modal.cat)
+      api.invalidateCache({ action: 'getBudget' })
+      api.invalidateCache({ action: 'init' })
       const nb = { ...budget }
       delete nb[modal.cat]
       dispatch({ type:'SET_BUDGET', payload: nb })
@@ -68,36 +73,18 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
   }
 
   return (
-    <div className="pg">
-      <UiSection
-        title="Budget Management"
-        icon={<Package size={14} />}
-        right={undefined}
-      />
-
-      <div className="kpis" style={{ marginBottom: 14 }}>
-        <div className="kpi-card kpi-card--blue">
-          <div className="kpi-card-l">Budget</div>
-          <div className="kpi-card-v kpi-card-v-soft" style={{ color: '#111827' }}>{INR(totalBudget)}</div>
+    <div className="pg ui-kit-page-shell monthly-subpage">
+      <SectionBlock title="Budget Management" icon={<Package size={14} />}>
+        <div className="kpis">
+          <KpiCard label="Budget" value={INR(totalBudget)} tone="navy" icon={<Package size={14} />} />
+          <KpiCard label="Spent" value={INR(totalSpent)} tone="red" icon={<AlertTriangle size={14} />} />
+          <KpiCard label={totalOver ? 'Over' : 'Remaining'} value={`${totalOver ? '−' : ''}${INR(Math.abs(remaining))}`} tone={totalOver ? 'red' : 'green'} icon={<Package size={14} />} />
+          <KpiCard label="Overspent" value={String(ovCount)} tone="amber" icon={<AlertTriangle size={14} />} />
         </div>
-        <div className="kpi-card kpi-card--red">
-          <div className="kpi-card-l">Spent</div>
-          <div className="kpi-card-v kpi-card-v-soft" style={{ color: '#111827' }}>{INR(totalSpent)}</div>
-        </div>
-        <div className={`kpi-card ${totalOver ? 'kpi-card--red' : 'kpi-card--green'}`}>
-          <div className="kpi-card-l">{totalOver ? 'Over' : 'Remaining'}</div>
-          <div className={`kpi-card-v kpi-card-v-soft ${totalOver ? 'kpi-card-v--red' : 'kpi-card-v--green'}`}>
-            {totalOver ? '−' : ''}{INR(Math.abs(remaining))}
-          </div>
-        </div>
-        <div className="kpi-card">
-          <div className="kpi-card-l">Overspent</div>
-          <div className="kpi-card-v kpi-card-v-soft" style={{ color: '#111827' }}>{ovCount}</div>
-        </div>
-      </div>
+      </SectionBlock>
 
       {/* Search */}
-      <div style={{position:'relative',marginBottom:8}}>
+      <div style={{position:'relative'}}>
         <input
           className="form-inp"
           style={{paddingRight:32,fontSize:14}}
@@ -111,9 +98,8 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
         )}
       </div>
 
-      <UiSection title="Categories" icon={<AlertTriangle size={14} />} />
-
-      <div className="budget-list">
+      <SectionBlock title="Categories" icon={<AlertTriangle size={14} />}>
+        <div className="budget-list">
         {active.filter(([cat]) => cat.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>(cm[b[0]]||0)-(cm[a[0]]||0)).map(([cat, budg]) => {
           const spent = cm[cat] || 0
           const over = spent > budg
@@ -121,24 +107,17 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
           const pct = budg > 0 ? (spent / budg) * 100 : 0
           const status = over ? 'OVER' : pct >= 90 ? 'CRITICAL' : pct >= 75 ? 'NEAR' : 'OK'
           const badgeClass = over ? 'budget-badge over' : pct >= 90 ? 'budget-badge critical' : pct >= 75 ? 'budget-badge near' : 'budget-badge ok'
-          const col = over ? 'var(--rm)' : 'var(--text)'
           return (
-            <div
+            <UiCard
               key={cat}
-              className="card budget-row"
-              onClick={() => setCatSheet(cat)}
+              title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><CatIcon cat={cat} size={14} />{cat}</span>}
+              right={<div className="budget-row-actions">
+                <span className={badgeClass}>{status}</span>
+                <button className="icon-btn" onClick={(e) => { e.stopPropagation(); openEdit(cat, budg) }} aria-label={`Edit ${cat}`} title={`Edit ${cat}`}><Pencil size={13} /></button>
+                <button className="icon-btn" style={{color:'var(--red)'}} onClick={(e) => { e.stopPropagation(); openDelete(cat) }} aria-label={`Delete ${cat}`} title={`Delete ${cat}`}><Trash2 size={13} /></button>
+              </div>}
             >
-              <div className="budget-row-top">
-                <div className="budget-row-cat" style={{color:'var(--text)'}}>
-                  <CatIcon cat={cat} size={14} />{cat}
-                </div>
-                <div className="budget-row-actions">
-                  <span className={badgeClass}>{status}</span>
-                  <button className="icon-btn" onClick={(e) => {e.stopPropagation(); openEdit(cat, budg)}}><Pencil size={13} /></button>
-                  <button className="icon-btn" style={{color:'var(--red)'}} onClick={(e) => {e.stopPropagation(); openDelete(cat)}}><Trash2 size={13} /></button>
-                </div>
-              </div>
-              <div className="budget-row-grid">
+              <div className="budget-row-grid" onClick={() => setCatSheet(cat)} style={{ cursor: 'pointer' }}>
                 <div>
                   <div className="budget-mini-lbl">Budget</div>
                   <div className="budget-mini-val">{INR(budg)}</div>
@@ -149,25 +128,24 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
                 </div>
                 <div className="budget-mini-right">
                   <div className="budget-mini-lbl">{over ? 'Over' : 'Left'}</div>
-                  <div className="budget-mini-val" style={{ color: col }}>{INR(Math.abs(remaining))}</div>
+                  <div className="budget-mini-val" style={{ color: over ? 'var(--red)' : 'var(--gm)' }}>{INR(Math.abs(remaining))}</div>
                 </div>
               </div>
-            </div>
+            </UiCard>
           )
         })}
         {!active.length && <div className="lb">No budget categories. Click "+ Add".</div>}
         {active.length > 0 && !active.filter(([cat]) => cat.toLowerCase().includes(search.toLowerCase())).length && <div className="lb">No matching categories.</div>}
-      </div>
+        </div>
+      </SectionBlock>
 
       {/* Modal */}
       <div className={`modal-bg ${modal.mode ? 'open' : ''}`} onClick={closeModal}>
         <div className="modal" onClick={e => e.stopPropagation()}>
           {modal.mode === 'delete' ? (
             <>
-              <div className="modal-hd">
-                <span className="modal-title" style={{display:'flex',alignItems:'center',gap:6}}>
-                  <AlertTriangle size={16} /> Remove Budget
-                </span>
+              <div className="modal-hd modal-hd--blue">
+                <span className="modal-title">Remove Budget</span>
                 <button className="modal-close" onClick={closeModal}><XIcon size={16} /></button>
               </div>
               <div className="modal-body">
@@ -182,17 +160,17 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
               </div>
               <div className="modal-foot">
                 <div className="modal-foot-l" />
-                <button className="btn btn-sm" style={{background:'var(--border)',color:'var(--text)'}} onClick={closeModal}><XIcon size={13} />Cancel</button>
+                <button className="btn btn-sm btn-cancel" onClick={closeModal}>Cancel</button>
                 <button className="btn btn-sm" style={{background:'var(--red)',color:'#fff'}} onClick={confirmDelete} disabled={saving}>
-                  <Trash2 size={13} />{saving ? '…' : 'Remove'}
+                  {saving ? 'Removing…' : 'Remove'}
                 </button>
               </div>
             </>
           ) : (
             <>
-              <div className="modal-hd">
-                <span className="modal-title" style={{display:'flex',alignItems:'center',gap:6}}>
-                  {modal.mode === 'add' ? <><Plus size={15} />Add Budget</> : <><Pencil size={14} />Edit Budget</>}
+              <div className="modal-hd modal-hd--blue">
+                <span className="modal-title">
+                  {modal.mode === 'add' ? 'Add Budget' : 'Edit Budget'}
                 </span>
                 <button className="modal-close" onClick={closeModal}><XIcon size={16} /></button>
               </div>
@@ -221,9 +199,9 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
               </div>
               <div className="modal-foot">
                 <div className="modal-foot-l" />
-                <button className="btn btn-sm" style={{background:'var(--border)',color:'var(--text)'}} onClick={closeModal}><XIcon size={13} />Cancel</button>
+                <button className="btn btn-sm btn-cancel" onClick={closeModal}>Cancel</button>
                 <button className="btn btn-sm btn-green" onClick={modal.mode === 'add' ? confirmAdd : confirmEdit} disabled={saving}>
-                  <Check size={13} />{saving ? '…' : 'Save'}
+                  {saving ? 'Saving…' : 'Save'}
                 </button>
               </div>
             </>
@@ -235,16 +213,12 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
       {catSheet && (
         <div className={`modal-bg ${catSheet ? 'open' : ''}`} onClick={() => setCatSheet(null)} style={{position:'fixed',inset:0,zIndex:1000}}>
           <div className="sheet-panel" onClick={e => e.stopPropagation()}>
-            <div className="sheet-hd">
-              <h3 style={{fontSize:16,fontWeight:700,color:'var(--text)',margin:0,display:'flex',alignItems:'center',gap:6}}>
-                <span style={{display:'flex',alignItems:'center',gap:6,color:decorColor(catSheet)}}>
-                  <CatIcon cat={catSheet} size={15} />{catSheet}
-                </span>
-              </h3>
+            <div className="sheet-hd modal-hd--blue">
+              <h3 className="sheet-title">{catSheet}</h3>
               <button className="modal-close" onClick={() => setCatSheet(null)} style={{padding:0}}><XIcon size={20} /></button>
             </div>
 
-            <div className="sheet-stats" style={{gridTemplateColumns:'1fr 1fr 1fr'}}>
+              <div className="sheet-stats" style={{gridTemplateColumns:'1fr 1fr 1fr'}}>
               <div className="card" style={{padding:'10px 12px'}}>
                 <div className="lbl">Budget</div>
                 <div style={{fontSize:14,fontWeight:700,color:'var(--text)',marginTop:4}}>{INR(budget[catSheet] || 0)}</div>

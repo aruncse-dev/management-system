@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { BarChart3, LayoutDashboard, Loader2, PieChart, RefreshCw, Shield, TrendingUp, Wallet } from 'lucide-react';
+import { BarChart3, LayoutDashboard, PieChart, RefreshCw, Shield, TrendingUp, Wallet } from 'lucide-react';
 import { api, type RawHolding } from '../api';
-import { KpiCard, SectionBlock, Spacer, TabBar, UiCard } from '../ui-kit';
-import Stocks from './Stocks';
-import MutualFunds from './MutualFunds';
+import { KpiCard, LoadingState, SectionBlock, Spacer, TabBar, UiCard } from '../ui-kit';
+import Stocks, { clearStocksCache } from './Stocks';
+import MutualFunds, { clearMutualFundsCache } from './MutualFunds';
 
 type InvestmentTab = 'dashboard' | 'stocks' | 'mutualFunds';
 
@@ -45,7 +45,6 @@ function MetricsSection({
 
   return (
     <>
-      <Spacer size={8} />
       <SectionBlock title={title} icon={icon}>
         <div className="dash-grid">
           <KpiCard label="Invested" value={formatRupees(stats.totalInvested)} icon={<Wallet size={14} />} tone="muted" />
@@ -71,15 +70,23 @@ function DashboardView() {
   const [hasToken, setHasToken] = useState(() => INVESTMENTS_CACHE?.hasToken ?? false);
   const [data, setData] = useState<HoldingsGroup>(() => INVESTMENTS_CACHE?.data ?? { stocks: [], mutualFunds: [] });
 
-  const loadDashboard = async () => {
+  const loadDashboard = async (forceRefresh = false) => {
     try {
       setLoading(true);
       setError('');
-      if (INVESTMENTS_CACHE) {
+      if (!forceRefresh && INVESTMENTS_CACHE) {
         setHasToken(INVESTMENTS_CACHE.hasToken);
         setData(INVESTMENTS_CACHE.data);
         setLoading(false);
         return;
+      }
+      if (forceRefresh) {
+        clearStocksCache();
+        clearMutualFundsCache();
+        api.invalidateCache({ action: 'getTokenStatus', params: { module: 'stocks' } });
+        api.invalidateCache({ action: 'getHoldings', params: { module: 'stocks' } });
+        api.invalidateCache({ action: 'getHoldings', params: { module: 'mutualfunds' } });
+        INVESTMENTS_CACHE = null;
       }
       const status = await api.getTokenStatus();
       setHasToken(status.hasToken);
@@ -120,10 +127,13 @@ function DashboardView() {
     try {
       setSyncing(true);
       setError('');
-      api.invalidateCache();
-      await Promise.all([api.syncStocks(), api.syncMutualFunds()]);
-      INVESTMENTS_CACHE = null;
-      await loadDashboard();
+      clearStocksCache();
+      clearMutualFundsCache();
+      api.invalidateCache({ action: 'getTokenStatus', params: { module: 'stocks' } });
+      api.invalidateCache({ action: 'getHoldings', params: { module: 'stocks' } });
+      api.invalidateCache({ action: 'getHoldings', params: { module: 'mutualfunds' } });
+      await api.syncStocks();
+      await loadDashboard(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Sync failed');
     } finally {
@@ -149,7 +159,7 @@ function DashboardView() {
         icon={<BarChart3 size={14} />}
         right={
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            {loading && <Loader2 size={16} className="spin-icon" style={{ color: 'var(--muted)' }} />}
+            {loading && <LoadingState variant="inline" />}
             <button
               className="settings-action-btn"
               onClick={syncAll}
@@ -178,9 +188,7 @@ function DashboardView() {
       {error && <div className="settings-alert">⚠ {error}</div>}
 
       {loading ? (
-        <div style={{ padding: '2rem', display: 'flex', justifyContent: 'center' }}>
-          <Loader2 size={18} className="spin-icon" style={{ color: 'var(--muted)' }} />
-        </div>
+        <LoadingState />
       ) : hasToken ? (
         <>
           <div>
@@ -225,7 +233,7 @@ export default function Investments() {
         onChange={id => setActiveTab(id as InvestmentTab)}
       />
 
-      <div className="pg ui-kit-page-stack ui-kit-page-stack--tight" style={{ padding: 0 }}>
+      <div className="pg" style={{ padding: 0 }}>
         {activeTab === 'dashboard' && <DashboardView />}
         {activeTab === 'stocks' && <Stocks embedded />}
         {activeTab === 'mutualFunds' && <MutualFunds embedded />}

@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react'
-import { Trash2, AlertTriangle, Loader2, Search, LayoutDashboard, Handshake, ArrowDownLeft, BarChart3, Shield, User, ArrowUpRight } from 'lucide-react'
+import { Search, LayoutDashboard, Handshake, ArrowDownLeft, BarChart3, Shield, User, ArrowUpRight } from 'lucide-react'
 import { api, RawLendingRow } from '../api'
 import { INR } from '../utils'
-import { FormField, HoldingCard, KpiCard, ModalActions, ModalShell, SearchField, SectionBlock, SectionChip, Spacer, TabBar } from '../ui-kit'
+import { FormField, HoldingCard, KpiCard, LoadingState, ModalActions, ModalShell, SearchField, SectionBlock, SectionChip, TabBar } from '../ui-kit'
 
 type LendType = 'LEND' | 'RECEIVED'
 type LendTab = 'dashboard' | 'lended' | 'received'
@@ -38,11 +38,18 @@ interface PersonDetails {
 
 function todayISO() { return new Date().toISOString().split('T')[0] }
 function toDateInput(dateStr: string): string {
-  try {
-    return new Date(dateStr).toISOString().split('T')[0]
-  } catch {
-    return todayISO()
+  const clean = String(dateStr ?? '').trim()
+  if (!clean) return todayISO()
+  const match = clean.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (match) return `${match[1]}-${match[2]}-${match[3]}`
+  const parsed = new Date(clean)
+  if (!isNaN(parsed.getTime())) {
+    const y = String(parsed.getFullYear()).padStart(4, '0')
+    const m = String(parsed.getMonth() + 1).padStart(2, '0')
+    const d = String(parsed.getDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
   }
+  return todayISO()
 }
 function emptyForm(): FormState { return { type: 'LEND', name: '', amount: '', date: todayISO(), description: '' } }
 
@@ -225,6 +232,7 @@ export default function Lending({ sheetName, onTabChange }: LendingProps) {
     try {
       if (editEntry) await api.updateLending({ ...p, id: editEntry.id }, sheetName)
       else await api.addLending(p, sheetName)
+      api.invalidateCache({ action: 'getEntries', params: { module: 'lending', ...(sheetName && sheetName !== 'Lending' ? { sheetName } : {}) } })
       setModalOpen(false)
       await loadData()
     } catch (e) {
@@ -240,6 +248,7 @@ export default function Lending({ sheetName, onTabChange }: LendingProps) {
     setSaving(true)
     try {
       await api.deleteLending(editEntry.id, sheetName)
+      api.invalidateCache({ action: 'getEntries', params: { module: 'lending', ...(sheetName && sheetName !== 'Lending' ? { sheetName } : {}) } })
       setModalOpen(false)
       await loadData()
     } catch (e) {
@@ -298,14 +307,14 @@ export default function Lending({ sheetName, onTabChange }: LendingProps) {
   const sheetTone = isVijayaAmma ? 'amber' : 'navy'
 
   return (
-      <div className="ui-kit-page-shell ui-kit-page-stack" style={{ paddingLeft: 8, paddingRight: 8 }}>
+    <div className="ui-kit-page-shell">
       <TabBar
         tabs={TAB_CONFIG}
         active={activeTab}
         onChange={id => setActiveTab(id as LendTab)}
       />
 
-    <div className="pg ui-kit-page-stack ui-kit-page-stack--tight" style={{ paddingTop: 0, paddingBottom: 0 }}>
+    <div className="pg" style={{ padding: 0 }}>
         {activeTab === 'dashboard' ? (
           <>
             <SectionBlock
@@ -321,7 +330,6 @@ export default function Lending({ sheetName, onTabChange }: LendingProps) {
               </div>
             </SectionBlock>
 
-            <Spacer size={8} />
             <SectionBlock
               title="People"
               icon={<Handshake size={14} />}
@@ -335,11 +343,8 @@ export default function Lending({ sheetName, onTabChange }: LendingProps) {
                   onClear={() => setSearch('')}
                   prefix={<Search size={15} />}
                 />
-                <Spacer size={8} />
                 {loading ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '1rem 0', color: 'var(--muted)', fontSize: 14 }}>
-                    <Loader2 size={16} className="spin-icon" /> Loading…
-                  </div>
+                  <LoadingState variant="section" />
                 ) : error ? (
                   <p style={{ color: '#EF4444', fontSize: 13, padding: '0.5rem 0' }}>⚠ {error}</p>
                 ) : filteredPeople.length === 0 ? (
@@ -370,54 +375,52 @@ export default function Lending({ sheetName, onTabChange }: LendingProps) {
               icon={<Search size={14} />}
               right={<SectionChip tone={sheetTone}>{activeTab === 'lended' ? filteredLendedEntries.length : filteredReceivedEntries.length}</SectionChip>}
             >
-            <SearchField
-              value={search}
-              placeholder="Search people..."
-              onChange={setSearch}
-              onClear={() => setSearch('')}
-              prefix={<Search size={15} />}
-            />
-            <Spacer size={8} />
-            {loading ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '1rem 0', color: 'var(--muted)', fontSize: 14 }}>
-                <Loader2 size={16} className="spin-icon" /> Loading…
-              </div>
-            ) : error ? (
-              <p style={{ color: '#EF4444', fontSize: 13, padding: '0.5rem 0' }}>⚠ {error}</p>
-            ) : activeTab === 'lended' ? (
-              filteredLendedEntries.length === 0 ? (
-                <p style={{ color: 'var(--muted)', padding: '0.5rem 0', fontSize: 14 }}>No transactions yet.</p>
+              <SearchField
+                value={search}
+                placeholder="Search people..."
+                onChange={setSearch}
+                onClear={() => setSearch('')}
+                prefix={<Search size={15} />}
+              />
+              <div style={{ height: 8 }} />
+              {loading ? (
+                <LoadingState variant="section" />
+              ) : error ? (
+                <p style={{ color: '#EF4444', fontSize: 13, padding: '0.5rem 0' }}>⚠ {error}</p>
+              ) : activeTab === 'lended' ? (
+                filteredLendedEntries.length === 0 ? (
+                  <p style={{ color: 'var(--muted)', padding: '0.5rem 0', fontSize: 14 }}>No transactions yet.</p>
+                ) : (
+                  <div style={{ display: 'grid', rowGap: 8, columnGap: 0 }}>
+                    {filteredLendedEntries.map(e => (
+                      <EntryCard
+                        key={e.id}
+                        entry={e}
+                        label="Given"
+                        useDescriptionAsTitle={shouldUseDescriptionAsTitle(e)}
+                        onClick={() => openEdit(e)}
+                      />
+                    ))}
+                  </div>
+                )
               ) : (
-                <div style={{ display: 'grid', rowGap: 8, columnGap: 0 }}>
-                  {filteredLendedEntries.map(e => (
-                    <EntryCard
-                      key={e.id}
-                      entry={e}
-                      label="Given"
-                      useDescriptionAsTitle={shouldUseDescriptionAsTitle(e)}
-                      onClick={() => openEdit(e)}
-                    />
-                  ))}
-                </div>
-              )
-            ) : (
-              filteredReceivedEntries.length === 0 ? (
-                <p style={{ color: 'var(--muted)', padding: '0.5rem 0', fontSize: 14 }}>No transactions yet.</p>
-              ) : (
-                <div style={{ display: 'grid', rowGap: 8, columnGap: 0 }}>
-                  {filteredReceivedEntries.map(e => (
-                    <EntryCard
-                      key={e.id}
-                      entry={e}
-                      label="Received"
-                      useDescriptionAsTitle={shouldUseDescriptionAsTitle(e)}
-                      onClick={() => openEdit(e)}
-                    />
-                  ))}
-                </div>
-              )
-            )}
-          </SectionBlock>
+                filteredReceivedEntries.length === 0 ? (
+                  <p style={{ color: 'var(--muted)', padding: '0.5rem 0', fontSize: 14 }}>No transactions yet.</p>
+                ) : (
+                  <div style={{ display: 'grid', rowGap: 8, columnGap: 0 }}>
+                    {filteredReceivedEntries.map(e => (
+                      <EntryCard
+                        key={e.id}
+                        entry={e}
+                        label="Received"
+                        useDescriptionAsTitle={shouldUseDescriptionAsTitle(e)}
+                        onClick={() => openEdit(e)}
+                      />
+                    ))}
+                  </div>
+                )
+              )}
+            </SectionBlock>
           </>
         )}
       </div>
@@ -434,7 +437,7 @@ export default function Lending({ sheetName, onTabChange }: LendingProps) {
               onSecondary={closeModal}
               leading={editEntry ? (
                 <button className="btn btn-red btn-sm" onClick={del} disabled={saving}>
-                  {delConfirm ? <><AlertTriangle size={14} />Confirm?</> : <><Trash2 size={14} />Delete</>}
+                  {delConfirm ? 'Confirm delete?' : 'Delete'}
                 </button>
               ) : null}
               disabled={saving}

@@ -88,8 +88,7 @@ function _handleUpstoxOAuthCallback(params) {
       '<html><body style="font-family: Arial, sans-serif; padding: 2rem; text-align: center;">' +
       '<h2 style="color: #16A34A;">✅ Upstox Connected!</h2>' +
       '<p>Your tokens have been saved in Apps Script.</p>' +
-      '<p>You can now close this tab and return to FinanceTracker.</p>' +
-      '<p>Your stocks will sync automatically every day.</p>' +
+      '<p>You can close this tab and return to FinanceTracker.</p>' +
       '</body></html>'
     );
   } catch(e) {

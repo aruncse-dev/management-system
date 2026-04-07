@@ -203,6 +203,13 @@ function _upstox_getTokenType() {
   return 'none';
 }
 
+function _upstox_isTokenValid(expiryValue) {
+  if (!expiryValue) return false;
+  const expiryMs = new Date(expiryValue).getTime();
+  if (isNaN(expiryMs)) return true;
+  return expiryMs > Date.now();
+}
+
 function clearUpstoxTokens() {
   const props = PropertiesService.getScriptProperties();
   [
@@ -460,12 +467,25 @@ function _portfolio_getTokenStatus() {
   const accessToken = props.getProperty('UPSTOX_ACCESS_TOKEN');
   const extendedToken = props.getProperty('UPSTOX_EXTENDED_TOKEN');
   const refreshToken = props.getProperty('UPSTOX_REFRESH_TOKEN');
+  const accessTokenExpiry = props.getProperty('UPSTOX_ACCESS_TOKEN_EXPIRY');
+  const extendedTokenExpiry = props.getProperty('UPSTOX_EXTENDED_TOKEN_EXPIRY');
+  const accessTokenValid = _upstox_isTokenValid(accessTokenExpiry);
+  const extendedTokenValid = _upstox_isTokenValid(extendedTokenExpiry);
+  const hasAnyToken = !!(accessToken || extendedToken || refreshToken);
+  const hasUsableToken = !!(
+    (accessToken && accessTokenValid) ||
+    (extendedToken && extendedTokenValid) ||
+    refreshToken
+  );
   return {
-    hasToken: !!(extendedToken || accessToken || refreshToken),
-    hasAccessToken: !!accessToken,
-    hasExtendedToken: !!extendedToken,
+    hasToken: hasAnyToken,
+    hasAccessToken: !!accessToken && accessTokenValid,
+    hasExtendedToken: !!extendedToken && extendedTokenValid,
     hasRefreshToken: !!refreshToken,
     tokenType: _upstox_getTokenType(),
+    accessTokenExpiry: accessTokenExpiry || '',
+    extendedTokenExpiry: extendedTokenExpiry || '',
+    expired: hasAnyToken ? !hasUsableToken : false,
   };
 }
 

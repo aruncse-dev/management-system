@@ -26,7 +26,7 @@ Google Sheets (your spreadsheet)
 - **Frontend** — React + Vite, deployed to GitHub Pages at `/fintracker/`
 - **Backend** — Google Apps Script serves a JSON REST API (`?action=...`)
 - **Database** — Google Sheets (data stays in your own spreadsheet)
-- **Auth** — Google OAuth implicit flow (id_token) restricted to one email
+- **Auth** — Google OAuth implicit flow (id_token) restricted to an allowed email list
 
 ---
 
@@ -87,7 +87,7 @@ Google Sheets (your spreadsheet)
 ```bash
 cd web
 cp .env.example .env
-# Fill in all four values in .env
+# Fill in the required values in .env
 npm install
 npm run dev
 # App runs at http://localhost:5173/fintracker/
@@ -100,7 +100,7 @@ npm run dev
 | `VITE_GAS_URL` | Your GAS `/exec` URL |
 | `VITE_GOOGLE_CLIENT_ID` | OAuth client ID |
 | `VITE_GEMINI_KEY` | Gemini API key (free tier at [aistudio.google.com](https://aistudio.google.com)) |
-| `VITE_ALLOWED_EMAIL` | Your Google email — only this account can log in |
+| `VITE_ALLOWED_EMAILS` | Allowed Google email addresses, comma-separated |
 
 The dev server proxies `/gas-proxy` requests to GAS server-side (bypasses CORS).
 
@@ -119,7 +119,7 @@ The dev server proxies `/gas-proxy` requests to GAS server-side (bypasses CORS).
 VITE_GAS_URL
 VITE_GOOGLE_CLIENT_ID
 VITE_GEMINI_KEY
-VITE_ALLOWED_EMAIL
+VITE_ALLOWED_EMAILS
 ```
 
 ---

@@ -2,8 +2,8 @@ import { useMemo } from 'react'
 import { useStore } from '../store'
 import { acctFlows, INR } from '../utils'
 import { ACCOUNTS, CC_MODES } from '../constants'
-import { Wallet } from 'lucide-react'
-import { decorColor } from '../constants'
+import { ArrowDownRight, ArrowUpRight, Wallet } from 'lucide-react'
+import { BalanceRow, KpiCard, SectionBlock } from '../ui-kit'
 
 interface Props { showStatus: (msg: string) => void }
 
@@ -31,71 +31,35 @@ export default function Accounts({ showStatus: _showStatus }: Props) {
     return { currentTotal, inflowTotal, outflowTotal, activeAccounts }
   }, [flows])
   return (
-    <div className="pg">
-      <div className="acct-section-head">
-        <div className="acct-section-title">
-          <Wallet size={14} />
-          <span>Overview</span>
+    <div className="pg ui-kit-page-shell monthly-subpage">
+      <SectionBlock title="Overview" icon={<Wallet size={14} />}>
+        <div className="kpis">
+          <KpiCard label="Current Balance" value={`${overview.currentTotal < 0 ? '−' : ''}${INR(Math.abs(overview.currentTotal))}`} tone={overview.currentTotal < 0 ? 'red' : 'green'} icon={<Wallet size={14} />} />
+          <KpiCard label="Inflow" value={INR(overview.inflowTotal)} tone="green" icon={<ArrowDownRight size={14} />} />
+          <KpiCard label="Outflow" value={INR(overview.outflowTotal)} tone="red" icon={<ArrowUpRight size={14} />} />
+          <KpiCard label="Accounts" value={String(overview.activeAccounts)} tone="navy" icon={<Wallet size={14} />} />
         </div>
-      </div>
+      </SectionBlock>
 
-      <div className="kpis" style={{ marginBottom: 14 }}>
-        <div className="kpi-card kpi-card--green">
-          <div className="kpi-card-l">Current Balance</div>
-          <div className="kpi-card-v kpi-card-v-soft" style={{ color: '#111827' }}>
-            {overview.currentTotal < 0 ? '−' : ''}{INR(Math.abs(overview.currentTotal))}
-          </div>
-        </div>
-        <div className="kpi-card">
-          <div className="kpi-card-l">Inflow</div>
-          <div className="kpi-card-v kpi-card-v-soft" style={{ color: '#111827' }}>{INR(overview.inflowTotal)}</div>
-        </div>
-        <div className="kpi-card">
-          <div className="kpi-card-l">Outflow</div>
-          <div className="kpi-card-v kpi-card-v-soft" style={{ color: '#111827' }}>{INR(overview.outflowTotal)}</div>
-        </div>
-        <div className="kpi-card">
-          <div className="kpi-card-l">Accounts</div>
-          <div className="kpi-card-v kpi-card-v-soft" style={{ color: '#111827' }}>{overview.activeAccounts}</div>
-        </div>
-      </div>
-
-      <div className="acct-section-head">
-        <div className="acct-section-title">
-          <Wallet size={14} />
-          <span>Account Balances</span>
-        </div>
-      </div>
-
-      <div className="acct-g2" style={{marginBottom:14}}>
+      <SectionBlock title="Account Balances" icon={<Wallet size={14} />}>
+        <div className="acct-g2">
         {ACCOUNTS.map((acc, i) => {
           const { inflow, outflow, current } = flows[acc] || { inflow:0, outflow:0, current:0 }
-          const curCol = current > 0 ? 'var(--green)' : current < 0 ? 'var(--red)' : '#6B7280'
-          const borderColors = [decorColor('Cash'), decorColor('HDFC Bank', 1), decorColor('Wallet', 2)]
           return (
-            <div key={acc} className="acct-card" style={{borderLeftColor: borderColors[i], borderLeftWidth: 0}}>
-              <div className="acct-card-top">
-                <div className="acct-bank">{accountLabel[acc] ?? acc}</div>
-                <div className="acct-balance-pill" style={{ color: curCol, borderColor: 'transparent' }}>
-                  {current < 0 ? '−' : ''}{INR(Math.abs(current))}
-                </div>
-              </div>
-              <div className="acct-main">
-                <div className="acct-flow-summary">
-                  <div className="acct-flow-summary-item">
-                    <span className="acct-flow-summary-label">In</span>
-                    <span className="acct-flow-summary-value acct-flow-summary-value-in">+{INR(inflow)}</span>
-                  </div>
-                  <div className="acct-flow-summary-item">
-                    <span className="acct-flow-summary-label">Out</span>
-                    <span className="acct-flow-summary-value acct-flow-summary-value-out">−{INR(outflow)}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <BalanceRow
+              key={acc}
+              title={accountLabel[acc] ?? acc}
+              value={`${current < 0 ? '−' : ''}${INR(Math.abs(current))}`}
+              subtitle={i === 0 ? 'Primary balance view' : undefined}
+              income={INR(inflow)}
+              expense={INR(outflow)}
+              incomeIcon={<ArrowDownRight size={11} strokeWidth={2.4} />}
+              expenseIcon={<ArrowUpRight size={11} strokeWidth={2.4} />}
+            />
           )
         })}
-      </div>
+        </div>
+      </SectionBlock>
 
     </div>
   )

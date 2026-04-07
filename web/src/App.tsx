@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type FormEvent } from 'react'
+import { useState, useEffect, useRef, type FormEvent, type CSSProperties } from 'react'
 import { StoreProvider } from './store'
 import Nav, { ModuleId } from './components/Nav'
 import ErrorScreen from './components/ErrorScreen'
@@ -9,12 +9,12 @@ import Lending from './pages/Lending'
 import Savings from './pages/Savings'
 import Gold from './pages/Gold'
 import Investments from './pages/Investments'
-import EMI from './pages/EMI'
-import JewelLoans from './pages/JewelLoans'
-import CashLoans from './pages/CashLoans'
+import Loans from './pages/Loans'
 import Settings from './pages/Settings'
 import Components from './pages/Components'
 import { ALLOWED_EMAILS } from './constants'
+import { SectionChip } from './ui-kit'
+import { api } from './api'
 
 function InstallBanner() {
   const deferredPrompt = useRef<Event & { prompt: () => void } | null>(null)
@@ -38,35 +38,40 @@ function InstallBanner() {
   )
 }
 
-const AUTH_COOKIE = 'ft_app_unlocked'
+const AUTH_GOOGLE_COOKIE = 'ft_google_authed'
 const AUTH_MODE_KEY = 'ft_lock_mode'
 const LAST_ACTIVE_KEY = 'ft_last_active'
-const IDLE_TIMEOUT_MS = 15 * 60 * 1000
+const GOOGLE_AUTH_MAX_AGE = 7 * 24 * 60 * 60
+const IDLE_TIMEOUT_MS = 60 * 60 * 1000
+const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 const GOOGLE_CLIENT_ID = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined)?.trim() || ''
 type LockMode = 'google' | 'password'
 
-function setAppAuthCookie(value: string) {
-  document.cookie = `${AUTH_COOKIE}=${value}; path=/; max-age=31536000; samesite=lax`
+function setGoogleAuthCookie(value: string) {
+  document.cookie = `${AUTH_GOOGLE_COOKIE}=${value}; path=/; max-age=${GOOGLE_AUTH_MAX_AGE}; samesite=lax`
 }
 
-function getAppAuthCookie() {
-  return document.cookie.split('; ').find(row => row.startsWith(`${AUTH_COOKIE}=`))?.split('=')[1] || ''
+function getGoogleAuthCookie() {
+  return document.cookie.split('; ').find(row => row.startsWith(`${AUTH_GOOGLE_COOKIE}=`))?.split('=')[1] || ''
 }
 
-function clearAppAuthCookie() {
-  document.cookie = `${AUTH_COOKIE}=; path=/; max-age=0; samesite=lax`
+function clearGoogleAuthCookie() {
+  document.cookie = `${AUTH_GOOGLE_COOKIE}=; path=/; max-age=0; samesite=lax`
 }
 
 function getInitialLockMode(): LockMode {
-  const unlocked = getAppAuthCookie() === '1'
+  const unlocked = getGoogleAuthCookie() === '1'
   const lastActive = Number(localStorage.getItem(LAST_ACTIVE_KEY) || '0')
-  if (unlocked && lastActive && Date.now() - lastActive > IDLE_TIMEOUT_MS) return 'password'
-  return localStorage.getItem(AUTH_MODE_KEY) === 'password' ? 'password' : 'google'
+  if (unlocked && lastActive && Date.now() - lastActive <= SESSION_MAX_AGE_MS) return 'password'
+  return 'google'
 }
 
 function Inner({ onLogout }: { onLogout: () => void }) {
   const [module, setModule] = useState<ModuleId>('monthly')
   const [lendingSheet, setLendingSheet] = useState('Lending')
+  const [pullState, setPullState] = useState<'idle' | 'pulling' | 'refreshing'>('idle')
+  const pullStartRef = useRef<{ y: number; active: boolean } | null>(null)
+  const refreshingRef = useRef(false)
 
   const handleModuleChange = (id: ModuleId) => {
     setModule(id)
@@ -79,25 +84,85 @@ function Inner({ onLogout }: { onLogout: () => void }) {
     if (module === 'savings') return 'Savings'
     if (module === 'gold') return 'Gold'
     if (module === 'investments') return 'Investments'
-    if (module === 'emi') return 'EMI Loans'
-    if (module === 'jewelLoans') return 'Jewel Loans'
-    if (module === 'cashLoans') return 'Cash Loans'
+    if (module === 'loans') return 'Loans'
     if (module === 'settings') return 'Settings'
     if (module === 'components') return 'UI Kit'
     return 'FinTracker'
   }
 
+  useEffect(() => {
+    const startYThreshold = 20
+    const refreshThreshold = 90
+
+    const canPullRefresh = () => {
+      const scrollTop = document.scrollingElement?.scrollTop ?? document.documentElement.scrollTop ?? document.body.scrollTop ?? 0
+      return scrollTop <= 0
+    }
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (refreshingRef.current) return
+      if (!canPullRefresh()) return
+      if (e.touches.length !== 1) return
+      pullStartRef.current = { y: e.touches[0].clientY, active: e.touches[0].clientY <= startYThreshold }
+    }
+
+    const handleTouchMove = (e: TouchEvent) => {
+      const start = pullStartRef.current
+      if (!start || refreshingRef.current || !start.active) return
+      const delta = e.touches[0].clientY - start.y
+      if (delta > 20) setPullState('pulling')
+      if (delta > refreshThreshold) {
+        refreshingRef.current = true
+        setPullState('refreshing')
+        api.clearPersistentCache()
+        window.location.reload()
+      }
+    }
+
+    const handleTouchEnd = () => {
+      pullStartRef.current = null
+      if (!refreshingRef.current) setPullState('idle')
+    }
+
+    window.addEventListener('touchstart', handleTouchStart, { passive: true })
+    window.addEventListener('touchmove', handleTouchMove, { passive: true })
+    window.addEventListener('touchend', handleTouchEnd, { passive: true })
+    window.addEventListener('touchcancel', handleTouchEnd, { passive: true })
+    return () => {
+      window.removeEventListener('touchstart', handleTouchStart)
+      window.removeEventListener('touchmove', handleTouchMove)
+      window.removeEventListener('touchend', handleTouchEnd)
+      window.removeEventListener('touchcancel', handleTouchEnd)
+    }
+  }, [])
+
   return (
     <div style={{ minHeight: '100vh' }} className={module === 'monthly' ? 'with-app-shell' : ''}>
       <Nav module={module} onModule={handleModuleChange} lendingSheet={lendingSheet} onLendingSheet={setLendingSheet} title={getTitleForModule()} onLogout={onLogout} />
+      {pullState !== 'idle' && (
+        <div style={{
+          position: 'fixed',
+          top: 8,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 220,
+          background: 'rgba(15, 28, 63, .92)',
+          color: '#fff',
+          borderRadius: 999,
+          padding: '8px 14px',
+          fontSize: 12,
+          fontWeight: 600,
+          boxShadow: '0 10px 30px rgba(15, 23, 42, .25)'
+        }}>
+          {pullState === 'pulling' ? 'Release to refresh' : 'Refreshing…'}
+        </div>
+      )}
       {module === 'monthly'     && <Monthly />}
       {module === 'lending'     && <Lending key={lendingSheet} sheetName={lendingSheet} />}
       {module === 'savings'     && <Savings />}
       {module === 'gold'        && <Gold />}
       {module === 'investments' && <Investments />}
-      {module === 'emi'         && <EMI />}
-      {module === 'jewelLoans'  && <JewelLoans />}
-      {module === 'cashLoans'   && <CashLoans />}
+      {module === 'loans'       && <Loans />}
       {module === 'settings'    && <Settings />}
       {module === 'components'  && <Components />}
       <InstallBanner />
@@ -173,34 +238,47 @@ function LockScreen({ mode, onUnlock }: { mode: LockMode; onUnlock: () => void }
     localStorage.setItem(AUTH_MODE_KEY, 'google')
     localStorage.setItem('ft_email', email)
     localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now()))
-    setAppAuthCookie('1')
+    setGoogleAuthCookie('1')
+    setError('')
     onUnlock()
   }
 
   const handlePasswordUnlock = () => {
+    localStorage.setItem(AUTH_MODE_KEY, 'password')
     localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now()))
-    setAppAuthCookie('1')
     onUnlock()
   }
 
   return (
     <div className="login-screen">
-      <div style={{ width: 'min(100%, 380px)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, textAlign: 'center' }}>
-        <div style={{ width: 92, height: 92, borderRadius: 28, background: 'rgba(255,255,255,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,.18)', boxShadow: '0 12px 36px rgba(0,0,0,.16)' }}>
-          <img
-            src="./apple-touch-icon.png"
-            alt="FinTracker"
-            width="50"
-            height="50"
-            style={{ borderRadius: 15, objectFit: 'contain' }}
-          />
+      <div style={{ width: 'min(100%, 380px)', display: 'grid', gap: 20 }}>
+        {/* Branding — on navy background */}
+        <div style={{ display: 'grid', gap: 10, justifyItems: 'center', textAlign: 'center' }}>
+          <div style={{ width: 72, height: 72, borderRadius: 20, background: 'rgba(255,255,255,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,.20)' }}>
+            <img src="./apple-touch-icon.png" alt="FinTracker" width="44" height="44" style={{ borderRadius: 12, objectFit: 'contain' }} />
+          </div>
+          <div>
+            <div className="login-title">FinTracker</div>
+            <div className="login-sub">
+              {mode === 'google' ? 'Sign in with Google to continue.' : 'Your session expired. Enter your app password to continue.'}
+            </div>
+          </div>
         </div>
-        <div className="login-title" style={{ textAlign: 'center', color: '#fff' }}>FinTracker</div>
-        <div className="login-sub" style={{ textAlign: 'center' }}>
-          {mode === 'google' ? 'Sign in with Google to continue.' : 'Your session expired. Enter your app password to continue.'}
-        </div>
-        {error && <div style={{ color: '#FCA5A5', fontSize: 13, fontWeight: 600, textAlign: 'center', marginTop: 2 }}>{error}</div>}
-        <div style={{ width: '100%', display: 'flex', justifyContent: 'center', marginTop: 8 }}>
+        {error && (
+          <div style={{
+            width: '100%',
+            maxWidth: 320,
+            padding: '6px 2px',
+            color: '#fff',
+            fontSize: 13,
+            fontWeight: 500,
+            lineHeight: 1.4,
+            textAlign: 'center',
+          }}>
+            {error}
+          </div>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
           {mode === 'google' ? (
             GOOGLE_CLIENT_ID ? (
               <GoogleLogin
@@ -214,12 +292,10 @@ function LockScreen({ mode, onUnlock }: { mode: LockMode; onUnlock: () => void }
                 width={300}
               />
             ) : (
-              <div style={{ color: '#FCA5A5', fontSize: 13, fontWeight: 600, textAlign: 'center' }}>
-                Google login is not configured. Add `VITE_GOOGLE_CLIENT_ID`.
-              </div>
+              <SectionChip tone="red">Google login is not configured. Add `VITE_GOOGLE_CLIENT_ID`.</SectionChip>
             )
           ) : (
-            <div style={{ width: '100%', maxWidth: 320 }}>
+            <div style={{ width: '100%' }}>
               <PasswordLock onUnlock={handlePasswordUnlock} error={error} setError={setError} />
             </div>
           )}
@@ -230,44 +306,93 @@ function LockScreen({ mode, onUnlock }: { mode: LockMode; onUnlock: () => void }
 }
 
 function PasswordLock({ onUnlock, error, setError }: { onUnlock: () => void; error: string; setError: (v: string) => void }) {
-  const [password, setPassword] = useState('')
-  const inputRef = useRef<HTMLInputElement>(null)
+  const [password, setPassword] = useState(['', '', '', ''])
+  const inputRefs = useRef<Array<HTMLInputElement | null>>([])
 
   useEffect(() => {
-    inputRef.current?.focus()
+    inputRefs.current[0]?.focus()
   }, [])
+
+  const focusBox = (index: number) => {
+    inputRefs.current[index]?.focus()
+    inputRefs.current[index]?.select()
+  }
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const appPassword = (import.meta.env.VITE_APP_PASSWORD as string | undefined)?.trim() || '1234'
-    if (password === appPassword) {
+    if (password.join('') === appPassword) {
       setError('')
       onUnlock()
       return
     }
     setError('Incorrect password. Please try again.')
-    setPassword('')
-    inputRef.current?.focus()
+    setPassword(['', '', '', ''])
+    focusBox(0)
   }
 
   return (
-    <form onSubmit={handleSubmit} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <input
-        ref={inputRef}
-        type="password"
-        value={password}
-        onChange={e => {
-          setPassword(e.target.value)
-          if (error) setError('')
-        }}
-        placeholder="Enter password"
-        className="form-inp"
-        style={{ background: 'rgba(255,255,255,.96)', borderColor: 'rgba(255,255,255,.25)', boxShadow: '0 8px 24px rgba(15, 23, 42, 0.12)' }}
-        autoComplete="current-password"
-      />
-      <button className="btn btn-full" style={{ fontSize: 15, padding: '12px 28px', justifyContent: 'center' }} type="submit">
-        Unlock App
-      </button>
+    <form onSubmit={handleSubmit} style={{ width: '100%', display: 'grid', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 48px)', gap: 8, justifyContent: 'center' }}>
+        {password.map((digit, index) => (
+          <input
+            key={index}
+            ref={el => { inputRefs.current[index] = el }}
+            type="password"
+            inputMode="numeric"
+            maxLength={1}
+            value={digit}
+            pattern="[0-9]*"
+            onChange={e => {
+              const next = e.target.value.replace(/\D/g, '').slice(-1)
+              const updated = [...password]
+              updated[index] = next
+              setPassword(updated)
+              if (error) setError('')
+              if (next && index < 3) focusBox(index + 1)
+            }}
+            onKeyDown={e => {
+              if (e.key === 'Backspace' && !password[index] && index > 0) {
+                focusBox(index - 1)
+              }
+            }}
+            className="form-inp"
+            style={{
+              width: '100%',
+              aspectRatio: '1 / 1',
+              minHeight: 48,
+              textAlign: 'center',
+              fontSize: 16,
+              fontWeight: 700,
+              background: 'rgba(255,255,255,.96)',
+              borderColor: 'rgba(191, 219, 254, .85)',
+              color: 'var(--text)',
+              boxShadow: '0 8px 20px rgba(15, 23, 42, 0.08)',
+              ...({ WebkitTextSecurity: 'disc' } as CSSProperties),
+            }}
+            autoComplete={index === 0 ? 'current-password' : 'off'}
+            aria-label={`Password digit ${index + 1}`}
+          />
+        ))}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+        <button
+          className="ui-kit-btn"
+          type="submit"
+          style={{
+            width: 'fit-content',
+            minWidth: 180,
+            justifyContent: 'center',
+            background: 'rgba(255,255,255,.92)',
+            color: 'var(--navy)',
+            border: '1px solid rgba(255,255,255,.45)',
+            borderRadius: 999,
+            boxShadow: '0 6px 16px rgba(15, 23, 42, 0.08)',
+          }}
+        >
+          Unlock App
+        </button>
+      </div>
     </form>
   )
 }
@@ -275,11 +400,9 @@ function PasswordLock({ onUnlock, error, setError }: { onUnlock: () => void; err
 export default function App() {
   const [authMode, setAuthMode] = useState<LockMode>(() => getInitialLockMode())
   const [authed, setAuthed] = useState(() => {
-    const unlocked = getAppAuthCookie() === '1'
-    if (!unlocked) return false
+    const unlocked = getGoogleAuthCookie() === '1'
     const lastActive = Number(localStorage.getItem(LAST_ACTIVE_KEY) || '0')
-    if (lastActive && Date.now() - lastActive > IDLE_TIMEOUT_MS) return false
-    return true
+    return unlocked && lastActive && Date.now() - lastActive <= SESSION_MAX_AGE_MS
   })
 
   useEffect(() => {
@@ -317,7 +440,7 @@ export default function App() {
   }
 
   const handleLogout = () => {
-    clearAppAuthCookie()
+    clearGoogleAuthCookie()
     localStorage.removeItem(LAST_ACTIVE_KEY)
     localStorage.removeItem('ft_email')
     localStorage.setItem(AUTH_MODE_KEY, 'google')
