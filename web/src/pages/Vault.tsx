@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Check, Copy, ExternalLink, Landmark, Plus, Search } from 'lucide-react'
 import { api, type RawBankingRow } from '../api'
 import { FormField, HoldingCard, ModalActions, ModalShell, SearchField, SectionBlock, Spacer, UiPill } from '../ui-kit'
-import { getAppAssetUrl } from '../appPaths'
 
 type BankingFormState = {
   account_holder_name: string
   bank_name: string
+  app_uuid: string
   account_no: string
   ifsc: string
   cif: string
@@ -20,6 +20,7 @@ type BankingFormState = {
 const EMPTY_FORM: BankingFormState = {
   account_holder_name: '',
   bank_name: '',
+  app_uuid: '',
   account_no: '',
   ifsc: '',
   cif: '',
@@ -34,6 +35,7 @@ function toForm(row: RawBankingRow): BankingFormState {
   return {
     account_holder_name: row.account_holder_name || '',
     bank_name: row.bank_name || '',
+    app_uuid: row.app_uuid || '',
     account_no: row.account_no || '',
     ifsc: row.ifsc || '',
     cif: row.cif || '',
@@ -68,78 +70,13 @@ function summaryText(row: RawBankingRow) {
   ].join('\n')
 }
 
-function bankBadgeMeta(name: string) {
-  const bank = name.trim().toLowerCase()
-  if (bank.includes('sbi')) return { label: 'SBI', bg: '#DBEAFE', fg: '#1D4ED8', logo: getAppAssetUrl('vault', 'sbi.svg') }
-  if (bank.includes('indian bank') || bank.includes('indianbank')) return { label: 'Indian Bank', bg: '#DBEAFE', fg: '#1D4ED8', logo: getAppAssetUrl('vault', 'indianbank.svg') }
-  if (bank.includes('hdfc')) return { label: 'HDFC', bg: '#DBEAFE', fg: '#1D4ED8', logo: getAppAssetUrl('vault', 'hdfc.svg') }
-  if (bank.includes('axis')) return { label: 'Axis', bg: '#DBEAFE', fg: '#1D4ED8', logo: getAppAssetUrl('vault', 'axis.svg') }
-  const initials = name.trim().split(/\s+/).slice(0, 2).map(part => part[0]?.toUpperCase() || '').join('') || 'BK'
-  return { label: initials, bg: '#EFF6FF', fg: '#1D4ED8' }
-}
-
-type BankLinkMeta = {
-  key: string
-  label?: string
-  url: string
-  logo: JSX.Element
-}
-
-const bankLogoShellStyle: CSSProperties = {
-  width: 22,
-  height: 22,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  borderRadius: 6,
-  overflow: 'hidden',
-  flexShrink: 0,
-  lineHeight: 0,
-}
-
-function bankRegistry(name: string): BankLinkMeta | null {
-  const bank = name.trim().toLowerCase()
-  if (bank.includes('sbi')) {
-    return {
-      key: 'sbi',
-      label: 'SBI',
-      url: 'https://retail.onlinesbi.sbi/retail/login.htm',
-      logo: <img src={getAppAssetUrl('vault', 'sbi.svg')} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />,
-    }
-  }
-  if (bank.includes('indian bank') || bank.includes('indianbank')) {
-    return {
-      key: 'indian-bank',
-      label: 'Indian Bank',
-      url: 'https://online.indianbank.bank.in/RetailBanking/',
-      logo: <img src={getAppAssetUrl('vault', 'indianbank.svg')} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />,
-    }
-  }
-  if (bank.includes('hdfc')) {
-    return {
-      key: 'hdfc',
-      label: 'HDFC',
-      url: 'https://netbanking.hdfcbank.com/',
-      logo: <img src={getAppAssetUrl('vault', 'hdfc.svg')} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />,
-    }
-  }
-  if (bank.includes('axis')) {
-    return {
-      key: 'axis',
-      label: 'AXIS',
-      url: 'https://omni.axis.bank.in/axisretailbanking/',
-      logo: <img src={getAppAssetUrl('vault', 'axis.svg')} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />,
-    }
-  }
-  return null
-}
-
 function openBankingUrl(url: string) {
   window.open(url, '_blank', 'noopener,noreferrer')
 }
 
 export function VaultBankingPage() {
   const [rows, setRows] = useState<RawBankingRow[]>([])
+  const [apps, setApps] = useState<Array<{ app_uuid: string; app_name: string; app_link?: string; logo?: string }>>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [mode, setMode] = useState<'add' | 'edit' | null>(null)
@@ -155,8 +92,9 @@ export function VaultBankingPage() {
     setLoading(true)
     setError('')
     try {
-      const data = await api.getBankingEntries()
-      setRows(data)
+      const [bankRows, appRows] = await Promise.all([api.getBankingEntries(), api.getApps()])
+      setRows(bankRows)
+      setApps(appRows.map(app => ({ app_uuid: app.app_uuid, app_name: app.app_name, app_link: app.app_link, logo: app.logo })))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load Banking Details')
     } finally {
@@ -174,6 +112,7 @@ export function VaultBankingPage() {
       const text = [
         row.account_holder_name,
       row.bank_name,
+      row.app_uuid,
       row.account_no,
       row.ifsc,
       row.cif,
@@ -285,8 +224,7 @@ export function VaultBankingPage() {
             <div className="lb">No entries</div>
           ) : (
             filteredRows.map(row => {
-              const bankBadge = bankBadgeMeta(row.bank_name || '')
-              const bankLink = bankRegistry(row.bank_name || '')
+              const app = apps.find(item => item.app_uuid === row.app_uuid)
               return (
                 <div key={row.id} style={{ display: 'grid', gap: 6 }}>
                   <HoldingCard
@@ -295,53 +233,35 @@ export function VaultBankingPage() {
                     leftLabel="Account No."
                     leftValue={row.account_no || '-'}
                     centerLabel=" "
-                    centerValue={
-                      bankBadge.logo ? (
-                        <span style={bankLogoShellStyle} aria-hidden="true">
-                          <img src={bankBadge.logo} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
-                        </span>
-                      ) : null
-                    }
+                    centerValue=" "
                     rightLabel="IFSC"
                     rightValue={row.ifsc || '-'}
-                    rightTop={
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                        {bankLink && (
-                          <div
-                            role="button"
-                            tabIndex={0}
-                            onClick={e => {
-                              e.stopPropagation()
-                              openBankingUrl(bankLink.url)
-                            }}
-                            onKeyDown={e => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                openBankingUrl(bankLink.url)
-                              }
-                            }}
-                            aria-label={`Open ${bankLink.label} netbanking`}
-                            title={`Open ${bankLink.label} netbanking`}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 0,
-                              padding: 0,
-                              border: 0,
-                              background: 'transparent',
-                              color: 'var(--muted)',
-                              fontSize: 0,
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              lineHeight: 1,
-                            }}
-                          >
-                            <ExternalLink size={15} />
-                          </div>
+                    rightTop={app ? (
+                      <button
+                        type="button"
+                        onClick={e => {
+                          e.stopPropagation()
+                          if (app.app_link) openBankingUrl(app.app_link)
+                        }}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          border: 0,
+                          background: 'transparent',
+                          cursor: 'pointer',
+                          padding: 0,
+                        }}
+                        aria-label="Open linked app"
+                        title="Open linked app"
+                      >
+                        {app.logo ? (
+                          <img src={app.logo} alt="" style={{ width: 24, height: 24, objectFit: 'contain', display: 'block' }} />
+                        ) : (
+                          <ExternalLink size={18} />
                         )}
-                      </div>
-                    }
+                      </button>
+                    ) : null}
                     accentTone="navy"
                     className="lending-entry-card"
                     onClick={() => setDetail(row)}
@@ -393,6 +313,14 @@ export function VaultBankingPage() {
           <div style={{ display: 'grid', gap: 12 }}>
             <FormField label="Account Holder Name"><input className="form-inp" value={form.account_holder_name} onChange={e => setForm(f => ({ ...f, account_holder_name: e.target.value }))} /></FormField>
             <FormField label="Bank Name"><input className="form-inp" value={form.bank_name} onChange={e => setForm(f => ({ ...f, bank_name: e.target.value }))} /></FormField>
+            <FormField label="App Entry">
+              <select className="form-inp" value={form.app_uuid} onChange={e => setForm(f => ({ ...f, app_uuid: e.target.value }))}>
+                <option value="">Select App</option>
+                {apps.map(app => (
+                  <option key={app.app_uuid} value={app.app_uuid}>{app.app_name}</option>
+                ))}
+              </select>
+            </FormField>
             <FormField label="Account No."><input className="form-inp" value={form.account_no} onChange={e => setForm(f => ({ ...f, account_no: e.target.value }))} /></FormField>
             <FormField label="IFSC"><input className="form-inp" value={form.ifsc} onChange={e => setForm(f => ({ ...f, ifsc: e.target.value }))} /></FormField>
             <FormField label="CIF"><input className="form-inp" value={form.cif} onChange={e => setForm(f => ({ ...f, cif: e.target.value }))} /></FormField>
@@ -523,7 +451,7 @@ function PasswordCopyLock({
             }}
             onKeyDown={e => { if (e.key === 'Backspace' && !password[index] && index > 0) focusBox(index - 1) }}
             className="form-inp"
-            style={{ width: '100%', aspectRatio: '1 / 1', minHeight: 48, textAlign: 'center', fontSize: 16, fontWeight: 700, background: '#fff', borderColor: 'rgba(191, 219, 254, .85)', color: 'var(--text)', boxShadow: '0 8px 20px rgba(15, 23, 42, 0.08)', ...({ WebkitTextSecurity: 'disc' } as CSSProperties) }}
+            style={{ width: '100%', aspectRatio: '1 / 1', minHeight: 48, textAlign: 'center', fontSize: 16, fontWeight: 700, background: '#fff', borderColor: 'rgba(191, 219, 254, .85)', color: 'var(--text)', boxShadow: '0 8px 20px rgba(15, 23, 42, 0.08)' }}
             autoComplete={index === 0 ? 'current-password' : 'off'}
             aria-label={`Password digit ${index + 1}`}
           />

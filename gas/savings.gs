@@ -48,7 +48,7 @@ function _ensureSavingsHeader(sh) {
 }
 
 // ── INTERNAL: get (or initialise) the Savings sheet ──────────────────────────
-function _savingsSheet() {
+function _savingsSheet(sheetName) {
   Logger.log('_savingsSheet: getting spreadsheet ID');
   const ssId = _getSpreadsheetId('ASSETS_SHEET_ID');
   Logger.log('_savingsSheet: opening spreadsheet: ' + ssId);
@@ -56,14 +56,15 @@ function _savingsSheet() {
   const ss = SpreadsheetApp.openById(ssId);
   Logger.log('_savingsSheet: spreadsheet name=' + ss.getName());
 
-  let sh = ss.getSheetByName(S_SHEET);
+  const resolvedSheet = String(sheetName || S_SHEET).trim() || S_SHEET;
+  let sh = ss.getSheetByName(resolvedSheet);
   if (!sh) {
-    Logger.log('_savingsSheet: sheet "' + S_SHEET + '" not found, creating');
-    sh = ss.insertSheet(S_SHEET);
+    Logger.log('_savingsSheet: sheet "' + resolvedSheet + '" not found, creating');
+    sh = ss.insertSheet(resolvedSheet);
     sh.appendRow(S_HDR);
     Logger.log('_savingsSheet: sheet created and header added');
   } else {
-    Logger.log('_savingsSheet: sheet "' + S_SHEET + '" found, lastRow=' + sh.getLastRow());
+    Logger.log('_savingsSheet: sheet "' + resolvedSheet + '" found, lastRow=' + sh.getLastRow());
   }
 
   // Always ensure header is correct
@@ -73,11 +74,11 @@ function _savingsSheet() {
 }
 
 // ── ROUTER ────────────────────────────────────────────────────────────────────
-function _savingsHandleGet(action) {
+function _savingsHandleGet(action, sheetName) {
   Logger.log('_savingsHandleGet action: ' + action);
   if (action === 'getEntries') {
     Logger.log('Calling _savings_getEntries');
-    const result = _savings_getEntries();
+    const result = _savings_getEntries(sheetName);
     Logger.log('_savings_getEntries returned: ' + result.length + ' entries');
     return result;
   }
@@ -88,24 +89,24 @@ function _savingsHandlePost(action, body) {
   Logger.log('_savingsHandlePost action: ' + action);
   if (action === 'addEntry') {
     Logger.log('Calling _savings_addEntry');
-    return _savings_addEntry(body.date, body.account, body.amount, body.desc, body.type, body.toAccount);
+    return _savings_addEntry(body.date, body.account, body.amount, body.desc, body.type, body.toAccount, body.sheetName);
   }
   if (action === 'updateEntry') {
     Logger.log('Calling _savings_updateEntry');
-    return _savings_updateEntry(body.id, body.date, body.account, body.amount, body.desc, body.type, body.toAccount);
+    return _savings_updateEntry(body.id, body.date, body.account, body.amount, body.desc, body.type, body.toAccount, body.sheetName);
   }
   if (action === 'deleteEntry') {
     Logger.log('Calling _savings_deleteEntry');
-    return _savings_deleteEntry(body.id);
+    return _savings_deleteEntry(body.id, body.sheetName);
   }
   throw new Error('Unknown savings POST action: ' + action);
 }
 
 // ── ACTIONS ───────────────────────────────────────────────────────────────────
-function _savings_getEntries() {
+function _savings_getEntries(sheetName) {
   try {
     Logger.log('_savings_getEntries: getting sheet');
-    const sh = _savingsSheet();
+    const sh = _savingsSheet(sheetName);
     Logger.log('_savings_getEntries: sheet obtained, reading data');
 
     const vals = sh.getDataRange().getValues();
@@ -139,10 +140,10 @@ function _savings_getEntries() {
   }
 }
 
-function _savings_addEntry(date, account, amount, desc, type, toAccount) {
+function _savings_addEntry(date, account, amount, desc, type, toAccount, sheetName) {
   try {
     Logger.log('_savings_addEntry: START date=' + date + ', account=' + account + ', amount=' + amount + ', type=' + type);
-    const sh  = _savingsSheet();
+    const sh  = _savingsSheet(sheetName);
     Logger.log('_savings_addEntry: sheet obtained');
     const id  = Utilities.getUuid();
     const amt = parseFloat(amount) || 0;
@@ -175,10 +176,10 @@ function _savings_addEntry(date, account, amount, desc, type, toAccount) {
   }
 }
 
-function _savings_updateEntry(id, date, account, amount, desc, type, toAccount) {
+function _savings_updateEntry(id, date, account, amount, desc, type, toAccount, sheetName) {
   try {
     Logger.log('_savings_updateEntry: START id=' + id + ', account=' + account + ', amount=' + amount);
-    const sh   = _savingsSheet();
+    const sh   = _savingsSheet(sheetName);
     Logger.log('_savings_updateEntry: sheet obtained');
     const vals = sh.getDataRange().getValues();
     const rowCountBefore = sh.getLastRow();
@@ -230,10 +231,10 @@ function _savings_updateEntry(id, date, account, amount, desc, type, toAccount) 
   }
 }
 
-function _savings_deleteEntry(id) {
+function _savings_deleteEntry(id, sheetName) {
   try {
     Logger.log('_savings_deleteEntry: id=' + id);
-    const sh   = _savingsSheet();
+    const sh   = _savingsSheet(sheetName);
     const vals = sh.getDataRange().getValues();
     const rowCountBefore = sh.getLastRow();
     Logger.log('_savings_deleteEntry: row count before delete=' + rowCountBefore);

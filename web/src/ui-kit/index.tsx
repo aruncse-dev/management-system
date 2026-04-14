@@ -677,6 +677,7 @@ export function HoldingCard({
   pnlValue,
   accentTone = 'navy',
   chips,
+  secondaryGrid,
   onClick,
   className = '',
 }: {
@@ -697,6 +698,14 @@ export function HoldingCard({
   pnlValue?: ReactNode
   accentTone?: Extract<UiTone, 'green' | 'red' | 'navy' | 'amber'>
   chips?: ReactNode
+  secondaryGrid?: {
+    leftLabel: string
+    leftValue: ReactNode
+    centerLabel?: string
+    centerValue?: ReactNode
+    rightLabel?: string
+    rightValue?: ReactNode
+  }
   onClick?: () => void
   className?: string
 }) {
@@ -735,6 +744,26 @@ export function HoldingCard({
           </div>
         )}
       </div>
+      {secondaryGrid && (
+        <div className="ui-kit-holding-card-grid">
+          <div className="ui-kit-holding-stat">
+            <span>{secondaryGrid.leftLabel}</span>
+            <strong>{secondaryGrid.leftValue}</strong>
+          </div>
+          {secondaryGrid.centerLabel && secondaryGrid.centerValue !== undefined && (
+            <div className="ui-kit-holding-stat ui-kit-holding-stat--center">
+              <span>{secondaryGrid.centerLabel}</span>
+              <strong>{secondaryGrid.centerValue}</strong>
+            </div>
+          )}
+          {secondaryGrid.rightLabel && secondaryGrid.rightValue !== undefined && (
+            <div className="ui-kit-holding-stat ui-kit-holding-stat--right">
+              <span>{secondaryGrid.rightLabel}</span>
+              <strong>{secondaryGrid.rightValue}</strong>
+            </div>
+          )}
+        </div>
+      )}
       {pnlValue !== undefined && (
         <div className={`ui-kit-holding-pnl${accentTone === 'green' || accentTone === 'red' ? ` ui-tone-${accentTone}` : ''}`}>
           <div className="ui-kit-holding-pnl-row">

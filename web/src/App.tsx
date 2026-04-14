@@ -2,17 +2,20 @@ import { useState, useEffect, useRef, type FormEvent, type CSSProperties } from 
 import { StoreProvider } from './store'
 import Nav, { ModuleId } from './components/Nav'
 import ErrorScreen from './components/ErrorScreen'
-import { Smartphone, Landmark, Settings as SettingsIcon, LogOut } from 'lucide-react'
+import { Grid2X2, Smartphone, Landmark, Settings as SettingsIcon, LogOut, Shield } from 'lucide-react'
 import { GoogleLogin, GoogleOAuthProvider, type CredentialResponse } from '@react-oauth/google'
 import Monthly from './pages/Monthly'
 import Lending from './pages/Lending'
 import Savings from './pages/Savings'
+import Bommi from './pages/Bommi'
 import Gold from './pages/Gold'
 import Investments from './pages/Investments'
 import Loans from './pages/Loans'
 import Settings from './pages/Settings'
 import Components from './pages/Components'
 import { VaultBankingPage } from './pages/Vault'
+import VaultAppsPage from './pages/VaultApps'
+import VaultInsurancePage from './pages/VaultInsurance'
 import VaultSettings from './pages/VaultSettings'
 import { ALLOWED_EMAILS } from './constants'
 import { SectionChip } from './ui-kit'
@@ -95,6 +98,7 @@ function FinanceShell({ onLogout }: { onLogout: () => void }) {
     if (module === 'monthly') return 'Monthly Expenses'
     if (module === 'lending') return lendingSheet === 'Vijaya Amma' ? 'Vijaya Amma' : 'Lending'
     if (module === 'savings') return 'Savings'
+    if (module === 'bommi') return 'Bommi'
     if (module === 'gold') return 'Gold'
     if (module === 'investments') return 'Investments'
     if (module === 'loans') return 'Loans'
@@ -148,6 +152,7 @@ function FinanceShell({ onLogout }: { onLogout: () => void }) {
       {module === 'monthly'     && <Monthly />}
       {module === 'lending'     && <Lending key={lendingSheet} sheetName={lendingSheet} />}
       {module === 'savings'     && <Savings />}
+      {module === 'bommi'       && <Bommi />}
       {module === 'gold'        && <Gold />}
       {module === 'investments' && <Investments />}
       {module === 'loans'       && <Loans />}
@@ -159,7 +164,7 @@ function FinanceShell({ onLogout }: { onLogout: () => void }) {
 }
 
 function VaultShell({ onLogout }: { onLogout: () => void }) {
-  const [vaultPage, setVaultPage] = useState<'banking' | 'settings'>('banking')
+  const [vaultPage, setVaultPage] = useState<'banking' | 'insurance' | 'apps' | 'settings'>('banking')
 
   useEffect(() => {
     setDocumentManifest('vault')
@@ -169,13 +174,15 @@ function VaultShell({ onLogout }: { onLogout: () => void }) {
     <div style={{ minHeight: '100vh' }}>
       <VaultNav onLogout={onLogout} currentPage={vaultPage} onPageChange={setVaultPage} />
       {vaultPage === 'banking' && <VaultBankingPage />}
+      {vaultPage === 'insurance' && <VaultInsurancePage />}
+      {vaultPage === 'apps' && <VaultAppsPage />}
       {vaultPage === 'settings' && <VaultSettings />}
       <InstallBanner area="vault" />
     </div>
   )
 }
 
-function VaultNav({ onLogout, currentPage, onPageChange }: { onLogout: () => void; currentPage: 'banking' | 'settings'; onPageChange: (page: 'banking' | 'settings') => void }) {
+function VaultNav({ onLogout, currentPage, onPageChange }: { onLogout: () => void; currentPage: 'banking' | 'insurance' | 'apps' | 'settings'; onPageChange: (page: 'banking' | 'insurance' | 'apps' | 'settings') => void }) {
   const [open, setOpen] = useState(false)
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
 
@@ -184,7 +191,9 @@ function VaultNav({ onLogout, currentPage, onPageChange }: { onLogout: () => voi
       <nav className="nav">
         <span className="nav-b" style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
           <img src={getAppAssetUrl('vault', getAppIconAsset('vault'))} width="30" height="30" alt={getAppDisplayName('vault')} style={{borderRadius:8,flexShrink:0,objectFit:'contain',background:'#1E5CC7'}} />
-          <span style={{ fontSize: 14, fontWeight: 600 }}>{currentPage === 'banking' ? 'Banking' : 'Settings'}</span>
+          <span style={{ fontSize: 14, fontWeight: 600 }}>
+            {currentPage === 'banking' ? 'Banking' : currentPage === 'insurance' ? 'Insurance' : currentPage === 'apps' ? 'Apps' : 'Settings'}
+          </span>
         </span>
         <button className="nav-hamburger" onClick={() => setOpen(true)}>☰</button>
       </nav>
@@ -204,6 +213,14 @@ function VaultNav({ onLogout, currentPage, onPageChange }: { onLogout: () => voi
           <button className={`nav-drawer-item${currentPage === 'banking' ? ' active' : ''}`} onClick={() => { onPageChange('banking'); setOpen(false) }}>
             <Landmark size={18} />
             <span>Banking</span>
+          </button>
+          <button className={`nav-drawer-item${currentPage === 'insurance' ? ' active' : ''}`} onClick={() => { onPageChange('insurance'); setOpen(false) }}>
+            <Shield size={18} />
+            <span>Insurance</span>
+          </button>
+          <button className={`nav-drawer-item${currentPage === 'apps' ? ' active' : ''}`} onClick={() => { onPageChange('apps'); setOpen(false) }}>
+            <Grid2X2 size={18} />
+            <span>Apps</span>
           </button>
         </div>
         <div style={{ paddingTop: 12, paddingBottom: 8 }}>

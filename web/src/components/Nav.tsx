@@ -3,7 +3,7 @@ import { CalendarDays, PiggyBank, Gem, TrendingUp, Wallet, User, Settings, Layou
 import React from 'react'
 import { getAppAssetUrl, getAppArea } from '../appPaths'
 
-export type ModuleId = 'monthly' | 'lending' | 'savings' | 'gold' | 'investments' | 'loans' | 'settings' | 'components'
+export type ModuleId = 'monthly' | 'lending' | 'savings' | 'bommi' | 'gold' | 'investments' | 'loans' | 'settings' | 'components'
 
 interface Props {
   module: ModuleId
@@ -17,6 +17,7 @@ interface Props {
 const MODULES_LG: { id: ModuleId; icon: React.ReactNode; label: string }[] = [
   { id: 'monthly',     icon: <CalendarDays size={18} />, label: 'Monthly Expenses' },
   { id: 'savings',     icon: <PiggyBank size={18} />,    label: 'Savings' },
+  { id: 'bommi',       icon: <PiggyBank size={18} />,    label: 'Bommi' },
   { id: 'gold',        icon: <Gem size={18} />,          label: 'Gold' },
   { id: 'investments', icon: <TrendingUp size={18} />,   label: 'Investments' },
 ]

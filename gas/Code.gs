@@ -173,7 +173,7 @@ function _handleGet(p) {
   }
   if (p.module === 'savings') {
     Logger.log('_handleGet: routing to savings handler for action=' + p.action);
-    return _savingsHandleGet(p.action);
+    return _savingsHandleGet(p.action, p.sheetName);
   }
   if (p.module === 'stocks' || p.module === 'mutualfunds') {
     Logger.log('_handleGet: routing to portfolio handler for module=' + p.module + ', action=' + p.action);
@@ -191,6 +191,10 @@ function _handleGet(p) {
     Logger.log('_handleGet: routing to vault handler for action=' + p.action);
     if (p.action === 'get') return _vault_getSettings();
     return _vaultHandleGet(p.action, p);
+  }
+  if (p.module === 'insurance') {
+    Logger.log('_handleGet: routing to insurance handler for action=' + p.action);
+    return _insuranceHandleGet(p.action, p);
   }
   if (p.module === 'settings') {
     Logger.log('_handleGet: routing to settings handler for action=' + p.action);
@@ -248,6 +252,10 @@ function _handlePost(body) {
     Logger.log('_handlePost: routing to vault handler for action=' + body.action);
     if (body.action === 'save') return _vault_saveSettings(body.vaultSpreadsheetId);
     return _vaultHandlePost(body.action, body);
+  }
+  if (body.module === 'insurance') {
+    Logger.log('_handlePost: routing to insurance handler for action=' + body.action);
+    return _insuranceHandlePost(body.action, body);
   }
   if (body.module === 'settings') {
     Logger.log('_handlePost: routing to settings handler for action=' + body.action);

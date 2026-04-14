@@ -38,7 +38,7 @@ export default function RecordsSettings() {
     setError('')
     setSheetStatus('checking')
     try {
-      if (forceRefresh) api.invalidateCache({ action: 'get', params: { module: 'records' } })
+      if (forceRefresh) api.invalidateCache({ action: 'get', params: { module: 'vault' } })
       const settingsResult = await api.getVaultSettings()
       const loaded: Record<string, string> = {}
       SETTINGS_SECTIONS.forEach(section => {

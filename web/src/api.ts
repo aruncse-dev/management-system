@@ -276,6 +276,7 @@ export interface RawBankingRow {
   id: string;
   account_holder_name: string;
   bank_name: string;
+  app_uuid?: string;
   account_no: string;
   ifsc: string;
   cif: string;
@@ -284,6 +285,40 @@ export interface RawBankingRow {
   transaction_password: string;
   profile_password: string;
   mpin: string;
+  updated_at?: string;
+}
+
+export interface RawVaultAppRow {
+  app_uuid: string;
+  app_name: string;
+  category: string;
+  logo: string;
+  app_link: string;
+  username: string;
+  password: string;
+  two_factor_enabled: boolean;
+  notes: string;
+  updated_at?: string;
+}
+
+export interface RawInsuranceRow {
+  id: string;
+  policy_type: string;
+  plan_name: string;
+  insurer: string;
+  app_uuid?: string;
+  policy_number: string;
+  policy_owner: string;
+  premium_amount: number | string;
+  premium_mode: string;
+  payment_method: string;
+  policy_term: string;
+  issue_date: string;
+  maturity_date: string;
+  sum_assured: number | string;
+  cash_value: number | string;
+  nominee_name: string;
+  notes: string;
   updated_at?: string;
 }
 
@@ -315,10 +350,10 @@ export const api = {
   addLending:    (p: Record<string, unknown>, sheetName?: string)  => post<string>({ module: 'lending', action: 'addEntry', ...(sheetName && sheetName !== 'Lending' && { sheetName }), ...p }),
   updateLending: (p: Record<string, unknown>, sheetName?: string)  => post<boolean>({ module: 'lending', action: 'updateEntry', ...(sheetName && sheetName !== 'Lending' && { sheetName }), ...p }),
   deleteLending: (id: string, sheetName?: string)                  => post<boolean>({ module: 'lending', action: 'deleteEntry', id, ...(sheetName && sheetName !== 'Lending' && { sheetName }) }),
-  getSavings:    ()                            => get<RawSavingsRow[]>('getEntries', { module: 'savings' }),
-  addSavings:    (p: Record<string, unknown>)  => post<string>({ module: 'savings', action: 'addEntry', ...p }),
-  updateSavings: (p: Record<string, unknown>)  => post<boolean>({ module: 'savings', action: 'updateEntry', ...p }),
-  deleteSavings: (id: string)                  => post<boolean>({ module: 'savings', action: 'deleteEntry', id }),
+  getSavings:    (sheetName?: string)          => get<RawSavingsRow[]>('getEntries', { module: 'savings', ...(sheetName && sheetName !== 'Savings' ? { sheetName } : {}) }),
+  addSavings:    (p: Record<string, unknown>, sheetName?: string)  => post<string>({ module: 'savings', action: 'addEntry', ...(sheetName && sheetName !== 'Savings' ? { sheetName } : {}), ...p }),
+  updateSavings: (p: Record<string, unknown>, sheetName?: string)  => post<boolean>({ module: 'savings', action: 'updateEntry', ...(sheetName && sheetName !== 'Savings' ? { sheetName } : {}), ...p }),
+  deleteSavings: (id: string, sheetName?: string)                  => post<boolean>({ module: 'savings', action: 'deleteEntry', id, ...(sheetName && sheetName !== 'Savings' ? { sheetName } : {}) }),
   getGold:       ()                            => get<RawGoldRow[]>('getEntries', { module: 'gold' }),
   addGold:       (p: Record<string, unknown>)  => post<string>({ module: 'gold', action: 'addEntry', ...p }),
   updateGold:    (p: Record<string, unknown>)  => post<boolean>({ module: 'gold', action: 'updateEntry', ...p }),
@@ -352,9 +387,60 @@ export const api = {
   saveVaultSettings:(p: Record<string, unknown>) => post<boolean>({ module: 'vault', action: 'save', ...p }),
   getBankingEntries: ()                       => get<RawBankingRow[]>('getEntries', { module: 'vault' }),
   getBankingEntry: (id: string)               => get<RawBankingRow>('getEntry', { module: 'vault', id }),
-  addBankingEntry: (p: Record<string, unknown>) => post<string>({ module: 'vault', action: 'addEntry', ...p }),
-  updateBankingEntry: (p: Record<string, unknown>) => post<boolean>({ module: 'vault', action: 'updateEntry', ...p }),
-  deleteBankingEntry: (id: string)            => post<boolean>({ module: 'vault', action: 'deleteEntry', id }),
+  addBankingEntry: async (p: Record<string, unknown>) => {
+    const result = await post<string>({ module: 'vault', action: 'addEntry', ...p })
+    invalidateCache({ action: 'getEntries', params: { module: 'vault' } })
+    return result
+  },
+  updateBankingEntry: async (p: Record<string, unknown>) => {
+    const result = await post<boolean>({ module: 'vault', action: 'updateEntry', ...p })
+    invalidateCache({ action: 'getEntries', params: { module: 'vault' } })
+    if (typeof p.id === 'string') invalidateCache({ action: 'getEntry', params: { module: 'vault', id: p.id } })
+    return result
+  },
+  deleteBankingEntry: async (id: string) => {
+    const result = await post<boolean>({ module: 'vault', action: 'deleteEntry', id })
+    invalidateCache({ action: 'getEntries', params: { module: 'vault' } })
+    invalidateCache({ action: 'getEntry', params: { module: 'vault', id } })
+    return result
+  },
+  getApps: ()                               => get<RawVaultAppRow[]>('getApps', { module: 'vault' }),
+  getApp: (appUuid: string)                 => get<RawVaultAppRow>('getApp', { module: 'vault', app_uuid: appUuid }),
+  addApp: async (p: Record<string, unknown>) => {
+    const result = await post<string>({ module: 'vault', action: 'addApp', ...p })
+    invalidateCache({ action: 'getApps', params: { module: 'vault' } })
+    return result
+  },
+  updateApp: async (p: Record<string, unknown>) => {
+    const result = await post<boolean>({ module: 'vault', action: 'updateApp', ...p })
+    invalidateCache({ action: 'getApps', params: { module: 'vault' } })
+    if (typeof p.app_uuid === 'string') invalidateCache({ action: 'getApp', params: { module: 'vault', app_uuid: p.app_uuid } })
+    return result
+  },
+  deleteApp: async (appUuid: string) => {
+    const result = await post<boolean>({ module: 'vault', action: 'deleteApp', app_uuid: appUuid })
+    invalidateCache({ action: 'getApps', params: { module: 'vault' } })
+    invalidateCache({ action: 'getApp', params: { module: 'vault', app_uuid: appUuid } })
+    return result
+  },
+  getInsuranceEntries: ()                   => get<RawInsuranceRow[]>('getEntries', { module: 'insurance' }),
+  addInsuranceEntry: async (p: Record<string, unknown>) => {
+    const result = await post<string>({ module: 'insurance', action: 'addEntry', ...p })
+    invalidateCache({ action: 'getEntries', params: { module: 'insurance' } })
+    return result
+  },
+  updateInsuranceEntry: async (p: Record<string, unknown>) => {
+    const result = await post<boolean>({ module: 'insurance', action: 'updateEntry', ...p })
+    invalidateCache({ action: 'getEntries', params: { module: 'insurance' } })
+    if (typeof p.id === 'string') invalidateCache({ action: 'getEntry', params: { module: 'insurance', id: p.id } })
+    return result
+  },
+  deleteInsuranceEntry: async (id: string) => {
+    const result = await post<boolean>({ module: 'insurance', action: 'deleteEntry', id })
+    invalidateCache({ action: 'getEntries', params: { module: 'insurance' } })
+    invalidateCache({ action: 'getEntry', params: { module: 'insurance', id } })
+    return result
+  },
   getTokenStatus: ()                           => get<{ hasToken: boolean; tokenType?: string; hasAccessToken?: boolean; hasExtendedToken?: boolean; hasRefreshToken?: boolean; accessTokenExpiry?: string; extendedTokenExpiry?: string; expired?: boolean }>('getTokenStatus', { module: 'stocks' }, { cache: false }),
   getUpstoxAuthUrl: ()                         => get<{ authUrl: string }>('getAuthUrl', { module: 'stocks' }, { cache: false }),
   setUpstoxToken: (token: string)              => post<boolean>({ module: 'stocks', action: 'setToken', token }),
