@@ -4,13 +4,14 @@ import react from '@vitejs/plugin-react'
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd())
   const gasUrl = env.VITE_GAS_URL || ''
+  const appBase = process.env.VITE_APP_BASE || '/fintracker/'
 
   // In development, use direct GAS URL if available, otherwise use proxy
   const apiUrl = env.VITE_API_URL || (mode === 'development' ? (gasUrl || '/gas-proxy') : '')
 
   return {
     plugins: [react()],
-    base: '/fintracker/',
+    base: appBase,
     define: {
       'import.meta.env.VITE_API_URL': JSON.stringify(apiUrl)
     },

@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FinTracker</title>
+    <script>
+      (function () {
+        var base = '/fintracker/';
+        var path = window.location.pathname || '';
+        var target = base;
+        if (path.indexOf('/records') !== -1) target = base + '?app=records';
+        window.location.replace(target + window.location.hash);
+      })();
+    </script>
+  </head>
+  <body></body>
+</html>

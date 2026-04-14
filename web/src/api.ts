@@ -268,6 +268,25 @@ export interface GoldSettings {
   assetsSheetId?: string;
 }
 
+export interface VaultSettings {
+  vaultSpreadsheetId?: string;
+}
+
+export interface RawBankingRow {
+  id: string;
+  account_holder_name: string;
+  bank_name: string;
+  account_no: string;
+  ifsc: string;
+  cif: string;
+  username: string;
+  password: string;
+  transaction_password: string;
+  profile_password: string;
+  mpin: string;
+  updated_at?: string;
+}
+
 export interface RawHolding {
   symbol: string;
   company: string;
@@ -329,6 +348,13 @@ export const api = {
   deleteCashLoanHistory: (id: string)                 => post<boolean>({ module: 'loans', action: 'deleteHistory', type: 'cash', id }),
   getSettings:   ()                            => get<GoldSettings>('get', { module: 'settings' }),
   saveSettings:  (p: Record<string, unknown>) => post<boolean>({ module: 'settings', action: 'save', ...p }),
+  getVaultSettings: ()                      => get<VaultSettings>('get', { module: 'vault' }),
+  saveVaultSettings:(p: Record<string, unknown>) => post<boolean>({ module: 'vault', action: 'save', ...p }),
+  getBankingEntries: ()                       => get<RawBankingRow[]>('getEntries', { module: 'vault' }),
+  getBankingEntry: (id: string)               => get<RawBankingRow>('getEntry', { module: 'vault', id }),
+  addBankingEntry: (p: Record<string, unknown>) => post<string>({ module: 'vault', action: 'addEntry', ...p }),
+  updateBankingEntry: (p: Record<string, unknown>) => post<boolean>({ module: 'vault', action: 'updateEntry', ...p }),
+  deleteBankingEntry: (id: string)            => post<boolean>({ module: 'vault', action: 'deleteEntry', id }),
   getTokenStatus: ()                           => get<{ hasToken: boolean; tokenType?: string; hasAccessToken?: boolean; hasExtendedToken?: boolean; hasRefreshToken?: boolean; accessTokenExpiry?: string; extendedTokenExpiry?: string; expired?: boolean }>('getTokenStatus', { module: 'stocks' }, { cache: false }),
   getUpstoxAuthUrl: ()                         => get<{ authUrl: string }>('getAuthUrl', { module: 'stocks' }, { cache: false }),
   setUpstoxToken: (token: string)              => post<boolean>({ module: 'stocks', action: 'setToken', token }),

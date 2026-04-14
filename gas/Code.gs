@@ -197,6 +197,11 @@ function _handleGet(p) {
     }
     throw new Error('Unknown settings GET action: ' + p.action);
   }
+  if (p.module === 'records') {
+    Logger.log('_handleGet: routing to records handler for action=' + p.action);
+    if (p.action === 'get') return _records_getSettings();
+    return _recordsHandleGet(p.action, p);
+  }
   const action = p.action;
   if (action === 'init') return {
     months:     getMonths(),
@@ -246,6 +251,11 @@ function _handlePost(body) {
       return true;
     }
     throw new Error('Unknown settings POST action: ' + body.action);
+  }
+  if (body.module === 'records') {
+    Logger.log('_handlePost: routing to records handler for action=' + body.action);
+    if (body.action === 'save') return _records_saveSettings(body.recordsSpreadsheetId);
+    return _recordsHandlePost(body.action, body);
   }
   const action = body.action;
   if (action === 'addRow')
@@ -603,6 +613,32 @@ function _config_saveSettings(expensesSheetId, assetsSheetId) {
     return true;
   } catch(e) {
     Logger.log('_config_saveSettings ERROR: ' + e.message);
+    throw e;
+  }
+}
+
+// ── RECORDS SETTINGS ─────────────────────────────────────────────────────────
+function _records_getSettings() {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    return {
+      recordsSpreadsheetId: props.getProperty('RECORDS_SPREADSHEET_ID') || '',
+    };
+  } catch(e) {
+    Logger.log('_records_getSettings ERROR: ' + e.message);
+    throw e;
+  }
+}
+
+function _records_saveSettings(recordsSpreadsheetId) {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    if (recordsSpreadsheetId) {
+      props.setProperty('RECORDS_SPREADSHEET_ID', String(recordsSpreadsheetId));
+    }
+    return true;
+  } catch(e) {
+    Logger.log('_records_saveSettings ERROR: ' + e.message);
     throw e;
   }
 }

@@ -64,7 +64,7 @@ export default function Settings() {
       if (settingsResult.status === 'fulfilled') {
         SETTINGS_SECTIONS.forEach(section => {
           section.fields.forEach(field => {
-            loaded[String(field.key)] = String(settingsResult.value[field.key] || '');
+            loaded[String(field.key)] = String(settingsResult.value[field.key as keyof typeof settingsResult.value] || '');
           });
         });
         setSettings(loaded);
@@ -160,7 +160,7 @@ export default function Settings() {
         <SectionTitle
           title="Settings"
           icon={<SlidersHorizontal size={16} />}
-          right={<UiPill tone="muted">Live config</UiPill>}
+          right={<UiPill tone="muted">Live Config</UiPill>}
         />
         <div className="settings-status-grid">
           <StatusBox

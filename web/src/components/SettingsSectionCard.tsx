@@ -1,15 +1,14 @@
 import { Check, Coins, Edit2, Landmark, Loader2, PiggyBank, ReceiptText, Wallet } from 'lucide-react'
 import { UiCard } from '../ui-kit'
-import type { GoldSettings } from '../api'
 
-export interface SettingField {
-  key: keyof GoldSettings
+export interface SettingField<T = Record<string, any>> {
+  key: keyof T
   label: string
   type: 'text' | 'number'
 }
 
-type Props = {
-  field: SettingField
+type Props<T = Record<string, any>> = {
+  field: SettingField<T>
   value: string
   editing: boolean
   saving: boolean
@@ -28,7 +27,7 @@ function fieldIcon(label: string) {
   return <Landmark size={12} />
 }
 
-export function SettingsSectionCard({
+export function SettingsSectionCard<T = Record<string, any>>({
   field,
   value,
   editing,
@@ -37,7 +36,7 @@ export function SettingsSectionCard({
   onStartEdit,
   onChange,
   onSave,
-}: Props) {
+}: Props<T>) {
   const displayValue = editing ? editValue : formatSettingValue(field, value)
 
   return (
@@ -86,7 +85,7 @@ export function SettingsSectionCard({
   )
 }
 
-function formatSettingValue(field: SettingField, value: string) {
+function formatSettingValue<T = Record<string, any>>(field: SettingField<T>, value: string) {
   if (field.type !== 'number') return value
   const parsed = Number(value)
   if (!Number.isFinite(parsed)) return value

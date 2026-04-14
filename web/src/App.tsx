@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, type FormEvent, type CSSProperties } from 
 import { StoreProvider } from './store'
 import Nav, { ModuleId } from './components/Nav'
 import ErrorScreen from './components/ErrorScreen'
-import { Smartphone } from 'lucide-react'
+import { Smartphone, Landmark, Settings as SettingsIcon, LogOut } from 'lucide-react'
 import { GoogleLogin, GoogleOAuthProvider, type CredentialResponse } from '@react-oauth/google'
 import Monthly from './pages/Monthly'
 import Lending from './pages/Lending'
@@ -12,11 +12,36 @@ import Investments from './pages/Investments'
 import Loans from './pages/Loans'
 import Settings from './pages/Settings'
 import Components from './pages/Components'
+import { VaultBankingPage } from './pages/Vault'
+import VaultSettings from './pages/VaultSettings'
 import { ALLOWED_EMAILS } from './constants'
 import { SectionChip } from './ui-kit'
 import { api } from './api'
 
-function InstallBanner() {
+type AppArea = 'finance' | 'vault'
+const APP_BASE = (import.meta.env.BASE_URL as string | undefined) || '/fintracker/'
+
+function getAppArea(): AppArea {
+  const params = new URLSearchParams(window.location.search)
+  if (params.get('app') === 'vault') return 'vault'
+  return window.location.pathname.includes('/vault') ? 'vault' : 'finance'
+}
+
+function getManifestHref(area: AppArea) {
+  return area === 'vault' ? `${APP_BASE}manifest-vault.json` : `${APP_BASE}manifest.json`
+}
+
+function setDocumentManifest(area: AppArea) {
+  const link = document.querySelector<HTMLLinkElement>("link[rel='manifest']")
+  if (link) link.href = getManifestHref(area)
+  document.title = area === 'vault' ? 'FinTracker Vault' : 'FinTracker'
+  const appleTitle = document.querySelector<HTMLMetaElement>("meta[name='apple-mobile-web-app-title']")
+  if (appleTitle) appleTitle.content = area === 'vault' ? 'FinTracker Vault' : 'FinTracker'
+  const themeColor = document.querySelector<HTMLMetaElement>("meta[name='theme-color']")
+  if (themeColor) themeColor.content = area === 'vault' ? '#0F766E' : '#1E5CC7'
+}
+
+function InstallBanner({ area }: { area: AppArea }) {
   const deferredPrompt = useRef<Event & { prompt: () => void } | null>(null)
   const [show, setShow] = useState(false)
 
@@ -28,8 +53,8 @@ function InstallBanner() {
 
   if (!show) return null
   return (
-    <div style={{position:'fixed',top:106,left:12,right:12,background:'var(--card)',border:'1px solid var(--border)',borderLeft:'4px solid var(--navy)',borderRadius:10,padding:'10px 12px',display:'flex',alignItems:'center',justifyContent:'space-between',zIndex:150,boxShadow:'0 4px 16px rgba(55,48,163,.12)'}}>
-      <span style={{fontSize:13,fontWeight:600,color:'var(--text)',display:'flex',alignItems:'center',gap:6}}><Smartphone size={14} /> Add FinTracker to home screen</span>
+    <div style={{position:'fixed',top:106,left:12,right:12,background:'var(--card)',border:'1px solid var(--border)',borderRadius:10,padding:'10px 12px',display:'flex',alignItems:'center',justifyContent:'space-between',zIndex:150,boxShadow:'0 4px 16px rgba(55,48,163,.12)'}}>
+      <span style={{fontSize:13,fontWeight:600,color:'var(--text)',display:'flex',alignItems:'center',gap:6}}><Smartphone size={14} /> Add {area === 'vault' ? 'Vault' : 'FinTracker'} to home screen</span>
       <div style={{display:'flex',gap:6,flexShrink:0}}>
         <button style={{background:'var(--navy)',color:'#fff',border:'none',borderRadius:8,padding:'5px 12px',fontSize:12,fontWeight:700,cursor:'pointer'}} onClick={() => { deferredPrompt.current?.prompt(); setShow(false) }}>Install</button>
         <button style={{background:'none',border:'none',color:'var(--muted)',fontSize:18,cursor:'pointer',lineHeight:1,padding:'0 2px'}} onClick={() => setShow(false)}>×</button>
@@ -66,7 +91,7 @@ function getInitialLockMode(): LockMode {
   return 'google'
 }
 
-function Inner({ onLogout }: { onLogout: () => void }) {
+function FinanceShell({ onLogout }: { onLogout: () => void }) {
   const [module, setModule] = useState<ModuleId>('monthly')
   const [lendingSheet, setLendingSheet] = useState('Lending')
   const [pullState, setPullState] = useState<'idle' | 'pulling' | 'refreshing'>('idle')
@@ -93,19 +118,13 @@ function Inner({ onLogout }: { onLogout: () => void }) {
   useEffect(() => {
     const startYThreshold = 20
     const refreshThreshold = 90
-
-    const canPullRefresh = () => {
-      const scrollTop = document.scrollingElement?.scrollTop ?? document.documentElement.scrollTop ?? document.body.scrollTop ?? 0
-      return scrollTop <= 0
-    }
-
+    const canPullRefresh = () => (document.scrollingElement?.scrollTop ?? document.documentElement.scrollTop ?? document.body.scrollTop ?? 0) <= 0
     const handleTouchStart = (e: TouchEvent) => {
       if (refreshingRef.current) return
       if (!canPullRefresh()) return
       if (e.touches.length !== 1) return
       pullStartRef.current = { y: e.touches[0].clientY, active: e.touches[0].clientY <= startYThreshold }
     }
-
     const handleTouchMove = (e: TouchEvent) => {
       const start = pullStartRef.current
       if (!start || refreshingRef.current || !start.active) return
@@ -118,12 +137,10 @@ function Inner({ onLogout }: { onLogout: () => void }) {
         window.location.reload()
       }
     }
-
     const handleTouchEnd = () => {
       pullStartRef.current = null
       if (!refreshingRef.current) setPullState('idle')
     }
-
     window.addEventListener('touchstart', handleTouchStart, { passive: true })
     window.addEventListener('touchmove', handleTouchMove, { passive: true })
     window.addEventListener('touchend', handleTouchEnd, { passive: true })
@@ -139,24 +156,7 @@ function Inner({ onLogout }: { onLogout: () => void }) {
   return (
     <div style={{ minHeight: '100vh' }} className={module === 'monthly' ? 'with-app-shell' : ''}>
       <Nav module={module} onModule={handleModuleChange} lendingSheet={lendingSheet} onLendingSheet={setLendingSheet} title={getTitleForModule()} onLogout={onLogout} />
-      {pullState !== 'idle' && (
-        <div style={{
-          position: 'fixed',
-          top: 8,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 220,
-          background: 'rgba(15, 28, 63, .92)',
-          color: '#fff',
-          borderRadius: 999,
-          padding: '8px 14px',
-          fontSize: 12,
-          fontWeight: 600,
-          boxShadow: '0 10px 30px rgba(15, 23, 42, .25)'
-        }}>
-          {pullState === 'pulling' ? 'Release to refresh' : 'Refreshing…'}
-        </div>
-      )}
+      {pullState !== 'idle' && <div style={{ position: 'fixed', top: 8, left: '50%', transform: 'translateX(-50%)', zIndex: 220, background: 'rgba(15, 28, 63, .92)', color: '#fff', borderRadius: 999, padding: '8px 14px', fontSize: 12, fontWeight: 600, boxShadow: '0 10px 30px rgba(15, 23, 42, .25)' }}>{pullState === 'pulling' ? 'Release to refresh' : 'Refreshing…'}</div>}
       {module === 'monthly'     && <Monthly />}
       {module === 'lending'     && <Lending key={lendingSheet} sheetName={lendingSheet} />}
       {module === 'savings'     && <Savings />}
@@ -165,21 +165,118 @@ function Inner({ onLogout }: { onLogout: () => void }) {
       {module === 'loans'       && <Loans />}
       {module === 'settings'    && <Settings />}
       {module === 'components'  && <Components />}
-      <InstallBanner />
+      <InstallBanner area="finance" />
     </div>
   )
 }
 
-// Error boundary wrapper
-function AppWithErrorBoundary({ onLogout }: { onLogout: () => void }) {
-  const [apiError, setApiError] = useState<string | null>(null)
-  const [shouldRetry, setShouldRetry] = useState(false)
+function VaultShell({ onLogout }: { onLogout: () => void }) {
+  const [vaultPage, setVaultPage] = useState<'banking' | 'settings'>('banking')
 
   useEffect(() => {
-    setShouldRetry(false)
-  }, [shouldRetry])
+    setDocumentManifest('vault')
+  }, [])
 
-  // Catch unhandled promise rejections
+  return (
+    <div style={{ minHeight: '100vh' }}>
+      <VaultNav onLogout={onLogout} currentPage={vaultPage} onPageChange={setVaultPage} />
+      {vaultPage === 'banking' && <VaultBankingPage />}
+      {vaultPage === 'settings' && <VaultSettings />}
+      <InstallBanner area="vault" />
+    </div>
+  )
+}
+
+function VaultNav({ onLogout, currentPage, onPageChange }: { onLogout: () => void; currentPage: 'banking' | 'settings'; onPageChange: (page: 'banking' | 'settings') => void }) {
+  const [open, setOpen] = useState(false)
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
+
+  return (
+    <>
+      <nav className="nav">
+        <span className="nav-b" style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
+          <img src={`${APP_BASE}vault-192.png`} width="30" height="30" alt="FinTracker Vault" style={{borderRadius:8,flexShrink:0,objectFit:'contain',background:'#0F766E'}} />
+          <span style={{ fontSize: 14, fontWeight: 600 }}>{currentPage === 'banking' ? 'Banking' : 'Settings'}</span>
+        </span>
+        <button className="nav-hamburger" onClick={() => setOpen(true)}>☰</button>
+      </nav>
+      {open && <div className="nav-overlay" onClick={() => setOpen(false)} />}
+      <div className={`nav-drawer${open ? ' open' : ''}`}>
+        <div className="nav-drawer-hd">
+          <span className="nav-b" style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            <img src={`${APP_BASE}vault-192.png`} width="28" height="28" alt="FinTracker Vault" style={{borderRadius:7,flexShrink:0,objectFit:'contain',background:'#0F766E'}} />
+            FinTracker Vault
+          </span>
+          <button className="modal-close" onClick={() => setOpen(false)}>×</button>
+        </div>
+        <div style={{ paddingTop: 8, paddingBottom: 6 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255, 255, 255, 0.5)', textTransform: 'uppercase', letterSpacing: '.04em', padding: '8px 14px 4px 14px', marginBottom: 2 }}>
+            Vault
+          </div>
+          <button className={`nav-drawer-item${currentPage === 'banking' ? ' active' : ''}`} onClick={() => { onPageChange('banking'); setOpen(false) }}>
+            <Landmark size={18} />
+            <span>Banking</span>
+          </button>
+        </div>
+        <div style={{ paddingTop: 12, paddingBottom: 8 }}>
+          <button className={`nav-drawer-item${currentPage === 'settings' ? ' active' : ''}`} onClick={() => { onPageChange('settings'); setOpen(false) }}>
+            <SettingsIcon size={18} />
+            <span>Settings</span>
+          </button>
+          <button className="nav-drawer-item" onClick={() => setLogoutConfirmOpen(true)}>
+            <LogOut size={18} />
+            <span>Logout</span>
+          </button>
+        </div>
+      </div>
+
+      {logoutConfirmOpen && (
+        <div className="modal-bg open" onClick={() => setLogoutConfirmOpen(false)} style={{ alignItems: 'center', padding: '24px 16px' }}>
+          <div
+            className="card"
+            onClick={e => e.stopPropagation()}
+            style={{ width: 'min(100%, 360px)', padding: 16, borderRadius: 16, boxShadow: '0 18px 48px rgba(15, 23, 42, 0.18)' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text)', fontWeight: 700, fontSize: 16 }}>
+                  <LogOut size={18} />
+                  Logout app?
+                </div>
+                <div style={{ marginTop: 6, fontSize: 13, lineHeight: 1.5, color: 'var(--muted)' }}>
+                  This clears only the FinTracker Vault session on this device. It will not log you out of Google.
+                </div>
+              </div>
+              <button className="modal-close" onClick={() => setLogoutConfirmOpen(false)} style={{ background: 'var(--bg)', color: 'var(--text)' }}>×</button>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                className="settings-action-btn"
+                onClick={() => setLogoutConfirmOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="settings-action-btn"
+                onClick={() => {
+                  setLogoutConfirmOpen(false)
+                  onLogout()
+                }}
+                style={{ borderColor: 'rgba(239,68,68,.25)', color: 'var(--red)' }}
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+function AppWithErrorBoundary({ onLogout }: { onLogout: () => void }) {
+  const [apiError, setApiError] = useState<string | null>(null)
   useEffect(() => {
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
       const msg = event.reason?.message || String(event.reason) || ''
@@ -188,16 +285,12 @@ function AppWithErrorBoundary({ onLogout }: { onLogout: () => void }) {
         event.preventDefault()
       }
     }
-
     window.addEventListener('unhandledrejection', handleUnhandledRejection)
     return () => window.removeEventListener('unhandledrejection', handleUnhandledRejection)
   }, [])
-
-  if (apiError) {
-    return <ErrorScreen error={apiError} onRetry={() => setApiError(null)} />
-  }
-
-  return <Inner onLogout={onLogout} />
+  if (apiError) return <ErrorScreen error={apiError} onRetry={() => setApiError(null)} />
+  const area = getAppArea()
+  return area === 'vault' ? <VaultShell onLogout={onLogout} /> : <FinanceShell onLogout={onLogout} />
 }
 
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
@@ -214,27 +307,17 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
 
 function LockScreen({ mode, onUnlock }: { mode: LockMode; onUnlock: () => void }) {
   const [error, setError] = useState('')
+  const area = getAppArea()
+  useEffect(() => setDocumentManifest(area), [area])
 
   const handleCredential = (resp: CredentialResponse) => {
     setError('')
     const token = resp.credential
-    if (!token) {
-      setError('Google sign-in did not return a token.')
-      return
-    }
-
+    if (!token) return setError('Google sign-in did not return a token.')
     const payload = decodeJwtPayload(token)
     const email = String(payload?.email || '').trim().toLowerCase()
-    if (!email) {
-      setError('Could not read Google account email.')
-      return
-    }
-
-    if (ALLOWED_EMAILS.length > 0 && !ALLOWED_EMAILS.includes(email)) {
-      setError('This Google account is not allowed for FinTracker.')
-      return
-    }
-
+    if (!email) return setError('Could not read Google account email.')
+    if (ALLOWED_EMAILS.length > 0 && !ALLOWED_EMAILS.includes(email)) return setError('This Google account is not allowed for FinTracker.')
     localStorage.setItem(AUTH_MODE_KEY, 'google')
     localStorage.setItem('ft_email', email)
     localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now()))
@@ -252,45 +335,20 @@ function LockScreen({ mode, onUnlock }: { mode: LockMode; onUnlock: () => void }
   return (
     <div className="login-screen">
       <div style={{ width: 'min(100%, 380px)', display: 'grid', gap: 20 }}>
-        {/* Branding — on navy background */}
         <div style={{ display: 'grid', gap: 10, justifyItems: 'center', textAlign: 'center' }}>
           <div style={{ width: 72, height: 72, borderRadius: 20, background: 'rgba(255,255,255,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,.20)' }}>
             <img src="./apple-touch-icon.png" alt="FinTracker" width="44" height="44" style={{ borderRadius: 12, objectFit: 'contain' }} />
           </div>
           <div>
-            <div className="login-title">FinTracker</div>
-            <div className="login-sub">
-              {mode === 'google' ? 'Sign in with Google to continue.' : 'Your session expired. Enter your app password to continue.'}
-            </div>
+            <div className="login-title">{area === 'vault' ? 'FinTracker Vault' : 'FinTracker'}</div>
+            <div className="login-sub">{mode === 'google' ? 'Sign in with Google to continue.' : 'Your session expired. Enter your app password to continue.'}</div>
           </div>
         </div>
-        {error && (
-          <div style={{
-            width: '100%',
-            maxWidth: 320,
-            padding: '6px 2px',
-            color: '#fff',
-            fontSize: 13,
-            fontWeight: 500,
-            lineHeight: 1.4,
-            textAlign: 'center',
-          }}>
-            {error}
-          </div>
-        )}
+        {error && <div style={{ width: '100%', maxWidth: 320, padding: '6px 2px', color: '#fff', fontSize: 13, fontWeight: 500, lineHeight: 1.4, textAlign: 'center' }}>{error}</div>}
         <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
           {mode === 'google' ? (
             GOOGLE_CLIENT_ID ? (
-              <GoogleLogin
-                onSuccess={handleCredential}
-                onError={() => setError('Google sign-in failed. Please try again.')}
-                type="standard"
-                theme="outline"
-                size="large"
-                text="signin_with"
-                shape="pill"
-                width={300}
-              />
+              <GoogleLogin onSuccess={handleCredential} onError={() => setError('Google sign-in failed. Please try again.')} type="standard" theme="outline" size="large" text="signin_with" shape="pill" width={300} />
             ) : (
               <SectionChip tone="red">Google login is not configured. Add `VITE_GOOGLE_CLIENT_ID`.</SectionChip>
             )
@@ -308,29 +366,16 @@ function LockScreen({ mode, onUnlock }: { mode: LockMode; onUnlock: () => void }
 function PasswordLock({ onUnlock, error, setError }: { onUnlock: () => void; error: string; setError: (v: string) => void }) {
   const [password, setPassword] = useState(['', '', '', ''])
   const inputRefs = useRef<Array<HTMLInputElement | null>>([])
-
-  useEffect(() => {
-    inputRefs.current[0]?.focus()
-  }, [])
-
-  const focusBox = (index: number) => {
-    inputRefs.current[index]?.focus()
-    inputRefs.current[index]?.select()
-  }
-
+  useEffect(() => { inputRefs.current[0]?.focus() }, [])
+  const focusBox = (index: number) => { inputRefs.current[index]?.focus(); inputRefs.current[index]?.select() }
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const appPassword = (import.meta.env.VITE_APP_PASSWORD as string | undefined)?.trim() || '1234'
-    if (password.join('') === appPassword) {
-      setError('')
-      onUnlock()
-      return
-    }
+    if (password.join('') === appPassword) { setError(''); onUnlock(); return }
     setError('Incorrect password. Please try again.')
     setPassword(['', '', '', ''])
     focusBox(0)
   }
-
   return (
     <form onSubmit={handleSubmit} style={{ width: '100%', display: 'grid', gap: 12 }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 48px)', gap: 8, justifyContent: 'center' }}>
@@ -351,53 +396,30 @@ function PasswordLock({ onUnlock, error, setError }: { onUnlock: () => void; err
               if (error) setError('')
               if (next && index < 3) focusBox(index + 1)
             }}
-            onKeyDown={e => {
-              if (e.key === 'Backspace' && !password[index] && index > 0) {
-                focusBox(index - 1)
-              }
-            }}
+            onKeyDown={e => { if (e.key === 'Backspace' && !password[index] && index > 0) focusBox(index - 1) }}
             className="form-inp"
-            style={{
-              width: '100%',
-              aspectRatio: '1 / 1',
-              minHeight: 48,
-              textAlign: 'center',
-              fontSize: 16,
-              fontWeight: 700,
-              background: 'rgba(255,255,255,.96)',
-              borderColor: 'rgba(191, 219, 254, .85)',
-              color: 'var(--text)',
-              boxShadow: '0 8px 20px rgba(15, 23, 42, 0.08)',
-              ...({ WebkitTextSecurity: 'disc' } as CSSProperties),
-            }}
+            style={{ width: '100%', aspectRatio: '1 / 1', minHeight: 48, textAlign: 'center', fontSize: 16, fontWeight: 700, background: 'rgba(255,255,255,.96)', borderColor: 'rgba(191, 219, 254, .85)', color: 'var(--text)', boxShadow: '0 8px 20px rgba(15, 23, 42, 0.08)', ...({ WebkitTextSecurity: 'disc' } as CSSProperties) }}
             autoComplete={index === 0 ? 'current-password' : 'off'}
             aria-label={`Password digit ${index + 1}`}
           />
         ))}
       </div>
       <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
-        <button
-          className="ui-kit-btn"
-          type="submit"
-          style={{
-            width: 'fit-content',
-            minWidth: 180,
-            justifyContent: 'center',
-            background: 'rgba(255,255,255,.92)',
-            color: 'var(--navy)',
-            border: '1px solid rgba(255,255,255,.45)',
-            borderRadius: 999,
-            boxShadow: '0 6px 16px rgba(15, 23, 42, 0.08)',
-          }}
-        >
-          Unlock App
-        </button>
+        <button className="ui-kit-btn" type="submit" style={{ width: 'fit-content', minWidth: 180, justifyContent: 'center', background: 'rgba(255,255,255,.92)', color: 'var(--navy)', border: '1px solid rgba(255,255,255,.45)', borderRadius: 999, boxShadow: '0 6px 16px rgba(15, 23, 42, 0.08)' }}>Unlock App</button>
       </div>
     </form>
   )
 }
 
 export default function App() {
+  useEffect(() => {
+    const area = getAppArea()
+    setDocumentManifest(area)
+    const onPop = () => setDocumentManifest(getAppArea())
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
+
   const [authMode, setAuthMode] = useState<LockMode>(() => getInitialLockMode())
   const [authed, setAuthed] = useState(() => {
     const unlocked = getGoogleAuthCookie() === '1'
@@ -407,25 +429,24 @@ export default function App() {
 
   useEffect(() => {
     if (!authed) return
-
-    const lockForIdle = () => {
+    let timer = window.setTimeout(() => {
       localStorage.setItem(AUTH_MODE_KEY, 'password')
       setAuthMode('password')
       setAuthed(false)
-    }
-
+    }, IDLE_TIMEOUT_MS)
     const bumpActivity = () => {
       localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now()))
       window.clearTimeout(timer)
-      timer = window.setTimeout(lockForIdle, IDLE_TIMEOUT_MS)
+      timer = window.setTimeout(() => {
+        localStorage.setItem(AUTH_MODE_KEY, 'password')
+        setAuthMode('password')
+        setAuthed(false)
+      }, IDLE_TIMEOUT_MS)
     }
-
-    let timer = window.setTimeout(lockForIdle, IDLE_TIMEOUT_MS)
     const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'] as const
     events.forEach(evt => window.addEventListener(evt, bumpActivity, { passive: true } as AddEventListenerOptions))
     document.addEventListener('visibilitychange', bumpActivity)
     bumpActivity()
-
     return () => {
       window.clearTimeout(timer)
       events.forEach(evt => window.removeEventListener(evt, bumpActivity as EventListener))
@@ -454,10 +475,7 @@ export default function App() {
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
       {!authed ? (
-        <LockScreen
-          mode={authMode}
-          onUnlock={() => handleUnlock(authMode)}
-        />
+        <LockScreen mode={authMode} onUnlock={() => handleUnlock(authMode)} />
       ) : (
         <StoreProvider>
           <AppWithErrorBoundary onLogout={handleLogout} />
