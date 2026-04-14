@@ -187,13 +187,19 @@ function _handleGet(p) {
     Logger.log('_handleGet: routing to loans handler for action=' + p.action);
     return _loansHandleGet(p.action, p);
   }
+  if (p.module === 'vault') {
+    Logger.log('_handleGet: routing to vault handler for action=' + p.action);
+    if (p.action === 'get') return _vault_getSettings();
+    return _vaultHandleGet(p.action, p);
+  }
   if (p.module === 'settings') {
     Logger.log('_handleGet: routing to settings handler for action=' + p.action);
     if (p.action === 'get') {
       const goldSettings = _gold_getSettings();
       const loansSettings = _loans_getSettings();
       const configSettings = _config_getSettings();
-      return { ...configSettings, ...goldSettings, ...loansSettings };
+      const vaultSettings = _vault_getSettings();
+      return { ...configSettings, ...goldSettings, ...loansSettings, ...vaultSettings };
     }
     throw new Error('Unknown settings GET action: ' + p.action);
   }
@@ -238,6 +244,11 @@ function _handlePost(body) {
     Logger.log('_handlePost: routing to loans handler for action=' + body.action);
     return _loansHandlePost(body.action, body);
   }
+  if (body.module === 'vault') {
+    Logger.log('_handlePost: routing to vault handler for action=' + body.action);
+    if (body.action === 'save') return _vault_saveSettings(body.vaultSpreadsheetId);
+    return _vaultHandlePost(body.action, body);
+  }
   if (body.module === 'settings') {
     Logger.log('_handlePost: routing to settings handler for action=' + body.action);
     if (body.action === 'save') {
@@ -247,6 +258,9 @@ function _handlePost(body) {
       }
       if (body.expensesSheetId !== undefined || body.assetsSheetId !== undefined) {
         _config_saveSettings(body.expensesSheetId, body.assetsSheetId);
+      }
+      if (body.vaultSpreadsheetId !== undefined) {
+        _vault_saveSettings(body.vaultSpreadsheetId);
       }
       return true;
     }

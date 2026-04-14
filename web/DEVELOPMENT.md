@@ -8,7 +8,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173/fintracker/
+Open http://localhost:5173/fintracker and http://localhost:5173/vault
 
 ## Configuration
 
@@ -19,7 +19,7 @@ Open http://localhost:5173/fintracker/
 VITE_GAS_URL=https://script.google.com/macros/s/{DEPLOYMENT_ID}/exec
 
 # Frontend app URL used after Upstox OAuth redirects
-VITE_APP_URL=http://localhost:5173/fintracker/
+VITE_APP_URL=http://localhost:5173/fintracker
 
 # Optional - Direct API URL (overrides GAS_URL in dev)
 VITE_API_URL=
@@ -55,7 +55,7 @@ The app will directly call the production GAS URL (CORS enabled).
 Set `VITE_APP_URL` to your frontend URL so the OAuth callback returns to the app after GAS stores the token:
 
 ```env
-VITE_APP_URL=https://aruncse-dev.github.io/fintracker/
+VITE_APP_URL=https://your-domain/fintracker
 ```
 
 **Pros:**
@@ -158,12 +158,28 @@ Then restart the dev server.
 
 ### Development (localhost:5173)
 ```
-Frontend → http://localhost:5173/gas-proxy
-       ↓ (Vite proxy intercepts)
-       → https://script.google.com/.../exec
-       ↓ (CORS allowed if "Anyone" has access)
+Frontend → http://localhost:5173/fintracker or /vault
+       ↓ (Vite serves SPA routes)
+        → https://script.google.com/.../exec
+        ↓ (CORS allowed if "Anyone" has access)
 Backend (GAS)
 ```
+
+### Production on Vercel
+```
+Frontend → Vercel app
+       ↓ (VITE_API_URL points to Cloudflare Worker)
+Cloudflare Worker → GAS_EXEC_URL
+       ↓
+Google Apps Script
+```
+
+For Vercel, set:
+- `VITE_API_URL=https://your-worker.workers.dev`
+- `VITE_GAS_URL=https://script.google.com/macros/s/{DEPLOYMENT_ID}/exec`
+
+For Cloudflare Worker, set:
+- `GAS_EXEC_URL=https://script.google.com/macros/s/{DEPLOYMENT_ID}/exec`
 
 ### Production (deployed)
 ```

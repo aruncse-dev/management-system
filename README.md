@@ -2,14 +2,14 @@
 
 A React PWA that uses **Google Sheets as its database** via Google Apps Script. No server costs, no database to manage — deploy once and track your family finances from any device.
 
-**Live app:** https://aruncse-dev.github.io/fintracker/
+**Live app:** Vercel deployments
 
 ---
 
 ## Architecture
 
 ```
-Browser (React PWA — GitHub Pages)
+Browser (React PWA — Vercel)
       │
       │  HTTPS fetch (JSON API)
       ▼
@@ -23,7 +23,7 @@ Google Sheets (your spreadsheet)
   └── Accounts                (account → opening balance)
 ```
 
-- **Frontend** — React + Vite, deployed to GitHub Pages at `/fintracker/`
+- **Frontend** — React + Vite, deployed to Vercel at `/fintracker` and `/vault`
 - **Backend** — Google Apps Script serves a JSON REST API (`?action=...`)
 - **Database** — Google Sheets (data stays in your own spreadsheet)
 - **Auth** — Google OAuth implicit flow (id_token) restricted to an allowed email list
@@ -74,10 +74,10 @@ Google Sheets (your spreadsheet)
 2. Create an **OAuth 2.0 Client ID** → Application type: **Web application**
 3. Add Authorised JavaScript origins:
    - `http://localhost:5173`
-   - `https://aruncse-dev.github.io`
+   - your Vercel deployment domains
 4. Add Authorised redirect URIs:
    - `http://localhost:5173/`
-   - `https://aruncse-dev.github.io/fintracker/`
+   - `https://your-domain/fintracker`
 5. Copy the **Client ID**
 
 ---
@@ -90,7 +90,7 @@ cp .env.example .env
 # Fill in the required values in .env
 npm install
 npm run dev
-# App runs at http://localhost:5173/fintracker/
+# App runs at http://localhost:5173/fintracker and http://localhost:5173/vault
 ```
 
 **.env values:**
@@ -106,20 +106,21 @@ The dev server proxies `/gas-proxy` requests to GAS server-side (bypasses CORS).
 
 ---
 
-### 4. Deploy to GitHub Pages
+### 4. Deploy to Vercel
 
-1. Fork or push this repo to your GitHub account
-2. Go to **Settings → Secrets and variables → Actions** → add the four secrets above
-3. Enable **GitHub Pages** → Source: `gh-pages` branch
-4. Push to `main` — the workflow builds and deploys automatically
+1. Import this repo into Vercel
+2. Set the root directory to `web`
+3. Add the runtime env vars in each Vercel project
+4. Use the same shared credentials for both apps
 
-**GitHub Actions secrets needed:**
+**Required Vercel env vars:**
 
 ```
 VITE_GAS_URL
 VITE_GOOGLE_CLIENT_ID
-VITE_GEMINI_KEY
 VITE_ALLOWED_EMAILS
+VITE_API_TOKEN
+VITE_GEMINI_KEY
 ```
 
 ---

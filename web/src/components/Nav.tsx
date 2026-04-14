@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { CalendarDays, PiggyBank, Gem, TrendingUp, Wallet, User, Settings, LayoutGrid, LogOut, Layers3 } from 'lucide-react'
 import React from 'react'
+import { getAppAssetUrl, getAppArea } from '../appPaths'
 
 export type ModuleId = 'monthly' | 'lending' | 'savings' | 'gold' | 'investments' | 'loans' | 'settings' | 'components'
 
@@ -26,6 +27,7 @@ const LENDING_SUBMENU = [
 ]
 
 export default function Nav({ module, onModule, lendingSheet, onLendingSheet, title, onLogout }: Props) {
+  const area = getAppArea()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
 
@@ -34,7 +36,7 @@ export default function Nav({ module, onModule, lendingSheet, onLendingSheet, ti
       <nav className="nav">
         {/* Brand — left */}
         <span className="nav-b" style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
-          <img src="./apple-touch-icon.png" width="30" height="30" alt="FinTracker" style={{borderRadius:8,flexShrink:0,objectFit:'contain',background:'#1E3A8A'}} />
+          <img src={getAppAssetUrl(area, area === 'vault' ? 'vault-192.png' : 'icon-192.png')} width="30" height="30" alt={area === 'vault' ? 'Vault' : 'FinTracker'} style={{borderRadius:8,flexShrink:0,objectFit:'contain',background:area === 'vault' ? '#1E5CC7' : '#fff'}} />
           {title && <span style={{ fontSize: 14, fontWeight: 600 }}>{title}</span>}
         </span>
 
@@ -49,8 +51,8 @@ export default function Nav({ module, onModule, lendingSheet, onLendingSheet, ti
       <div className={`nav-drawer${drawerOpen ? ' open' : ''}`}>
         <div className="nav-drawer-hd">
           <span className="nav-b" style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-            <img src="./apple-touch-icon.png" width="28" height="28" alt="FinTracker" style={{borderRadius:7,flexShrink:0,objectFit:'contain',background:'#1E3A8A'}} />
-            FinTracker
+            <img src={getAppAssetUrl(area, area === 'vault' ? 'vault-192.png' : 'icon-192.png')} width="28" height="28" alt={area === 'vault' ? 'Vault' : 'FinTracker'} style={{borderRadius:7,flexShrink:0,objectFit:'contain',background:area === 'vault' ? '#1E5CC7' : '#fff'}} />
+            {area === 'vault' ? 'Vault' : 'FinTracker'}
           </span>
           <button className="modal-close" onClick={() => setDrawerOpen(false)}>×</button>
         </div>

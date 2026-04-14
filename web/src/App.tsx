@@ -17,28 +17,16 @@ import VaultSettings from './pages/VaultSettings'
 import { ALLOWED_EMAILS } from './constants'
 import { SectionChip } from './ui-kit'
 import { api } from './api'
-
-type AppArea = 'finance' | 'vault'
-const APP_BASE = (import.meta.env.BASE_URL as string | undefined) || '/fintracker/'
-
-function getAppArea(): AppArea {
-  const params = new URLSearchParams(window.location.search)
-  if (params.get('app') === 'vault') return 'vault'
-  return window.location.pathname.includes('/vault') ? 'vault' : 'finance'
-}
-
-function getManifestHref(area: AppArea) {
-  return area === 'vault' ? `${APP_BASE}manifest-vault.json` : `${APP_BASE}manifest.json`
-}
+import { getAppAssetUrl, getAppDisplayName, getAppIconAsset, getAppManifestUrl, resolveAppArea, type AppArea } from './appPaths'
 
 function setDocumentManifest(area: AppArea) {
   const link = document.querySelector<HTMLLinkElement>("link[rel='manifest']")
-  if (link) link.href = getManifestHref(area)
-  document.title = area === 'vault' ? 'FinTracker Vault' : 'FinTracker'
+  if (link) link.href = getAppManifestUrl(area)
+  document.title = getAppDisplayName(area)
   const appleTitle = document.querySelector<HTMLMetaElement>("meta[name='apple-mobile-web-app-title']")
-  if (appleTitle) appleTitle.content = area === 'vault' ? 'FinTracker Vault' : 'FinTracker'
+  if (appleTitle) appleTitle.content = getAppDisplayName(area)
   const themeColor = document.querySelector<HTMLMetaElement>("meta[name='theme-color']")
-  if (themeColor) themeColor.content = area === 'vault' ? '#0F766E' : '#1E5CC7'
+  if (themeColor) themeColor.content = '#1E5CC7'
 }
 
 function InstallBanner({ area }: { area: AppArea }) {
@@ -54,7 +42,7 @@ function InstallBanner({ area }: { area: AppArea }) {
   if (!show) return null
   return (
     <div style={{position:'fixed',top:106,left:12,right:12,background:'var(--card)',border:'1px solid var(--border)',borderRadius:10,padding:'10px 12px',display:'flex',alignItems:'center',justifyContent:'space-between',zIndex:150,boxShadow:'0 4px 16px rgba(55,48,163,.12)'}}>
-      <span style={{fontSize:13,fontWeight:600,color:'var(--text)',display:'flex',alignItems:'center',gap:6}}><Smartphone size={14} /> Add {area === 'vault' ? 'Vault' : 'FinTracker'} to home screen</span>
+      <span style={{fontSize:13,fontWeight:600,color:'var(--text)',display:'flex',alignItems:'center',gap:6}}><Smartphone size={14} /> Add {getAppDisplayName(area)} to home screen</span>
       <div style={{display:'flex',gap:6,flexShrink:0}}>
         <button style={{background:'var(--navy)',color:'#fff',border:'none',borderRadius:8,padding:'5px 12px',fontSize:12,fontWeight:700,cursor:'pointer'}} onClick={() => { deferredPrompt.current?.prompt(); setShow(false) }}>Install</button>
         <button style={{background:'none',border:'none',color:'var(--muted)',fontSize:18,cursor:'pointer',lineHeight:1,padding:'0 2px'}} onClick={() => setShow(false)}>×</button>
@@ -195,7 +183,7 @@ function VaultNav({ onLogout, currentPage, onPageChange }: { onLogout: () => voi
     <>
       <nav className="nav">
         <span className="nav-b" style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
-          <img src={`${APP_BASE}vault-192.png`} width="30" height="30" alt="FinTracker Vault" style={{borderRadius:8,flexShrink:0,objectFit:'contain',background:'#0F766E'}} />
+          <img src={getAppAssetUrl('vault', getAppIconAsset('vault'))} width="30" height="30" alt={getAppDisplayName('vault')} style={{borderRadius:8,flexShrink:0,objectFit:'contain',background:'#1E5CC7'}} />
           <span style={{ fontSize: 14, fontWeight: 600 }}>{currentPage === 'banking' ? 'Banking' : 'Settings'}</span>
         </span>
         <button className="nav-hamburger" onClick={() => setOpen(true)}>☰</button>
@@ -204,8 +192,8 @@ function VaultNav({ onLogout, currentPage, onPageChange }: { onLogout: () => voi
       <div className={`nav-drawer${open ? ' open' : ''}`}>
         <div className="nav-drawer-hd">
           <span className="nav-b" style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-            <img src={`${APP_BASE}vault-192.png`} width="28" height="28" alt="FinTracker Vault" style={{borderRadius:7,flexShrink:0,objectFit:'contain',background:'#0F766E'}} />
-            FinTracker Vault
+            <img src={getAppAssetUrl('vault', getAppIconAsset('vault'))} width="28" height="28" alt={getAppDisplayName('vault')} style={{borderRadius:7,flexShrink:0,objectFit:'contain',background:'#1E5CC7'}} />
+            {getAppDisplayName('vault')}
           </span>
           <button className="modal-close" onClick={() => setOpen(false)}>×</button>
         </div>
@@ -244,7 +232,7 @@ function VaultNav({ onLogout, currentPage, onPageChange }: { onLogout: () => voi
                   Logout app?
                 </div>
                 <div style={{ marginTop: 6, fontSize: 13, lineHeight: 1.5, color: 'var(--muted)' }}>
-                  This clears only the FinTracker Vault session on this device. It will not log you out of Google.
+                  This clears only the Vault session on this device. It will not log you out of Google.
                 </div>
               </div>
               <button className="modal-close" onClick={() => setLogoutConfirmOpen(false)} style={{ background: 'var(--bg)', color: 'var(--text)' }}>×</button>
@@ -289,7 +277,7 @@ function AppWithErrorBoundary({ onLogout }: { onLogout: () => void }) {
     return () => window.removeEventListener('unhandledrejection', handleUnhandledRejection)
   }, [])
   if (apiError) return <ErrorScreen error={apiError} onRetry={() => setApiError(null)} />
-  const area = getAppArea()
+  const area = resolveAppArea()
   return area === 'vault' ? <VaultShell onLogout={onLogout} /> : <FinanceShell onLogout={onLogout} />
 }
 
@@ -307,7 +295,7 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
 
 function LockScreen({ mode, onUnlock }: { mode: LockMode; onUnlock: () => void }) {
   const [error, setError] = useState('')
-  const area = getAppArea()
+  const area = resolveAppArea()
   useEffect(() => setDocumentManifest(area), [area])
 
   const handleCredential = (resp: CredentialResponse) => {
@@ -337,10 +325,10 @@ function LockScreen({ mode, onUnlock }: { mode: LockMode; onUnlock: () => void }
       <div style={{ width: 'min(100%, 380px)', display: 'grid', gap: 20 }}>
         <div style={{ display: 'grid', gap: 10, justifyItems: 'center', textAlign: 'center' }}>
           <div style={{ width: 72, height: 72, borderRadius: 20, background: 'rgba(255,255,255,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,.20)' }}>
-            <img src="./apple-touch-icon.png" alt="FinTracker" width="44" height="44" style={{ borderRadius: 12, objectFit: 'contain' }} />
+            <img src={getAppAssetUrl(area, getAppIconAsset(area))} alt={getAppDisplayName(area)} width="44" height="44" style={{ borderRadius: 12, objectFit: 'contain' }} />
           </div>
           <div>
-            <div className="login-title">{area === 'vault' ? 'FinTracker Vault' : 'FinTracker'}</div>
+            <div className="login-title">{getAppDisplayName(area)}</div>
             <div className="login-sub">{mode === 'google' ? 'Sign in with Google to continue.' : 'Your session expired. Enter your app password to continue.'}</div>
           </div>
         </div>
@@ -413,9 +401,9 @@ function PasswordLock({ onUnlock, error, setError }: { onUnlock: () => void; err
 
 export default function App() {
   useEffect(() => {
-    const area = getAppArea()
+    const area = resolveAppArea()
     setDocumentManifest(area)
-    const onPop = () => setDocumentManifest(getAppArea())
+    const onPop = () => setDocumentManifest(resolveAppArea())
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
   }, [])

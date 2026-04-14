@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent, type CSSPropertie
 import { Check, Copy, ExternalLink, Landmark, Plus, Search } from 'lucide-react'
 import { api, type RawBankingRow } from '../api'
 import { FormField, HoldingCard, ModalActions, ModalShell, SearchField, SectionBlock, Spacer, UiPill } from '../ui-kit'
+import { getAppAssetUrl } from '../appPaths'
 
 type BankingFormState = {
   account_holder_name: string
@@ -69,10 +70,10 @@ function summaryText(row: RawBankingRow) {
 
 function bankBadgeMeta(name: string) {
   const bank = name.trim().toLowerCase()
-  if (bank.includes('sbi')) return { label: 'SBI', bg: '#DBEAFE', fg: '#1D4ED8', logo: `${import.meta.env.BASE_URL}sbi.svg` }
-  if (bank.includes('indian bank') || bank.includes('indianbank')) return { label: 'Indian Bank', bg: '#DBEAFE', fg: '#1D4ED8', logo: `${import.meta.env.BASE_URL}indianbank.svg` }
-  if (bank.includes('hdfc')) return { label: 'HDFC', bg: '#DBEAFE', fg: '#1D4ED8', logo: `${import.meta.env.BASE_URL}hdfc.svg` }
-  if (bank.includes('axis')) return { label: 'Axis', bg: '#DBEAFE', fg: '#1D4ED8', logo: `${import.meta.env.BASE_URL}axis.svg` }
+  if (bank.includes('sbi')) return { label: 'SBI', bg: '#DBEAFE', fg: '#1D4ED8', logo: getAppAssetUrl('vault', 'sbi.svg') }
+  if (bank.includes('indian bank') || bank.includes('indianbank')) return { label: 'Indian Bank', bg: '#DBEAFE', fg: '#1D4ED8', logo: getAppAssetUrl('vault', 'indianbank.svg') }
+  if (bank.includes('hdfc')) return { label: 'HDFC', bg: '#DBEAFE', fg: '#1D4ED8', logo: getAppAssetUrl('vault', 'hdfc.svg') }
+  if (bank.includes('axis')) return { label: 'Axis', bg: '#DBEAFE', fg: '#1D4ED8', logo: getAppAssetUrl('vault', 'axis.svg') }
   const initials = name.trim().split(/\s+/).slice(0, 2).map(part => part[0]?.toUpperCase() || '').join('') || 'BK'
   return { label: initials, bg: '#EFF6FF', fg: '#1D4ED8' }
 }
@@ -103,7 +104,7 @@ function bankRegistry(name: string): BankLinkMeta | null {
       key: 'sbi',
       label: 'SBI',
       url: 'https://retail.onlinesbi.sbi/retail/login.htm',
-      logo: <img src={`${import.meta.env.BASE_URL}sbi.svg`} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />,
+      logo: <img src={getAppAssetUrl('vault', 'sbi.svg')} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />,
     }
   }
   if (bank.includes('indian bank') || bank.includes('indianbank')) {
@@ -111,7 +112,7 @@ function bankRegistry(name: string): BankLinkMeta | null {
       key: 'indian-bank',
       label: 'Indian Bank',
       url: 'https://online.indianbank.bank.in/RetailBanking/',
-      logo: <img src={`${import.meta.env.BASE_URL}indianbank.svg`} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />,
+      logo: <img src={getAppAssetUrl('vault', 'indianbank.svg')} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />,
     }
   }
   if (bank.includes('hdfc')) {
@@ -119,7 +120,7 @@ function bankRegistry(name: string): BankLinkMeta | null {
       key: 'hdfc',
       label: 'HDFC',
       url: 'https://netbanking.hdfcbank.com/',
-      logo: <img src={`${import.meta.env.BASE_URL}hdfc.svg`} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />,
+      logo: <img src={getAppAssetUrl('vault', 'hdfc.svg')} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />,
     }
   }
   if (bank.includes('axis')) {
@@ -127,7 +128,7 @@ function bankRegistry(name: string): BankLinkMeta | null {
       key: 'axis',
       label: 'AXIS',
       url: 'https://omni.axis.bank.in/axisretailbanking/',
-      logo: <img src={`${import.meta.env.BASE_URL}axis.svg`} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />,
+      logo: <img src={getAppAssetUrl('vault', 'axis.svg')} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />,
     }
   }
   return null

@@ -9,11 +9,6 @@ if ! command -v clasp &> /dev/null; then
   exit 1
 fi
 
-if ! command -v gh &> /dev/null; then
-  echo "❌ GitHub CLI (gh) not found. Install: https://cli.github.com"
-  exit 1
-fi
-
 echo "→ Pushing code to Apps Script..."
 clasp push --force
 
@@ -85,33 +80,18 @@ if echo "$RESPONSE" | grep -q "ok\|data"; then
     echo ""
     echo "→ Updating .env file..."
     if [ -f "web/.env" ]; then
-      sed -i '' "s|^VITE_GAS_URL=.*|VITE_GAS_URL=$GAS_URL|" "web/.env"
+      if grep -q '^VITE_GAS_URL=' "web/.env"; then
+        sed -i '' "s|^VITE_GAS_URL=.*|VITE_GAS_URL=$GAS_URL|" "web/.env"
+      else
+        printf '\nVITE_GAS_URL=%s\n' "$GAS_URL" >> "web/.env"
+      fi
       echo "✓ .env updated"
     else
       echo "⚠ web/.env not found"
     fi
-
-    # Update GitHub secret
-    echo ""
-    echo "→ Updating GitHub secret VITE_GAS_URL..."
-    if gh secret set VITE_GAS_URL --body "$GAS_URL" 2>/dev/null; then
-      echo "✓ GitHub secret updated"
-      echo ""
-      echo "→ Triggering Worker redeploy to pick up new GAS URL..."
-      if gh workflow run deploy-worker.yml 2>/dev/null; then
-        echo "✓ Worker redeploy triggered (see: gh run list --workflow=deploy-worker.yml)"
-      else
-        echo "⚠ Worker redeploy trigger failed. Run manually:"
-        echo "   gh workflow run deploy-worker.yml"
-      fi
-    else
-      echo "⚠ GitHub secret update skipped. Run these manually:"
-      echo "   gh secret set VITE_GAS_URL --body \"$GAS_URL\""
-      echo "   gh workflow run deploy-worker.yml"
-    fi
   else
     echo ""
-    echo "✓ GAS URL unchanged; skipping .env, secret, and worker updates"
+    echo "✓ GAS URL unchanged; skipping .env update"
   fi
 else
   echo "⚠ Deployment returned unexpected response: $RESPONSE"
@@ -136,9 +116,8 @@ echo "1️⃣  REQUIRED: Set GAS deployment permissions"
 echo "   → Open: https://script.google.com"
 echo "   → Manage deployments → Edit latest → Who has access → Anyone"
 echo ""
-echo "2️⃣  OPTIONAL: Authenticate GitHub CLI for auto-secret updates"
-echo "   → Run: gh auth login"
-echo "   → Redeploy updates the same GAS deployment: ./deploy.sh"
+echo "2️⃣  OPTIONAL: Update Vercel env vars if the GAS URL changed"
+echo "   → Set VITE_GAS_URL in each Vercel project to the URL above"
 echo ""
 echo "3️⃣  CREATE: Savings sheet in FinanceTrackerAssets"
 echo "   → Open spreadsheet"
@@ -147,6 +126,6 @@ echo "   → (Headers auto-created by GAS on first API call)"
 echo ""
 echo "4️⃣  TEST: Frontend"
 echo "   → cd web && npm run dev"
-echo "   → Click Savings in nav → Should show Dashboard"
+echo "   → Open http://localhost:5173/fintracker and http://localhost:5173/vault"
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
