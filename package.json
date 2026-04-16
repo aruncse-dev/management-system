@@ -1,0 +1,46 @@
+{
+  "name": "fintracker-vault",
+  "version": "1.0.0",
+  "description": "Monorepo for Fintracker & Vault applications",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "packages/shared/*",
+    "packages/apps/*",
+    "packages/tools/configs/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "dev:fintracker": "turbo run dev --scope=fintracker",
+    "dev:vault": "turbo run dev --scope=vault",
+    "build": "turbo run build",
+    "build:fintracker": "turbo run build --scope=fintracker",
+    "build:vault": "turbo run build --scope=vault",
+    "lint": "turbo run lint",
+    "type-check": "turbo run type-check",
+    "test": "turbo run test",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,json,md}\"",
+    "clean": "turbo clean && rm -rf node_modules && pnpm store prune",
+    "deps:check": "node packages/tools/scripts/validate-deps.js",
+    "version:bump": "node packages/tools/scripts/version-bump.js"
+  },
+  "devDependencies": {
+    "prettier": "^3.0.0",
+    "eslint": "^8.50.0",
+    "eslint-config-next": "^14.0.0",
+    "turbo": "^1.10.0",
+    "typescript": "^5.2.0",
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "tsup": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.0.0"
+}

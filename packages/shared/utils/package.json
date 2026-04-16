@@ -1,0 +1,48 @@
+{
+  "name": "@fintracker-vault/utils",
+  "version": "1.0.0",
+  "description": "Shared utility functions",
+  "license": "MIT",
+  "type": "module",
+  "private": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./formatters": {
+      "import": "./dist/formatters/index.js",
+      "types": "./dist/formatters/index.d.ts"
+    },
+    "./validators": {
+      "import": "./dist/validators/index.js",
+      "types": "./dist/validators/index.d.ts"
+    },
+    "./calculations": {
+      "import": "./dist/calculations/index.js",
+      "types": "./dist/calculations/index.d.ts"
+    }
+  },
+  "scripts": {
+    "dev": "tsc --watch",
+    "build": "tsc",
+    "lint": "eslint src --ext .ts,.tsx",
+    "type-check": "tsc --noEmit",
+    "test": "jest",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@fintracker-vault/types": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "workspace:*",
+    "eslint": "workspace:*",
+    "jest": "^29.0.0"
+  }
+}

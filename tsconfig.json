@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "allowJs": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "baseUrl": ".",
+    "paths": {
+      "@fintracker-vault/ui": ["packages/shared/ui/src"],
+      "@fintracker-vault/ui/*": ["packages/shared/ui/src/*"],
+      "@fintracker-vault/types": ["packages/shared/types/src"],
+      "@fintracker-vault/types/*": ["packages/shared/types/src/*"],
+      "@fintracker-vault/config": ["packages/shared/config/src"],
+      "@fintracker-vault/config/*": ["packages/shared/config/src/*"],
+      "@fintracker-vault/utils": ["packages/shared/utils/src"],
+      "@fintracker-vault/utils/*": ["packages/shared/utils/src/*"]
+    }
+  },
+  "include": ["packages/**/*.ts", "packages/**/*.tsx"],
+  "exclude": ["node_modules", "dist", ".next", "out"]
+}
