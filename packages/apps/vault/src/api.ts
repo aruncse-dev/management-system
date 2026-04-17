@@ -1,5 +1,5 @@
 import { Budget, MonthRef, OpeningBal, Transaction } from '../types';
-import { API_URL } from '../config.js';
+import { API_URL } from '../constants';
 
 type ApiResponse<T> = { ok: true; data: T; traceId?: string; debug?: Record<string, unknown> } | { ok: false; error: string; traceId?: string };
 
