@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-/** Lowercase URLs in the browser; rewrite to PascalCase page files. */
 const vaultRouteMap: Record<string, string> = {
   '/vault': '/Vault',
   '/vaultinsurance': '/VaultInsurance',
@@ -28,7 +27,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|ico|png|jpg|jpeg|gif|webp)$).*)',
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 }
