@@ -12,8 +12,8 @@ type CacheEntry = {
 
 // Dev: Vite proxy (/gas-proxy), Prod: Cloudflare Worker (via VITE_API_URL)
 const BASE = API_URL;
-const TOKEN = import.meta.env.VITE_API_TOKEN as string | undefined;
-const DEBUG = import.meta.env.VITE_DEBUG === 'true';
+const TOKEN = process.env.NEXT_PUBLIC_API_TOKEN as string | undefined;
+const DEBUG = process.env.NEXT_PUBLIC_DEBUG === 'true';
 const GET_CACHE = new Map<string, CacheEntry>();
 const PERSIST_KEY = `fintracker:get-cache:${BASE}:${TOKEN ?? 'anon'}`;
 
