@@ -75,10 +75,11 @@ function clearGoogleAuthCookie() {
   document.cookie = `${AUTH_GOOGLE_COOKIE}=; path=/; max-age=0; samesite=lax`
 }
 
+/** PIN only after 1h idle (cookie cleared). Otherwise Google: first visit, logout, expiry. */
 function getInitialLockMode(): LockMode {
-  const unlocked = getGoogleAuthCookie() === '1'
-  const lastActive = Number(localStorage.getItem(LAST_ACTIVE_KEY) || '0')
-  if (unlocked && lastActive && Date.now() - lastActive <= SESSION_MAX_AGE_MS) return 'password'
+  const hasCookie = getGoogleAuthCookie() === '1'
+  const mode = localStorage.getItem(AUTH_MODE_KEY) as LockMode | null
+  if (mode === 'password' && !hasCookie) return 'password'
   return 'google'
 }
 
@@ -334,6 +335,7 @@ function LockScreen({ mode, onUnlock }: { mode: LockMode; onUnlock: () => void }
   const handlePasswordUnlock = () => {
     localStorage.setItem(AUTH_MODE_KEY, 'password')
     localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now()))
+    setGoogleAuthCookie('1')
     onUnlock()
   }
 
@@ -346,7 +348,7 @@ function LockScreen({ mode, onUnlock }: { mode: LockMode; onUnlock: () => void }
           </div>
           <div>
             <div className="login-title">{getAppDisplayName(area)}</div>
-            <div className="login-sub">{mode === 'google' ? 'Sign in with Google to continue.' : 'Your session expired. Enter your app password to continue.'}</div>
+            <div className="login-sub">{mode === 'google' ? 'Sign in with Google to continue.' : 'You were idle for an hour. Enter your app PIN to unlock.'}</div>
           </div>
         </div>
         {error && <div style={{ width: '100%', maxWidth: 320, padding: '6px 2px', color: '#fff', fontSize: 13, fontWeight: 500, lineHeight: 1.4, textAlign: 'center' }}>{error}</div>}
@@ -435,6 +437,7 @@ export default function App() {
   useEffect(() => {
     if (!authed) return
     let timer = window.setTimeout(() => {
+      clearGoogleAuthCookie()
       localStorage.setItem(AUTH_MODE_KEY, 'password')
       setAuthMode('password')
       setAuthed(false)
@@ -443,6 +446,7 @@ export default function App() {
       localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now()))
       window.clearTimeout(timer)
       timer = window.setTimeout(() => {
+        clearGoogleAuthCookie()
         localStorage.setItem(AUTH_MODE_KEY, 'password')
         setAuthMode('password')
         setAuthed(false)

@@ -42,11 +42,16 @@ function clearGoogleAuthCookie() {
   document.cookie = `${AUTH_GOOGLE_COOKIE}=; path=/; max-age=0; samesite=lax`
 }
 
+/**
+ * PIN is only for the 1h idle lock (we clear the session cookie then, but keep
+ * `ft_lock_mode=password`). Every other locked state uses Google: first visit,
+ * logout, or expired session.
+ */
 function getInitialLockMode(): LockMode {
   if (typeof window === 'undefined') return 'google'
-  const unlocked = getGoogleAuthCookie() === '1'
-  const lastActive = Number(localStorage.getItem(LAST_ACTIVE_KEY) || '0')
-  if (unlocked && lastActive && Date.now() - lastActive <= SESSION_MAX_AGE_MS) return 'password'
+  const hasCookie = getGoogleAuthCookie() === '1'
+  const mode = localStorage.getItem(AUTH_MODE_KEY) as LockMode | null
+  if (mode === 'password' && !hasCookie) return 'password'
   return 'google'
 }
 
@@ -127,6 +132,7 @@ function LockScreen({
   const handlePasswordUnlock = () => {
     localStorage.setItem(AUTH_MODE_KEY, 'password')
     localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now()))
+    setGoogleAuthCookie('1')
     onUnlock()
   }
 
@@ -159,7 +165,7 @@ function LockScreen({
             <div className="login-sub">
               {mode === 'google'
                 ? 'Sign in with Google to continue.'
-                : 'Your session expired. Enter your app password to continue.'}
+                : 'You were idle for an hour. Enter your app PIN to unlock.'}
             </div>
           </div>
         </div>
@@ -329,6 +335,7 @@ export default function AppAuthGate({
   useEffect(() => {
     if (!authed) return
     let timer = window.setTimeout(() => {
+      clearGoogleAuthCookie()
       localStorage.setItem(AUTH_MODE_KEY, 'password')
       setAuthMode('password')
       setAuthed(false)
@@ -337,6 +344,7 @@ export default function AppAuthGate({
       localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now()))
       window.clearTimeout(timer)
       timer = window.setTimeout(() => {
+        clearGoogleAuthCookie()
         localStorage.setItem(AUTH_MODE_KEY, 'password')
         setAuthMode('password')
         setAuthed(false)
