@@ -38,7 +38,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@fintracker-vault/types": "workspace:*"
+    "@fintracker-vault/types": "workspace:*",
+    "@fintracker-vault/config": "workspace:*"
   },
   "devDependencies": {
     "typescript": "workspace:*",
