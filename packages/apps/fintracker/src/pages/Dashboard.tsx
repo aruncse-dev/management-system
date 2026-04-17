@@ -2,7 +2,7 @@ import { TrendingUp, CalendarDays, Banknote, CreditCard, Package, AlertTriangle,
 import { useStore } from '../store'
 import { sumType, sumCC, sumOtherCr, catMap, budgetSummary, acctFlows, INR } from '../utils'
 import { ACCOUNTS, ALL_CR } from '../config'
-import { RightLegendDonut } from '../components/RightLegendDonut'
+import { RightLegendDonut } from '../ui'
 import { BalanceRow, KpiCard, LoadingState, SectionBlock, UiCard } from '../ui'
 
 export default function Dashboard() {
@@ -78,7 +78,7 @@ export default function Dashboard() {
       </SectionBlock>
 
       <SectionBlock title="Budget Progress" icon={<Package size={14} />}>
-        <UiCard subtitle={`${ovCount} overspent categories`} icon={<Package size={14} />}>
+        <UiCard subtitle={`${ovCount} overspent categories`}>
           <div className="dash-budget-card">
             <div className="dash-budget-top">
               <div className="dash-budget-figure">{INR(totalSpent)} / {INR(totalBudget)}</div>
@@ -94,7 +94,7 @@ export default function Dashboard() {
       </SectionBlock>
 
       <SectionBlock title="Overspent Categories" icon={<AlertTriangle size={14} />}>
-        <UiCard icon={<AlertTriangle size={14} />}>
+        <UiCard>
           <div className="dash-overspent-card dash-flat-card">
             {overspent.length > 0 ? (
               <div className="dash-overflow-list">
@@ -117,7 +117,7 @@ export default function Dashboard() {
 
       {(inc > 0 || exp > 0) && (
         <SectionBlock title="Cash Flow" icon={<TrendingUp size={14} />}>
-          <UiCard icon={<TrendingUp size={14} />}>
+          <UiCard>
             <div className="dash-cashflow-card dash-flat-card">
               <RightLegendDonut
                 items={incExpData.map(d => ({ label: d.label, value: d.v, color: d.col }))}

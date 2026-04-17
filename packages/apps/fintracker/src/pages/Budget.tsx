@@ -4,7 +4,7 @@ import { useStore } from '../store'
 import { catMap, budgetSummary, INR } from '../utils'
 import { api } from '../api'
 import { CATEGORIES } from '../config'
-import CatIcon from '../components/CatIcon'
+import { CatIcon } from '../ui'
 import { KpiCard, SectionBlock, UiCard } from '../ui'
 
 interface Props { showStatus: (msg: string) => void; onCategoryClick: (cat: string) => void }

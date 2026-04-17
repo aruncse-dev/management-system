@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Banknote, BarChart3, CreditCard, Landmark, Clock, Layers3, ArrowDownLeft, ArrowUpRight, Plus } from 'lucide-react'
 import { api, RawCashLoanHistoryRow, RawCashLoanRow, RawEmiRow, RawJewelLoanHistoryRow, RawJewelLoanRow } from '../api'
 import { INR } from '../utils'
-import { FormField, HoldingCard, KpiCard, LoadingState, ModalActions, ModalShell, SectionBlock, SectionChip, TabBar } from '../ui'
+import { FormField, HoldingCard, KpiCard, LoadingState, ModalActions, ModalShell, SectionBlock, SectionChip } from '../ui'
 
 type LoanSource = 'EMI' | 'Jewel' | 'Cash'
 type LoansTab = 'dashboard' | 'emi' | 'jewel' | 'cash' | 'history'
@@ -418,14 +418,6 @@ export default function Loans() {
 
   const filteredHistory = history
 
-  const tabs = [
-    { id: 'dashboard' as const, icon: <BarChart3 size={19} />, label: 'Dashboard' },
-    { id: 'emi' as const, icon: <CreditCard size={19} />, label: 'EMI Loans' },
-    { id: 'jewel' as const, icon: <Landmark size={19} />, label: 'Jewel Loans' },
-    { id: 'cash' as const, icon: <Banknote size={19} />, label: 'Cash Loans' },
-    { id: 'history' as const, icon: <Clock size={19} />, label: 'Repayments' },
-  ]
-
   const jewelMetrics = useMemo(() => {
     const totalPrincipal = Math.round(jewelRows.reduce((sum, loan) => sum + loan.principal, 0))
     const totalInterest = Math.round(jewelRows.reduce((sum, loan) => sum + loan.interest, 0))
@@ -723,17 +715,59 @@ export default function Loans() {
 
   if (loading) {
     return (
-      <div className="ui-kit-page-shell" style={{ paddingLeft: 8, paddingRight: 8 }}>
-        <TabBar tabs={tabs} active={activeTab} onChange={id => setActiveTab(id as LoansTab)} />
+      <div className="ui-kit-page-shell loans-page">
+        <nav className="bottom-nav">
+          <button type="button" className={`bottom-nav-item${activeTab === 'dashboard' ? ' active' : ''}`} onClick={() => setActiveTab('dashboard')}>
+            <span className="bottom-nav-icon"><BarChart3 size={19} /></span>
+            <span>Dashboard</span>
+          </button>
+          <button type="button" className={`bottom-nav-item${activeTab === 'emi' ? ' active' : ''}`} onClick={() => setActiveTab('emi')}>
+            <span className="bottom-nav-icon"><CreditCard size={19} /></span>
+            <span>EMI Loans</span>
+          </button>
+          <button type="button" className={`bottom-nav-item${activeTab === 'jewel' ? ' active' : ''}`} onClick={() => setActiveTab('jewel')}>
+            <span className="bottom-nav-icon"><Landmark size={19} /></span>
+            <span>Jewel Loans</span>
+          </button>
+          <button type="button" className={`bottom-nav-item${activeTab === 'cash' ? ' active' : ''}`} onClick={() => setActiveTab('cash')}>
+            <span className="bottom-nav-icon"><Banknote size={19} /></span>
+            <span>Cash Loans</span>
+          </button>
+          <button type="button" className={`bottom-nav-item${activeTab === 'history' ? ' active' : ''}`} onClick={() => setActiveTab('history')}>
+            <span className="bottom-nav-icon"><Clock size={19} /></span>
+            <span>Repayments</span>
+          </button>
+        </nav>
         <LoadingState />
       </div>
     )
   }
 
   return (
-    <div className="ui-kit-page-shell" style={{ paddingLeft: 8, paddingRight: 8 }}>
-      <TabBar tabs={tabs} active={activeTab} onChange={id => setActiveTab(id as LoansTab)} />
-      <div style={{ paddingTop: 0, paddingBottom: 0 }}>
+    <div className="ui-kit-page-shell loans-page">
+      <nav className="bottom-nav">
+        <button type="button" className={`bottom-nav-item${activeTab === 'dashboard' ? ' active' : ''}`} onClick={() => setActiveTab('dashboard')}>
+          <span className="bottom-nav-icon"><BarChart3 size={19} /></span>
+          <span>Dashboard</span>
+        </button>
+        <button type="button" className={`bottom-nav-item${activeTab === 'emi' ? ' active' : ''}`} onClick={() => setActiveTab('emi')}>
+          <span className="bottom-nav-icon"><CreditCard size={19} /></span>
+          <span>EMI Loans</span>
+        </button>
+        <button type="button" className={`bottom-nav-item${activeTab === 'jewel' ? ' active' : ''}`} onClick={() => setActiveTab('jewel')}>
+          <span className="bottom-nav-icon"><Landmark size={19} /></span>
+          <span>Jewel Loans</span>
+        </button>
+        <button type="button" className={`bottom-nav-item${activeTab === 'cash' ? ' active' : ''}`} onClick={() => setActiveTab('cash')}>
+          <span className="bottom-nav-icon"><Banknote size={19} /></span>
+          <span>Cash Loans</span>
+        </button>
+        <button type="button" className={`bottom-nav-item${activeTab === 'history' ? ' active' : ''}`} onClick={() => setActiveTab('history')}>
+          <span className="bottom-nav-icon"><Clock size={19} /></span>
+          <span>Repayments</span>
+        </button>
+      </nav>
+      <div className="pg">
         {activeTab === 'dashboard' && (
           <SectionBlock
             title="Loans Dashboard"

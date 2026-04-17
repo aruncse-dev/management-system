@@ -8,15 +8,14 @@ Shared packages used by all applications in the monorepo.
 Shared UI components and theme configuration.
 
 **Exports:**
-- Components (Button, Card, Form, Layout, etc.)
-- Theme configuration
-- Theme hooks
+- Components (see `packages/shared/ui/src/components` — e.g. `Nav`, `UiCard`, `TransactionCard`, modals)
+- Theme configuration (`@fintracker-vault/ui/theme`)
+- Styles (`@fintracker-vault/ui/styles`)
 
 **Usage:**
 ```typescript
-import { Button, Card } from '@fintracker-vault/ui'
+import { Nav, UiCard } from '@fintracker-vault/ui'
 import { theme } from '@fintracker-vault/ui/theme'
-import { useTheme } from '@fintracker-vault/ui/hooks'
 ```
 
 ### @fintracker-vault/types
@@ -75,5 +74,5 @@ pnpm --filter=@fintracker-vault/ui build
 
 1. **No app-to-app imports** - Apps should only import from shared packages
 2. **No circular dependencies** - Shared packages depend on nothing in the monorepo
-3. **Barrel exports** - Use `index.ts` for clean imports
+3. **Barrel exports** - Use `index.ts` / `index.tsx` for clean imports
 4. **Strict typing** - Use full type definitions, avoid `any`

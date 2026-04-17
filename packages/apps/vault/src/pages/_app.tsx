@@ -1,17 +1,14 @@
 import type { AppProps } from 'next/app'
-import { Inter } from 'next/font/google'
 import { StoreProvider } from '../store'
+import VaultNav from '../components/VaultNav'
+import '../ui-kit/ui-kit.css'
 import '../styles/globals.css'
-
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-geist',
-})
 
 export default function App({ Component, pageProps }: AppProps) {
   return (
     <StoreProvider>
-      <div className={inter.variable}>
+      <div className="with-app-shell">
+        <VaultNav />
         <Component {...pageProps} />
       </div>
     </StoreProvider>

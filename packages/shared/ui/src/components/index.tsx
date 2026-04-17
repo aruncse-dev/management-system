@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from 'react'
 import { Loader2 } from 'lucide-react'
+import { UiCard } from './UiCard'
 
 export type UiTone = 'navy' | 'green' | 'red' | 'amber' | 'muted'
 
@@ -256,40 +257,6 @@ export function FilterChips({
         </button>
       ))}
     </div>
-  )
-}
-
-export function UiCard({
-  title,
-  subtitle,
-  icon,
-  right,
-  children,
-}: {
-  title?: ReactNode
-  subtitle?: string
-  icon?: ReactNode
-  right?: ReactNode
-  children: ReactNode
-}) {
-  return (
-    <section className="ui-kit-card">
-      {(title || subtitle || icon || right) && (
-        <div className="ui-kit-card-hd">
-          <div>
-            {title && (
-              <div className="ui-kit-card-title">
-                {icon && <span className="ui-kit-section-icon">{icon}</span>}
-                {title}
-              </div>
-            )}
-            {subtitle && <div className="ui-kit-card-subtitle">{subtitle}</div>}
-          </div>
-          {right}
-        </div>
-      )}
-      <div className="ui-kit-card-body">{children}</div>
-    </section>
   )
 }
 
@@ -819,3 +786,74 @@ export function HoldingModal({
     </ModalShell>
   )
 }
+
+export function TransactionCard({
+  title,
+  subtitle,
+  amount,
+  type,
+  date,
+  tone,
+  icon,
+  onClick,
+  className = '',
+}: {
+  title: ReactNode
+  subtitle: ReactNode
+  amount: ReactNode
+  type: ReactNode
+  date: ReactNode
+  tone: Extract<UiTone, 'green' | 'red' | 'amber' | 'navy' | 'muted'>
+  icon: ReactNode
+  onClick?: () => void
+  className?: string
+}) {
+  return (
+    <button
+      type="button"
+      className={`ui-kit-holding-card ui-kit-holding-card--accent-${tone} ui-kit-holding-card--btn txn-entry-card ${className}`.trim()}
+      onClick={onClick}
+    >
+      <div className="ui-kit-holding-card-head">
+        <div>
+          <div className="ui-kit-holding-card-title">
+            <span>{title}</span>
+          </div>
+          <div className="ui-kit-holding-card-subtitle">{subtitle}</div>
+        </div>
+        <div className="ui-kit-holding-card-head-right">
+          <div className={`ui-kit-holding-icon ui-kit-holding-icon--bg ui-tone-${tone}`}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--muted)', flexShrink: 0 }}>
+              {icon}
+            </span>
+          </div>
+        </div>
+      </div>
+      <div className="ui-kit-holding-card-grid">
+        <div className="ui-kit-holding-stat">
+          <span>Amount</span>
+          <strong>{amount}</strong>
+        </div>
+        <div className="ui-kit-holding-stat ui-kit-holding-stat--center">
+          <span>Type</span>
+          <strong>{type}</strong>
+        </div>
+        <div className="ui-kit-holding-stat ui-kit-holding-stat--right">
+          <span>Date</span>
+          <strong>{date}</strong>
+        </div>
+      </div>
+    </button>
+  )
+}
+
+export { UiCard } from './UiCard'
+export { SettingsSectionCard, type SettingField } from './SettingsSectionCard'
+
+export { default as CatIcon } from './CatIcon'
+export * from './FinanceUI'
+export * from './RightLegendDonut'
+export { default as BottomNav } from './BottomNav'
+export { default as ErrorScreen } from './ErrorScreen'
+export { default as Nav, type ModuleId, type AppNavArea } from './Nav'
+export { default as TransactionModal, type TransactionModalApi } from './TransactionModal'

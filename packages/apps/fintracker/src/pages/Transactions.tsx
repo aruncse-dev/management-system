@@ -3,8 +3,8 @@ import { useStore, usePage } from '../store'
 import { Transaction } from '../types'
 import { fd, INR } from '../utils'
 import { TXN_PAGE } from '../config'
-import { HoldingCard, LoadingState, SectionBlock } from '../ui'
-import CatIcon from '../components/CatIcon'
+import { LoadingState, SectionBlock, TransactionCard } from '../ui'
+import { CatIcon } from '../ui'
 
 const FILTERS = ['All','Expense','Income','Transfer','Savings','ICICI','HDFC','Bommi','Ramya']
 
@@ -15,6 +15,13 @@ function toneForKey(key: string) {
   let sum = 0
   for (const ch of key) sum += ch.charCodeAt(0)
   return tones[sum % tones.length]
+}
+
+function toneForTransaction(row: Transaction) {
+  if (row.t === 'Income' || row.t === 'Savings') return 'green'
+  if (row.t === 'Transfer') return 'amber'
+  if (row.t === 'Expense') return 'red'
+  return toneForKey(row.c)
 }
 
 export default function Transactions({ onEdit }: Props) {
@@ -69,22 +76,17 @@ export default function Transactions({ onEdit }: Props) {
         <div className="txn-cards">
           {rows.map(r => {
             const isI = r.t==='Income', isS=r.t==='Savings'
+            const tone = toneForTransaction(r)
             return (
-              <HoldingCard
+              <TransactionCard
                 key={r.id}
                 title={r.desc || r.c}
                 subtitle={r.c}
-                leftLabel="Amount"
-                leftValue={`${(isI||isS)?'+':'−'}${INR(r.a)}`}
-                centerLabel="Type"
-                centerValue={r.t}
-                rightLabel="Date"
-                rightValue={fd(r.date)}
-                accentTone={toneForKey(r.c)}
+                amount={`${(isI || isS) ? '+' : '-'}${INR(r.a)}`}
+                type={r.t}
+                date={fd(r.date)}
+                tone={tone}
                 icon={<CatIcon cat={r.c} size={14} />}
-                iconPosition="right"
-                iconBackground
-                className="txn-entry-card"
                 onClick={() => onEdit(r)}
               />
             )

@@ -2,7 +2,7 @@ import type { GetServerSideProps } from 'next'
 
 export const getServerSideProps: GetServerSideProps = async () => ({
   redirect: {
-    destination: '/Monthly',
+    destination: '/monthly',
     permanent: false,
   },
 })

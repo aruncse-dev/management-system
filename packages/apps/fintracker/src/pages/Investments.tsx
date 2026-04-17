@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { BarChart3, LayoutDashboard, PieChart, RefreshCw, Shield, TrendingUp, Wallet } from 'lucide-react';
 import { api, type RawHolding } from '../api';
-import { KpiCard, LoadingState, SectionBlock, Spacer, TabBar, UiCard } from '../ui';
+import { KpiCard, LoadingState, SectionBlock, Spacer, UiCard } from '../ui';
 import Stocks, { clearStocksCache } from './Stocks';
 import MutualFunds, { clearMutualFundsCache } from './MutualFunds';
 
@@ -222,18 +222,35 @@ export default function Investments() {
   const [activeTab, setActiveTab] = useState<InvestmentTab>('dashboard');
 
   return (
-    <div className="ui-kit-page-shell" style={{ paddingLeft: 0, paddingRight: 0 }}>
-      <TabBar
-        tabs={[
-          { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={19} /> },
-          { id: 'stocks', label: 'Stocks', icon: <TrendingUp size={19} /> },
-          { id: 'mutualFunds', label: 'Mutual Funds', icon: <PieChart size={19} /> },
-        ]}
-        active={activeTab}
-        onChange={id => setActiveTab(id as InvestmentTab)}
-      />
+    <div className="ui-kit-page-shell investments-page">
+      <nav className="bottom-nav">
+        <button
+          type="button"
+          className={`bottom-nav-item${activeTab === 'dashboard' ? ' active' : ''}`}
+          onClick={() => setActiveTab('dashboard')}
+        >
+          <span className="bottom-nav-icon"><LayoutDashboard size={19} /></span>
+          <span>Dashboard</span>
+        </button>
+        <button
+          type="button"
+          className={`bottom-nav-item${activeTab === 'stocks' ? ' active' : ''}`}
+          onClick={() => setActiveTab('stocks')}
+        >
+          <span className="bottom-nav-icon"><TrendingUp size={19} /></span>
+          <span>Stocks</span>
+        </button>
+        <button
+          type="button"
+          className={`bottom-nav-item${activeTab === 'mutualFunds' ? ' active' : ''}`}
+          onClick={() => setActiveTab('mutualFunds')}
+        >
+          <span className="bottom-nav-icon"><PieChart size={19} /></span>
+          <span>Mutual Funds</span>
+        </button>
+      </nav>
 
-      <div className="pg" style={{ padding: 0 }}>
+      <div className="pg">
         {activeTab === 'dashboard' && <DashboardView />}
         {activeTab === 'stocks' && <Stocks embedded />}
         {activeTab === 'mutualFunds' && <MutualFunds embedded />}

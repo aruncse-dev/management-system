@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import { Loader2, Link2, Unlink2, SlidersHorizontal, Database, RotateCcw } from 'lucide-react';
 import { api } from '../api';
 import { LoadingState, SectionBlock, SectionTitle, Spacer, UiCard, UiPill } from '../ui';
-import { SettingsSectionCard, type SettingField } from '../components/SettingsSectionCard';
+import { SettingsSectionCard, type SettingField } from '../ui'
 
 interface SettingsSection {
   key: string;
@@ -154,7 +154,8 @@ export default function Settings() {
   }
 
   return (
-    <div className="ui-kit-page-shell">
+    <div className="ui-kit-page-shell settings-page">
+      <div className="pg settings-page">
       <Spacer size={12} />
       <div style={{ display: 'grid', gap: 16 }}>
         <SectionTitle
@@ -229,6 +230,7 @@ export default function Settings() {
         )}
       </div>
       <Spacer size={20} />
+      </div>
     </div>
   );
 }

@@ -17,10 +17,9 @@ import {
   SectionChip,
   SectionTitle,
   Spacer,
-  TabBar,
   UiPill,
 } from '../ui'
-import { RightLegendDonut } from '../components/RightLegendDonut'
+import { RightLegendDonut } from '../ui'
 
 const DONUT = [
   { label: 'Savings', value: 29300, color: '#2563EB' },
@@ -47,6 +46,7 @@ export default function Components() {
 
   return (
     <div className="ui-kit-page-shell components-page">
+      <div className="pg components-page">
       <Spacer size={16} />
       <SectionTitle
         title="UI Kit"
@@ -73,16 +73,31 @@ export default function Components() {
 
       <SectionBlock title="Navigation" icon={<LayoutGrid size={13} />} right={<SectionChip tone="muted">Tabs</SectionChip>}>
         <div className="ui-stack">
-          <TabBar tabs={TABS} active={navActive} onChange={setNavActive} />
-          <InternalTabBar
-            tabs={[
-              { id: 'entries', label: 'Entries' },
-              { id: 'summary', label: 'Summary' },
-              { id: 'notes', label: 'Notes' },
-            ]}
-            active={internalTab}
-            onChange={setInternalTab}
-          />
+          <nav className="bottom-nav">
+            {TABS.map(tab => (
+              <button
+                key={tab.id}
+                type="button"
+                className={`bottom-nav-item${navActive === tab.id ? ' active' : ''}`}
+                onClick={() => setNavActive(tab.id)}
+              >
+                <span className="bottom-nav-icon">{tab.icon}</span>
+                <span>{tab.label}</span>
+              </button>
+            ))}
+          </nav>
+          <div className="pills">
+            {['entries', 'summary', 'notes'].map(tab => (
+              <button
+                key={tab}
+                type="button"
+                className={`pill ${internalTab === tab ? 'active' : ''}`}
+                onClick={() => setInternalTab(tab)}
+              >
+                {tab[0].toUpperCase() + tab.slice(1)}
+              </button>
+            ))}
+          </div>
         </div>
       </SectionBlock>
 
@@ -267,6 +282,7 @@ export default function Components() {
       )}
       </div>
       <Spacer size={20} />
+      </div>
     </div>
   )
 }

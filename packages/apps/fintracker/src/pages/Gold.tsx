@@ -3,8 +3,8 @@ import { Plus, Loader2, Pencil, LayoutDashboard, List, Clock, BarChart3, Shield,
 import { api, RawGoldRow, RawGoldHistoryRow } from '../api';
 import { INR } from '../utils';
 import { THEME_COLORS } from '../config';
-import { RightLegendDonut } from '../components/RightLegendDonut';
-import { FormField, HoldingCard, KpiCard, LoadingState, ListStack, ModalActions, ModalShell, SearchField, SectionBlock, TabBar } from '../ui';
+import { RightLegendDonut } from '../ui'
+import { FormField, KpiCard, LoadingState, ListStack, SearchField, SectionBlock } from '../ui';
 import '../ui-kit/ui-kit.css';
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -61,12 +61,6 @@ const LOCATION_ICONS: Record<string, React.ReactNode> = {
   Bank: <Building2 size={12} />,
   Locker: <Lock size={12} />,
 };
-const GOLD_TABS: Array<{ id: GoldTab; label: string; icon: React.ReactNode }> = [
-  { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={19} /> },
-  { id: 'items', label: 'Items', icon: <List size={19} /> },
-  { id: 'history', label: 'History', icon: <Clock size={19} /> },
-];
-
 function emptyForm(): GoldFormState {
   return {
     name: '',
@@ -189,22 +183,30 @@ const ItemCard = memo(function ItemCard({
   const accentTone = item.location === 'Bank' ? 'red' : item.location === 'Locker' ? 'green' : 'navy';
   const icon = LOCATION_ICONS[item.location] ?? <Home size={12} />;
   return (
-    <HoldingCard
-      title={item.name}
-      subtitle={item.person}
-      leftLabel="Weight"
-      leftValue={`${Math.round(item.weight_g)}g`}
-      centerLabel="Location"
-      centerValue={item.location}
-      rightLabel="Pavan"
-      rightValue={item.pavan.toFixed(2)}
-      accentTone={accentTone}
-      icon={icon}
-      iconPosition="right"
-      iconBackground
+    <button
+      type="button"
+      className={`ui-kit-holding-card ui-kit-holding-card--accent-${accentTone} ui-kit-holding-card--btn txn-entry-card`}
       onClick={onClick}
-      className="lending-entry-card"
-    />
+    >
+      <div className="ui-kit-holding-card-head">
+        <div>
+          <div className="ui-kit-holding-card-title"><span>{item.name}</span></div>
+          <div className="ui-kit-holding-card-subtitle">{item.person}</div>
+        </div>
+        <div className="ui-kit-holding-card-head-right">
+          <div className={`ui-kit-holding-icon ui-kit-holding-icon--bg ui-tone-${accentTone}`}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--muted)', flexShrink: 0 }}>
+              {icon}
+            </span>
+          </div>
+        </div>
+      </div>
+      <div className="ui-kit-holding-card-grid">
+        <div className="ui-kit-holding-stat"><span>Weight</span><strong>{Math.round(item.weight_g)}g</strong></div>
+        <div className="ui-kit-holding-stat ui-kit-holding-stat--center"><span>Location</span><strong>{item.location}</strong></div>
+        <div className="ui-kit-holding-stat ui-kit-holding-stat--right"><span>Pavan</span><strong>{item.pavan.toFixed(2)}</strong></div>
+      </div>
+    </button>
   );
 });
 
@@ -218,22 +220,30 @@ const HistoryCard = memo(function HistoryCard({
   const isIn = item.type === 'IN';
   const icon = isIn ? <ArrowDownRight size={14} /> : <ArrowUpRight size={14} />;
   return (
-    <HoldingCard
-      title={item.name}
-      subtitle={item.note}
-      leftLabel="Weight"
-      leftValue={`${isIn ? '+' : '−'}${Math.round(item.weight_g)}g`}
-      centerLabel="Type"
-      centerValue={item.type}
-      rightLabel="Date"
-      rightValue={item.date}
-      accentTone={isIn ? 'green' : 'red'}
-      icon={icon}
-      iconPosition="right"
-      iconBackground
+    <button
+      type="button"
+      className={`ui-kit-holding-card ui-kit-holding-card--accent-${isIn ? 'green' : 'red'} ui-kit-holding-card--btn txn-entry-card`}
       onClick={onClick}
-      className="lending-entry-card"
-    />
+    >
+      <div className="ui-kit-holding-card-head">
+        <div>
+          <div className="ui-kit-holding-card-title"><span>{item.name}</span></div>
+          <div className="ui-kit-holding-card-subtitle">{item.note}</div>
+        </div>
+        <div className="ui-kit-holding-card-head-right">
+          <div className={`ui-kit-holding-icon ui-kit-holding-icon--bg ui-tone-${isIn ? 'green' : 'red'}`}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--muted)', flexShrink: 0 }}>
+              {icon}
+            </span>
+          </div>
+        </div>
+      </div>
+      <div className="ui-kit-holding-card-grid">
+        <div className="ui-kit-holding-stat"><span>Weight</span><strong>{isIn ? '+' : '-'}{Math.round(item.weight_g)}g</strong></div>
+        <div className="ui-kit-holding-stat ui-kit-holding-stat--center"><span>Type</span><strong>{item.type}</strong></div>
+        <div className="ui-kit-holding-stat ui-kit-holding-stat--right"><span>Date</span><strong>{item.date}</strong></div>
+      </div>
+    </button>
   );
 });
 
@@ -534,10 +544,34 @@ export default function Gold() {
 
   return (
     <div className="ui-kit-page-shell gold-page">
-      {/* Tab bar */}
-      <TabBar tabs={GOLD_TABS} active={activeTab} onChange={id => setActiveTab(id as GoldTab)} />
+      <nav className="bottom-nav">
+        <button
+          type="button"
+          className={`bottom-nav-item${activeTab === 'dashboard' ? ' active' : ''}`}
+          onClick={() => setActiveTab('dashboard')}
+        >
+          <span className="bottom-nav-icon"><LayoutDashboard size={19} /></span>
+          <span>Dashboard</span>
+        </button>
+        <button
+          type="button"
+          className={`bottom-nav-item${activeTab === 'items' ? ' active' : ''}`}
+          onClick={() => setActiveTab('items')}
+        >
+          <span className="bottom-nav-icon"><List size={19} /></span>
+          <span>Items</span>
+        </button>
+        <button
+          type="button"
+          className={`bottom-nav-item${activeTab === 'history' ? ' active' : ''}`}
+          onClick={() => setActiveTab('history')}
+        >
+          <span className="bottom-nav-icon"><Clock size={19} /></span>
+          <span>History</span>
+        </button>
+      </nav>
 
-      <div className="pg" style={{ padding: 0 }}>
+      <div className="pg">
         {/* DASHBOARD TAB */}
         {activeTab === 'dashboard' && (
           <>
@@ -748,93 +782,99 @@ export default function Gold() {
 
       {/* ITEMS MODAL */}
       {itemsModalOpen && (
-        <ModalShell
-          title={editItem ? 'Edit Gold Item' : 'Add Gold Item'}
-          onClose={closeItemModal}
-          footer={
-            <ModalActions
-              secondaryLabel="Cancel"
-              primaryLabel={savingItem ? 'Saving…' : editItem ? 'Save' : 'Add'}
-              leading={editItem ? (
-                <button type="button" className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={deleteItem} disabled={savingItem || deletingItem}>
-                  {deletingItem && <Loader2 size={14} className="spin-icon" />}
-                  {deletingItem ? 'Deleting…' : 'Delete'}
+        <div className="modal-bg open" onClick={closeItemModal}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-hd modal-hd--blue">
+              <span className="modal-title">{editItem ? 'Edit Gold Item' : 'Add Gold Item'}</span>
+              <button className="modal-close" onClick={closeItemModal}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="ui-stack">
+                <FormField label="Item Name">
+                  <input className="form-inp" type="text" placeholder="Necklace, Bangles…" value={form.name} onChange={e => setField('name', e.target.value)} />
+                </FormField>
+                <FormField label="Weight (g)">
+                  <input className="form-inp" type="number" min="0" step="0.01" placeholder="0" value={form.weight_g} onChange={e => setField('weight_g', e.target.value)} />
+                </FormField>
+                <FormField label="Pavan">
+                  <input className="form-inp" type="number" min="0" step="0.001" placeholder="0.000" value={form.pavan} disabled />
+                </FormField>
+                <FormField label="Person">
+                  <select className="form-sel" value={form.person} onChange={e => setField('person', e.target.value)}>
+                    {PEOPLE.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </FormField>
+                <FormField label="Location">
+                  <select className="form-sel" value={form.location} onChange={e => setField('location', e.target.value)}>
+                    {LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
+                  </select>
+                </FormField>
+              </div>
+            </div>
+            <div className="modal-foot">
+              {editItem && (
+                <button type="button" className="btn btn-sm btn-red" onClick={deleteItem} disabled={savingItem || deletingItem}>
+                  {deletingItem ? 'Deleting...' : 'Delete'}
                 </button>
-              ) : null}
-              primaryPrefix={savingItem ? <Loader2 size={14} className="spin-icon" /> : null}
-              disabled={savingItem || deletingItem}
-              onSecondary={closeItemModal}
-              onPrimary={saveItem}
-            />
-          }
-        >
-          <div className="ui-stack">
-            <FormField label="Item Name">
-              <input className="form-inp" type="text" placeholder="Necklace, Bangles…" value={form.name} onChange={e => setField('name', e.target.value)} />
-            </FormField>
-            <FormField label="Weight (g)">
-              <input className="form-inp" type="number" min="0" step="0.01" placeholder="0" value={form.weight_g} onChange={e => setField('weight_g', e.target.value)} />
-            </FormField>
-            <FormField label="Pavan">
-              <input className="form-inp" type="number" min="0" step="0.001" placeholder="0.000" value={form.pavan} disabled />
-            </FormField>
-            <FormField label="Person">
-              <select className="form-sel" value={form.person} onChange={e => setField('person', e.target.value)}>
-                {PEOPLE.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
-            </FormField>
-            <FormField label="Location">
-              <select className="form-sel" value={form.location} onChange={e => setField('location', e.target.value)}>
-                {LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
-              </select>
-            </FormField>
+              )}
+              <div className="modal-foot-l" />
+              <button type="button" className="btn btn-sm btn-cancel" onClick={closeItemModal} disabled={savingItem || deletingItem}>
+                Cancel
+              </button>
+              <button type="button" className="btn btn-sm btn-green" onClick={saveItem} disabled={savingItem || deletingItem}>
+                {savingItem ? 'Saving...' : editItem ? 'Save' : 'Add'}
+              </button>
+            </div>
           </div>
-        </ModalShell>
+        </div>
       )}
 
       {/* HISTORY MODAL */}
       {historyModalOpen && (
-        <ModalShell
-          title={editHistory ? 'Edit Gold Movement' : 'Add Gold Movement'}
-          onClose={closeHistoryModal}
-          footer={
-            <ModalActions
-              secondaryLabel="Cancel"
-              primaryLabel={savingHistory ? 'Saving…' : editHistory ? 'Save' : 'Add'}
-              leading={editHistory ? (
-                <button type="button" className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={deleteHistory} disabled={savingHistory || deletingHistory}>
-                  {deletingHistory && <Loader2 size={14} className="spin-icon" />}
-                  {deletingHistory ? 'Deleting…' : 'Delete'}
+        <div className="modal-bg open" onClick={closeHistoryModal}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-hd modal-hd--blue">
+              <span className="modal-title">{editHistory ? 'Edit Gold Movement' : 'Add Gold Movement'}</span>
+              <button className="modal-close" onClick={closeHistoryModal}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="ui-stack">
+                <FormField label="Date">
+                  <input className="form-inp" type="date" value={historyForm.date} onChange={e => setHistoryField('date', e.target.value)} />
+                </FormField>
+                <FormField label="Type">
+                  <select className="form-sel" value={historyForm.type} onChange={e => setHistoryField('type', e.target.value as 'IN' | 'OUT')}>
+                    <option value="IN">In</option>
+                    <option value="OUT">Out</option>
+                  </select>
+                </FormField>
+                <FormField label="Item Name">
+                  <input className="form-inp" type="text" placeholder="Gold received from…" value={historyForm.name} onChange={e => setHistoryField('name', e.target.value)} />
+                </FormField>
+                <FormField label="Weight (g)">
+                  <input className="form-inp" type="number" min="0" step="0.01" placeholder="0" value={historyForm.weight_g} onChange={e => setHistoryField('weight_g', e.target.value)} />
+                </FormField>
+                <FormField label="Note">
+                  <input className="form-inp" type="text" placeholder="Wedding gift, resale…" value={historyForm.note} onChange={e => setHistoryField('note', e.target.value)} />
+                </FormField>
+              </div>
+            </div>
+            <div className="modal-foot">
+              {editHistory && (
+                <button type="button" className="btn btn-sm btn-red" onClick={deleteHistory} disabled={savingHistory || deletingHistory}>
+                  {deletingHistory ? 'Deleting...' : 'Delete'}
                 </button>
-              ) : null}
-              primaryPrefix={savingHistory ? <Loader2 size={14} className="spin-icon" /> : null}
-              disabled={savingHistory || deletingHistory}
-              onSecondary={closeHistoryModal}
-              onPrimary={saveHistory}
-            />
-          }
-        >
-          <div className="ui-stack">
-            <FormField label="Date">
-              <input className="form-inp" type="date" value={historyForm.date} onChange={e => setHistoryField('date', e.target.value)} />
-            </FormField>
-            <FormField label="Type">
-              <select className="form-sel" value={historyForm.type} onChange={e => setHistoryField('type', e.target.value as 'IN' | 'OUT')}>
-                <option value="IN">In</option>
-                <option value="OUT">Out</option>
-              </select>
-            </FormField>
-            <FormField label="Item Name">
-              <input className="form-inp" type="text" placeholder="Gold received from…" value={historyForm.name} onChange={e => setHistoryField('name', e.target.value)} />
-            </FormField>
-            <FormField label="Weight (g)">
-              <input className="form-inp" type="number" min="0" step="0.01" placeholder="0" value={historyForm.weight_g} onChange={e => setHistoryField('weight_g', e.target.value)} />
-            </FormField>
-            <FormField label="Note">
-              <input className="form-inp" type="text" placeholder="Wedding gift, resale…" value={historyForm.note} onChange={e => setHistoryField('note', e.target.value)} />
-            </FormField>
+              )}
+              <div className="modal-foot-l" />
+              <button type="button" className="btn btn-sm btn-cancel" onClick={closeHistoryModal} disabled={savingHistory || deletingHistory}>
+                Cancel
+              </button>
+              <button type="button" className="btn btn-sm btn-green" onClick={saveHistory} disabled={savingHistory || deletingHistory}>
+                {savingHistory ? 'Saving...' : editHistory ? 'Save' : 'Add'}
+              </button>
+            </div>
           </div>
-        </ModalShell>
+        </div>
       )}
     </div>
   );

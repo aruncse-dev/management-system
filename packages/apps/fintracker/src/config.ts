@@ -60,6 +60,9 @@ export const CR_COLORS = {
 export const API_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
+  process.env.NEXT_PUBLIC_GAS_URL ||
+  process.env.GAS_EXEC_URL ||
   process.env.API_URL ||
   process.env.VITE_API_URL ||
-  'http://127.0.0.1:3001'
+  process.env.VITE_GAS_URL ||
+  '/gas-proxy'

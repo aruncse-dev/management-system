@@ -2,13 +2,12 @@ import { useState, useEffect, useCallback } from 'react'
 import { ChevronLeft, ChevronRight, RefreshCw, X as XIcon, Check } from 'lucide-react'
 import { useStore } from '../store'
 import { api } from '../api'
-import BottomNav from '../components/BottomNav'
+import { BottomNav, TransactionModal } from '../ui'
 import Dashboard from './Dashboard'
 import Transactions from './Transactions'
 import Budget from './Budget'
 import Credits from './Credits'
 import Accounts from './Accounts'
-import TransactionModal from '../components/TransactionModal'
 import { CATEGORIES } from '../config'
 import { MNS } from '../config'
 
@@ -175,6 +174,7 @@ export default function Monthly() {
         <TransactionModal
           row={editRow}
           month={state.month} year={state.year}
+          api={api}
           onClose={() => setModalOpen(false)}
           onSaved={async () => {
             setModalOpen(false)

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { SlidersHorizontal, Database } from 'lucide-react'
 import { api, type VaultSettings } from '../api'
 import { LoadingState, SectionBlock, SectionTitle, Spacer, UiPill } from '../ui'
-import { SettingsSectionCard, type SettingField } from '../components/SettingsSectionCard'
+import { SettingsSectionCard, type SettingField } from '../ui'
 
 interface SettingsSection {
   key: string

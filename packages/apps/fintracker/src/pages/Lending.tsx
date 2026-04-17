@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react'
-import { Search, LayoutDashboard, Handshake, ArrowDownLeft, BarChart3, Shield, User, ArrowUpRight } from 'lucide-react'
+import { Search, LayoutDashboard, Handshake, ArrowDownLeft, BarChart3, Shield, User, ArrowUpRight, Plus } from 'lucide-react'
 import { api, RawLendingRow } from '../api'
 import { INR } from '../utils'
-import { FormField, HoldingCard, KpiCard, LoadingState, ModalActions, ModalShell, SearchField, SectionBlock, SectionChip, TabBar } from '../ui'
+import { FormField, HoldingCard, KpiCard, LoadingState, SearchField, SectionBlock, SectionChip } from '../ui'
 
 type LendType = 'LEND' | 'RECEIVED'
 type LendTab = 'dashboard' | 'lended' | 'received'
@@ -153,6 +153,7 @@ const EntryCard = memo(function EntryCard({
 })
 
 export default function Lending({ sheetName, onTabChange }: LendingProps) {
+  const safeSheetName = String(sheetName ?? 'Lending')
   const [entries, setEntries] = useState<LendingEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -170,14 +171,14 @@ export default function Lending({ sheetName, onTabChange }: LendingProps) {
     setLoading(true)
     setError('')
     try {
-      const rows = await api.getLending(sheetName)
+      const rows = await api.getLending(safeSheetName)
       setEntries(rows.map(parseRow).filter((e): e is LendingEntry => e !== null))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load')
     } finally {
       setLoading(false)
     }
-  }, [sheetName])
+  }, [safeSheetName])
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -230,9 +231,9 @@ export default function Lending({ sheetName, onTabChange }: LendingProps) {
     const apiType = form.type === 'RECEIVED' ? 'REPAY' : form.type
     const p = { date: form.date, name: form.name.trim(), amount: parseFloat(form.amount), type: apiType, description: form.description.trim() }
     try {
-      if (editEntry) await api.updateLending({ ...p, id: editEntry.id }, sheetName)
-      else await api.addLending(p, sheetName)
-      api.invalidateCache({ action: 'getEntries', params: { module: 'lending', ...(sheetName && sheetName !== 'Lending' ? { sheetName } : {}) } })
+      if (editEntry) await api.updateLending({ ...p, id: editEntry.id }, safeSheetName)
+      else await api.addLending(p, safeSheetName)
+      api.invalidateCache({ action: 'getEntries', params: { module: 'lending', ...(safeSheetName && safeSheetName !== 'Lending' ? { sheetName: safeSheetName } : {}) } })
       setModalOpen(false)
       await loadData()
     } catch (e) {
@@ -247,8 +248,8 @@ export default function Lending({ sheetName, onTabChange }: LendingProps) {
     if (!editEntry) return
     setSaving(true)
     try {
-      await api.deleteLending(editEntry.id, sheetName)
-      api.invalidateCache({ action: 'getEntries', params: { module: 'lending', ...(sheetName && sheetName !== 'Lending' ? { sheetName } : {}) } })
+      await api.deleteLending(editEntry.id, safeSheetName)
+      api.invalidateCache({ action: 'getEntries', params: { module: 'lending', ...(safeSheetName && safeSheetName !== 'Lending' ? { sheetName: safeSheetName } : {}) } })
       setModalOpen(false)
       await loadData()
     } catch (e) {
@@ -294,33 +295,48 @@ export default function Lending({ sheetName, onTabChange }: LendingProps) {
     return entries.filter(e => e.name === personModalName).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   }, [entries, personModalName])
 
-  const TAB_CONFIG = [
-    { id: 'dashboard' as const, icon: <LayoutDashboard size={19} />, label: 'Dashboard' },
-    { id: 'lended' as const, icon: <Handshake size={19} />, label: 'Given' },
-    { id: 'received' as const, icon: <ArrowDownLeft size={19} />, label: 'Received' },
-  ]
-
   const shouldUseDescriptionAsTitle = (entry: LendingEntry) =>
     !entry.name.trim() || entry.name.trim().toLowerCase() === 'vijaya amma'
 
-  const isVijayaAmma = sheetName.trim().toLowerCase() === 'vijaya amma'
+  const isVijayaAmma = safeSheetName.trim().toLowerCase() === 'vijaya amma'
   const sheetTone = isVijayaAmma ? 'amber' : 'navy'
 
   return (
     <div className="ui-kit-page-shell">
-      <TabBar
-        tabs={TAB_CONFIG}
-        active={activeTab}
-        onChange={id => setActiveTab(id as LendTab)}
-      />
+      <nav className="bottom-nav">
+        <button
+          type="button"
+          className={`bottom-nav-item${activeTab === 'dashboard' ? ' active' : ''}`}
+          onClick={() => setActiveTab('dashboard')}
+        >
+          <span className="bottom-nav-icon"><LayoutDashboard size={19} /></span>
+          <span>Dashboard</span>
+        </button>
+        <button
+          type="button"
+          className={`bottom-nav-item${activeTab === 'lended' ? ' active' : ''}`}
+          onClick={() => setActiveTab('lended')}
+        >
+          <span className="bottom-nav-icon"><Handshake size={19} /></span>
+          <span>Given</span>
+        </button>
+        <button
+          type="button"
+          className={`bottom-nav-item${activeTab === 'received' ? ' active' : ''}`}
+          onClick={() => setActiveTab('received')}
+        >
+          <span className="bottom-nav-icon"><ArrowDownLeft size={19} /></span>
+          <span>Received</span>
+        </button>
+      </nav>
 
-    <div className="pg" style={{ padding: 0 }}>
+      <div className="pg">
         {activeTab === 'dashboard' ? (
           <>
             <SectionBlock
               title="Metrics"
               icon={<BarChart3 size={14} />}
-              right={<SectionChip tone={sheetTone}>{sheetName}</SectionChip>}
+              right={<SectionChip tone={sheetTone}>{safeSheetName}</SectionChip>}
             >
               <div className="dash-grid">
                 <KpiCard label="Given" value={INR(totalLent)} tone="navy" icon={<ArrowUpRight size={14} />} />
@@ -426,87 +442,97 @@ export default function Lending({ sheetName, onTabChange }: LendingProps) {
       </div>
 
       {modalOpen && (
-        <ModalShell
-          title={editEntry ? 'Edit Entry' : 'Add Entry'}
-          onClose={closeModal}
-          footer={
-            <ModalActions
-              primaryLabel={saving ? 'Saving…' : editEntry ? 'Save' : 'Add'}
-              secondaryLabel="Cancel"
-              onPrimary={save}
-              onSecondary={closeModal}
-              leading={editEntry ? (
-                <button className="btn btn-red btn-sm" onClick={del} disabled={saving}>
+        <div className="modal-bg open" onClick={closeModal}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-hd modal-hd--blue">
+              <span className="modal-title">{editEntry ? 'Edit Entry' : 'Add Entry'}</span>
+              <button className="modal-close" onClick={closeModal}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="ui-stack">
+                <FormField label="Type">
+                  <select className="form-sel" value={form.type} onChange={e => set('type', e.target.value as LendType)}>
+                    <option value="LEND">LEND</option>
+                    <option value="RECEIVED">RECEIVED</option>
+                  </select>
+                </FormField>
+                <FormField label="Name">
+                  <input className="form-inp" type="text" placeholder="Who?" value={form.name} onChange={e => set('name', e.target.value)} />
+                </FormField>
+                <FormField label="Amount (₹)">
+                  <input className="form-inp" type="number" min="0" step="1" placeholder="0" value={form.amount} onChange={e => set('amount', e.target.value)} />
+                </FormField>
+                <FormField label="Date">
+                  <input className="form-inp" type="date" value={form.date} onChange={e => set('date', e.target.value)} />
+                </FormField>
+                <FormField label="Description">
+                  <input className="form-inp" type="text" placeholder="Optional" value={form.description} onChange={e => set('description', e.target.value)} />
+                </FormField>
+              </div>
+            </div>
+            <div className="modal-foot">
+              {editEntry && (
+                <button type="button" className="btn btn-sm btn-red" onClick={del} disabled={saving}>
                   {delConfirm ? 'Confirm delete?' : 'Delete'}
                 </button>
-              ) : null}
-              disabled={saving}
-            />
-          }
-        >
-          <div style={{ display: 'grid', rowGap: 8, columnGap: 0 }}>
-            <FormField label="Type">
-              <select className="form-sel" value={form.type} onChange={e => set('type', e.target.value as LendType)}>
-                <option value="LEND">LEND</option>
-                <option value="RECEIVED">RECEIVED</option>
-              </select>
-            </FormField>
-            <FormField label="Name">
-              <input className="form-inp" type="text" placeholder="Who?" value={form.name} onChange={e => set('name', e.target.value)} />
-            </FormField>
-            <FormField label="Amount (₹)">
-              <input className="form-inp" type="number" min="0" step="1" placeholder="0" value={form.amount} onChange={e => set('amount', e.target.value)} />
-            </FormField>
-            <FormField label="Date">
-              <input className="form-inp" type="date" value={form.date} onChange={e => set('date', e.target.value)} />
-            </FormField>
-            <FormField label="Description">
-              <input className="form-inp" type="text" placeholder="Optional" value={form.description} onChange={e => set('description', e.target.value)} />
-            </FormField>
+              )}
+              <div className="modal-foot-l" />
+              <button type="button" className="btn btn-sm btn-cancel" onClick={closeModal} disabled={saving}>
+                Cancel
+              </button>
+              <button type="button" className="btn btn-sm btn-green" onClick={save} disabled={saving}>
+                {saving ? 'Saving...' : editEntry ? 'Save' : 'Add'}
+              </button>
+            </div>
           </div>
-        </ModalShell>
+        </div>
       )}
 
       {personModalOpen && personModalName && personDetails && (
-        <ModalShell
-          title={personModalName}
-          onClose={() => setPersonModalOpen(false)}
-        >
-          <div style={{ display: 'grid', rowGap: 8, columnGap: 0 }}>
-            <div className="dash-grid">
-              <KpiCard label="Lent" value={INR(personDetails.totalLent)} tone="red" icon={<Handshake size={14} />} />
-              <KpiCard label="Received" value={INR(personDetails.totalRepaid)} tone="green" icon={<ArrowDownLeft size={14} />} />
-              <KpiCard label="Outstanding" value={INR(Math.abs(personDetails.outstanding))} tone="muted" icon={<Shield size={14} />} />
+        <div className="modal-bg open" onClick={() => setPersonModalOpen(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-hd modal-hd--blue">
+              <span className="modal-title">{personModalName}</span>
+              <button className="modal-close" onClick={() => setPersonModalOpen(false)}>×</button>
             </div>
-            {personModalEntries.length === 0 ? (
-              <p style={{ color: 'var(--muted)', padding: '0.5rem 0', fontSize: 14, textAlign: 'center' }}>
-                No entries for this person.
-              </p>
-            ) : (
-              <div style={{ display: 'grid', rowGap: 8, columnGap: 0 }}>
-                {personModalEntries.map(e => (
-                  <EntryCard
-                    key={e.id}
-                    entry={e}
-                    label={e.type === 'LEND' ? 'Given' : 'Received'}
-                    useDescriptionAsTitle={shouldUseDescriptionAsTitle(e)}
-                    onClick={() => {
-                      openEdit(e)
-                      setPersonModalOpen(false)
-                    }}
-                  />
-                ))}
+            <div className="modal-body">
+              <div className="ui-stack">
+                <div className="dash-grid">
+                  <KpiCard label="Lent" value={INR(personDetails.totalLent)} tone="red" icon={<Handshake size={14} />} />
+                  <KpiCard label="Received" value={INR(personDetails.totalRepaid)} tone="green" icon={<ArrowDownLeft size={14} />} />
+                  <KpiCard label="Outstanding" value={INR(Math.abs(personDetails.outstanding))} tone="muted" icon={<Shield size={14} />} />
+                </div>
+                {personModalEntries.length === 0 ? (
+                  <p style={{ color: 'var(--muted)', padding: '0.5rem 0', fontSize: 14, textAlign: 'center' }}>
+                    No entries for this person.
+                  </p>
+                ) : (
+                  <div style={{ display: 'grid', rowGap: 8, columnGap: 0 }}>
+                    {personModalEntries.map(e => (
+                      <EntryCard
+                        key={e.id}
+                        entry={e}
+                        label={e.type === 'LEND' ? 'Given' : 'Received'}
+                        useDescriptionAsTitle={shouldUseDescriptionAsTitle(e)}
+                        onClick={() => {
+                          openEdit(e)
+                          setPersonModalOpen(false)
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
-        </ModalShell>
+        </div>
       )}
 
       <button
         onClick={openAdd}
         style={{ position:'fixed', bottom:24, right:20, width:52, height:52, borderRadius:'50%', background:'var(--navy-dark)', color:'#fff', fontSize:24, border:'none', boxShadow:'0 4px 16px rgba(0,0,0,.2)', cursor:'pointer', zIndex:100, display:'flex', alignItems:'center', justifyContent:'center' }}
         title="Add entry"
-      >+</button>
+      ><Plus size={22} strokeWidth={2.5} /></button>
     </div>
   )
 }

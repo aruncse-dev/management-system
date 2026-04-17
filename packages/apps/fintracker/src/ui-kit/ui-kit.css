@@ -1030,7 +1030,7 @@
   gap: 8px;
 }
 .ui-kit-page-shell {
-  padding: 0 10px 80px;
+  padding: 0;
 }
 .ui-kit-internal-tabs {
   display: inline-flex;

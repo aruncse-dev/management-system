@@ -27,11 +27,6 @@
       "require": "./dist/theme/index.cjs",
       "types": "./dist/theme/index.d.ts"
     },
-    "./hooks": {
-      "import": "./dist/hooks/index.js",
-      "require": "./dist/hooks/index.cjs",
-      "types": "./dist/hooks/index.d.ts"
-    },
     "./styles": "./src/styles/globals.css"
   },
   "scripts": {
@@ -42,7 +37,10 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "clsx": "^2.0.0"
+    "@fintracker-vault/config": "workspace:*",
+    "@fintracker-vault/types": "workspace:*",
+    "clsx": "^2.0.0",
+    "lucide-react": "^0.460.0"
   },
   "peerDependencies": {
     "react": "^18.0.0",

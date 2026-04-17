@@ -1,10 +1,11 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { -webkit-text-size-adjust: 100%; background: var(--navy-dark); }
+html { -webkit-text-size-adjust: 100%; background: var(--bg); }
 body {
   font-family: 'Geist', sans-serif;
   background: var(--bg); color: var(--text); font-size: 15px;
   overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch;
   padding-bottom: env(safe-area-inset-bottom);
+  min-height: 100vh;
 }
 code, pre, kbd, samp {
   font-family: inherit;
@@ -12,7 +13,7 @@ code, pre, kbd, samp {
 button, input, select, textarea {
   font-family: inherit;
 }
-.with-app-shell { overflow: hidden; }
+.with-app-shell { overflow-x: hidden; background: var(--bg); min-height: 100vh; }
 
 :root {
   --bg: #F0F5FF; --card: #FFF; --border: #BFDBFE; --text: #0F1C3F; --muted: #4B6080;
@@ -57,20 +58,52 @@ button, input, select, textarea {
 /* MONTHLY SUB-NAV (month controls below global nav) */
 .nav-sub { background: var(--navy-dark); height: 46px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; position: sticky; top: 0; z-index: 95; gap: 10px; box-shadow: 0 1px 6px rgba(30,92,199,.2); }
 
-/* TAB BAR */
-.tab-bar { display: flex; background: var(--card); border-bottom: 2px solid var(--border); position: sticky; top: 0; z-index: 90; }
-.monthly-wrap .tab-bar { top: 46px; }
-.tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; border: none; border-bottom: 3px solid transparent; margin-bottom: -2px; background: transparent; color: var(--muted); font-size: 10px; font-weight: 500; cursor: pointer; font-family: inherit; touch-action: manipulation; -webkit-tap-highlight-color: transparent; transition: color .15s, border-color .15s; }
-.tab-item.active { color: var(--navy); border-bottom-color: var(--navy); font-weight: 700; }
-.tab-icon { font-size: 18px; line-height: 1; }
+/* MONTHLY BOTTOM NAV */
+.bottom-nav {
+  display: flex;
+  gap: 0;
+  background: var(--card);
+  border-bottom: 2px solid var(--border);
+  position: sticky;
+  top: 46px;
+  z-index: 90;
+}
+.bottom-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 8px 4px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: color .15s;
+}
+.bottom-nav-item.active {
+  color: var(--navy);
+  font-weight: 700;
+  border-bottom-color: var(--navy);
+}
+.bottom-nav-icon {
+  font-size: 18px;
+  line-height: 1;
+}
 
 /* APP-SHELL LAYOUT FOR MONTHLY */
 .monthly-wrap { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-.monthly-wrap main { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-.monthly-wrap .pg { padding: 12px 10px 28px; margin: 0; max-width: 100%; }
+.monthly-wrap main { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+.monthly-wrap .pg { padding: 0 10px 96px; margin: 0; max-width: 100%; }
 
 /* PAGE */
-.pg { padding: 12px 10px 28px; max-width: 100%; }
+.pg { padding: 0 0 28px; max-width: 100%; }
 
 /* KPI */
 .kpis { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; margin-bottom: 14px; }
@@ -344,6 +377,19 @@ button, input, select, textarea {
   display: grid;
   gap: 0;
 }
+.ui-kit-page-shell > .tab-bar,
+.ui-kit-page-shell > .bottom-nav {
+  margin: 0;
+  padding-left: 0;
+  padding-right: 0;
+  width: 100%;
+}
+.ui-kit-page-shell > .pg {
+  padding: 0 10px 28px;
+}
+.ui-kit-page-shell > .pg.savings-page {
+  padding: 0 10px 96px;
+}
 .monthly-subpage {
   padding-top: 0;
 }
@@ -351,7 +397,7 @@ button, input, select, textarea {
   margin-top: 0;
 }
 .savings-page .ui-kit-section-block:first-of-type {
-  margin-top: 8px;
+  margin-top: 0;
 }
 .monthly-subpage .kpis,
 .monthly-subpage .cc-g,
@@ -515,8 +561,9 @@ button, input, select, textarea {
 .ui-stack { display: grid; gap: 12px; }
 .savings-page .ui-stack { gap: 8px; }
 .savings-page .txn-cards { gap: 8px; }
+.savings-page .bottom-nav { top: 0; }
 .savings-page.pg {
-  padding: 0;
+  padding: 0 0 96px;
   display: grid;
   gap: 0;
 }
@@ -985,13 +1032,13 @@ button, input, select, textarea {
 }
 .dash-budget-card {
   display: grid;
-  gap: 10px;
-  padding: 2px 0 0;
+  gap: 8px;
+  padding: 6px 2px 2px;
 }
 .dash-overflow-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
 }
 .dash-tag-button {
   border: 1px solid transparent;
@@ -1004,10 +1051,10 @@ button, input, select, textarea {
 .dash-overspent-card,
 .dash-cashflow-card {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 .dash-overspent-card {
-  padding: 2px 0 0;
+  padding: 6px 2px 2px;
 }
 .ui-modal-cat {
   font-size: 18px;
