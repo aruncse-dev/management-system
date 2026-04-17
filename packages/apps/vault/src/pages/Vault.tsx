@@ -417,7 +417,7 @@ function PasswordCopyLock({
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    const appPassword = (import.meta.env.VITE_APP_PASSWORD as string | undefined)?.trim() || '1234'
+    const appPassword = (process.env.NEXT_PUBLIC_APP_PASSWORD as string | undefined)?.trim() || '1234'
     if (password.join('') !== appPassword) {
       setError('Incorrect password')
       setPassword(['', '', '', ''])
@@ -463,3 +463,5 @@ function PasswordCopyLock({
     </form>
   )
 }
+
+export default VaultBankingPage

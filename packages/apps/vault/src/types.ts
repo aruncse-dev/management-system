@@ -10,6 +10,17 @@ export interface Transaction {
   _k?: number
 }
 
+export interface TransactionForm {
+  date: string
+  desc: string
+  a: string
+  c: string
+  t: string
+  m: string
+  notes: string
+  toAcct: string
+}
+
 export interface MonthRef {
   month: string
   year: string
