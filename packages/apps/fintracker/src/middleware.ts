@@ -30,9 +30,11 @@ export function middleware(request: NextRequest) {
 
   if (!target) return NextResponse.next()
 
+  // Redirect (not rewrite) so the URL matches filesystem routes; client-side
+  // transitions use /_next/data/.../{pathname}.json and must match page files.
   const url = request.nextUrl.clone()
   url.pathname = target
-  return NextResponse.rewrite(url)
+  return NextResponse.redirect(url, 308)
 }
 
 export const config = {

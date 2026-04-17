@@ -5,10 +5,10 @@ import { Grid2X2, Landmark, LogOut, Settings as SettingsIcon, Shield } from 'luc
 type VaultPage = 'banking' | 'insurance' | 'apps' | 'settings'
 
 const ROUTES: Record<VaultPage, string> = {
-  banking: '/vault',
-  insurance: '/vaultinsurance',
-  apps: '/vaultapps',
-  settings: '/vaultsettings',
+  banking: '/Vault',
+  insurance: '/VaultInsurance',
+  apps: '/VaultApps',
+  settings: '/VaultSettings',
 }
 
 const AUTH_GOOGLE_COOKIE = 'ft_google_authed'
@@ -57,7 +57,7 @@ export default function VaultNav({ onLogout }: { onLogout?: () => void }) {
   const [open, setOpen] = useState(false)
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
 
-  const currentPage = useMemo(() => pathToVaultPage(router.pathname || '/vault'), [router.pathname])
+  const currentPage = useMemo(() => pathToVaultPage(router.pathname || '/Vault'), [router.pathname])
 
   const iconSrc = getAppAssetUrl(getAppIconAsset())
 

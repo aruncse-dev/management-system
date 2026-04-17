@@ -3,12 +3,14 @@ export type AppKind = AppArea | 'auto'
 
 export const APP_PATHS: Record<AppArea, string> = {
   finance: '/fintracker',
-  vault: '/vault',
+  vault: '/Vault',
 }
 
 export function getAppArea(pathname?: string): AppArea {
-  const currentPath = pathname ?? (typeof window !== 'undefined' ? window.location.pathname : '/')
-  return currentPath.startsWith(APP_PATHS.vault) ? 'vault' : 'finance'
+  const currentPath = (
+    pathname ?? (typeof window !== 'undefined' ? window.location.pathname : '/')
+  ).toLowerCase()
+  return currentPath.startsWith('/vault') ? 'vault' : 'finance'
 }
 
 export function getDeploymentArea(): AppKind {

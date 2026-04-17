@@ -34,17 +34,20 @@ export default function App({ Component, pageProps }: AppProps) {
 
   const goToModule = useCallback((id: ModuleId) => {
     const pathByModule: Record<ModuleId, string> = {
-      monthly: '/monthly',
-      lending: lendingSheet && lendingSheet !== 'Lending' ? `/lending?sheet=${encodeURIComponent(lendingSheet)}` : '/lending',
-      savings: '/savings',
-      bommi: '/bommi',
-      gold: '/gold',
-      investments: '/investments',
-      loans: '/loans',
-      settings: '/settings',
-      components: '/components',
+      monthly: '/Monthly',
+      lending:
+        lendingSheet && lendingSheet !== 'Lending'
+          ? `/Lending?sheet=${encodeURIComponent(lendingSheet)}`
+          : '/Lending',
+      savings: '/Savings',
+      bommi: '/Bommi',
+      gold: '/Gold',
+      investments: '/Investments',
+      loans: '/Loans',
+      settings: '/Settings',
+      components: '/Components',
     }
-    void router.push(pathByModule[id] || '/monthly')
+    void router.push(pathByModule[id] || '/Monthly')
   }, [router, lendingSheet])
 
   return (
