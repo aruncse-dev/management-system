@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Data vault and secure storage application",
   "license": "MIT",
-  "type": "module",
   "private": true,
   "scripts": {
     "dev": "next dev",

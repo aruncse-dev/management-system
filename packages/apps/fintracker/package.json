@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Financial tracking application",
   "license": "MIT",
-  "type": "module",
   "private": true,
   "scripts": {
     "dev": "next dev",
