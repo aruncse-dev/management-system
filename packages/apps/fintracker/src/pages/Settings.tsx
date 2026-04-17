@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import { Loader2, Link2, Unlink2, SlidersHorizontal, Database, RotateCcw } from 'lucide-react';
 import { api } from '../api';
-import { LoadingState, SectionBlock, SectionTitle, Spacer, UiCard, UiPill } from '@fintracker-vault/ui';
+import { LoadingState, SectionBlock, SectionTitle, Spacer, UiCard, UiPill } from '../ui';
 import { SettingsSectionCard, type SettingField } from '../components/SettingsSectionCard';
 
 interface SettingsSection {

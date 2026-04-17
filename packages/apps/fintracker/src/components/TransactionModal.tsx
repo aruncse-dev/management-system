@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
-import { Transaction, TransactionForm } from '@fintracker-vault/types'
+import { Transaction, TransactionForm } from '../types'
 import { api } from '../api'
-import { CATEGORIES, INCOME_CATS, ACCOUNTS, CC_MODES, OTHER_CR } from '@fintracker-vault/config'
+import { CATEGORIES, INCOME_CATS, ACCOUNTS, CC_MODES, OTHER_CR } from '../config'
 
 const ALL_MODES = [...ACCOUNTS, ...CC_MODES, ...OTHER_CR]
 const ALL_CATS = [...CATEGORIES, ...INCOME_CATS]

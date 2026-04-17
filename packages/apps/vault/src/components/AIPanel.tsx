@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useStore } from '../store'
-import { MNS, ACCOUNTS, CC_MODES, OTHER_CR, CATEGORIES, INCOME_CATS, ALL_MODES } from '@fintracker-vault/config'
-import { catMap, sumType, budgetSummary, acctFlows, INR } from '@fintracker-vault/utils'
+import { MNS, ACCOUNTS, CC_MODES, OTHER_CR, CATEGORIES, INCOME_CATS, ALL_MODES } from '../config'
+import { catMap, sumType, budgetSummary, acctFlows, INR } from '../utils'
 import { api } from '../api'
 
 interface Msg { role: 'u' | 'a'; text: string }

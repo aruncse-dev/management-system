@@ -1,9 +1,9 @@
 import { useMemo } from 'react'
 import { useStore } from '../store'
-import { acctFlows, INR } from '@fintracker-vault/utils'
-import { ACCOUNTS, CC_MODES } from '@fintracker-vault/config'
+import { acctFlows, INR } from '../utils'
+import { ACCOUNTS, CC_MODES } from '../config'
 import { ArrowDownRight, ArrowUpRight, Wallet } from 'lucide-react'
-import { BalanceRow, KpiCard, SectionBlock } from '@fintracker-vault/ui'
+import { BalanceRow, KpiCard, SectionBlock } from '../ui'
 
 interface Props { showStatus: (msg: string) => void }
 

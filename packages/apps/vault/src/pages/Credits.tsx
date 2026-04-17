@@ -1,10 +1,10 @@
 import { useMemo } from 'react'
 import { useStore } from '../store'
-import { INR } from '@fintracker-vault/utils'
-import { CC_MODES, OTHER_CR, ALL_CR, MNS } from '@fintracker-vault/config'
+import { INR } from '../utils'
+import { CC_MODES, OTHER_CR, ALL_CR, MNS } from '../config'
 import { CreditCard, Users, CircleDollarSign, Banknote, Layers3, Users2 } from 'lucide-react'
 import { UiPill } from '../components/FinanceUI'
-import { KpiCard, SectionBlock } from '@fintracker-vault/ui'
+import { KpiCard, SectionBlock } from '../ui'
 
 const CC_CYCLE_DAY = 19 // billing cycle: 19th → 18th next month
 

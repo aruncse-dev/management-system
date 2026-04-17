@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Banknote, BarChart3, CreditCard, Landmark, Clock, Layers3, ArrowDownLeft, ArrowUpRight, Plus } from 'lucide-react'
 import { api, RawCashLoanHistoryRow, RawCashLoanRow, RawEmiRow, RawJewelLoanHistoryRow, RawJewelLoanRow } from '../api'
-import { INR } from '@fintracker-vault/utils'
-import { FormField, HoldingCard, KpiCard, LoadingState, ModalActions, ModalShell, SectionBlock, SectionChip, TabBar } from '@fintracker-vault/ui'
+import { INR } from '../utils'
+import { FormField, HoldingCard, KpiCard, LoadingState, ModalActions, ModalShell, SectionBlock, SectionChip, TabBar } from '../ui'
 
 type LoanSource = 'EMI' | 'Jewel' | 'Cash'
 type LoansTab = 'dashboard' | 'emi' | 'jewel' | 'cash' | 'history'

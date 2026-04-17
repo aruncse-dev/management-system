@@ -1,9 +1,9 @@
 import { TrendingUp, CalendarDays, Banknote, CreditCard, Package, AlertTriangle, Wallet, ArrowDownRight, ArrowUpRight } from 'lucide-react'
 import { useStore } from '../store'
-import { sumType, sumCC, sumOtherCr, catMap, budgetSummary, acctFlows, INR } from '@fintracker-vault/utils'
-import { ACCOUNTS, ALL_CR } from '@fintracker-vault/config'
+import { sumType, sumCC, sumOtherCr, catMap, budgetSummary, acctFlows, INR } from '../utils'
+import { ACCOUNTS, ALL_CR } from '../config'
 import { RightLegendDonut } from '../components/RightLegendDonut'
-import { BalanceRow, KpiCard, LoadingState, SectionBlock, UiCard } from '@fintracker-vault/ui'
+import { BalanceRow, KpiCard, LoadingState, SectionBlock, UiCard } from '../ui'
 
 export default function Dashboard() {
   const { state } = useStore()

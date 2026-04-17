@@ -1,5 +1,5 @@
-import { Budget, MonthRef, OpeningBal, Transaction } from '@fintracker-vault/types';
-import { API_URL } from '@fintracker-vault/config';
+import { Budget, MonthRef, OpeningBal, Transaction } from '../types';
+import { API_URL } from '../config';
 
 type ApiResponse<T> = { ok: true; data: T; traceId?: string; debug?: Record<string, unknown> } | { ok: false; error: string; traceId?: string };
 

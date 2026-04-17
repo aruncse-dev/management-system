@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { Plus, LayoutDashboard, List, BarChart3, Wallet, Search, TrendingUp, AlertTriangle, ArrowUpRight, ArrowDownRight, Repeat2 } from 'lucide-react';
 import { api, RawSavingsRow } from '../api';
-import { THEME_COLORS } from '@fintracker-vault/config';
-import { INR } from '@fintracker-vault/utils';
-import { BalanceRow, FilterChips, FormField, HoldingCard, KpiCard, LoadingState, ModalActions, ModalShell, SearchField, SectionBlock, Spacer, TabBar } from '@fintracker-vault/ui';
+import { THEME_COLORS } from '../config';
+import { INR } from '../utils';
+import { BalanceRow, FilterChips, FormField, HoldingCard, KpiCard, LoadingState, ModalActions, ModalShell, SearchField, SectionBlock, Spacer, TabBar } from '../ui';
 import '../ui-kit/ui-kit.css';
 
 type SavingsType = 'Income' | 'Expense' | 'Transfer';

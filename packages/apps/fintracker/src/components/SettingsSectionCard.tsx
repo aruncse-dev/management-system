@@ -1,5 +1,5 @@
 import { Check, Coins, Edit2, Landmark, Loader2, PiggyBank, ReceiptText, Wallet } from 'lucide-react'
-import { UiCard } from '@fintracker-vault/ui'
+import { UiCard } from '../ui'
 
 export interface SettingField<T = Record<string, any>> {
   key: keyof T

@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { BarChart3, RefreshCw, TrendingUp } from 'lucide-react';
 import { api } from '../api';
-import { HoldingCard, HoldingModal, InfoCallout, KpiCard, LoadingState, SectionBlock, SectionChip, Spacer } from '@fintracker-vault/ui';
+import { HoldingCard, HoldingModal, InfoCallout, KpiCard, LoadingState, SectionBlock, SectionChip, Spacer } from '../ui';
 
 interface Holding {
   symbol: string;

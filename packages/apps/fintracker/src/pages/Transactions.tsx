@@ -1,9 +1,9 @@
 import { Pencil, X } from 'lucide-react'
 import { useStore, usePage } from '../store'
-import { Transaction } from '@fintracker-vault/types'
-import { fd, INR } from '@fintracker-vault/utils'
-import { TXN_PAGE } from '@fintracker-vault/config'
-import { HoldingCard, LoadingState, SectionBlock } from '@fintracker-vault/ui'
+import { Transaction } from '../types'
+import { fd, INR } from '../utils'
+import { TXN_PAGE } from '../config'
+import { HoldingCard, LoadingState, SectionBlock } from '../ui'
 import CatIcon from '../components/CatIcon'
 
 const FILTERS = ['All','Expense','Income','Transfer','Savings','ICICI','HDFC','Bommi','Ramya']

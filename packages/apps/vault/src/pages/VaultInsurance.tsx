@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Check, Copy, Search, ShieldPlus, Plus, HeartPulse, Shield, Sparkles } from 'lucide-react'
 import { api, type RawInsuranceRow } from '../api'
-import { FormField, HoldingCard, ModalActions, ModalShell, SearchField, SectionBlock, Spacer, UiPill } from '@fintracker-vault/ui'
-import { INR } from '@fintracker-vault/utils'
+import { FormField, HoldingCard, ModalActions, ModalShell, SearchField, SectionBlock, Spacer, UiPill } from '../ui'
+import { INR } from '../utils'
 
 type InsuranceFormState = {
   id: string

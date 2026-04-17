@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { Plus, Loader2, Pencil, LayoutDashboard, List, Clock, BarChart3, Shield, Gem, Package, Users, Home, Building2, Lock, ArrowDownRight, ArrowUpRight } from 'lucide-react';
 import { api, RawGoldRow, RawGoldHistoryRow } from '../api';
-import { INR } from '@fintracker-vault/utils';
-import { THEME_COLORS } from '@fintracker-vault/config';
+import { INR } from '../utils';
+import { THEME_COLORS } from '../config';
 import { RightLegendDonut } from '../components/RightLegendDonut';
-import { FormField, HoldingCard, KpiCard, LoadingState, ListStack, ModalActions, ModalShell, SearchField, SectionBlock, TabBar } from '@fintracker-vault/ui';
+import { FormField, HoldingCard, KpiCard, LoadingState, ListStack, ModalActions, ModalShell, SearchField, SectionBlock, TabBar } from '../ui';
 import '../ui-kit/ui-kit.css';
 
 // ──────────────────────────────────────────────────────────────────────────────

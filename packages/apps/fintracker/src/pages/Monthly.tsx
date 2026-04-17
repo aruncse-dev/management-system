@@ -9,8 +9,8 @@ import Budget from './Budget'
 import Credits from './Credits'
 import Accounts from './Accounts'
 import TransactionModal from '../components/TransactionModal'
-import { CATEGORIES } from '@fintracker-vault/config'
-import { MNS } from '@fintracker-vault/config'
+import { CATEGORIES } from '../config'
+import { MNS } from '../config'
 
 type TabId = 'dash' | 'txns' | 'bud' | 'cc' | 'acct'
 

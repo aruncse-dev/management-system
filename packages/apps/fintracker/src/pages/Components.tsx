@@ -19,7 +19,7 @@ import {
   Spacer,
   TabBar,
   UiPill,
-} from '@fintracker-vault/ui'
+} from '../ui'
 import { RightLegendDonut } from '../components/RightLegendDonut'
 
 const DONUT = [

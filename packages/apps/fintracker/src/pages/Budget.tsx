@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { Pencil, Trash2, X as XIcon, AlertTriangle, Package } from 'lucide-react'
 import { useStore } from '../store'
-import { catMap, budgetSummary, INR } from '@fintracker-vault/utils'
+import { catMap, budgetSummary, INR } from '../utils'
 import { api } from '../api'
-import { CATEGORIES } from '@fintracker-vault/config'
+import { CATEGORIES } from '../config'
 import CatIcon from '../components/CatIcon'
-import { KpiCard, SectionBlock, UiCard } from '@fintracker-vault/ui'
+import { KpiCard, SectionBlock, UiCard } from '../ui'
 
 interface Props { showStatus: (msg: string) => void; onCategoryClick: (cat: string) => void }
 

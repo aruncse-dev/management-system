@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Check, Copy, Globe, GraduationCap, Layers3, Lock, Plus, Search, AppWindow } from 'lucide-react'
 import { api, type RawVaultAppRow } from '../api'
-import { FormField, ModalActions, ModalShell, SearchField, SectionBlock, Spacer, UiPill } from '@fintracker-vault/ui'
+import { FormField, ModalActions, ModalShell, SearchField, SectionBlock, Spacer, UiPill } from '../ui'
 
 type AppFormState = {
   app_uuid: string

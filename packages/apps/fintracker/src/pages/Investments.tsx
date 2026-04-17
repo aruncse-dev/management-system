@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { BarChart3, LayoutDashboard, PieChart, RefreshCw, Shield, TrendingUp, Wallet } from 'lucide-react';
 import { api, type RawHolding } from '../api';
-import { KpiCard, LoadingState, SectionBlock, Spacer, TabBar, UiCard } from '@fintracker-vault/ui';
+import { KpiCard, LoadingState, SectionBlock, Spacer, TabBar, UiCard } from '../ui';
 import Stocks, { clearStocksCache } from './Stocks';
 import MutualFunds, { clearMutualFundsCache } from './MutualFunds';
 

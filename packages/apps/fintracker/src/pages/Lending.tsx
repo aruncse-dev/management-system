@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react'
 import { Search, LayoutDashboard, Handshake, ArrowDownLeft, BarChart3, Shield, User, ArrowUpRight } from 'lucide-react'
 import { api, RawLendingRow } from '../api'
-import { INR } from '@fintracker-vault/utils'
-import { FormField, HoldingCard, KpiCard, LoadingState, ModalActions, ModalShell, SearchField, SectionBlock, SectionChip, TabBar } from '@fintracker-vault/ui'
+import { INR } from '../utils'
+import { FormField, HoldingCard, KpiCard, LoadingState, ModalActions, ModalShell, SearchField, SectionBlock, SectionChip, TabBar } from '../ui'
 
 type LendType = 'LEND' | 'RECEIVED'
 type LendTab = 'dashboard' | 'lended' | 'received'
