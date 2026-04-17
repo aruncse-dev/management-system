@@ -38,6 +38,18 @@ const nextConfig = {
       process.env.NEXT_PUBLIC_GAS_URL ||
       webEnv.VITE_GAS_URL ||
       '',
+    NEXT_PUBLIC_GOOGLE_CLIENT_ID:
+      process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
+      webEnv.VITE_GOOGLE_CLIENT_ID ||
+      '',
+    NEXT_PUBLIC_APP_PASSWORD:
+      process.env.NEXT_PUBLIC_APP_PASSWORD ||
+      webEnv.VITE_APP_PASSWORD ||
+      '',
+    NEXT_PUBLIC_ALLOWED_EMAILS:
+      process.env.NEXT_PUBLIC_ALLOWED_EMAILS ||
+      webEnv.VITE_ALLOWED_EMAILS ||
+      '',
   },
   transpilePackages: [
     '@fintracker-vault/ui',

@@ -52,7 +52,7 @@ export function performVaultLogout() {
   window.location.reload()
 }
 
-export default function VaultNav() {
+export default function VaultNav({ onLogout }: { onLogout?: () => void }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
@@ -195,7 +195,8 @@ export default function VaultNav() {
                 className="settings-action-btn"
                 onClick={() => {
                   setLogoutConfirmOpen(false)
-                  performVaultLogout()
+                  if (onLogout) onLogout()
+                  else performVaultLogout()
                 }}
                 style={{ borderColor: 'rgba(239,68,68,.25)', color: 'var(--red)' }}
               >

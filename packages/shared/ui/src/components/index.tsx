@@ -857,3 +857,9 @@ export { default as BottomNav } from './BottomNav'
 export { default as ErrorScreen } from './ErrorScreen'
 export { default as Nav, type ModuleId, type AppNavArea } from './Nav'
 export { default as TransactionModal, type TransactionModalApi } from './TransactionModal'
+export {
+  default as AppAuthGate,
+  type AppAuthGateProps,
+  type AppAuthGateRender,
+  type AppAuthKind,
+} from './AppAuthGate'

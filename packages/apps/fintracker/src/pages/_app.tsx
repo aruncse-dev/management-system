@@ -1,11 +1,18 @@
 import type { AppProps } from 'next/app'
 import { useCallback, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Nav, type ModuleId } from '../ui'
+import { AppAuthGate, Nav, type ModuleId } from '../ui'
 import { getAppArea } from '../appPaths'
 import { StoreProvider } from '../store'
 import '../ui-kit/ui-kit.css'
 import '../styles/globals.css'
+
+const googleClientId = (process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '').trim()
+const appPassword = (process.env.NEXT_PUBLIC_APP_PASSWORD || '').trim() || '1234'
+const allowedEmails = (process.env.NEXT_PUBLIC_ALLOWED_EMAILS || '')
+  .split(',')
+  .map(e => e.trim().toLowerCase())
+  .filter(Boolean)
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter()
@@ -41,21 +48,31 @@ export default function App({ Component, pageProps }: AppProps) {
   }, [router, lendingSheet])
 
   return (
-    <StoreProvider>
-      <div className="with-app-shell">
-        {moduleFromPath && (
-          <Nav
-            module={moduleFromPath}
-            onModule={goToModule}
-            lendingSheet={lendingSheet}
-            onLendingSheet={setLendingSheet}
-            title="FinTracker"
-            appName="FinTracker"
-            area={getAppArea(router.asPath)}
-          />
-        )}
-        <Component {...pageProps} />
-      </div>
-    </StoreProvider>
+    <AppAuthGate
+      appKind="fintracker"
+      googleClientId={googleClientId}
+      appPassword={appPassword}
+      allowedEmails={allowedEmails}
+    >
+      {({ onLogout }) => (
+        <StoreProvider>
+          <div className="with-app-shell">
+            {moduleFromPath && (
+              <Nav
+                module={moduleFromPath}
+                onModule={goToModule}
+                lendingSheet={lendingSheet}
+                onLendingSheet={setLendingSheet}
+                title="FinTracker"
+                appName="FinTracker"
+                area={getAppArea(router.asPath)}
+                onLogout={onLogout}
+              />
+            )}
+            <Component {...pageProps} />
+          </div>
+        </StoreProvider>
+      )}
+    </AppAuthGate>
   )
 }
