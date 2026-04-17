@@ -7,7 +7,7 @@
   "main": "index.js",
   "private": true,
   "dependencies": {
-    "eslint": "workspace:*",
-    "eslint-config-next": "workspace:*"
+    "eslint": "^8.50.0",
+    "eslint-config-next": "^14.0.0"
   }
 }
