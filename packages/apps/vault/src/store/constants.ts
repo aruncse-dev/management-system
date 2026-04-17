@@ -1,1 +1,1 @@
-export { TXN_PAGE } from '@fintracker-vault/config'
+export { TXN_PAGE } from '../config'
