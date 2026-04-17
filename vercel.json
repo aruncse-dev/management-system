@@ -1,0 +1,33 @@
+{
+  "version": 2,
+  "projectId": "WILL_BE_SET_BY_VERCEL",
+  "orgId": "WILL_BE_SET_BY_VERCEL",
+  "builds": [
+    {
+      "src": "packages/apps/fintracker/package.json",
+      "use": "@vercel/next",
+      "config": {
+        "zeroConfig": true,
+        "maxDuration": 60,
+        "memory": 3008,
+        "regions": ["iad1"]
+      }
+    },
+    {
+      "src": "packages/apps/vault/package.json",
+      "use": "@vercel/next",
+      "config": {
+        "zeroConfig": true,
+        "maxDuration": 60,
+        "memory": 3008,
+        "regions": ["iad1"]
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "status": 404
+    }
+  ]
+}
