@@ -1,9 +1,9 @@
 import type { AppProps } from 'next/app'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
-import { AppAuthGate } from '@fintracker-vault/ui'
+import { Grid2X2, Landmark, Settings as SettingsIcon, Shield } from 'lucide-react'
+import { AppAuthGate, SimpleAppNav, type SimpleAppNavSection } from '@fintracker-vault/ui'
 import { StoreProvider } from '../store'
-import VaultNav from '../components/VaultNav'
 import { getClientAuthEnv } from '../clientAuthEnv'
 import '../ui-kit/ui-kit.css'
 import '../styles/globals.css'
@@ -14,6 +14,17 @@ const VAULT_PAGE_TITLES: Record<string, string> = {
   '/vaultapps': 'Apps',
   '/vaultsettings': 'Settings',
 }
+
+const VAULT_NAV_SECTIONS: SimpleAppNavSection[] = [
+  {
+    heading: 'Vault',
+    items: [
+      { path: '/vault', label: 'Banking', icon: <Landmark size={18} /> },
+      { path: '/vaultinsurance', label: 'Insurance', icon: <Shield size={18} /> },
+      { path: '/vaultapps', label: 'Apps', icon: <Grid2X2 size={18} /> },
+    ],
+  },
+]
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter()
@@ -43,7 +54,19 @@ export default function App({ Component, pageProps }: AppProps) {
       {({ onLogout }) => (
         <StoreProvider>
           <div className="with-app-shell">
-            <VaultNav onLogout={onLogout} />
+            <SimpleAppNav
+              appName="Vault"
+              iconSrc="/vault-192.png"
+              iconAlt="Vault"
+              barTitle={pageTitle}
+              currentPath={router.pathname || '/vault'}
+              onNavigate={(path: string) => {
+                void router.push(path)
+              }}
+              sections={VAULT_NAV_SECTIONS}
+              settingsItem={{ path: '/vaultsettings', label: 'Settings', icon: <SettingsIcon size={18} /> }}
+              onLogout={onLogout}
+            />
             <Component {...pageProps} />
           </div>
         </StoreProvider>

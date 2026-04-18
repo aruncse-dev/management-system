@@ -750,6 +750,13 @@ export * from './RightLegendDonut'
 export { default as BottomNav } from './BottomNav'
 export { default as ErrorScreen } from './ErrorScreen'
 export { default as Nav, type ModuleId, type AppNavArea } from './Nav'
+export {
+  default as SimpleAppNav,
+  performGoogleAppLogout,
+  type SimpleAppNavProps,
+  type SimpleAppNavItem,
+  type SimpleAppNavSection,
+} from './SimpleAppNav'
 export { default as TransactionModal, type TransactionModalApi } from './TransactionModal'
 export {
   default as AppAuthGate,
@@ -757,3 +764,9 @@ export {
   type AppAuthGateRender,
   type AppAuthKind,
 } from './AppAuthGate'
+export {
+  GoogleAuthCard,
+  GoogleSignInButton,
+  LOGIN_BRAND_MARK_STYLE,
+  type GoogleAuthCardProps,
+} from './GoogleAuthCard'

@@ -106,6 +106,11 @@ export function invalidateCache(matcher?: { action?: string; params?: Record<str
   persistCache()
 }
 
+export function clearPersistentCache() {
+  GET_CACHE.clear()
+  clearPersistedStorage()
+}
+
 async function get<T>(
   action: string,
   params: Record<string, string> = {},
@@ -152,37 +157,59 @@ async function post<T>(body: Record<string, unknown>): Promise<T> {
 }
 
 export const api = {
-  getSettings: () => get<StaffSettings>('getSettings', {}, { cache: false }),
+  invalidateCache,
+  clearPersistentCache,
 
-  saveSettings: (staffAttendanceSpreadsheetId: string) =>
-    post<boolean>({ action: 'saveSettings', staffAttendanceSpreadsheetId }),
+  getSettings: () => get<StaffSettings>('getSettings', {}),
 
-  listStaff: () => get<StaffMember[]>('listStaff', {}, { cache: false }),
+  saveSettings: async (staffAttendanceSpreadsheetId: string) => {
+    const result = await post<boolean>({ action: 'saveSettings', staffAttendanceSpreadsheetId })
+    invalidateCache({ action: 'getSettings', params: {} })
+    return result
+  },
 
-  addStaff: (payload: { name: string; salaryType?: SalaryBasis; salaryAmount?: number }) =>
-    post<StaffMember>({ action: 'addStaff', ...payload }),
+  listStaff: () => get<StaffMember[]>('listStaff', {}),
 
-  updateStaff: (payload: {
+  addStaff: async (payload: { name: string; salaryType?: SalaryBasis; salaryAmount?: number }) => {
+    const result = await post<StaffMember>({ action: 'addStaff', ...payload })
+    invalidateCache({ action: 'listStaff', params: {} })
+    return result
+  },
+
+  updateStaff: async (payload: {
     id: string
     name: string
     active?: boolean
     salaryType: SalaryBasis
     salaryAmount: number
-  }) => post<StaffMember>({ action: 'updateStaff', ...payload }),
+  }) => {
+    const result = await post<StaffMember>({ action: 'updateStaff', ...payload })
+    invalidateCache({ action: 'listStaff', params: {} })
+    return result
+  },
 
-  getMonths: () => get<MonthRef[]>('getMonths', {}, { cache: false }),
+  getMonths: () => get<MonthRef[]>('getMonths', {}),
 
-  getAttendance: (month: string, year: string) =>
-    get<AttendanceRow[]>('getAttendance', { month, year }, { cache: false }),
+  getAttendance: (month: string, year: string) => get<AttendanceRow[]>('getAttendance', { month, year }),
 
-  ensureMonth: (month: string, year: string) => post<boolean>({ action: 'ensureMonth', month, year }),
+  ensureMonth: async (month: string, year: string) => {
+    const result = await post<boolean>({ action: 'ensureMonth', month, year })
+    invalidateCache({ action: 'getMonths', params: {} })
+    invalidateCache({ action: 'getAttendance', params: { month, year } })
+    return result
+  },
 
-  setAttendance: (payload: {
+  setAttendance: async (payload: {
     month: string
     year: string
     date: string
     staffId: string
     worked: boolean
     overtime: boolean
-  }) => post<AttendanceRow>({ action: 'setAttendance', ...payload }),
+  }) => {
+    const { month, year } = payload
+    const result = await post<AttendanceRow>({ action: 'setAttendance', ...payload })
+    invalidateCache({ action: 'getAttendance', params: { month, year } })
+    return result
+  },
 }

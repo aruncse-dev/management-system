@@ -1,8 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Plus, Search, Users } from 'lucide-react'
-import { api, invalidateCache } from '../api'
+import { api } from '../api'
+import { useStaffWorkspace } from '../StaffWorkspaceContext'
 import type { SalaryBasis, StaffMember } from '../types'
-import { FormField, ModalActions, ModalShell, SearchField, SectionBlock, Spacer, TransactionCard, UiPill } from '../ui'
+import {
+  FormField,
+  LoadingState,
+  ModalActions,
+  ModalShell,
+  SearchField,
+  SectionBlock,
+  Spacer,
+  TransactionCard,
+  UiPill,
+} from '../ui'
 
 const fabStyle = {
   position: 'fixed' as const,
@@ -27,8 +38,7 @@ type ModalMode = 'add' | 'edit'
 const STAFF_SEARCH_MIN_COUNT = 5
 
 export default function StaffsPage() {
-  const [rows, setRows] = useState<StaffMember[]>([])
-  const [loading, setLoading] = useState(true)
+  const { staffList: rows, staffLoading: loading, staffError, refreshStaff } = useStaffWorkspace()
   const [toast, setToast] = useState('')
   const [search, setSearch] = useState('')
   const [modalMode, setModalMode] = useState<ModalMode | null>(null)
@@ -43,22 +53,6 @@ export default function StaffsPage() {
     setToast(msg)
     setTimeout(() => setToast(''), 2800)
   }, [])
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      const list = await api.listStaff()
-      setRows(list.filter(s => s.active))
-    } catch (e) {
-      showToast('⚠ ' + (e instanceof Error ? e.message : 'Load failed'))
-    } finally {
-      setLoading(false)
-    }
-  }, [showToast])
-
-  useEffect(() => {
-    void load()
-  }, [load])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -121,11 +115,10 @@ export default function StaffsPage() {
         await api.updateStaff({ id: editId, name: n, salaryType, salaryAmount: amt })
         successMsg = '✓ Saved'
       }
-      invalidateCache({ action: 'listStaff', params: {} })
       setModalMode(null)
       setEditId(null)
       closedModal = true
-      await load()
+      await refreshStaff({ soft: true })
       if (successMsg) showToast(successMsg)
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Save failed'
@@ -162,6 +155,7 @@ export default function StaffsPage() {
               </span>
             )}
           </div>
+          {staffError ? <div className="settings-alert">⚠ {staffError}</div> : null}
           {toast ? (
             <div className={`settings-alert${toast.startsWith('✓') ? ' settings-alert--success' : ''}`}>{toast}</div>
           ) : null}
@@ -171,7 +165,7 @@ export default function StaffsPage() {
 
       <main className="staffs-page-main">
         {loading ? (
-          <div className="ui-kit-loading ui-kit-loading--page">Loading…</div>
+          <LoadingState variant="page" label="Loading staff…" />
         ) : filtered.length === 0 ? (
           <div
             style={{

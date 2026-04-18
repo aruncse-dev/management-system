@@ -79,28 +79,14 @@ export default function Nav({
   const iconSrc = getAppAssetUrl(area, getAppIconAsset(area))
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
-  /** Circular mask: transparent PNG mark; vault keeps brand plate behind glyph. */
-  const navBrandImgStyle =
-    area === 'vault'
-      ? {
-          borderRadius: '50%',
-          flexShrink: 0,
-          objectFit: 'contain' as const,
-          background: '#1E5CC7',
-          display: 'block' as const,
-        }
-      : {
-          borderRadius: '50%',
-          flexShrink: 0,
-          objectFit: 'contain' as const,
-          display: 'block' as const,
-        }
 
   return (
     <>
       <nav className="nav">
         <span className="nav-b" style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
-          <img src={iconSrc} width="30" height="30" alt={name} style={navBrandImgStyle} />
+          <span className="nav-app-icon-wrap">
+            <img src={iconSrc} alt={name} className="nav-app-icon" />
+          </span>
           {title && <span style={{ fontSize: 14, fontWeight: 600 }}>{title}</span>}
         </span>
 
@@ -114,7 +100,9 @@ export default function Nav({
       <div className={`nav-drawer${drawerOpen ? ' open' : ''}`}>
         <div className="nav-drawer-hd">
           <span className="nav-b" style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-            <img src={iconSrc} width="28" height="28" alt={name} style={navBrandImgStyle} />
+            <span className="nav-app-icon-wrap nav-app-icon-wrap--drawer">
+              <img src={iconSrc} alt={name} className="nav-app-icon" />
+            </span>
             {name}
           </span>
           <button type="button" className="modal-close" onClick={() => setDrawerOpen(false)}>

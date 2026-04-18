@@ -1,11 +1,19 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Calendar, ChevronLeft, ChevronRight, RefreshCw, Users } from 'lucide-react'
 import { MNS } from '../config'
-import { api, invalidateCache } from '../api'
+import { api } from '../api'
+import { useStaffWorkspace } from '../StaffWorkspaceContext'
 import type { AttendanceRow, StaffMember } from '../types'
-import { FormField, KpiCard, KpiGrid, ModalShell, SectionBlock, Spacer, UiPill } from '../ui'
+import { FormField, KpiCard, KpiGrid, LoadingState, ModalShell, SectionBlock, Spacer, UiPill } from '../ui'
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
+
+/** Keeps last-fetched rows per month for this browser session (avoids full-page loader on return). */
+const attendanceByMonth = new Map<string, AttendanceRow[]>()
+
+function attendanceMonthKey(month: string, year: string) {
+  return `${month}|${year}`
+}
 
 function pad2(n: number) {
   return String(n).padStart(2, '0')
@@ -40,39 +48,65 @@ function dayCellVisual(rows: AttendanceRow[], dateStr: string): DayCellVisual {
 }
 
 export default function AttendancePage() {
-  const now = useMemo(() => new Date(), [])
-  const [month, setMonth] = useState<string>(MNS[now.getMonth()])
-  const [year, setYear] = useState<string>(String(now.getFullYear()))
-  const [staffList, setStaffList] = useState<StaffMember[]>([])
-  const [attendanceRows, setAttendanceRows] = useState<AttendanceRow[]>([])
-  const [loading, setLoading] = useState(false)
+  const { staffList, staffLoading, staffError } = useStaffWorkspace()
+  const [month, setMonth] = useState<string>(() => MNS[new Date().getMonth()])
+  const [year, setYear] = useState<string>(() => String(new Date().getFullYear()))
+  const [attendanceRows, setAttendanceRows] = useState<AttendanceRow[]>(() => {
+    const m = MNS[new Date().getMonth()]
+    const y = String(new Date().getFullYear())
+    return attendanceByMonth.get(attendanceMonthKey(m, y)) ?? []
+  })
+  const [loading, setLoading] = useState(() => {
+    const m = MNS[new Date().getMonth()]
+    const y = String(new Date().getFullYear())
+    return !attendanceByMonth.has(attendanceMonthKey(m, y))
+  })
   const [status, setStatus] = useState('')
   const [dayModalDate, setDayModalDate] = useState<string | null>(null)
   const [addStaffId, setAddStaffId] = useState('')
   const [addOt, setAddOt] = useState(false)
   const [modalBusy, setModalBusy] = useState(false)
+  const monthRef = useRef(month)
+  const yearRef = useRef(year)
+  monthRef.current = month
+  yearRef.current = year
 
   const showStatus = useCallback((msg: string) => {
     setStatus(msg)
     setTimeout(() => setStatus(''), 3000)
   }, [])
 
-  const loadStaff = useCallback(async () => {
-    const list = await api.listStaff()
-    setStaffList(list.filter(s => s.active))
-  }, [])
-
   const loadMonth = useCallback(
-    async (m: string, y: string) => {
+    async (m: string, y: string, opts?: { force?: boolean }) => {
+      const key = attendanceMonthKey(m, y)
+      const cached = attendanceByMonth.get(key)
+      if (cached && !opts?.force) {
+        setAttendanceRows(cached)
+        setLoading(false)
+        void (async () => {
+          try {
+            await api.ensureMonth(m, y)
+            const rows = await api.getAttendance(m, y)
+            if (monthRef.current !== m || yearRef.current !== y) return
+            attendanceByMonth.set(key, rows)
+            setAttendanceRows(rows)
+          } catch (e) {
+            showStatus('⚠ ' + (e instanceof Error ? e.message : 'Load failed'))
+          }
+        })()
+        return
+      }
+
       setLoading(true)
       try {
         await api.ensureMonth(m, y)
-        invalidateCache({ action: 'getAttendance', params: { month: m, year: y } })
         const rows = await api.getAttendance(m, y)
+        attendanceByMonth.set(key, rows)
         setAttendanceRows(rows)
         showStatus(`✓ ${m} ${y}`)
       } catch (e) {
         showStatus('⚠ ' + (e instanceof Error ? e.message : 'Load failed'))
+        attendanceByMonth.delete(key)
         setAttendanceRows([])
       } finally {
         setLoading(false)
@@ -82,20 +116,11 @@ export default function AttendancePage() {
   )
 
   const refreshAttendance = useCallback(async () => {
-    invalidateCache({ action: 'getAttendance', params: { month, year } })
+    const key = attendanceMonthKey(month, year)
     const rows = await api.getAttendance(month, year)
+    attendanceByMonth.set(key, rows)
     setAttendanceRows(rows)
   }, [month, year])
-
-  useEffect(() => {
-    ;(async () => {
-      try {
-        await loadStaff()
-      } catch (e) {
-        showStatus('⚠ ' + (e instanceof Error ? e.message : 'Staff list failed'))
-      }
-    })()
-  }, [loadStaff, showStatus])
 
   useEffect(() => {
     void loadMonth(month, year)
@@ -225,7 +250,7 @@ export default function AttendancePage() {
         <button
           type="button"
           className="nav-sync"
-          onClick={() => void loadMonth(month, year)}
+          onClick={() => void loadMonth(month, year, { force: true })}
           disabled={loading}
           aria-label="Refresh"
         >
@@ -234,8 +259,12 @@ export default function AttendancePage() {
       </nav>
 
       <main className="attendance-main">
-        {!staffList.length ? (
-          <div style={{ color: 'var(--muted)', fontSize: 13, textAlign: 'center', padding: 16 }}>Add staff first.</div>
+        {staffLoading || loading ? (
+          <LoadingState variant="page" label="Loading…" />
+        ) : !staffList.length ? (
+          <div style={{ color: 'var(--muted)', fontSize: 13, textAlign: 'center', padding: 16 }}>
+            {staffError ? `⚠ ${staffError}` : 'Add staff first.'}
+          </div>
         ) : (
           <>
             <div className="dashboard-page">

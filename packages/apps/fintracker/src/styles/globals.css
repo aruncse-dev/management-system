@@ -30,6 +30,31 @@ button, input, select, textarea {
 .nav { background: var(--navy-dark); height: calc(54px + env(safe-area-inset-top)); display: flex; align-items: center; justify-content: space-between; padding: env(safe-area-inset-top) 14px 0; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 12px rgba(30,92,199,.35); gap: 10px; will-change: transform; transform: translateZ(0); }
 .nav-b { color: #fff; font-weight: 700; font-size: 13px; letter-spacing: 0; white-space: nowrap; }
 .nav-b em { color: #A5B4FC; font-style: normal; }
+.nav-app-icon-wrap {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.22);
+}
+.nav-app-icon-wrap--drawer {
+  width: 28px;
+  height: 28px;
+}
+.nav-app-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  display: block;
+}
+.nav-app-icon-wrap--drawer .nav-app-icon {
+  width: 22px;
+  height: 22px;
+}
 .nav-month { display: flex; align-items: center; gap: 6px; flex: 1; justify-content: center; }
 .nav-arrow { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.25); color: #fff; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; font-size: 15px; display: flex; align-items: center; justify-content: center; line-height: 1; touch-action: manipulation; }
 .nav-ml { color: #fff; font-weight: 700; font-size: 13px; min-width: 72px; text-align: center; line-height: 1.35; }
@@ -1859,7 +1884,7 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
 .login-title { font-size: 24px; font-weight: 800; color: #fff; letter-spacing: -0.03em; }
 .login-sub { font-size: 15px; color: rgba(255,255,255,.76); text-align: center; line-height: 1.45; max-width: 320px; }
 
-/* Google auth: frosted panel; rounded-rect plate behind transparent logo (nav uses circular mask separately). */
+/* Google auth frosted card (see also `.login-auth-card`). */
 .login-panel {
   width: min(100%, 380px);
   display: grid;
@@ -1880,26 +1905,81 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
   text-align: center;
 }
 
+.login-auth-card__head {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  text-align: center;
+}
+
+.login-auth-card__mark {
+  isolation: isolate;
+}
+
+.login-auth-card__error {
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto;
+  padding: 6px 8px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.login-auth-card__actions {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.login-auth-card__google {
+  width: 100%;
+  max-width: 260px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 0;
+}
+
+.login-auth-card__pin {
+  width: 100%;
+  min-width: 0;
+}
+
+.login-auth-card__config-warn {
+  max-width: 320px;
+  text-align: center;
+}
+
 .login-brand-mark {
-  width: 76px;
-  height: 76px;
-  border-radius: 20px;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.14);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+  background: #fff;
+  border: 1px solid rgba(15, 35, 80, 0.08);
+  box-shadow: 0 8px 22px rgba(15, 35, 80, 0.28);
 }
 
 .login-brand-img {
   object-fit: contain;
   display: block;
+  opacity: 1;
+  filter: none;
+  border-radius: 50%;
 }
 
 .login-google-placeholder {
   min-height: 40px;
-  width: 300px;
+  width: 240px;
   margin: 0 auto;
   box-sizing: border-box;
   border-radius: 999px;

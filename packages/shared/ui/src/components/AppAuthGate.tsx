@@ -1,12 +1,6 @@
-import {
-  useState,
-  useEffect,
-  useRef,
-  type FormEvent,
-  type CSSProperties,
-  type ReactNode,
-} from 'react'
-import { GoogleLogin, GoogleOAuthProvider, type CredentialResponse } from '@react-oauth/google'
+import { useState, useEffect, useRef, type FormEvent, type CSSProperties, type ReactNode } from 'react'
+import { GoogleOAuthProvider, type CredentialResponse } from '@react-oauth/google'
+import { GoogleAuthCard, GoogleSignInButton } from './GoogleAuthCard'
 
 const AUTH_GOOGLE_COOKIE = 'ft_google_authed'
 const AUTH_MODE_KEY = 'ft_lock_mode'
@@ -80,7 +74,7 @@ function brandName(kind: AppAuthKind) {
   return 'FinTracker'
 }
 
-/** Transparent playstore export; rendered inside `.login-brand-mark` (rounded rect). Nav uses `icon-192` (launcher / round mask). */
+/** Transparent playstore export; rendered inside `.login-brand-mark` (circular white tile). Nav uses `icon-192` (launcher / round mask). */
 function iconAsset(kind: AppAuthKind) {
   if (kind === 'vault') return 'vault-rect.png'
   if (kind === 'staff') return 'staff-rect.png'
@@ -89,33 +83,6 @@ function iconAsset(kind: AppAuthKind) {
 
 function iconUrl(kind: AppAuthKind) {
   return `/${iconAsset(kind)}`
-}
-
-/** Mount Google button after paint so GSI script + Strict Mode remounts do not race. */
-function GoogleSignInDeferred({
-  onSuccess,
-  onError,
-}: {
-  onSuccess: (credentialResponse: CredentialResponse) => void
-  onError: () => void
-}) {
-  const [ready, setReady] = useState(false)
-  useEffect(() => setReady(true), [])
-  if (!ready) {
-    return <div className="login-google-placeholder" aria-busy="true" aria-label="Loading Google Sign-In" />
-  }
-  return (
-    <GoogleLogin
-      onSuccess={onSuccess}
-      onError={onError}
-      type="standard"
-      theme="outline"
-      size="large"
-      text="signin_with"
-      shape="pill"
-      width={300}
-    />
-  )
 }
 
 function LockScreen({
@@ -171,66 +138,45 @@ function LockScreen({
   }
 
   return (
-    <div className="login-screen">
-      <div className="login-panel">
-        <div className="login-panel-head">
-          <div className="login-brand-mark">
-            <img src={src} alt={displayName} width={64} height={64} className="login-brand-img" />
+    <GoogleAuthCard
+      iconSrc={src}
+      iconAlt={displayName}
+      title={displayName}
+      subtitle={
+        mode === 'google'
+          ? 'Sign in with Google to continue.'
+          : 'You were idle for an hour. Enter your app PIN to unlock.'
+      }
+      error={error || oauthError || undefined}
+    >
+      {mode === 'google' ? (
+        googleClientId ? (
+          <div className="login-auth-card__google">
+            <GoogleSignInButton
+              onSuccess={handleCredential}
+              onError={() =>
+                setError(
+                  'Google sign-in failed. If the button is blank, add this origin in Google Cloud Console → OAuth client → Authorized JavaScript origins (e.g. http://localhost:3000).',
+                )
+              }
+            />
           </div>
-          <div>
-            <div className="login-title">{displayName}</div>
-            <div className="login-sub">
-              {mode === 'google'
-                ? 'Sign in with Google to continue.'
-                : 'You were idle for an hour. Enter your app PIN to unlock.'}
-            </div>
-          </div>
+        ) : (
+          <span className="ui-kit-section-chip ui-tone-red login-auth-card__config-warn">
+            Add VITE_GOOGLE_CLIENT_ID to web/.env or this app&apos;s .env.local, then restart next dev.
+          </span>
+        )
+      ) : (
+        <div className="login-auth-card__pin">
+          <PasswordLock
+            onUnlock={handlePasswordUnlock}
+            error={error}
+            setError={setError}
+            appPassword={appPassword}
+          />
         </div>
-        {(error || oauthError) && (
-          <div
-            style={{
-              width: '100%',
-              maxWidth: 320,
-              padding: '6px 2px',
-              color: '#fff',
-              fontSize: 13,
-              fontWeight: 500,
-              lineHeight: 1.4,
-              textAlign: 'center',
-            }}
-          >
-            {error || oauthError}
-          </div>
-        )}
-        <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
-          {mode === 'google' ? (
-            googleClientId ? (
-              <GoogleSignInDeferred
-                onSuccess={handleCredential}
-                onError={() =>
-                  setError(
-                    'Google sign-in failed. If the button is blank, add this origin in Google Cloud Console → OAuth client → Authorized JavaScript origins (e.g. http://localhost:3000).',
-                  )
-                }
-              />
-            ) : (
-              <span className="ui-kit-section-chip ui-tone-red">
-                Add VITE_GOOGLE_CLIENT_ID to web/.env or this app&apos;s .env.local, then restart next dev.
-              </span>
-            )
-          ) : (
-            <div style={{ width: '100%' }}>
-              <PasswordLock
-                onUnlock={handlePasswordUnlock}
-                error={error}
-                setError={setError}
-                appPassword={appPassword}
-              />
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+      )}
+    </GoogleAuthCard>
   )
 }
 
