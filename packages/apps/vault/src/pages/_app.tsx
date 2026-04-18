@@ -1,7 +1,7 @@
 import type { AppProps } from 'next/app'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
-import { AppAuthGate } from '../ui'
+import { AppAuthGate } from '@fintracker-vault/ui'
 import { StoreProvider } from '../store'
 import VaultNav from '../components/VaultNav'
 import { getClientAuthEnv } from '../clientAuthEnv'
