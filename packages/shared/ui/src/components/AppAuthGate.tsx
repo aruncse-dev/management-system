@@ -186,8 +186,8 @@ function LockScreen({
             style={{
               width: 72,
               height: 72,
-              borderRadius: 20,
-              background: 'rgba(255,255,255,.15)',
+              borderRadius: 999,
+              background: '#ffffff',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -199,7 +199,7 @@ function LockScreen({
               alt={displayName}
               width="44"
               height="44"
-              style={{ borderRadius: 12, objectFit: 'contain' }}
+              style={{ borderRadius: 999, objectFit: 'contain' }}
             />
           </div>
           <div>
