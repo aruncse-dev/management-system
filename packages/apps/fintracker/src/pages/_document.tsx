@@ -26,6 +26,10 @@ export default class MyDocument extends Document<Props> {
     return (
       <Html lang="en" className="with-app-shell">
         <Head>
+          <link rel="manifest" href="/manifest.json" />
+          <link rel="icon" href="/favicon.ico" />
+          <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+          <meta name="theme-color" content="#1E5CC7" />
           <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;600&display=swap" rel="stylesheet" />
         </Head>
         <body className="with-app-shell">
