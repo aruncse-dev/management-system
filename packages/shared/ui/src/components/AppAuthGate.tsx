@@ -80,6 +80,7 @@ function brandName(kind: AppAuthKind) {
   return 'FinTracker'
 }
 
+/** Transparent playstore export; rendered inside `.login-brand-mark` (rounded rect). Nav uses `icon-192` (launcher / round mask). */
 function iconAsset(kind: AppAuthKind) {
   if (kind === 'vault') return 'vault-rect.png'
   if (kind === 'staff') return 'staff-rect.png'
@@ -101,20 +102,7 @@ function GoogleSignInDeferred({
   const [ready, setReady] = useState(false)
   useEffect(() => setReady(true), [])
   if (!ready) {
-    return (
-      <div
-        style={{
-          minHeight: 40,
-          width: 300,
-          margin: '0 auto',
-          borderRadius: 999,
-          background: 'rgba(255,255,255,0.12)',
-          border: '1px solid rgba(255,255,255,0.2)',
-        }}
-        aria-busy="true"
-        aria-label="Loading Google Sign-In"
-      />
-    )
+    return <div className="login-google-placeholder" aria-busy="true" aria-label="Loading Google Sign-In" />
   }
   return (
     <GoogleLogin
@@ -184,28 +172,10 @@ function LockScreen({
 
   return (
     <div className="login-screen">
-      <div style={{ width: 'min(100%, 380px)', display: 'grid', gap: 20 }}>
-        <div style={{ display: 'grid', gap: 10, justifyItems: 'center', textAlign: 'center' }}>
-          <div
-            style={{
-              width: 76,
-              height: 76,
-              borderRadius: 22,
-              overflow: 'hidden',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'rgba(255, 255, 255, 0.1)',
-              boxShadow: '0 10px 28px rgba(0, 0, 0, 0.28)',
-            }}
-          >
-            <img
-              src={src}
-              alt={displayName}
-              width="64"
-              height="64"
-              style={{ objectFit: 'contain', display: 'block' }}
-            />
+      <div className="login-panel">
+        <div className="login-panel-head">
+          <div className="login-brand-mark">
+            <img src={src} alt={displayName} width={64} height={64} className="login-brand-img" />
           </div>
           <div>
             <div className="login-title">{displayName}</div>
