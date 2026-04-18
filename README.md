@@ -1,178 +1,157 @@
-# FinTracker — Personal Finance Tracker
+# FinTracker & Vault
 
-A React PWA that uses **Google Sheets as its database** via Google Apps Script. No server costs, no database to manage — deploy once and track your family finances from any device.
+Two personal finance apps built with **Next.js 14** + **Google Sheets** (via Google Apps Script). Deployed to Vercel.
 
-**Live app:** Vercel deployments
+- **FinTracker** — Financial tracking: monthly expenses, gold, investments, loans, savings
+- **Vault** — Secure storage: insurance, passwords, documents
+
+Both apps share UI components via a pnpm monorepo. Backend runs on Google Apps Script, frontend on Vercel.
+
+---
+
+## Quick Start
+
+### Prerequisites
+- Node.js 20+
+- pnpm 10.x
+
+### Local Development
+
+```bash
+# Install
+pnpm install
+
+# Start both apps (fintracker :3000, vault :3001)
+pnpm dev
+
+# Fresh restart (kill ports, clear caches)
+pnpm dev:fresh
+```
+
+### Create `.env.local` Files
+
+Create `packages/apps/fintracker/.env.local` and `packages/apps/vault/.env.local`:
+
+```env
+VITE_GOOGLE_CLIENT_ID=your-oauth-client-id
+VITE_GAS_URL=https://script.google.com/macros/s/...your-gas-url.../exec
+VITE_API_TOKEN=your-gas-api-token
+VITE_ALLOWED_EMAILS=your@email.com
+VITE_SHEET_ID=your-google-sheet-id
+```
+
+(`.env.local` files are gitignored — never committed)
 
 ---
 
 ## Architecture
 
 ```
-Browser (React PWA — Vercel)
-      │
-      │  HTTPS fetch (JSON API)
-      ▼
-Google Apps Script (/exec endpoint)
-      │
-      │  SpreadsheetApp.*()
-      ▼
-Google Sheets (your spreadsheet)
-  ├── Apr-2026, Mar-2026 …   (one tab per month, auto-created)
-  ├── Budget                  (category → monthly target)
-  └── Accounts                (account → opening balance)
+Frontend (Next.js 14, Vercel)
+    ├── fintracker/   (pages router, port 3000)
+    └── vault/        (pages router, port 3001)
+           ↓
+    Shared packages (@fintracker-vault/*)
+    ├── config/       (constants, env config)
+    ├── types/        (TypeScript interfaces)
+    ├── ui/           (React components, AppAuthGate)
+    └── utils/        (formatters, validators)
+           ↓
+Backend (Google Apps Script)
+    ├── JSON REST API (?action=...)
+           ↓
+    Google Sheets (your spreadsheet)
 ```
 
-- **Frontend** — React + Vite, deployed to Vercel at `/fintracker` and `/vault`
-- **Backend** — Google Apps Script serves a JSON REST API (`?action=...`)
-- **Database** — Google Sheets (data stays in your own spreadsheet)
-- **Auth** — Google OAuth implicit flow (id_token) restricted to an allowed email list
+**See [CLAUDE.md](./CLAUDE.md) for full architecture, code guidelines, and development tips.**
 
 ---
 
-## Features
+## Tech Stack
 
-| Feature | Details |
-|---------|---------|
-| **Dashboard** | Income / Expense / Savings KPI cards, SVG donut charts, budget overview |
-| **Transactions** | Add / edit / delete with filters by type and payment mode |
-| **Budget** | Per-category targets with progress bars and over-budget alerts |
-| **Credits** | CC spend view on 19th–18th billing cycle (ICICI + HDFC) |
-| **Accounts** | Balance tracking across Cash, HDFC Bank, Indian Bank, Wallet |
-| **AI Assistant** | Gemini-powered chat for financial insights and quick transaction entry |
-| **PWA** | Installable, mobile-optimised |
-
----
-
-## Setup
-
-### Prerequisites
-
-- Node.js 20+
-- [clasp](https://github.com/google/clasp) — `npm install -g @google/clasp`
-- A Google account
-
----
-
-### 1. Google Sheets + Apps Script
-
-1. Create a new blank spreadsheet at [sheets.google.com](https://sheets.google.com)
-2. Open **Extensions → Apps Script**
-3. Replace `Code.gs` contents with `gas/Code.gs` from this repo
-4. Create an HTML file: **File → New → HTML file** → name it `Index` → paste `gas/Index.html`
-5. **Deploy → New deployment**
-   - Type: **Web app**
-   - Execute as: **Me**
-   - Who has access: **Anyone** *(required for the React frontend to call it without auth)*
-6. Copy the `/exec` URL
-
----
-
-### 2. Google OAuth Client
-
-1. Go to [console.cloud.google.com](https://console.cloud.google.com) → APIs & Services → Credentials
-2. Create an **OAuth 2.0 Client ID** → Application type: **Web application**
-3. Add Authorised JavaScript origins:
-   - `http://localhost:5173`
-   - your Vercel deployment domains
-4. Add Authorised redirect URIs:
-   - `http://localhost:5173/`
-   - `https://your-domain/fintracker`
-5. Copy the **Client ID**
-
----
-
-### 3. Local development
-
-```bash
-cd web
-# Create web/.env with your values (see table; keep it out of git)
-npm install
-npm run dev
-# App runs at http://localhost:5173/fintracker and http://localhost:5173/vault
-```
-
-**`web/.env` variables:**
-
-| Variable | Description |
-|----------|-------------|
-| `VITE_GAS_URL` | Your GAS `/exec` URL |
-| `VITE_GOOGLE_CLIENT_ID` | OAuth client ID |
-| `VITE_GEMINI_KEY` | Gemini API key (free tier at [aistudio.google.com](https://aistudio.google.com)) |
-| `VITE_ALLOWED_EMAILS` | Allowed Google email addresses, comma-separated |
-
-The dev server proxies `/gas-proxy` requests to GAS server-side (bypasses CORS).
-
----
-
-### 4. Deploy to Vercel
-
-1. Import this repo into Vercel
-2. Set the root directory to `web`
-3. Add the runtime env vars in each Vercel project
-4. Use the same shared credentials for both apps
-
-**Required Vercel env vars:**
-
-```
-VITE_GAS_URL
-VITE_GOOGLE_CLIENT_ID
-VITE_ALLOWED_EMAILS
-VITE_API_TOKEN
-VITE_GEMINI_KEY
-```
-
----
-
-### 5. Redeploy GAS after code changes
-
-```bash
-# From repo root (requires clasp login)
-./deploy.sh
-```
-
-This pushes `gas/Code.gs` and updates the existing deployment in-place. The URL stays the same.
-
----
-
-## Customising
-
-### Change account names
-`gas/Code.gs` → `ACCT_NAMES` array
-`web/src/constants.ts` → `ACCOUNTS` array and `TransactionModal.tsx` mode options
-
-### Change credit cards
-`web/src/constants.ts` → `CC_MODES` and `OTHER_CR` arrays
-`web/src/pages/Credits.tsx` → card labels
-
-### Change billing cycle day
-`web/src/components/Nav.tsx` → `CC_CYCLE_DAY`
-`web/src/utils.ts` → `currentMonthYear()` uses the same value
-
-### Change budget categories / defaults
-`gas/Code.gs` → `_defaultBudgets()` — only applied when Budget sheet is empty
-
----
-
-## Sheet structure
-
-| Tab | Created when | Columns |
-|-----|-------------|---------|
-| `Apr-2026`, `Mar-2026` … | First transaction for that month | ID · Date · Description · Amount · Category · Type · Mode · Notes |
-| `Budget` | App first loads | Category · Budget |
-| `Accounts` | App first loads | Account · Opening Balance |
-
----
-
-## Tech stack
-
-| Layer | Technology |
-|-------|-----------|
-| Frontend | React 18, TypeScript, Vite |
-| Hosting | GitHub Pages |
-| Backend | Google Apps Script (JSON REST API) |
+| Component | Tech |
+|-----------|------|
+| Frontend Apps | Next.js 14 (pages router) |
+| UI Components | React 18 + Tailwind CSS |
+| Shared Packages | TypeScript, tsup |
+| Build Tool | Turborepo (monorepo orchestration) |
+| Auth | Google OAuth 2.0 |
+| Backend | Google Apps Script (JSON API) |
 | Database | Google Sheets |
-| Auth | Google OAuth (implicit flow / id_token) |
-| AI | Gemini 2.0 Flash Lite (Google AI Studio free tier) |
-| Charts | Pure SVG (no chart library) |
-| PWA | Web App Manifest + service worker |
+| Deployment | Vercel (auto-deploy on push) |
+
+---
+
+## Development Commands
+
+```bash
+pnpm dev                    # Start both apps
+pnpm dev:fintracker        # Start fintracker only
+pnpm dev:vault             # Start vault only
+pnpm dev:fresh             # Fresh restart (kill ports, clear cache)
+
+pnpm build                  # Build all apps
+pnpm type-check             # TypeScript validation
+pnpm lint                   # ESLint
+pnpm format                 # Prettier
+
+pnpm kill-ports             # Kill port 3000/3001
+pnpm clean:cache            # Clear .next + .turbo
+pnpm clean                  # Full clean (node_modules + .turbo + .next)
+```
+
+---
+
+## Deployment
+
+Both apps deploy to Vercel automatically on push to `main`.
+
+**Setup (one-time):**
+1. Create two Vercel projects (fintracker + vault)
+2. Set Root Directory: `packages/apps/fintracker` (or `vault`)
+3. Add environment variables in Vercel project settings:
+   - `VITE_GOOGLE_CLIENT_ID`
+   - `VITE_GAS_URL`
+   - `VITE_API_TOKEN`
+   - `VITE_ALLOWED_EMAILS`
+4. Enable corepack: Set `ENABLE_EXPERIMENTAL_COREPACK=1`
+
+---
+
+## Key Features
+
+- **Google OAuth** — Sign in with Google, email-based access control
+- **Idle timeout** → PIN lock after 1 hour of inactivity
+- **Real-time sync** — Data synced to Google Sheets automatically
+- **Responsive design** — Mobile-optimized with Tailwind CSS
+- **Shared components** — Code reuse via monorepo pattern
+- **TypeScript** — Full type safety across all packages
+
+---
+
+## FAQ
+
+**Q: Is my data secure?**
+- A: Data lives in your Google Sheets (you own it). Auth is simplified for personal use. See [CLAUDE.md](./CLAUDE.md) for security details.
+
+**Q: Can I customize account names?**
+- A: Yes. Modify `gas/Code.gs` (backend) and `packages/apps/*/src/constants.ts` (frontend).
+
+**Q: How do I redeploy Google Apps Script?**
+- A: `./deploy.sh` (requires clasp login). See `gas/SETUP.md` for details.
+
+**Q: How do I add a new page?**
+- A: Create a file in `packages/apps/fintracker/src/pages/` (or vault). Next.js auto-routes it.
+
+---
+
+## More Info
+
+- **Architecture & Code Guidelines:** [CLAUDE.md](./CLAUDE.md)
+- **GAS Setup:** [gas/SETUP.md](./gas/SETUP.md)
+
+---
+
+## License
+
+MIT
