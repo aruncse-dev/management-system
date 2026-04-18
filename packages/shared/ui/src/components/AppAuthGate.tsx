@@ -188,17 +188,23 @@ function LockScreen({
         <div style={{ display: 'grid', gap: 10, justifyItems: 'center', textAlign: 'center' }}>
           <div
             style={{
+              width: 76,
+              height: 76,
+              borderRadius: 22,
+              overflow: 'hidden',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              background: 'rgba(255, 255, 255, 0.1)',
+              boxShadow: '0 10px 28px rgba(0, 0, 0, 0.28)',
             }}
           >
             <img
               src={src}
               alt={displayName}
-              width="72"
-              height="72"
-              style={{ objectFit: 'contain' }}
+              width="64"
+              height="64"
+              style={{ objectFit: 'contain', display: 'block' }}
             />
           </div>
           <div>

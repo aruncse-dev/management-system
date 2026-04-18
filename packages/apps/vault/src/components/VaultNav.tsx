@@ -60,6 +60,13 @@ export default function VaultNav({ onLogout }: { onLogout?: () => void }) {
   const currentPage = useMemo(() => pathToVaultPage(router.pathname || '/vault'), [router.pathname])
 
   const iconSrc = getAppAssetUrl(getAppIconAsset())
+  const vaultBrandImgStyle = {
+    borderRadius: '50%',
+    flexShrink: 0,
+    objectFit: 'contain' as const,
+    background: '#1E5CC7',
+    display: 'block' as const,
+  }
 
   function go(page: VaultPage) {
     void router.push(ROUTES[page])
@@ -75,7 +82,7 @@ export default function VaultNav({ onLogout }: { onLogout?: () => void }) {
             width="30"
             height="30"
             alt="Vault"
-            style={{ borderRadius: 8, flexShrink: 0, objectFit: 'contain', background: '#1E5CC7' }}
+            style={vaultBrandImgStyle}
           />
           <span style={{ fontSize: 14, fontWeight: 600 }}>{pageTitle(currentPage)}</span>
         </span>
@@ -92,7 +99,7 @@ export default function VaultNav({ onLogout }: { onLogout?: () => void }) {
               width="28"
               height="28"
               alt="Vault"
-              style={{ borderRadius: 7, flexShrink: 0, objectFit: 'contain', background: '#1E5CC7' }}
+              style={vaultBrandImgStyle}
             />
             Vault
           </span>

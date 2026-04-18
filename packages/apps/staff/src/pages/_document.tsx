@@ -29,7 +29,7 @@ export default class MyDocument extends Document<Props> {
         <Head>
           <link rel="manifest" href="/manifest.json" />
           <link rel="icon" href="/favicon.png" type="image/png" />
-          <link rel="apple-touch-icon" href="/icon-192.png" />
+          <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
           <meta name="theme-color" content="#1E5CC7" />
           <link
             href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;600&display=swap"

@@ -10,6 +10,15 @@ const ROUTES: Record<StaffPage, string> = {
   settings: '/settings',
 }
 
+const STAFF_NAV_ICON_SRC = '/icon-192.png'
+
+const staffNavBrandImgStyle = {
+  borderRadius: '50%',
+  flexShrink: 0,
+  objectFit: 'contain' as const,
+  display: 'block' as const,
+}
+
 const AUTH_GOOGLE_COOKIE = 'ft_google_authed'
 
 function pathToStaffPage(pathname: string): StaffPage {
@@ -53,22 +62,14 @@ export default function StaffNav({ onLogout }: { onLogout?: () => void }) {
     <>
       <nav className="nav">
         <span className="nav-b" style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
-          <span
-            style={{
-              width: 30,
-              height: 30,
-              borderRadius: 8,
-              flexShrink: 0,
-              background: '#1E5CC7',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#fff',
-            }}
+          <img
+            src={STAFF_NAV_ICON_SRC}
+            width={30}
+            height={30}
+            alt=""
+            style={staffNavBrandImgStyle}
             aria-hidden
-          >
-            <Users size={16} strokeWidth={2.2} />
-          </span>
+          />
           <span style={{ fontSize: 14, fontWeight: 600 }}>{pageTitle(currentPage)}</span>
         </span>
         <button type="button" className="nav-hamburger" onClick={() => setOpen(true)} aria-label="Open menu">
@@ -79,22 +80,14 @@ export default function StaffNav({ onLogout }: { onLogout?: () => void }) {
       <div className={`nav-drawer${open ? ' open' : ''}`}>
         <div className="nav-drawer-hd">
           <span className="nav-b" style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-            <span
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: 7,
-                flexShrink: 0,
-                background: '#1E5CC7',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#fff',
-              }}
+            <img
+              src={STAFF_NAV_ICON_SRC}
+              width={28}
+              height={28}
+              alt=""
+              style={staffNavBrandImgStyle}
               aria-hidden
-            >
-              <Users size={15} strokeWidth={2.2} />
-            </span>
+            />
             Staff
           </span>
           <button type="button" className="modal-close" onClick={() => setOpen(false)} aria-label="Close menu">
