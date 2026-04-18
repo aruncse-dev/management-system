@@ -3,7 +3,7 @@ import { Plus, LayoutDashboard, List, BarChart3, Wallet, Search, TrendingUp, Ale
 import { api, RawSavingsRow } from '../api'
 import { THEME_COLORS } from '../config'
 import { INR } from '../utils'
-import { BalanceRow, FormField, KpiCard, LoadingState, SearchField, SectionBlock, Spacer, TransactionCard } from '../ui'
+import { BalanceRow, FormField, KpiCard, KpiGrid, LoadingState, SearchField, SectionBlock, Spacer, TransactionCard } from '../ui'
 
 type SavingsType = 'Income' | 'Expense' | 'Transfer'
 type SavingsTab = 'dashboard' | 'transactions'
@@ -287,11 +287,11 @@ export default function SavingsPage({
         {activeTab === 'dashboard' && (
           <>
             <SectionBlock title={`${title} Metrics`} icon={<BarChart3 size={14} />} right={loading ? <LoadingState variant="inline" /> : null}>
-              <div className="dash-grid">
+              <KpiGrid>
                 <KpiCard label="Total Balance" value={signedINR(totalBalance)} tone="navy" icon={<Wallet size={14} />} />
                 <KpiCard label="Total Income" value={INR(totalIncome)} tone="green" icon={<TrendingUp size={14} />} />
                 <KpiCard label="Total Expenses" value={INR(totalExpenses)} tone="red" icon={<AlertTriangle size={14} />} />
-              </div>
+              </KpiGrid>
             </SectionBlock>
 
             <Spacer size={6} />
@@ -347,8 +347,13 @@ export default function SavingsPage({
                 {filteredEntries.map(e => (
                   <TransactionCard
                     key={e.id}
-                    title={e.desc || e.account}
-                    subtitle={e.account}
+                    title={
+                      e.type === 'Transfer' && e.toAccount
+                        ? e.desc?.trim()
+                          ? `${e.desc} · ${e.account} → ${e.toAccount}`
+                          : `${e.account} → ${e.toAccount}`
+                        : e.desc || e.account
+                    }
                     amount={`${e.type === 'Income' ? '+' : e.type === 'Transfer' ? '↔' : '−'}${INR(e.amount)}`}
                     type={e.type}
                     date={e.date}

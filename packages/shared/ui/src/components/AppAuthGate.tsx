@@ -17,7 +17,7 @@ const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 
 type LockMode = 'google' | 'password'
 
-export type AppAuthKind = 'fintracker' | 'vault'
+export type AppAuthKind = 'fintracker' | 'vault' | 'staff'
 
 export type AppAuthGateRender = (ctx: { onLogout: () => void }) => ReactNode
 
@@ -75,11 +75,15 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
 }
 
 function brandName(kind: AppAuthKind) {
-  return kind === 'vault' ? 'Vault' : 'FinTracker'
+  if (kind === 'vault') return 'Vault'
+  if (kind === 'staff') return 'Staff'
+  return 'FinTracker'
 }
 
 function iconAsset(kind: AppAuthKind) {
-  return kind === 'vault' ? 'vault-rect.png' : 'icon-rect.png'
+  if (kind === 'vault') return 'vault-rect.png'
+  if (kind === 'staff') return 'staff-rect.png'
+  return 'icon-rect.png'
 }
 
 function iconUrl(kind: AppAuthKind) {

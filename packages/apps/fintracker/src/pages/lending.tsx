@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, memo } from 'react'
 import { Search, LayoutDashboard, Handshake, ArrowDownLeft, BarChart3, Shield, User, ArrowUpRight, Plus } from 'lucide-react'
 import { api, RawLendingRow } from '../api'
 import { INR } from '../utils'
-import { FormField, HoldingCard, KpiCard, LoadingState, SearchField, SectionBlock, SectionChip } from '../ui'
+import { FormField, HoldingCard, KpiCard, KpiGrid, LoadingState, SearchField, SectionBlock, SectionChip } from '../ui'
 
 type LendType = 'LEND' | 'RECEIVED'
 type LendTab = 'dashboard' | 'lended' | 'received'
@@ -338,12 +338,12 @@ export default function Lending({ sheetName, onTabChange }: LendingProps) {
               icon={<BarChart3 size={14} />}
               right={<SectionChip tone={sheetTone}>{safeSheetName}</SectionChip>}
             >
-              <div className="dash-grid">
+              <KpiGrid>
                 <KpiCard label="Given" value={INR(totalLent)} tone="navy" icon={<ArrowUpRight size={14} />} />
                 <KpiCard label="Received" value={INR(totalRepaid)} tone="green" icon={<ArrowDownLeft size={14} />} />
                 <KpiCard label="Outstanding" value={INR(Math.abs(outstanding))} tone="amber" icon={<Shield size={14} />} />
                 <KpiCard label="People" value={totalPeople} tone="muted" icon={<User size={14} />} />
-              </div>
+              </KpiGrid>
             </SectionBlock>
 
             <SectionBlock
@@ -497,11 +497,11 @@ export default function Lending({ sheetName, onTabChange }: LendingProps) {
             </div>
             <div className="modal-body">
               <div className="ui-stack">
-                <div className="dash-grid">
+                <KpiGrid>
                   <KpiCard label="Lent" value={INR(personDetails.totalLent)} tone="red" icon={<Handshake size={14} />} />
                   <KpiCard label="Received" value={INR(personDetails.totalRepaid)} tone="green" icon={<ArrowDownLeft size={14} />} />
                   <KpiCard label="Outstanding" value={INR(Math.abs(personDetails.outstanding))} tone="muted" icon={<Shield size={14} />} />
-                </div>
+                </KpiGrid>
                 {personModalEntries.length === 0 ? (
                   <p style={{ color: 'var(--muted)', padding: '0.5rem 0', fontSize: 14, textAlign: 'center' }}>
                     No entries for this person.

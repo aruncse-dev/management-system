@@ -27,7 +27,7 @@ In your Google Sheet → **Extensions → Apps Script**
 5. Click **Deploy** → Authorize → copy the `/exec` URL
 
 ### Step 5 — Connect to the React frontend
-Paste the URL into `web/.env` as `VITE_GAS_URL`.
+Paste the URL as `VITE_GAS_URL` in **repo** `.env` or `.env.local`, or in `web/.env` (Next apps merge those paths on startup and in `/api/gas-proxy`).
 
 ---
 
@@ -84,3 +84,20 @@ All endpoints return `{ ok: true, data: ... }` or `{ ok: false, error: "..." }`.
 | `Apr-2026`, `Mar-2026` … | One per month — transactions |
 | `Budget` | Category → monthly budget amount |
 | `Accounts` | Account → opening balance |
+
+---
+
+## Staff attendance app (`module=staff`)
+
+Uses a **separate spreadsheet** (ID saved in the Staff Next app → Script property `STAFF_ATTENDANCE_SHEET_ID`). Deploy the same `gas/` project; no second web app required.
+
+| Sheet | Purpose |
+|-------|---------|
+| `Staff` | Columns: `ID`, `Name`, `Active`, `SalaryType` (`daily` / `monthly`), `SalaryAmount` — roster |
+| `Apr-2026`, … | Columns: `EntryID`, `Date`, `StaffID`, `Worked`, `Overtime` |
+
+**GET** (query: `module=staff&action=...`): `getSettings`, `listStaff`, `getMonths`, `getAttendance` (params `month`, `year`).
+
+**POST** (JSON body includes `module: "staff"`): `saveSettings` (`staffAttendanceSpreadsheetId`), `addStaff` (`name`, optional `salaryType`, `salaryAmount`), `updateStaff` (`id`, `name`, `salaryType`, `salaryAmount`, optional `active`), `ensureMonth` (`month`, `year`), `setAttendance` (`month`, `year`, `date`, `staffId`, `worked`, `overtime`).
+
+Local / Vercel: same `NEXT_PUBLIC_GAS_URL` (or `VITE_GAS_URL`) as FinTracker; run **`pnpm dev:staff`** (port **3002**).

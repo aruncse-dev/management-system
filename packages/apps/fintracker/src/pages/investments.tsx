@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { BarChart3, LayoutDashboard, PieChart, RefreshCw, Shield, TrendingUp, Wallet } from 'lucide-react';
 import { api, type RawHolding } from '../api';
-import { KpiCard, LoadingState, SectionBlock, Spacer, UiCard } from '../ui';
+import { KpiCard, KpiGrid, LoadingState, SectionBlock, Spacer, UiCard } from '../ui';
 import Stocks, { clearStocksCache } from './stocks';
 import MutualFunds, { clearMutualFundsCache } from './mutualfunds';
 
@@ -46,7 +46,7 @@ function MetricsSection({
   return (
     <>
       <SectionBlock title={title} icon={icon}>
-        <div className="dash-grid">
+        <KpiGrid>
           <KpiCard label="Invested" value={formatRupees(stats.totalInvested)} icon={<Wallet size={14} />} tone="muted" />
           <KpiCard label="Current" value={formatRupees(stats.currentValue)} icon={<TrendingUp size={14} />} tone="muted" />
           <KpiCard
@@ -57,7 +57,7 @@ function MetricsSection({
             accentTone={stats.pnl >= 0 ? 'green' : 'red'}
           />
           <KpiCard label="Holdings" value={holdings.length} icon={<PieChart size={14} />} tone="muted" />
-        </div>
+        </KpiGrid>
       </SectionBlock>
     </>
   );
@@ -171,7 +171,7 @@ function DashboardView() {
           </div>
         }
       >
-        <div className="dash-grid">
+        <KpiGrid>
           <KpiCard label="Total Invested" value={formatRupees(stats.totalInvested)} icon={<Wallet size={14} />} tone="muted" />
           <KpiCard label="Current Value" value={formatRupees(stats.currentValue)} icon={<TrendingUp size={14} />} tone="muted" />
           <KpiCard
@@ -182,7 +182,7 @@ function DashboardView() {
             accentTone={stats.totalPnL >= 0 ? 'green' : 'red'}
           />
           <KpiCard label="Return %" value={`${stats.totalPnLPct >= 0 ? '+' : ''}${Math.round(stats.totalPnLPct)}%`} icon={<PieChart size={14} />} tone="muted" />
-        </div>
+        </KpiGrid>
       </SectionBlock>
 
       {error && <div className="settings-alert">⚠ {error}</div>}

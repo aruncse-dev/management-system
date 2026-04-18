@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Banknote, BarChart3, CreditCard, Landmark, Clock, Layers3, ArrowDownLeft, ArrowUpRight, Plus } from 'lucide-react'
 import { api, RawCashLoanHistoryRow, RawCashLoanRow, RawEmiRow, RawJewelLoanHistoryRow, RawJewelLoanRow } from '../api'
 import { INR } from '../utils'
-import { FormField, HoldingCard, KpiCard, LoadingState, ModalActions, ModalShell, SectionBlock, SectionChip } from '../ui'
+import { FormField, HoldingCard, KpiCard, KpiGrid, LoadingState, ModalActions, ModalShell, SectionBlock, SectionChip } from '../ui'
 
 type LoanSource = 'EMI' | 'Jewel' | 'Cash'
 type LoansTab = 'dashboard' | 'emi' | 'jewel' | 'cash' | 'history'
@@ -774,7 +774,7 @@ export default function Loans() {
             icon={<Layers3 size={14} />}
             right={<SectionChip tone="muted">{metrics.loanCount} loans</SectionChip>}
           >
-            <div className="dash-grid">
+            <KpiGrid>
               <KpiCard label="Total Outstanding" value={<span className="kpi-card-v--red">{INR(metrics.totalOutstanding)}</span>} tone="red" icon={<ArrowUpRight size={14} />} full />
               <KpiCard label="Total Loan Amount" value={INR(metrics.totalLoanAmount)} tone="navy" icon={<CreditCard size={14} />} full />
               <KpiCard label="Total Principal" value={INR(metrics.totalPrincipal)} tone="muted" icon={<CreditCard size={14} />} />
@@ -783,7 +783,7 @@ export default function Loans() {
               <KpiCard label="EMI Loans" value={emiMetrics.totalLoanCount} tone="muted" icon={<CreditCard size={14} />} />
               <KpiCard label="Jewel Loans" value={jewelMetrics.count} tone="muted" icon={<Landmark size={14} />} />
               <KpiCard label="Cash Loans" value={cashLoans.length} tone="muted" icon={<Banknote size={14} />} />
-            </div>
+            </KpiGrid>
           </SectionBlock>
         )}
 
@@ -794,14 +794,14 @@ export default function Loans() {
               icon={<BarChart3 size={14} />}
               right={<SectionChip tone="muted">{emiMetrics.totalLoanCount} loans</SectionChip>}
             >
-              <div className="dash-grid">
+              <KpiGrid>
                 <KpiCard label="Loan Value" value={INR(emiMetrics.totalLoanValue)} tone="navy" icon={<CreditCard size={14} />} />
                 <KpiCard label="Principal" value={INR(emiRows.reduce((sum, loan) => sum + loan.principal, 0))} tone="navy" icon={<CreditCard size={14} />} />
                 <KpiCard label="Interest" value={INR(emiRows.reduce((sum, loan) => sum + loan.interest, 0))} tone="amber" icon={<Landmark size={14} />} />
                 <KpiCard label="Paid" value={INR(emiRows.reduce((sum, loan) => sum + (loan.emi_amount * loan.paid_emis), 0))} tone="muted" icon={<Banknote size={14} />} />
                 <KpiCard label="Outstanding" value={<span className="kpi-card-v--red">{INR(emiMetrics.totalOutstanding)}</span>} tone="red" icon={<ArrowUpRight size={14} />} />
                 <KpiCard label="Monthly EMIs" value={INR(emiMetrics.totalMonthlyEmis)} tone="green" icon={<ArrowDownLeft size={14} />} />
-              </div>
+              </KpiGrid>
             </SectionBlock>
 
             <SectionBlock
@@ -931,12 +931,12 @@ export default function Loans() {
               icon={<Landmark size={14} />}
               right={<SectionChip tone="muted">{jewelMetrics.count} loans</SectionChip>}
             >
-              <div className="dash-grid">
+              <KpiGrid>
                 <KpiCard label="Principal" value={INR(jewelMetrics.totalPrincipal)} tone="navy" icon={<CreditCard size={14} />} />
                 <KpiCard label="Paid" value={INR(jewelMetrics.totalPaid)} tone="green" icon={<ArrowDownLeft size={14} />} />
                 <KpiCard label="Outstanding" value={<span className="kpi-card-v--red">{INR(jewelMetrics.totalOutstanding)}</span>} tone="red" icon={<ArrowUpRight size={14} />} />
                 <KpiCard label="Interest" value={INR(jewelMetrics.totalInterest)} tone="amber" icon={<Landmark size={14} />} />
-              </div>
+              </KpiGrid>
             </SectionBlock>
 
             <SectionBlock
@@ -1028,12 +1028,12 @@ export default function Loans() {
               icon={<Banknote size={14} />}
               right={<SectionChip tone="muted">{cashLoans.length} loans</SectionChip>}
             >
-              <div className="dash-grid">
+              <KpiGrid>
                 <KpiCard label="Principal" value={INR(cashLoans.reduce((sum, loan) => sum + loan.principal, 0))} tone="navy" icon={<Banknote size={14} />} />
                 <KpiCard label="Paid" value={INR(cashLoans.reduce((sum, loan) => sum + loan.paid, 0))} tone="green" icon={<ArrowDownLeft size={14} />} />
                 <KpiCard label="Outstanding" value={<span className="kpi-card-v--red">{INR(cashLoans.reduce((sum, loan) => sum + loan.outstanding, 0))}</span>} tone="red" icon={<ArrowUpRight size={14} />} />
                 <KpiCard label="Loans" value={cashLoans.length} tone="muted" icon={<CreditCard size={14} />} />
-              </div>
+              </KpiGrid>
             </SectionBlock>
 
             <SectionBlock

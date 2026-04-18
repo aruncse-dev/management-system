@@ -1,0 +1,36 @@
+---
+description: Google OAuth env vars — monorepo Next apps (fintracker, vault, staff)
+alwaysApply: true
+---
+
+# Google OAuth environment (shared convention)
+
+All Next apps under `packages/apps/*` use **`packages/apps/resolve-google-env.cjs`** via `getGoogleAuthEnv(__dirname)` in `next.config.js`.
+
+## Client ID — use any one of these names (same value)
+
+1. `VITE_GOOGLE_CLIENT_ID` (shared with Vite / `web/`)
+2. `NEXT_PUBLIC_GOOGLE_CLIENT_ID`
+3. `GOOGLE_CLIENT_ID`
+
+**Local file merge** (later files override earlier keys; only fills `process.env` keys that are still empty):  
+repo **`.env`** → repo **`.env.local`** → **`web/.env`** → **`packages/apps/<app>/.env.local`**.
+
+Vercel / shell env wins over all files.
+
+`next.config` mirrors a resolved id into `NEXT_PUBLIC_GOOGLE_CLIENT_ID` and `VITE_GOOGLE_CLIENT_ID` for the client bundle.
+
+## Allowlist (optional)
+
+`VITE_ALLOWED_EMAILS` or `NEXT_PUBLIC_ALLOWED_EMAILS` or `ALLOWED_EMAILS` (comma-separated).
+
+## Do not
+
+- Add app-specific Google env key names — keep the three client-id keys above.
+- Skip `getGoogleAuthEnv` in new Next apps; copy `next.config.js` env block from fintracker/vault/staff.
+
+## If the id is “missing” locally
+
+Set `VITE_GOOGLE_CLIENT_ID=...` in **repo** `.env` or `.env.local`, or `web/.env`, or `packages/apps/<app>/.env.local`, then restart `next dev` (or `dev:*:fresh`).
+
+**GAS URL** for `/api/gas-proxy` uses the same merged files for `VITE_GAS_URL` / `NEXT_PUBLIC_GAS_URL` when not in `process.env`.

@@ -4,7 +4,7 @@ import { api, RawGoldRow, RawGoldHistoryRow } from '../api';
 import { INR } from '../utils';
 import { THEME_COLORS } from '../config';
 import { RightLegendDonut } from '../ui'
-import { FormField, KpiCard, LoadingState, ListStack, SearchField, SectionBlock } from '../ui';
+import { FormField, KpiCard, KpiGrid, LoadingState, ListStack, SearchField, SectionBlock } from '../ui';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // TYPES & CONSTANTS
@@ -579,12 +579,12 @@ export default function Gold() {
               icon={<BarChart3 size={14} />}
               right={loading ? <LoadingState variant="inline" /> : null}
             >
-              <div className="dash-grid">
+              <KpiGrid>
                 <KpiCard label="Total Gold" value={`${Math.round(totalGrams)}g`} tone="navy" icon={<Gem size={14} />} subtitle={`${Math.round(totalPavan)} pavan`} />
                 <KpiCard label="Estimated Value" value={INR(estimatedValue)} tone="amber" icon={<Shield size={14} />} subtitle={`${Math.round(personalGrams)}g @ ₹${goldRate}/g`} />
                 <KpiCard label="Items" value={totalItems} tone="muted" icon={<Package size={14} />} subtitle="Tracked pieces" />
                 <KpiCard label="People" value={totalPeople} tone="muted" icon={<Users size={14} />} subtitle="Ownership groups" />
-              </div>
+              </KpiGrid>
             </SectionBlock>
 
             <SectionBlock title="By Location" icon={<BarChart3 size={14} />}>

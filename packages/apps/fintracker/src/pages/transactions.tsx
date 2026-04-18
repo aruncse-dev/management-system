@@ -81,7 +81,6 @@ export default function Transactions({ onEdit }: Props) {
               <TransactionCard
                 key={r.id}
                 title={r.desc || r.c}
-                subtitle={r.c}
                 amount={`${(isI || isS) ? '+' : '-'}${INR(r.a)}`}
                 type={r.t}
                 date={fd(r.date)}

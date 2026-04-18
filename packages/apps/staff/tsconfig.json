@@ -1,0 +1,25 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "jsx": "preserve",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@fintracker-vault/ui": ["../../shared/ui/src"],
+      "@fintracker-vault/ui/*": ["../../shared/ui/src/*"],
+      "@fintracker-vault/types": ["../../shared/types/src"],
+      "@fintracker-vault/types/*": ["../../shared/types/src/*"],
+      "@fintracker-vault/config": ["../../shared/config/src"],
+      "@fintracker-vault/config/*": ["../../shared/config/src/*"],
+      "@fintracker-vault/utils": ["../../shared/utils/src"],
+      "@fintracker-vault/utils/*": ["../../shared/utils/src/*"]
+    },
+    "noEmit": true,
+    "incremental": true,
+    "isolatedModules": true,
+    "plugins": [{ "name": "next" }],
+    "strictNullChecks": true
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}

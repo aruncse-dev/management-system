@@ -10,6 +10,7 @@ import {
   InfoCallout,
   InternalTabBar,
   KpiCard,
+  KpiGrid,
   ModalActions,
   ModalShell,
   SearchField,
@@ -102,12 +103,12 @@ export default function Components() {
       </SectionBlock>
 
       <SectionBlock title="Metrics" icon={<Wallet size={13} />} rightChip={<SectionChip tone="green">KPIs</SectionChip>}>
-        <div className="dash-grid">
+        <KpiGrid>
           <KpiCard label="Balance" value="₹1,28,500" tone="navy" icon={<Wallet size={13} />} />
           <KpiCard label="Savings" value="₹29,300" tone="green" icon={<TrendingUp size={13} />} />
           <KpiCard label="Loans" value="₹18,400" tone="red" icon={<CreditCard size={13} />} />
           <KpiCard label="Invested" value="₹12,150" tone="amber" icon={<BarChart3 size={13} />} />
-        </div>
+        </KpiGrid>
       </SectionBlock>
 
       <SectionBlock title="Summary Chart" icon={<ChartPie size={13} />} right={<UiPill tone="navy">Donut</UiPill>}>

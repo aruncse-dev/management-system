@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { BarChart3, RefreshCw, TrendingUp } from 'lucide-react';
 import { api } from '../api';
-import { HoldingCard, HoldingModal, InfoCallout, KpiCard, LoadingState, SectionBlock, SectionChip, Spacer } from '../ui';
+import { HoldingCard, HoldingModal, InfoCallout, KpiCard, KpiGrid, LoadingState, SectionBlock, SectionChip, Spacer } from '../ui';
 
 interface Holding {
   symbol: string;
@@ -173,7 +173,7 @@ export default function Stocks({ embedded = false }: { embedded?: boolean } = {}
               </button>
             }
           >
-            <div className="dash-grid">
+            <KpiGrid>
               <KpiCard label="Total Invested" value={formatRupees(stats.totalInvested)} tone="navy" />
               <KpiCard label="Current Value" value={formatRupees(stats.currentValue)} tone="navy" />
               <KpiCard
@@ -188,7 +188,7 @@ export default function Stocks({ embedded = false }: { embedded?: boolean } = {}
                 tone={stats.totalPnLPct >= 0 ? 'green' : 'red'}
                 accentTone={stats.totalPnLPct >= 0 ? 'green' : 'red'}
               />
-            </div>
+            </KpiGrid>
           </SectionBlock>
 
           {/* Error message */}

@@ -1,33 +1,20 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import fs from 'fs'
-import path from 'path'
-
-function readWebEnvValue(key: string): string | undefined {
-  try {
-    const envPath = path.resolve(process.cwd(), '../../../web/.env')
-    if (!fs.existsSync(envPath)) return undefined
-    const raw = fs.readFileSync(envPath, 'utf8')
-    for (const line of raw.split('\n')) {
-      const trimmed = line.trim()
-      if (!trimmed || trimmed.startsWith('#')) continue
-      const idx = trimmed.indexOf('=')
-      if (idx <= 0) continue
-      const k = trimmed.slice(0, idx).trim()
-      if (k !== key) continue
-      return trimmed.slice(idx + 1).trim()
-    }
-  } catch {
-    return undefined
-  }
-  return undefined
-}
 
 function resolveGasUrl(): string | undefined {
+  // Same merge as next.config: repo `.env` / `.env.local`, `web/.env`, app `.env.local`
+  // Static path so Next/webpack can resolve the CJS helper (dynamic require breaks in the API bundle).
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { readMergedDotenv } = require('../../../../../resolve-google-env.cjs') as {
+    readMergedDotenv: (appDir: string) => Record<string, string>
+  }
+  const fileEnv = readMergedDotenv(process.cwd())
   return (
     process.env.NEXT_PUBLIC_GAS_URL ||
     process.env.GAS_EXEC_URL ||
     process.env.VITE_GAS_URL ||
-    readWebEnvValue('VITE_GAS_URL')
+    fileEnv.VITE_GAS_URL ||
+    fileEnv.NEXT_PUBLIC_GAS_URL ||
+    undefined
   )
 }
 

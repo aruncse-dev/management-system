@@ -9,9 +9,11 @@ dist/
 out/
 build/
 
-# Development
+# Development — secrets (use repo root `.env` / `.env.local` or `web/.env` or per-app `.env.local`)
+.env
 .env.local
 .env.*.local
+web/.env
 packages/apps/**/.env.local
 .DS_Store
 
@@ -20,6 +22,9 @@ packages/apps/**/.env.local
 .idea/
 *.swp
 *.swo
+
+# TypeScript incremental
+**/tsconfig.tsbuildinfo
 
 # Turbo
 .turbo/

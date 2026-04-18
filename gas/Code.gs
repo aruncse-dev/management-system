@@ -212,6 +212,10 @@ function _handleGet(p) {
     if (p.action === 'get') return _records_getSettings();
     return _recordsHandleGet(p.action, p);
   }
+  if (p.module === 'staff') {
+    Logger.log('_handleGet: routing to staff handler for action=' + p.action);
+    return _staffHandleGet(p.action, p);
+  }
   const action = p.action;
   if (action === 'init') return {
     months:     getMonths(),
@@ -278,6 +282,10 @@ function _handlePost(body) {
     Logger.log('_handlePost: routing to records handler for action=' + body.action);
     if (body.action === 'save') return _records_saveSettings(body.recordsSpreadsheetId);
     return _recordsHandlePost(body.action, body);
+  }
+  if (body.module === 'staff') {
+    Logger.log('_handlePost: routing to staff handler for action=' + body.action);
+    return _staffHandlePost(body.action, body);
   }
   const action = body.action;
   if (action === 'addRow')

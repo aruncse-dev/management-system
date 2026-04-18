@@ -5,7 +5,7 @@ import { catMap, budgetSummary, INR } from '../utils'
 import { api } from '../api'
 import { CATEGORIES } from '../config'
 import { CatIcon } from '../ui'
-import { KpiCard, SectionBlock, UiCard } from '../ui'
+import { KpiCard, KpiGrid, SectionBlock, UiCard } from '../ui'
 
 interface Props { showStatus: (msg: string) => void; onCategoryClick: (cat: string) => void }
 
@@ -75,12 +75,12 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
   return (
     <div className="pg ui-kit-page-shell monthly-subpage">
       <SectionBlock title="Budget Management" icon={<Package size={14} />}>
-        <div className="kpis">
+        <KpiGrid variant="compact">
           <KpiCard label="Budget" value={INR(totalBudget)} tone="navy" icon={<Package size={14} />} />
           <KpiCard label="Spent" value={INR(totalSpent)} tone="red" icon={<AlertTriangle size={14} />} />
           <KpiCard label={totalOver ? 'Over' : 'Remaining'} value={`${totalOver ? '−' : ''}${INR(Math.abs(remaining))}`} tone={totalOver ? 'red' : 'green'} icon={<Package size={14} />} />
           <KpiCard label="Overspent" value={String(ovCount)} tone="amber" icon={<AlertTriangle size={14} />} />
-        </div>
+        </KpiGrid>
       </SectionBlock>
 
       {/* Search */}

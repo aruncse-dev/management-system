@@ -3,7 +3,7 @@ import { useStore } from '../store'
 import { acctFlows, INR } from '../utils'
 import { ACCOUNTS, CC_MODES } from '../config'
 import { ArrowDownRight, ArrowUpRight, Wallet } from 'lucide-react'
-import { BalanceRow, KpiCard, SectionBlock } from '../ui'
+import { BalanceRow, KpiCard, KpiGrid, SectionBlock } from '../ui'
 
 interface Props { showStatus: (msg: string) => void }
 
@@ -33,12 +33,12 @@ export default function Accounts({ showStatus: _showStatus }: Props) {
   return (
     <div className="pg ui-kit-page-shell monthly-subpage">
       <SectionBlock title="Overview" icon={<Wallet size={14} />}>
-        <div className="kpis">
+        <KpiGrid variant="compact">
           <KpiCard label="Current Balance" value={`${overview.currentTotal < 0 ? '−' : ''}${INR(Math.abs(overview.currentTotal))}`} tone={overview.currentTotal < 0 ? 'red' : 'green'} icon={<Wallet size={14} />} />
           <KpiCard label="Inflow" value={INR(overview.inflowTotal)} tone="green" icon={<ArrowDownRight size={14} />} />
           <KpiCard label="Outflow" value={INR(overview.outflowTotal)} tone="red" icon={<ArrowUpRight size={14} />} />
           <KpiCard label="Accounts" value={String(overview.activeAccounts)} tone="navy" icon={<Wallet size={14} />} />
-        </div>
+        </KpiGrid>
       </SectionBlock>
 
       <SectionBlock title="Account Balances" icon={<Wallet size={14} />}>

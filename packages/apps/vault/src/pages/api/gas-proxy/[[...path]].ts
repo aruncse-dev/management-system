@@ -1,9 +1,20 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import fs from 'fs'
-import path from 'path'
 
 function resolveGasUrl(): string | undefined {
-  return process.env.NEXT_PUBLIC_GAS_URL || process.env.GAS_EXEC_URL || process.env.VITE_GAS_URL || ''
+  // Static path so Next/webpack can resolve the CJS helper (dynamic require breaks in the API bundle).
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { readMergedDotenv } = require('../../../../../resolve-google-env.cjs') as {
+    readMergedDotenv: (appDir: string) => Record<string, string>
+  }
+  const fileEnv = readMergedDotenv(process.cwd())
+  return (
+    process.env.NEXT_PUBLIC_GAS_URL ||
+    process.env.GAS_EXEC_URL ||
+    process.env.VITE_GAS_URL ||
+    fileEnv.VITE_GAS_URL ||
+    fileEnv.NEXT_PUBLIC_GAS_URL ||
+    undefined
+  )
 }
 
 export const config = {

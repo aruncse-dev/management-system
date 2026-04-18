@@ -1,10 +1,13 @@
 /**
- * Google auth env sources (first wins; later file layers only fill empty process.env keys):
- * - Vercel Environment Variables, or
- * - `<repo>/web/.env`, or
- * - `<appDir>/.env.local` (e.g. packages/apps/fintracker/.env.local) — overrides web/.env on same key.
+ * Google OAuth + shared local env (all Next apps: fintracker, vault, staff):
+ * - process.env / Vercel already set wins.
+ * - Then merge file keys only where process.env is still empty. File order (later overrides earlier):
+ *   `<repo>/.env` → `<repo>/.env.local` → `<repo>/web/.env` → `<appDir>/.env.local`
+ * - Google client id keys (any one): VITE_GOOGLE_CLIENT_ID, NEXT_PUBLIC_GOOGLE_CLIENT_ID, GOOGLE_CLIENT_ID
+ * - Allowlist: VITE_ALLOWED_EMAILS, NEXT_PUBLIC_ALLOWED_EMAILS, ALLOWED_EMAILS
  *
- * next.config calls getGoogleAuthEnv() once; the client sees values via next.config `env` + _document script.
+ * Each app’s next.config.js calls getGoogleAuthEnv(__dirname).
+ * API routes can use readMergedDotenv(process.cwd()) for VITE_GAS_URL etc. (cwd = app package root).
  */
 const fs = require('fs')
 const path = require('path')
@@ -55,10 +58,25 @@ function readEnvFile(envPath) {
   return out
 }
 
+/** Merged key/value from repo + app env files (does not mutate process.env). */
+function readMergedDotenv(appDir) {
+  const monoRoot = findMonorepoRoot(appDir)
+  const resolvedApp = path.resolve(appDir)
+  return {
+    ...readEnvFile(path.join(monoRoot, '.env')),
+    ...readEnvFile(path.join(monoRoot, '.env.local')),
+    ...readEnvFile(path.join(monoRoot, 'web', '.env')),
+    ...readEnvFile(path.join(resolvedApp, '.env.local')),
+  }
+}
+
 function getGoogleAuthEnv(appDir) {
   const monoRoot = findMonorepoRoot(appDir)
+  const webEnvPath = path.join(monoRoot, 'web', '.env')
+  const rootEnvPath = path.join(monoRoot, '.env')
+  const rootEnvLocalPath = path.join(monoRoot, '.env.local')
   const appEnvLocalPath = path.join(path.resolve(appDir), '.env.local')
-  const fileVars = readEnvFile(appEnvLocalPath)
+  const fileVars = readMergedDotenv(appDir)
   for (const [k, v] of Object.entries(fileVars)) {
     if (!k) continue
     if (process.env[k] === undefined || process.env[k] === '') {
@@ -82,7 +100,7 @@ function getGoogleAuthEnv(appDir) {
 
   if (!googleClientId) {
     console.warn(
-      '[next.config] Google OAuth client id missing. Add VITE_GOOGLE_CLIENT_ID to web/.env or this app\'s .env.local, then restart `next dev`.',
+      '[next.config] Google OAuth client id missing. Set VITE_GOOGLE_CLIENT_ID (or NEXT_PUBLIC_GOOGLE_CLIENT_ID or GOOGLE_CLIENT_ID) in repo `.env`, `.env.local`, `web/.env`, this app\'s `.env.local`, or Vercel — then restart `next dev`.',
     )
   }
 
@@ -90,9 +108,13 @@ function getGoogleAuthEnv(appDir) {
     googleClientId,
     allowedEmails,
     monoRoot,
+    rootEnvPath,
+    rootEnvLocalPath,
+    webEnvPath,
     appEnvLocalPath,
     readEnvFile,
+    readMergedDotenv,
   }
 }
 
-module.exports = { getGoogleAuthEnv, readEnvFile, findMonorepoRoot }
+module.exports = { getGoogleAuthEnv, readEnvFile, findMonorepoRoot, readMergedDotenv }

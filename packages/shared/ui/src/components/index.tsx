@@ -1,8 +1,11 @@
 import { useEffect, type ReactNode } from 'react'
 import { Loader2 } from 'lucide-react'
+import type { UiTone } from './uiTone'
 import { UiCard } from './UiCard'
 
-export type UiTone = 'navy' | 'green' | 'red' | 'amber' | 'muted'
+export type { UiTone } from './uiTone'
+export { KpiCard, KPI_ICON_SIZE, type KpiCardProps } from './KpiCard'
+export { KpiGrid, type KpiGridVariant } from './KpiGrid'
 
 export function LoadingState({
   label = 'Loading…',
@@ -147,39 +150,6 @@ export function DonutSummaryCard({
         </div>
       </div>
     </UiCard>
-  )
-}
-
-export function KpiCard({
-  label,
-  value,
-  icon,
-  subtitle,
-  tone = 'navy',
-  accentTone,
-  full = false,
-  onClick,
-}: {
-  label: string
-  value: ReactNode
-  icon?: ReactNode
-  subtitle?: string
-  tone?: UiTone
-  accentTone?: Extract<UiTone, 'green' | 'red'>
-  full?: boolean
-  onClick?: () => void
-}) {
-  return (
-    <div className={`ui-kit-card ui-kit-kpi ui-tone-${tone}${accentTone ? ` ui-kit-kpi--accent-${accentTone}` : ''}${full ? ' ui-kit-kpi--full' : ''}`} onClick={onClick} role={onClick ? 'button' : undefined} tabIndex={onClick ? 0 : undefined}>
-      <div className="ui-kit-kpi-hd">
-        <div className={`ui-kit-kpi-head${icon ? ' has-icon' : ' no-icon'}`}>
-          {icon && <div className="ui-kit-kpi-icon">{icon}</div>}
-          <div className="ui-kit-kpi-label">{label}</div>
-        </div>
-      </div>
-      <div className="kpi-card-v kpi-card-v-soft">{value}</div>
-      {subtitle && <div className="ui-kit-kpi-sub">{subtitle}</div>}
-    </div>
   )
 }
 
@@ -467,89 +437,6 @@ export function ModalActions({
   )
 }
 
-export function TransactionRow({
-  title,
-  amount,
-  date,
-  category,
-  type,
-  mode,
-  tone = 'navy',
-  icon,
-  trailing,
-  onClick,
-  className = '',
-  showCategory = true,
-  showType = true,
-  showMode = true,
-  categoryChip = false,
-  categoryTone = 'muted',
-  chips,
-  metaLeft,
-  metaRight,
-}: {
-  title: string
-  amount: ReactNode
-  date: string
-  category: string
-  type: string
-  mode: ReactNode
-  tone?: UiTone
-  icon?: ReactNode
-  trailing?: ReactNode
-  onClick?: () => void
-  className?: string
-  showCategory?: boolean
-  showType?: boolean
-  showMode?: boolean
-  categoryChip?: boolean
-  categoryTone?: UiTone
-  chips?: ReactNode
-  metaLeft?: ReactNode
-  metaRight?: ReactNode
-}) {
-  return (
-    <button type="button" className={`ui-kit-txn ui-tone-${tone} ui-kit-txn-btn ${className}`.trim()} onClick={onClick}>
-      <div className="ui-kit-txn-main">
-        <div className="ui-kit-txn-title-row">
-          <div className="ui-kit-txn-title">{title}</div>
-          <div className="ui-kit-txn-amt">{amount}</div>
-        </div>
-        <div className="ui-kit-txn-meta">
-          <div className="ui-kit-txn-meta-left">
-            {metaLeft || (
-              showCategory && (
-                <span className={`ui-kit-txn-cat${categoryChip ? ` ui-kit-txn-cat-chip ui-tone-${categoryTone}` : ''}`}>
-                  {category}
-                </span>
-              )
-            )}
-          </div>
-          <div className="ui-kit-txn-meta-right">
-            {metaRight || (
-              <>
-                {date && <span className="ui-kit-txn-date">{date}</span>}
-                {showType && (
-                  <>
-                    <span className="ui-kit-txn-sep">•</span>
-                    <span className="ui-kit-txn-type">{type}</span>
-                  </>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-        {chips && <div className="ui-kit-txn-chips">{chips}</div>}
-      </div>
-      <div className="ui-kit-txn-foot">
-        {icon && <span className="ui-kit-txn-icon">{icon}</span>}
-        {showMode && <span className="ui-kit-txn-mode">{mode}</span>}
-        {trailing}
-      </div>
-    </button>
-  )
-}
-
 export function BalanceRow({
   title,
   value,
@@ -787,9 +674,9 @@ export function HoldingModal({
   )
 }
 
+/** Ledger / savings entry card: holding header + Amount · Type · Date grid (matches txn-entry-card). */
 export function TransactionCard({
   title,
-  subtitle,
   amount,
   type,
   date,
@@ -797,9 +684,11 @@ export function TransactionCard({
   icon,
   onClick,
   className = '',
+  amountLabel = 'Amount',
+  typeLabel = 'Type',
+  dateLabel = 'Date',
 }: {
   title: ReactNode
-  subtitle: ReactNode
   amount: ReactNode
   type: ReactNode
   date: ReactNode
@@ -807,6 +696,12 @@ export function TransactionCard({
   icon: ReactNode
   onClick?: () => void
   className?: string
+  /** Column header above `amount` (default: Amount). */
+  amountLabel?: string
+  /** Column header above `type` (default: Type). */
+  typeLabel?: string
+  /** Column header above `date` (default: Date). */
+  dateLabel?: string
 }) {
   return (
     <button
@@ -819,7 +714,6 @@ export function TransactionCard({
           <div className="ui-kit-holding-card-title">
             <span>{title}</span>
           </div>
-          <div className="ui-kit-holding-card-subtitle">{subtitle}</div>
         </div>
         <div className="ui-kit-holding-card-head-right">
           <div className={`ui-kit-holding-icon ui-kit-holding-icon--bg ui-tone-${tone}`}>
@@ -831,15 +725,15 @@ export function TransactionCard({
       </div>
       <div className="ui-kit-holding-card-grid">
         <div className="ui-kit-holding-stat">
-          <span>Amount</span>
+          <span>{amountLabel}</span>
           <strong>{amount}</strong>
         </div>
         <div className="ui-kit-holding-stat ui-kit-holding-stat--center">
-          <span>Type</span>
+          <span>{typeLabel}</span>
           <strong>{type}</strong>
         </div>
         <div className="ui-kit-holding-stat ui-kit-holding-stat--right">
-          <span>Date</span>
+          <span>{dateLabel}</span>
           <strong>{date}</strong>
         </div>
       </div>
