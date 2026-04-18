@@ -1,5 +1,5 @@
 {
   "installCommand": "cd ../.. && corepack enable pnpm && pnpm install --frozen-lockfile",
-  "buildCommand": "cd ../.. && pnpm --filter fintracker run build",
+  "buildCommand": "cd ../.. && pnpm build --filter '@fintracker-vault/*' && pnpm --filter fintracker run build",
   "outputDirectory": ".next"
 }
