@@ -5,7 +5,6 @@ import { INR } from '../utils';
 import { THEME_COLORS } from '../config';
 import { RightLegendDonut } from '../ui'
 import { FormField, KpiCard, LoadingState, ListStack, SearchField, SectionBlock } from '../ui';
-import '../ui-kit/ui-kit.css';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // TYPES & CONSTANTS
