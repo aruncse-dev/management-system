@@ -9,6 +9,18 @@ import { getClientAuthEnv } from '../clientAuthEnv'
 import '../ui-kit/ui-kit.css'
 import '../styles/globals.css'
 
+const PAGE_TITLES: Record<ModuleId, string> = {
+  monthly: 'Monthly Expenses',
+  lending: 'Lending',
+  savings: 'Savings',
+  bommi: 'Bommi',
+  gold: 'Gold',
+  investments: 'Investments',
+  loans: 'All Loans',
+  settings: 'Settings',
+  components: 'UI Kit',
+}
+
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter()
   const [lendingSheet, setLendingSheet] = useState('Lending')
@@ -52,9 +64,12 @@ export default function App({ Component, pageProps }: AppProps) {
     void router.push(pathByModule[id] || '/monthly')
   }, [router, lendingSheet])
 
+  const pageTitle = moduleFromPath ? PAGE_TITLES[moduleFromPath] : 'FinTracker'
+
   return (
     <>
       <Head>
+        <title>{pageTitle}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
         <meta name="theme-color" content="#1E5CC7" />
       </Head>
@@ -73,7 +88,7 @@ export default function App({ Component, pageProps }: AppProps) {
                 onModule={goToModule}
                 lendingSheet={lendingSheet}
                 onLendingSheet={setLendingSheet}
-                title="FinTracker"
+                title={pageTitle}
                 appName="FinTracker"
                 area={getAppArea(router.asPath)}
                 onLogout={onLogout}
