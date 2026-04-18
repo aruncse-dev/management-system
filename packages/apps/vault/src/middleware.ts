@@ -1,37 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-/** Lowercase public URL -> internal page path. Keep in sync with `next.config.js` vault rewrites (removed; handled here). */
-const LOWER_TO_PAGE: Record<string, string> = {
-  '/vault': '/Vault',
-  '/vaultinsurance': '/VaultInsurance',
-  '/vaultapps': '/VaultApps',
-  '/vaultsettings': '/VaultSettings',
+function stripTrailingSlash(p: string): string {
+  if (p.length > 1 && p.endsWith('/')) return p.slice(0, -1)
+  return p
 }
 
+const LOWERCASE_ROUTES = new Set(['/vault', '/vaultinsurance', '/vaultapps', '/vaultsettings'])
+
 export function middleware(request: NextRequest) {
-  const pathname = request.nextUrl.pathname
-  if (pathname === '/gas-proxy' || pathname.startsWith('/gas-proxy/')) {
+  const pathnameRaw = request.nextUrl.pathname
+  if (pathnameRaw === '/gas-proxy' || pathnameRaw.startsWith('/gas-proxy/')) {
     const url = request.nextUrl.clone()
-    url.pathname = pathname.replace(/^\/gas-proxy/, '/api/gas-proxy') || '/api/gas-proxy'
+    url.pathname = pathnameRaw.replace(/^\/gas-proxy/, '/api/gas-proxy') || '/api/gas-proxy'
     return NextResponse.rewrite(url)
   }
 
+  const pathname = stripTrailingSlash(pathnameRaw)
   const lower = pathname.toLowerCase()
-  const internal = LOWER_TO_PAGE[lower]
-  if (!internal) {
+  if (!LOWERCASE_ROUTES.has(lower)) {
     return NextResponse.next()
   }
 
-  if (pathname !== lower) {
+  if (pathnameRaw !== lower) {
     const url = request.nextUrl.clone()
     url.pathname = lower
     return NextResponse.redirect(url, 308)
-  }
-
-  if (pathname !== internal) {
-    const url = request.nextUrl.clone()
-    url.pathname = internal
-    return NextResponse.rewrite(url)
   }
 
   return NextResponse.next()

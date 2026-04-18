@@ -45,6 +45,18 @@ async function readBody(req: NextApiRequest): Promise<Buffer> {
   return Buffer.concat(chunks)
 }
 
+/** Apps Script and some proxies behave badly if the upstream fetch omits browser-like headers. */
+function buildUpstreamHeaders(req: NextApiRequest): Record<string, string> | undefined {
+  const out: Record<string, string> = {}
+  for (const name of ['user-agent', 'accept', 'accept-language']) {
+    const v = req.headers[name]
+    if (typeof v === 'string' && v) out[name] = v
+  }
+  const ct = req.headers['content-type']
+  if (typeof ct === 'string' && ct) out['content-type'] = ct
+  return Object.keys(out).length > 0 ? out : undefined
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const gasUrl = resolveGasUrl()
   if (!gasUrl) {
@@ -70,9 +82,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const body = bodyBuffer && bodyBuffer.length > 0 ? new Uint8Array(bodyBuffer) : undefined
   const upstream = await fetch(target.toString(), {
     method,
-    headers: bodyAllowed && req.headers['content-type']
-      ? { 'content-type': req.headers['content-type'] as string }
-      : undefined,
+    headers: buildUpstreamHeaders(req),
     body,
     redirect: 'follow',
   })

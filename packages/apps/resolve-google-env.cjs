@@ -57,9 +57,8 @@ function readEnvFile(envPath) {
 
 function getGoogleAuthEnv(appDir) {
   const monoRoot = findMonorepoRoot(appDir)
-  const webEnvPath = path.join(monoRoot, 'web', '.env')
   const appEnvLocalPath = path.join(path.resolve(appDir), '.env.local')
-  const fileVars = { ...readEnvFile(webEnvPath), ...readEnvFile(appEnvLocalPath) }
+  const fileVars = readEnvFile(appEnvLocalPath)
   for (const [k, v] of Object.entries(fileVars)) {
     if (!k) continue
     if (process.env[k] === undefined || process.env[k] === '') {
@@ -91,8 +90,6 @@ function getGoogleAuthEnv(appDir) {
     googleClientId,
     allowedEmails,
     monoRoot,
-    webDir: path.join(monoRoot, 'web'),
-    webEnvPath,
     appEnvLocalPath,
     readEnvFile,
   }

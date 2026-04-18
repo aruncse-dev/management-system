@@ -2,33 +2,8 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import fs from 'fs'
 import path from 'path'
 
-function readWebEnvValue(key: string): string | undefined {
-  try {
-    const envPath = path.resolve(process.cwd(), '../../../web/.env')
-    if (!fs.existsSync(envPath)) return undefined
-    const raw = fs.readFileSync(envPath, 'utf8')
-    for (const line of raw.split('\n')) {
-      const trimmed = line.trim()
-      if (!trimmed || trimmed.startsWith('#')) continue
-      const idx = trimmed.indexOf('=')
-      if (idx <= 0) continue
-      const k = trimmed.slice(0, idx).trim()
-      if (k !== key) continue
-      return trimmed.slice(idx + 1).trim()
-    }
-  } catch {
-    return undefined
-  }
-  return undefined
-}
-
 function resolveGasUrl(): string | undefined {
-  return (
-    process.env.NEXT_PUBLIC_GAS_URL ||
-    process.env.GAS_EXEC_URL ||
-    process.env.VITE_GAS_URL ||
-    readWebEnvValue('VITE_GAS_URL')
-  )
+  return process.env.NEXT_PUBLIC_GAS_URL || process.env.GAS_EXEC_URL || process.env.VITE_GAS_URL || ''
 }
 
 export const config = {
@@ -43,6 +18,17 @@ async function readBody(req: NextApiRequest): Promise<Buffer> {
     chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
   }
   return Buffer.concat(chunks)
+}
+
+function buildUpstreamHeaders(req: NextApiRequest): Record<string, string> | undefined {
+  const out: Record<string, string> = {}
+  for (const name of ['user-agent', 'accept', 'accept-language']) {
+    const v = req.headers[name]
+    if (typeof v === 'string' && v) out[name] = v
+  }
+  const ct = req.headers['content-type']
+  if (typeof ct === 'string' && ct) out['content-type'] = ct
+  return Object.keys(out).length > 0 ? out : undefined
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -70,8 +56,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const body = bodyBuffer && bodyBuffer.length > 0 ? new Uint8Array(bodyBuffer) : undefined
   const upstream = await fetch(target.toString(), {
     method,
-    headers:
-      bodyAllowed && req.headers['content-type'] ? { 'content-type': req.headers['content-type'] as string } : undefined,
+    headers: buildUpstreamHeaders(req),
     body,
     redirect: 'follow',
   })

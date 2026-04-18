@@ -13,7 +13,7 @@ export default class MyDocument extends Document<Props> {
           process.env.GOOGLE_CLIENT_ID ||
           '',
       ).trim(),
-      appPassword: (process.env.NEXT_PUBLIC_APP_PASSWORD || process.env.VITE_APP_PASSWORD || '').trim() || '1234',
+      appPassword: (process.env.NEXT_PUBLIC_APP_PASSWORD || process.env.VITE_APP_PASSWORD || '').trim(),
       allowedEmailsRaw: String(
         process.env.NEXT_PUBLIC_ALLOWED_EMAILS || process.env.VITE_ALLOWED_EMAILS || process.env.ALLOWED_EMAILS || '',
       ),
@@ -22,7 +22,8 @@ export default class MyDocument extends Document<Props> {
   }
 
   render() {
-    const payload = JSON.stringify(this.props.authEnv).replace(/</g, '\\u003c')
+    const { appPassword: _unused, ...safeAuthEnv } = this.props.authEnv
+    const payload = JSON.stringify(safeAuthEnv).replace(/</g, '\\u003c')
     return (
       <Html lang="en" className="with-app-shell">
         <Head>

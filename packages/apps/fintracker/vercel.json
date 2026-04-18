@@ -1,5 +1,5 @@
 {
-  "buildCommand": "turbo run build --scope=fintracker",
-  "outputDirectory": ".next",
-  "installCommand": "corepack enable pnpm && pnpm install --frozen-lockfile"
+  "installCommand": "cd ../.. && corepack enable pnpm && pnpm install --frozen-lockfile",
+  "buildCommand": "cd ../.. && pnpm --filter fintracker run build",
+  "outputDirectory": ".next"
 }

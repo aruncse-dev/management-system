@@ -1,4 +1,4 @@
-import SavingsPage from './SavingsPage'
+import SavingsPage from './savingspage'
 
 const ACCOUNTS = ['Axis Bank', 'Indian Bank', 'Axis Credit Card'] as const
 

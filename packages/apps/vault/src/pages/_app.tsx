@@ -9,10 +9,10 @@ import '../ui-kit/ui-kit.css'
 import '../styles/globals.css'
 
 const VAULT_PAGE_TITLES: Record<string, string> = {
-  '/Vault': 'Banking',
-  '/VaultInsurance': 'Insurance',
-  '/VaultApps': 'Apps',
-  '/VaultSettings': 'Settings',
+  '/vault': 'Banking',
+  '/vaultinsurance': 'Insurance',
+  '/vaultapps': 'Apps',
+  '/vaultsettings': 'Settings',
 }
 
 export default function App({ Component, pageProps }: AppProps) {

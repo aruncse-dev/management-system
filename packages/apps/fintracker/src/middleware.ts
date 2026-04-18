@@ -1,54 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-/**
- * Lowercase public URL -> internal page path (PascalCase files).
- * Must stay in sync with `routeAliases` in `next.config.js.cjs`.
- * Rewrites happen here because `next.config` rewrites alone do not resolve these paths reliably in dev.
- */
-const LOWER_TO_PAGE: Record<string, string> = {
-  '/monthly': '/Monthly',
-  '/transactions': '/Transactions',
-  '/budget': '/Budget',
-  '/credits': '/Credits',
-  '/accounts': '/Accounts',
-  '/lending': '/Lending',
-  '/savings': '/Savings',
-  '/bommi': '/Bommi',
-  '/gold': '/Gold',
-  '/investments': '/Investments',
-  '/loans': '/Loans',
-  '/settings': '/Settings',
-  '/components': '/Components',
-  '/mutualfunds': '/MutualFunds',
-  '/stocks': '/Stocks',
+function stripTrailingSlash(p: string): string {
+  if (p.length > 1 && p.endsWith('/')) return p.slice(0, -1)
+  return p
 }
 
+/**
+ * Lowercase routes only (matches page filenames). Redirect wrong casing so
+ * `/_next/data/.../monthly.json` matches `pages/monthly.tsx` — rewrites break client navigation.
+ */
+const LOWERCASE_ROUTES = new Set([
+  '/monthly',
+  '/transactions',
+  '/budget',
+  '/credits',
+  '/accounts',
+  '/lending',
+  '/savings',
+  '/bommi',
+  '/gold',
+  '/investments',
+  '/loans',
+  '/settings',
+  '/components',
+  '/mutualfunds',
+  '/stocks',
+  '/savingspage',
+  '/dashboard',
+])
+
 export function middleware(request: NextRequest) {
-  const pathname = request.nextUrl.pathname
-  if (pathname === '/gas-proxy' || pathname.startsWith('/gas-proxy/')) {
+  const pathnameRaw = request.nextUrl.pathname
+  if (pathnameRaw === '/gas-proxy' || pathnameRaw.startsWith('/gas-proxy/')) {
     const url = request.nextUrl.clone()
-    url.pathname = pathname.replace(/^\/gas-proxy/, '/api/gas-proxy') || '/api/gas-proxy'
+    url.pathname = pathnameRaw.replace(/^\/gas-proxy/, '/api/gas-proxy') || '/api/gas-proxy'
     return NextResponse.rewrite(url)
   }
 
+  const pathname = stripTrailingSlash(pathnameRaw)
   const lower = pathname.toLowerCase()
-  const internal = LOWER_TO_PAGE[lower]
-  if (!internal) {
+  if (!LOWERCASE_ROUTES.has(lower)) {
     return NextResponse.next()
   }
 
-  // Enforce lowercase URL in the address bar
-  if (pathname !== lower) {
+  if (pathnameRaw !== lower) {
     const url = request.nextUrl.clone()
     url.pathname = lower
     return NextResponse.redirect(url, 308)
-  }
-
-  // Serve PascalCase page while keeping /monthly etc. in the browser
-  if (pathname !== internal) {
-    const url = request.nextUrl.clone()
-    url.pathname = internal
-    return NextResponse.rewrite(url)
   }
 
   return NextResponse.next()

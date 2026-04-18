@@ -1,3 +1,4 @@
+const path = require('path')
 const { getGoogleAuthEnv } = require('../resolve-google-env.cjs')
 
 const { googleClientId: resolvedGoogleClientId, allowedEmails: resolvedAllowedEmails } =
@@ -28,6 +29,9 @@ for (const [k, v] of Object.entries(clientEnv)) {
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
+  experimental: {
+    outputFileTracingRoot: path.join(__dirname, '../..'),
+  },
   env: clientEnv,
   transpilePackages: [
     '@fintracker-vault/ui',

@@ -1,7 +1,0 @@
-{
-  "rewrites": [
-    { "source": "/fintracker/:path*", "destination": "/" },
-    { "source": "/vault/:path*", "destination": "/" },
-    { "source": "/:path*", "destination": "/" }
-  ]
-}

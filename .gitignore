@@ -1,6 +1,5 @@
 # Dependencies
 node_modules/
-pnpm-lock.yaml
 package-lock.json
 yarn.lock
 
@@ -13,6 +12,7 @@ build/
 # Development
 .env.local
 .env.*.local
+packages/apps/**/.env.local
 .DS_Store
 
 # IDE

@@ -1,4 +1,4 @@
-import SavingsContent from './SavingsPage'
+import SavingsContent from './savingspage'
 
 const ACCOUNTS = ['Amma IB', 'Ramya IB', 'Arun IB', 'Amma SBI', 'Cash'] as const
 
