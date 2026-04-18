@@ -1,8 +1,5 @@
 {
   "buildCommand": "turbo run build --scope=vault",
   "outputDirectory": "packages/apps/vault/.next",
-  "installCommand": "pnpm install --frozen-lockfile",
-  "env": {
-    "NEXT_PUBLIC_API_BASE_URL": "@next_public_api_base_url_vault"
-  }
+  "installCommand": "pnpm install --frozen-lockfile"
 }

@@ -1,8 +1,5 @@
 {
   "buildCommand": "turbo run build --scope=fintracker",
   "outputDirectory": "packages/apps/fintracker/.next",
-  "installCommand": "pnpm install --frozen-lockfile",
-  "env": {
-    "NEXT_PUBLIC_API_BASE_URL": "@next_public_api_base_url_fintracker"
-  }
+  "installCommand": "pnpm install --frozen-lockfile"
 }
