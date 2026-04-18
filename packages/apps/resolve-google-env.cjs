@@ -1,8 +1,10 @@
 /**
- * Local: shared `web/.env` at monorepo root (same for Fintracker + Vault).
- * Vercel: project env vars (shell wins; file only fills missing keys locally).
+ * Google auth env sources (first wins; later file layers only fill empty process.env keys):
+ * - Vercel Environment Variables, or
+ * - `<repo>/web/.env`, or
+ * - `<appDir>/.env.local` (e.g. packages/apps/fintracker/.env.local) — overrides web/.env on same key.
  *
- * Debug logs (masked client id): set FT_DEBUG_ENV=1 (also on when NODE_ENV !== production).
+ * next.config calls getGoogleAuthEnv() once; the client sees values via next.config `env` + _document script.
  */
 const fs = require('fs')
 const path = require('path')
@@ -53,76 +55,17 @@ function readEnvFile(envPath) {
   return out
 }
 
-/** Repo root (where pnpm installs `@next/env` next to `next`). */
-function findRepoRootFromAppsModule() {
-  return path.resolve(__dirname, '..', '..')
-}
-
-/**
- * Merge `web/.env` into process.env when a key is missing or empty (shell / Vercel wins if set).
- */
-function mergeWebDotEnvIntoProcess(appDir) {
+function getGoogleAuthEnv(appDir) {
   const monoRoot = findMonorepoRoot(appDir)
-  const webDir = path.join(monoRoot, 'web')
-  const webEnvPath = path.join(webDir, '.env')
-  const fileVars = readEnvFile(webEnvPath)
+  const webEnvPath = path.join(monoRoot, 'web', '.env')
+  const appEnvLocalPath = path.join(path.resolve(appDir), '.env.local')
+  const fileVars = { ...readEnvFile(webEnvPath), ...readEnvFile(appEnvLocalPath) }
   for (const [k, v] of Object.entries(fileVars)) {
     if (!k) continue
-    const cur = process.env[k]
-    if (cur === undefined || cur === '') {
+    if (process.env[k] === undefined || process.env[k] === '') {
       process.env[k] = v
     }
   }
-  return { monoRoot, webDir, webEnvPath }
-}
-
-function maskClientId(id) {
-  if (!id) return '(empty)'
-  const s = String(id)
-  if (s.length <= 14) return `${s.length} chars`
-  return `${s.slice(0, 8)}…${s.slice(-4)} (${s.length} chars)`
-}
-
-function envDebugEnabled() {
-  return process.env.FT_DEBUG_ENV === '1' || process.env.NODE_ENV !== 'production'
-}
-
-function debugLog(label, payload) {
-  if (!envDebugEnabled()) return
-  console.log(`[resolve-google-env] ${label}`, payload)
-}
-
-function tryNextLoadEnvConfig(webDir, appDir) {
-  const repoRoot = findRepoRootFromAppsModule()
-  const searchPaths = [
-    repoRoot,
-    path.join(repoRoot, 'node_modules'),
-    appDir,
-    path.join(appDir, 'node_modules'),
-  ]
-  try {
-    const entry = require.resolve('@next/env', { paths: searchPaths })
-    const { loadEnvConfig } = require(entry)
-    const dev = process.env.NODE_ENV !== 'production'
-    loadEnvConfig(webDir, dev)
-    debugLog('@next/env loaded', { webDir, dev })
-  } catch (e) {
-    debugLog('@next/env skipped', { reason: e && e.message ? e.message : String(e) })
-  }
-}
-
-function getGoogleAuthEnv(appDir) {
-  const { monoRoot, webDir, webEnvPath } = mergeWebDotEnvIntoProcess(appDir)
-  debugLog('after mergeWebDotEnv', {
-    appDir,
-    monoRoot,
-    webEnvPath,
-    webEnvExists: fs.existsSync(webEnvPath),
-    hasViteGoogle: Boolean(process.env.VITE_GOOGLE_CLIENT_ID),
-    hasNextPublicGoogle: Boolean(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID),
-  })
-
-  tryNextLoadEnvConfig(webDir, appDir)
 
   const googleClientId =
     process.env.VITE_GOOGLE_CLIENT_ID ||
@@ -133,24 +76,26 @@ function getGoogleAuthEnv(appDir) {
   const allowedEmails =
     process.env.VITE_ALLOWED_EMAILS || process.env.NEXT_PUBLIC_ALLOWED_EMAILS || process.env.ALLOWED_EMAILS || ''
 
-  debugLog('resolved Google auth', {
-    googleClientId: maskClientId(googleClientId),
-    allowedEmailsLen: String(allowedEmails).length,
-  })
-
   if (googleClientId) {
     if (!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID) process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID = googleClientId
     if (!process.env.VITE_GOOGLE_CLIENT_ID) process.env.VITE_GOOGLE_CLIENT_ID = googleClientId
   }
 
   if (!googleClientId) {
-    const hint = fs.existsSync(webEnvPath)
-      ? `Check VITE_GOOGLE_CLIENT_ID, NEXT_PUBLIC_GOOGLE_CLIENT_ID, or GOOGLE_CLIENT_ID in ${webEnvPath}.`
-      : `No ${webEnvPath} — for Vercel, set NEXT_PUBLIC_GOOGLE_CLIENT_ID (or VITE_GOOGLE_CLIENT_ID) on the project.`
-    console.warn(`[next.config] Google client id is empty. ${hint}`)
+    console.warn(
+      '[next.config] Google OAuth client id missing. Add VITE_GOOGLE_CLIENT_ID to web/.env or this app\'s .env.local, then restart `next dev`.',
+    )
   }
 
-  return { googleClientId, allowedEmails, monoRoot, webDir, webEnvPath, readEnvFile }
+  return {
+    googleClientId,
+    allowedEmails,
+    monoRoot,
+    webDir: path.join(monoRoot, 'web'),
+    webEnvPath,
+    appEnvLocalPath,
+    readEnvFile,
+  }
 }
 
-module.exports = { getGoogleAuthEnv, readEnvFile, findMonorepoRoot, mergeWebDotEnvIntoProcess }
+module.exports = { getGoogleAuthEnv, readEnvFile, findMonorepoRoot }

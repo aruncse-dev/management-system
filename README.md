@@ -86,14 +86,13 @@ Google Sheets (your spreadsheet)
 
 ```bash
 cd web
-cp .env.example .env
-# Fill in the required values in .env
+# Create web/.env with your values (see table; keep it out of git)
 npm install
 npm run dev
 # App runs at http://localhost:5173/fintracker and http://localhost:5173/vault
 ```
 
-**.env values:**
+**`web/.env` variables:**
 
 | Variable | Description |
 |----------|-------------|

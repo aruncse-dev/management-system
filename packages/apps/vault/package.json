@@ -18,7 +18,6 @@
     "@fintracker-vault/types": "workspace:*",
     "@fintracker-vault/ui": "workspace:*",
     "@fintracker-vault/utils": "workspace:*",
-    "@next/env": "14.2.35",
     "lucide-react": "^0.460.0",
     "next": "^14.0.0",
     "react": "^18.2.0",

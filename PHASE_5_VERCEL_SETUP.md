@@ -13,7 +13,6 @@
 - [x] `vercel.json` - Root Vercel deployment config
 - [x] `packages/apps/fintracker/vercel.json` - Fintracker-specific Vercel config
 - [x] `packages/apps/vault/vercel.json` - Vault-specific Vercel config
-- [x] `.env.example` - Environment variables template
 - [x] Root `package.json` - Build scripts already present
 
 ---
@@ -63,7 +62,6 @@ NODE_ENV = production
 | `vercel.json` | Root-level Vercel config (both apps) |
 | `packages/apps/fintracker/vercel.json` | Fintracker-specific build config |
 | `packages/apps/vault/vercel.json` | Vault-specific build config |
-| `.env.example` | Template for environment variables |
 
 ---
 

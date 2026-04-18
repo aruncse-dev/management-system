@@ -1,4 +1,4 @@
-/** Next client chunks often leave `process.env.NEXT_PUBLIC_*` empty; server fills this from the same env as `web/.env` / Vercel. */
+/** Server injects `window.__FT_AUTH_ENV` from env; client falls back to process.env. */
 export type ClientAuthEnv = {
   googleClientId: string
   appPassword: string

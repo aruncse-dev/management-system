@@ -6,7 +6,6 @@ type Props = DocumentProps & { authEnv: ClientAuthEnv }
 export default class MyDocument extends Document<Props> {
   static async getInitialProps(ctx: DocumentContext) {
     const initialProps = await Document.getInitialProps(ctx)
-    // Auth snapshot from process.env (populated by next.config → resolve-google-env at build/dev startup).
     const authEnv: ClientAuthEnv = {
       googleClientId: String(
         process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
