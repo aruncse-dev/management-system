@@ -10,7 +10,15 @@
     "paths": {
       "@/*": [
         "./src/*"
-      ]
+      ],
+      "@fintracker-vault/ui": ["../../shared/ui/src"],
+      "@fintracker-vault/ui/*": ["../../shared/ui/src/*"],
+      "@fintracker-vault/types": ["../../shared/types/src"],
+      "@fintracker-vault/types/*": ["../../shared/types/src/*"],
+      "@fintracker-vault/config": ["../../shared/config/src"],
+      "@fintracker-vault/config/*": ["../../shared/config/src/*"],
+      "@fintracker-vault/utils": ["../../shared/utils/src"],
+      "@fintracker-vault/utils/*": ["../../shared/utils/src/*"]
     },
     "noEmit": true,
     "incremental": true,
