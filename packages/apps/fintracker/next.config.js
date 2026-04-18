@@ -33,7 +33,7 @@ const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
   experimental: {
-    outputFileTracingRoot: path.join(__dirname, '../..'),
+    outputFileTracingRoot: path.join(__dirname, '../../..'),
   },
   env: clientEnv,
   transpilePackages: [
