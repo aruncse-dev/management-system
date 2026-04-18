@@ -1,22 +1,24 @@
 import type { AppProps } from 'next/app'
+import Head from 'next/head'
 import { useCallback, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
 import { AppAuthGate, Nav, type ModuleId } from '../ui'
 import { getAppArea } from '../appPaths'
 import { StoreProvider } from '../store'
+import { getClientAuthEnv } from '../clientAuthEnv'
 import '../ui-kit/ui-kit.css'
 import '../styles/globals.css'
-
-const googleClientId = (process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '').trim()
-const appPassword = (process.env.NEXT_PUBLIC_APP_PASSWORD || '').trim() || '1234'
-const allowedEmails = (process.env.NEXT_PUBLIC_ALLOWED_EMAILS || '')
-  .split(',')
-  .map(e => e.trim().toLowerCase())
-  .filter(Boolean)
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter()
   const [lendingSheet, setLendingSheet] = useState('Lending')
+  const { googleClientId: gid, appPassword: pw, allowedEmailsRaw } = getClientAuthEnv()
+  const googleClientId = gid
+  const appPassword = pw
+  const allowedEmails = allowedEmailsRaw
+    .split(',')
+    .map(e => e.trim().toLowerCase())
+    .filter(Boolean)
 
   const moduleFromPath = useMemo<ModuleId | null>(() => {
     const p = router.pathname.toLowerCase()
@@ -34,24 +36,29 @@ export default function App({ Component, pageProps }: AppProps) {
 
   const goToModule = useCallback((id: ModuleId) => {
     const pathByModule: Record<ModuleId, string> = {
-      monthly: '/Monthly',
+      monthly: '/monthly',
       lending:
         lendingSheet && lendingSheet !== 'Lending'
-          ? `/Lending?sheet=${encodeURIComponent(lendingSheet)}`
-          : '/Lending',
-      savings: '/Savings',
-      bommi: '/Bommi',
-      gold: '/Gold',
-      investments: '/Investments',
-      loans: '/Loans',
-      settings: '/Settings',
-      components: '/Components',
+          ? `/lending?sheet=${encodeURIComponent(lendingSheet)}`
+          : '/lending',
+      savings: '/savings',
+      bommi: '/bommi',
+      gold: '/gold',
+      investments: '/investments',
+      loans: '/loans',
+      settings: '/settings',
+      components: '/components',
     }
-    void router.push(pathByModule[id] || '/Monthly')
+    void router.push(pathByModule[id] || '/monthly')
   }, [router, lendingSheet])
 
   return (
-    <AppAuthGate
+    <>
+      <Head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+        <meta name="theme-color" content="#1E5CC7" />
+      </Head>
+      <AppAuthGate
       appKind="fintracker"
       googleClientId={googleClientId}
       appPassword={appPassword}
@@ -77,5 +84,6 @@ export default function App({ Component, pageProps }: AppProps) {
         </StoreProvider>
       )}
     </AppAuthGate>
+    </>
   )
 }

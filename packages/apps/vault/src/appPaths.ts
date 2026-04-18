@@ -3,7 +3,7 @@ export type AppKind = AppArea | 'auto'
 
 export const APP_PATHS: Record<AppArea, string> = {
   finance: '/fintracker',
-  vault: '/Vault',
+  vault: '/vault',
 }
 
 export function getAppArea(pathname?: string): AppArea {

@@ -1,20 +1,28 @@
 import type { AppProps } from 'next/app'
+import Head from 'next/head'
 import { AppAuthGate } from '../ui'
 import { StoreProvider } from '../store'
 import VaultNav from '../components/VaultNav'
+import { getClientAuthEnv } from '../clientAuthEnv'
 import '../ui-kit/ui-kit.css'
 import '../styles/globals.css'
 
-const googleClientId = (process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '').trim()
-const appPassword = (process.env.NEXT_PUBLIC_APP_PASSWORD || '').trim() || '1234'
-const allowedEmails = (process.env.NEXT_PUBLIC_ALLOWED_EMAILS || '')
-  .split(',')
-  .map(e => e.trim().toLowerCase())
-  .filter(Boolean)
-
 export default function App({ Component, pageProps }: AppProps) {
+  const { googleClientId: gid, appPassword: pw, allowedEmailsRaw } = getClientAuthEnv()
+  const googleClientId = gid
+  const appPassword = pw
+  const allowedEmails = allowedEmailsRaw
+    .split(',')
+    .map(e => e.trim().toLowerCase())
+    .filter(Boolean)
+
   return (
-    <AppAuthGate
+    <>
+      <Head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+        <meta name="theme-color" content="#1E5CC7" />
+      </Head>
+      <AppAuthGate
       appKind="vault"
       googleClientId={googleClientId}
       appPassword={appPassword}
@@ -29,5 +37,6 @@ export default function App({ Component, pageProps }: AppProps) {
         </StoreProvider>
       )}
     </AppAuthGate>
+    </>
   )
 }

@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const routeMap: Record<string, string> = {
+/**
+ * Lowercase public URL -> internal page path (PascalCase files).
+ * Must stay in sync with `routeAliases` in `next.config.js.cjs`.
+ * Rewrites happen here because `next.config` rewrites alone do not resolve these paths reliably in dev.
+ */
+const LOWER_TO_PAGE: Record<string, string> = {
   '/monthly': '/Monthly',
   '/transactions': '/Transactions',
   '/budget': '/Budget',
@@ -26,15 +31,27 @@ export function middleware(request: NextRequest) {
     return NextResponse.rewrite(url)
   }
 
-  const target = routeMap[pathname]
+  const lower = pathname.toLowerCase()
+  const internal = LOWER_TO_PAGE[lower]
+  if (!internal) {
+    return NextResponse.next()
+  }
 
-  if (!target) return NextResponse.next()
+  // Enforce lowercase URL in the address bar
+  if (pathname !== lower) {
+    const url = request.nextUrl.clone()
+    url.pathname = lower
+    return NextResponse.redirect(url, 308)
+  }
 
-  // Redirect (not rewrite) so the URL matches filesystem routes; client-side
-  // transitions use /_next/data/.../{pathname}.json and must match page files.
-  const url = request.nextUrl.clone()
-  url.pathname = target
-  return NextResponse.redirect(url, 308)
+  // Serve PascalCase page while keeping /monthly etc. in the browser
+  if (pathname !== internal) {
+    const url = request.nextUrl.clone()
+    url.pathname = internal
+    return NextResponse.rewrite(url)
+  }
+
+  return NextResponse.next()
 }
 
 export const config = {

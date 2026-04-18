@@ -86,6 +86,46 @@ function iconUrl(kind: AppAuthKind) {
   return `/${iconAsset(kind)}`
 }
 
+/** Mount Google button after paint so GSI script + Strict Mode remounts do not race. */
+function GoogleSignInDeferred({
+  onSuccess,
+  onError,
+}: {
+  onSuccess: (credentialResponse: CredentialResponse) => void
+  onError: () => void
+}) {
+  const [ready, setReady] = useState(false)
+  useEffect(() => setReady(true), [])
+  if (!ready) {
+    return (
+      <div
+        style={{
+          minHeight: 40,
+          width: 300,
+          margin: '0 auto',
+          borderRadius: 999,
+          background: 'rgba(255,255,255,0.12)',
+          border: '1px solid rgba(255,255,255,0.2)',
+        }}
+        aria-busy="true"
+        aria-label="Loading Google Sign-In"
+      />
+    )
+  }
+  return (
+    <GoogleLogin
+      onSuccess={onSuccess}
+      onError={onError}
+      type="standard"
+      theme="outline"
+      size="large"
+      text="signin_with"
+      shape="pill"
+      width={300}
+    />
+  )
+}
+
 function LockScreen({
   mode,
   onUnlock,
@@ -93,6 +133,7 @@ function LockScreen({
   googleClientId,
   appPassword,
   allowedEmails,
+  oauthError,
 }: {
   mode: LockMode
   onUnlock: () => void
@@ -100,6 +141,7 @@ function LockScreen({
   googleClientId: string
   appPassword: string
   allowedEmails: string[]
+  oauthError?: string | null
 }) {
   const [error, setError] = useState('')
   const displayName = brandName(appKind)
@@ -169,7 +211,7 @@ function LockScreen({
             </div>
           </div>
         </div>
-        {error && (
+        {(error || oauthError) && (
           <div
             style={{
               width: '100%',
@@ -182,26 +224,23 @@ function LockScreen({
               textAlign: 'center',
             }}
           >
-            {error}
+            {error || oauthError}
           </div>
         )}
         <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
           {mode === 'google' ? (
             googleClientId ? (
-              <GoogleLogin
+              <GoogleSignInDeferred
                 onSuccess={handleCredential}
-                onError={() => setError('Google sign-in failed. Please try again.')}
-                type="standard"
-                theme="outline"
-                size="large"
-                text="signin_with"
-                shape="pill"
-                width={300}
+                onError={() =>
+                  setError(
+                    'Google sign-in failed. If the button is blank, add this origin in Google Cloud Console → OAuth client → Authorized JavaScript origins (e.g. http://localhost:3000).',
+                  )
+                }
               />
             ) : (
               <span className="ui-kit-section-chip ui-tone-red">
-                Google login is not configured. Set NEXT_PUBLIC_GOOGLE_CLIENT_ID (or VITE_GOOGLE_CLIENT_ID in
-                web/.env).
+                Add VITE_GOOGLE_CLIENT_ID to web/.env or this app&apos;s .env.local, then restart next dev.
               </span>
             )
           ) : (
@@ -324,8 +363,10 @@ export default function AppAuthGate({
   allowedEmails,
   children,
 }: AppAuthGateProps) {
+  const clientId = (googleClientId || '').trim()
   const [authMode, setAuthMode] = useState<LockMode>('google')
   const [authed, setAuthed] = useState(false)
+  const [oauthScriptError, setOauthScriptError] = useState<string | null>(null)
 
   useEffect(() => {
     setAuthMode(getInitialLockMode())
@@ -362,6 +403,7 @@ export default function AppAuthGate({
   }, [authed])
 
   const handleUnlock = () => {
+    setOauthScriptError(null)
     const mode = (localStorage.getItem(AUTH_MODE_KEY) as LockMode | null) || authMode
     localStorage.setItem(AUTH_MODE_KEY, mode)
     setAuthMode(mode)
@@ -369,6 +411,7 @@ export default function AppAuthGate({
   }
 
   const handleLogout = () => {
+    setOauthScriptError(null)
     clearGoogleAuthCookie()
     localStorage.removeItem(LAST_ACTIVE_KEY)
     localStorage.removeItem('ft_email')
@@ -377,15 +420,16 @@ export default function AppAuthGate({
     setAuthed(false)
   }
 
-  if (!googleClientId && authMode === 'google') {
+  if (!clientId && authMode === 'google') {
     return (
       <LockScreen
-        mode="password"
+        mode="google"
         onUnlock={handleUnlock}
         appKind={appKind}
-        googleClientId={googleClientId}
+        googleClientId=""
         appPassword={appPassword}
         allowedEmails={allowedEmails}
+        oauthError={oauthScriptError}
       />
     )
   }
@@ -395,9 +439,10 @@ export default function AppAuthGate({
       mode={authMode}
       onUnlock={handleUnlock}
       appKind={appKind}
-      googleClientId={googleClientId}
+      googleClientId={clientId}
       appPassword={appPassword}
       allowedEmails={allowedEmails}
+      oauthError={oauthScriptError}
     />
   ) : typeof children === 'function' ? (
     (children as AppAuthGateRender)({ onLogout: handleLogout })
@@ -405,5 +450,16 @@ export default function AppAuthGate({
     children
   )
 
-  return <GoogleOAuthProvider clientId={googleClientId}>{inner}</GoogleOAuthProvider>
+  return (
+    <GoogleOAuthProvider
+      clientId={clientId}
+      onScriptLoadError={() =>
+        setOauthScriptError(
+          'Could not load Google Sign-In (accounts.google.com). Check network, ad blockers, and firewall.',
+        )
+      }
+    >
+      {inner}
+    </GoogleOAuthProvider>
+  )
 }

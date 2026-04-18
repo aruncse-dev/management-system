@@ -1,0 +1,9 @@
+# Build outputs & caches (keeps AI context smaller)
+.next
+**/.next
+.turbo
+**/.turbo
+**/dist
+web/dist
+coverage
+*.tsbuildinfo
