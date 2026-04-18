@@ -79,7 +79,7 @@ function brandName(kind: AppAuthKind) {
 }
 
 function iconAsset(kind: AppAuthKind) {
-  return kind === 'vault' ? 'vault-192.png' : 'icon-192.png'
+  return kind === 'vault' ? 'vault-rect.png' : 'icon-rect.png'
 }
 
 function iconUrl(kind: AppAuthKind) {
@@ -184,22 +184,17 @@ function LockScreen({
         <div style={{ display: 'grid', gap: 10, justifyItems: 'center', textAlign: 'center' }}>
           <div
             style={{
-              width: 72,
-              height: 72,
-              borderRadius: 999,
-              background: '#ffffff',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              border: '1px solid rgba(255,255,255,.20)',
             }}
           >
             <img
               src={src}
               alt={displayName}
-              width="44"
-              height="44"
-              style={{ borderRadius: 999, objectFit: 'contain' }}
+              width="72"
+              height="72"
+              style={{ objectFit: 'contain' }}
             />
           </div>
           <div>
