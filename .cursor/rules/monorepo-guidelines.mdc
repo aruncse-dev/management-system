@@ -1,0 +1,33 @@
+---
+description: FinTracker monorepo — docs, conventions, and checklists for new apps/pages/API/shared UI
+alwaysApply: true
+---
+
+# FinTracker-Vault — development guidelines (persistent)
+
+Use this as **baseline context** for any feature work. Full detail lives in repo docs (do not duplicate long playbooks here).
+
+## Canonical docs (read when planning or scaffolding)
+
+| Doc | Purpose |
+|-----|---------|
+| [`AGENTS.md`](../../AGENTS.md) | Agent/developer entry: invariants, app ports, links |
+| [`CLAUDE.md`](../../CLAUDE.md) | Architecture, env, deployment, **Developer and agent playbook** (new apps, pages, API caching, shared UI) |
+| [`.cursor/rules/google-oauth-env.mdc`](./google-oauth-env.mdc) | Google client ID / allowlist env names — **do not invent new keys** |
+
+## Non-negotiables
+
+- Run **`pnpm type-check`** at repo root before pushing (`.git/hooks/pre-push`).
+- **Global CSS** only in `src/pages/_app.tsx` or `_document.tsx` — not in page components.
+- **Imports** across packages: `@fintracker-vault/*` aliases from root `tsconfig.json`.
+- **New Next apps**: `packages/apps/resolve-google-env.cjs` + **`getGoogleAuthEnv(__dirname)`** in `next.config.js`; list all consumed packages in **`transpilePackages`**; mirror **`experimental.outputFileTracingRoot`** from existing apps.
+- **Shared UI** (`@fintracker-vault/ui`): after editing `packages/shared/ui/src`, run **`pnpm --filter @fintracker-vault/ui run build`** so consumers see updated `dist/`.
+- **Staff / GAS API pattern**: GET caching + **`invalidateCache`** on mutations — see `packages/apps/staff/src/api.ts` and **`CLAUDE.md`** playbook.
+
+## New work quick checklist
+
+- **New page**: `src/pages/…`, match app layout classes, no global CSS imports in the page file.
+- **New API reads/writes**: default cache on reads; invalidate affected GET keys after writes (prefer encapsulation inside `api` methods).
+- **New `appKind` for `AppAuthGate`**: update `packages/shared/ui` (`AppAuthGate`, icons, copy).
+
+Prefer extending **`CLAUDE.md`** / **`AGENTS.md`** for new conventions instead of scattering one-off root markdown files.
