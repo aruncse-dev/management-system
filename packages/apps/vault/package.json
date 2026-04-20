@@ -5,7 +5,7 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "predev": "pnpm --filter @fintracker-vault/ui run build",
+    "predev": "pnpm --filter @fintracker-vault/ui run build && pnpm --filter @fintracker-vault/auth run build",
     "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start",
@@ -15,10 +15,12 @@
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },
   "dependencies": {
+    "@fintracker-vault/auth": "workspace:*",
     "@fintracker-vault/config": "workspace:*",
     "@fintracker-vault/types": "workspace:*",
     "@fintracker-vault/ui": "workspace:*",
     "@fintracker-vault/utils": "workspace:*",
+    "iron-session": "^8.0.1",
     "lucide-react": "^0.460.0",
     "next": "^14.0.0",
     "react": "^18.2.0",

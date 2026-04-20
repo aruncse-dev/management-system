@@ -1,0 +1,41 @@
+{
+  "name": "@fintracker-vault/auth",
+  "version": "1.0.0",
+  "description": "Shared iron-session + auth API handlers for Next.js apps",
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist", "README.md"],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./middleware": {
+      "types": "./dist/middleware.d.ts",
+      "import": "./dist/middleware.js"
+    }
+  },
+  "scripts": {
+    "dev": "tsc --watch",
+    "build": "tsc",
+    "lint": "eslint src --ext .ts",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "iron-session": "^8.0.1",
+    "jose": "^5.0.0"
+  },
+  "peerDependencies": {
+    "next": "^14.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "next": "^14.0.0",
+    "typescript": "^5.2.0",
+    "eslint": "^8.50.0"
+  }
+}

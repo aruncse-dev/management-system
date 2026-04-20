@@ -41,23 +41,50 @@ function _staffNormalizeSalaryAmount(v) {
 function _staffMigrateStaffSheet(sh) {
   var lastRow = sh.getLastRow();
   if (lastRow < 1) return;
-  var a1 = String(sh.getRange(1, 1).getValue() || '');
+  // Case-insensitive so we don't insert a duplicate header on every request if the sheet says "Id" / "id".
+  var a1 = String(sh.getRange(1, 1).getValue() || '').trim().toUpperCase();
   if (a1 !== 'ID') {
     sh.insertRowBefore(1);
     lastRow++;
   }
   sh.getRange(1, 1, 1, STAFF_HDR.length).setValues([STAFF_HDR]);
   if (lastRow <= 1) return;
-  var data = sh.getRange(2, 1, lastRow, STAFF_HDR.length).getValues();
+
+  var raw = sh.getRange(2, 1, lastRow, STAFF_HDR.length).getValues();
+  var cleaned = [];
   var r;
-  for (r = 0; r < data.length; r++) {
-    while (data[r].length < STAFF_HDR.length) data[r].push('');
-    if (!data[r][STAFF_COL.SALARY_TYPE]) data[r][STAFF_COL.SALARY_TYPE] = 'daily';
-    if (data[r][STAFF_COL.SALARY_AMOUNT] === '' || data[r][STAFF_COL.SALARY_AMOUNT] === null || data[r][STAFF_COL.SALARY_AMOUNT] === undefined) {
-      data[r][STAFF_COL.SALARY_AMOUNT] = 0;
+  for (r = 0; r < raw.length; r++) {
+    var row = raw[r].slice();
+    while (row.length < STAFF_HDR.length) row.push('');
+
+    var id = String(row[STAFF_COL.ID] || '').trim();
+    var name = String(row[STAFF_COL.NAME] || '').trim();
+    // Skip blank spacer rows — previously every empty row was forced to "daily" / 0 and looked like junk in the sheet.
+    if (!id && !name) continue;
+
+    if (!id && name) {
+      row[STAFF_COL.ID] = Utilities.getUuid();
     }
+    if (!row[STAFF_COL.SALARY_TYPE]) row[STAFF_COL.SALARY_TYPE] = 'daily';
+    if (row[STAFF_COL.SALARY_AMOUNT] === '' || row[STAFF_COL.SALARY_AMOUNT] === null || row[STAFF_COL.SALARY_AMOUNT] === undefined) {
+      row[STAFF_COL.SALARY_AMOUNT] = 0;
+    }
+    if (row[STAFF_COL.ACTIVE] === '' || row[STAFF_COL.ACTIVE] === null || row[STAFF_COL.ACTIVE] === undefined) {
+      row[STAFF_COL.ACTIVE] = true;
+    }
+    cleaned.push(row);
   }
-  sh.getRange(2, 1, lastRow, STAFF_HDR.length).setValues(data);
+
+  if (cleaned.length === 0) {
+    if (lastRow > 1) sh.deleteRows(2, lastRow - 1);
+    return;
+  }
+
+  sh.getRange(2, 1, cleaned.length, STAFF_HDR.length).setValues(cleaned);
+  var staleStart = 2 + cleaned.length;
+  if (lastRow >= staleStart) {
+    sh.deleteRows(staleStart, lastRow - staleStart + 1);
+  }
 }
 
 function _staffEnsureStaffSheet() {

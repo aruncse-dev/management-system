@@ -28,13 +28,8 @@ const VAULT_NAV_SECTIONS: SimpleAppNavSection[] = [
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter()
-  const { googleClientId: gid, appPassword: pw, allowedEmailsRaw } = getClientAuthEnv()
+  const { googleClientId: gid } = getClientAuthEnv()
   const googleClientId = gid
-  const appPassword = pw
-  const allowedEmails = allowedEmailsRaw
-    .split(',')
-    .map(e => e.trim().toLowerCase())
-    .filter(Boolean)
 
   const pageTitle = VAULT_PAGE_TITLES[router.pathname] || 'Vault'
 
@@ -45,12 +40,7 @@ export default function App({ Component, pageProps }: AppProps) {
         <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
         <meta name="theme-color" content="#1E5CC7" />
       </Head>
-      <AppAuthGate
-      appKind="vault"
-      googleClientId={googleClientId}
-      appPassword={appPassword}
-      allowedEmails={allowedEmails}
-    >
+      <AppAuthGate appKind="vault" googleClientId={googleClientId}>
       {({ onLogout }) => (
         <StoreProvider>
           <div className="with-app-shell">

@@ -34,3 +34,11 @@ Vercel / shell env wins over all files.
 Set `VITE_GOOGLE_CLIENT_ID=...` in **repo** `.env` or `.env.local`, or `web/.env`, or `packages/apps/<app>/.env.local`, then restart `next dev` (or `dev:*:fresh`).
 
 **GAS URL** for `/api/gas-proxy` uses the same merged files for `VITE_GAS_URL` / `NEXT_PUBLIC_GAS_URL` when not in `process.env`.
+
+## Server auth (iron-session + GAS proxy)
+
+- **`SESSION_SECRET`** — 32+ character random string; encrypts the HttpOnly session cookie (`ft_session_fintracker` / `ft_session_vault` / `ft_session_staff` per app). Required for login + gated `/api/gas-proxy` once set (middleware and API routes fail open if unset during rollout).
+- **`APP_PASSWORD`** — 4-digit PIN validated only on the server (`POST /api/auth/verify-pin`). Prefer this over client-exposed `VITE_APP_PASSWORD` / `NEXT_PUBLIC_APP_PASSWORD` (removed from the client bundle). **`PIN_SESSION_EMAIL`** (optional) — if there is no Google session cookie but the PIN is correct, the server binds the session to this email; otherwise the first entry in **`ALLOWED_EMAILS`** / **`VITE_ALLOWED_EMAILS`** is used for PIN-only session bootstrap.
+- **`VITE_API_TOKEN`** — GAS API token; **server-only** for proxy injection. Do **not** put it in `NEXT_PUBLIC_*` (removed from `next.config` client env).
+
+Allowlist for Google sign-in remains **`VITE_ALLOWED_EMAILS`** / **`NEXT_PUBLIC_ALLOWED_EMAILS`** / **`ALLOWED_EMAILS`** (checked in `POST /api/auth/google`, not exposed on the client).

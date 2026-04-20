@@ -417,15 +417,28 @@ function PasswordCopyLock({
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    const appPassword = (process.env.NEXT_PUBLIC_APP_PASSWORD as string | undefined)?.trim() || '1234'
-    if (password.join('') !== appPassword) {
-      setError('Incorrect password')
+    const pin = password.join('')
+    setError('')
+    try {
+      const r = await fetch('/api/auth/verify-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ pin }),
+      })
+      const data = (await r.json().catch(() => ({}))) as { error?: string }
+      if (!r.ok) {
+        setError(data.error || 'Incorrect password')
+        setPassword(['', '', '', ''])
+        focusBox(0)
+        return
+      }
+      await onUnlock()
+    } catch {
+      setError('Request failed')
       setPassword(['', '', '', ''])
       focusBox(0)
-      return
     }
-    setError('')
-    await onUnlock()
   }
 
   return (

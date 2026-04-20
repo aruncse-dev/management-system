@@ -23,7 +23,9 @@
       "@fintracker-vault/config": ["packages/shared/config/src"],
       "@fintracker-vault/config/*": ["packages/shared/config/src/*"],
       "@fintracker-vault/utils": ["packages/shared/utils/src"],
-      "@fintracker-vault/utils/*": ["packages/shared/utils/src/*"]
+      "@fintracker-vault/utils/*": ["packages/shared/utils/src/*"],
+      "@fintracker-vault/auth": ["packages/shared/auth/src/index.ts"],
+      "@fintracker-vault/auth/middleware": ["packages/shared/auth/src/middleware.ts"]
     }
   },
   "include": ["packages/**/*.ts", "packages/**/*.tsx"],

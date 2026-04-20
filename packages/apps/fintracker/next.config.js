@@ -10,11 +10,9 @@ const clientEnv = {
     process.env.NEXT_PUBLIC_API_BASE_URL ||
     process.env.VITE_API_URL ||
     '/gas-proxy',
-  NEXT_PUBLIC_API_TOKEN: process.env.NEXT_PUBLIC_API_TOKEN || process.env.VITE_API_TOKEN || '',
   NEXT_PUBLIC_GAS_URL: process.env.NEXT_PUBLIC_GAS_URL || process.env.VITE_GAS_URL || '',
   VITE_GOOGLE_CLIENT_ID: resolvedGoogleClientId,
   NEXT_PUBLIC_GOOGLE_CLIENT_ID: resolvedGoogleClientId,
-  NEXT_PUBLIC_APP_PASSWORD: process.env.NEXT_PUBLIC_APP_PASSWORD || process.env.VITE_APP_PASSWORD || '',
   VITE_ALLOWED_EMAILS: resolvedAllowedEmails,
   NEXT_PUBLIC_ALLOWED_EMAILS: resolvedAllowedEmails,
 }
@@ -37,6 +35,7 @@ const nextConfig = {
   },
   env: clientEnv,
   transpilePackages: [
+    '@fintracker-vault/auth',
     '@fintracker-vault/ui',
     '@fintracker-vault/types',
     '@fintracker-vault/config',

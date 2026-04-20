@@ -13,6 +13,7 @@
 ├── packages/apps/vault/         # Secure storage (port 3001)
 ├── packages/apps/staff/        # Staff attendance (port 3002)
 ├── packages/shared/             # Shared @fintracker-vault/* packages
+│   ├── auth/                    # iron-session + /api/auth/* handlers + middleware factory
 │   ├── config/                  # Constants, domain config
 │   ├── types/                   # Shared TypeScript interfaces
 │   ├── ui/                      # React components, theme, AppAuthGate
@@ -44,8 +45,9 @@ All apps use the **pages router** (`src/pages/`), not the App Router.
 **Authentication Flow:**
 1. `_document.tsx` — Injects `window.__FT_AUTH_ENV` (Google client ID + allowed emails, NOT password)
 2. `_app.tsx` — Wraps app in `<AppAuthGate>` (from `@fintracker-vault/ui`)
-3. `AppAuthGate.tsx` — Lock screen with Google OAuth or PIN (after 1h idle timeout)
+3. `AppAuthGate.tsx` — Lock screen with Google OAuth or PIN (after 1h idle timeout); Google credential is **POST**ed to `/api/auth/google`, which verifies JWT **on the server** and sets an **HttpOnly** iron-session cookie (`ft_session_fintracker` / `ft_session_vault` / `ft_session_staff`)
 4. `clientAuthEnv.ts` — Reads auth config from `process.env` (auto-loaded from `.env.local`)
+5. `middleware.ts` — Uses `@fintracker-vault/auth/middleware` to gate non-public routes and `/api/gas-proxy` behind the session cookie
 
 **Environment Variables:**
 - Local dev: `packages/apps/{fintracker,vault,staff}/.env.local` (gitignored; each app loads its own file)
@@ -64,12 +66,13 @@ Each package in `packages/shared/` is published as `@fintracker-vault/*`:
 
 | Package | Exports | Usage |
 |---------|---------|-------|
+| `auth/` | Session options, `/api/auth/*` handlers, `createFtMiddleware` | Shared server auth for all Next apps |
 | `config/` | Env config, domain mapping, constants | Imported in both apps |
 | `types/` | TypeScript interfaces (GoldRow, etc.) | Shared data structures |
 | `ui/` | React components (AppAuthGate, Nav, KpiCard, etc.) | Built with tsup (ESM + CJS) |
 | `utils/` | `formatINR()`, `calculateReturn()`, validators | Shared logic |
 
-**Transpiling:** Both apps declare `transpilePackages: ['@fintracker-vault/*']` in next.config.js so shared packages (written in TS) are compiled during app build.
+**Transpiling:** Apps list every consumed `@fintracker-vault/*` package in **`transpilePackages`** in `next.config.js` (including **`@fintracker-vault/auth`**) so shared TS is compiled during the app build.
 
 ### Backend
 
@@ -125,30 +128,35 @@ Before pushing to GitHub, `.git/hooks/pre-push` runs `pnpm type-check`. Prevents
 Create `packages/apps/<app>/.env.local` (e.g. `fintracker`, `vault`, `staff`):
 
 ```env
+SESSION_SECRET=<32+-char-random-string>   # Required for login + session cookie + gated gas-proxy (see packages/apps/<app>/.env.local.example)
 VITE_GOOGLE_CLIENT_ID=<your-oauth-client-id>
 VITE_GAS_URL=https://script.google.com/macros/s/...
 VITE_API_TOKEN=<gas-api-token>
 VITE_ALLOWED_EMAILS=your@email.com
 VITE_API_URL=/gas-proxy           # Proxied by Next.js
-VITE_APP_PASSWORD=                # Optional: 4-digit PIN for idle lock
+APP_PASSWORD=                     # Optional: 4-digit PIN (server-only; preferred over VITE_APP_PASSWORD)
+PIN_SESSION_EMAIL=                # Optional: email to bind when using PIN without a prior Google session (see Authentication Model)
 VITE_SHEET_ID=                    # Optional: GAS spreadsheet ID
 ```
 
 **Important:**
 - Each app reads from its own `.env.local` (Next.js auto-loads before build)
+- **`SESSION_SECRET`**: minimum **32 characters**; without it, `/api/auth/google` and other auth routes return errors, `/api/gas-proxy` returns **503**, and in **development** the middleware logs a console error (see `.cursor/rules/google-oauth-env.mdc`).
 - `VITE_GOOGLE_CLIENT_ID` must be registered in Google Cloud Console with your localhost origins
 - `.env.local` files are gitignored and never committed
-- If `VITE_APP_PASSWORD` is not set, PIN lock is disabled (safe default)
+- If **`APP_PASSWORD`** / `VITE_APP_PASSWORD` is not set, PIN lock is disabled (safe default)
 
 ### Vercel Deployment
 
 Set in each Vercel project's **Settings → Environment Variables**:
 
 ```
+SESSION_SECRET = <32+-char-random-string>
 VITE_GOOGLE_CLIENT_ID = <your-oauth-client-id>
 VITE_GAS_URL = https://script.google.com/macros/s/...
 VITE_API_TOKEN = <gas-api-token>
 VITE_ALLOWED_EMAILS = your@email.com
+APP_PASSWORD = <optional 4-digit PIN>
 ```
 
 - Vercel injects these via `process.env` during build
@@ -160,28 +168,33 @@ VITE_ALLOWED_EMAILS = your@email.com
 
 ### How It Works
 
-1. User visits app → sees lock screen with Google "Sign In" button
-2. Clicks → Google OAuth dialog → user authorizes
-3. App decodes JWT token client-side, extracts email
-4. Checks if email is in `VITE_ALLOWED_EMAILS` → grants access
-5. Sets cookie `ft_google_authed=1` + `localStorage.ft_last_active` → unlocked
-6. After 1 hour of inactivity → lock resets, requires PIN entry
+1. User visits app → sees lock screen with Google "Sign In" or PIN (after idle)
+2. Google: client obtains a credential JWT → **`POST /api/auth/google`** verifies it with Google’s JWKS, checks allowlist, sets **HttpOnly** iron-session cookie (`email`, `authedAt`)
+3. PIN (idle lock): **`POST /api/auth/verify-pin`** checks **`APP_PASSWORD`** (or `VITE_APP_PASSWORD`); if the session already has `email`, it refreshes `authedAt`; otherwise it binds **`PIN_SESSION_EMAIL`** or, if unset, the **first** entry in **`ALLOWED_EMAILS` / `VITE_ALLOWED_EMAILS`** (documented in `@fintracker-vault/auth` — for **multiple** allowlisted users, set **`PIN_SESSION_EMAIL`** explicitly)
+4. **`GET /api/auth/session`** drives `AppAuthGate` unlock state; **`localStorage.ft_last_active`** / **`ft_lock_mode`** still control the **idle PIN layer** in the browser
+5. **`middleware.ts`** requires a session for non-public pages and for **`/gas-proxy`** / **`/api/gas-proxy`**
+
+### Deploy / upgrade note (legacy client keys)
+
+Older builds stored **`ft_google_authed`** and relied on client-only checks. After server sessions ship, **users sign in once again** (Google or PIN) so the HttpOnly cookie is issued. There is **no** automatic migration from old localStorage JWT or cookies into the new session.
 
 ### Security Model
 
-**Known Limitations (By Design):**
+**Defense in depth (current):**
 
-- Auth is **entirely client-side** — a determined attacker can:
-  - Set cookie `ft_google_authed=1` in DevTools
-  - Modify JavaScript to bypass lock screen
-- `window.__FT_AUTH_ENV` exposes `allowedEmailsRaw` (needed for client-side auth check)
-- `NEXT_PUBLIC_API_TOKEN` is visible in JS bundle (embedded via webpack define)
+- GAS and **`/api/gas-proxy`** are gated by the **server session** + **`VITE_API_TOKEN`** injected only on the server
+- Google allowlist is enforced in **`POST /api/auth/google`**, not only in the client bundle
+
+**Residual client surface:**
+
+- `window.__FT_AUTH_ENV` still exposes allowlist-related config for the Google button UX
+- A determined local attacker could still tamper with client JS; treat the lock screen as **casual access control**, not a hardened perimeter
 
 **Real Data Security:**
+
 - The GAS API (`VITE_GAS_URL`) is the actual backend — data lives there
 - API token (`VITE_API_TOKEN`) is the real secret; keep it safe in Vercel
-- Client-side auth is for casual access control, not adversary defense
-- For a personal app (single user: aruncse17@gmail.com), this model is acceptable
+- For a personal app (single user), this model is acceptable
 
 ---
 
@@ -301,14 +314,14 @@ const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
 2. **`next.config.js`**
    - Require `../resolve-google-env.cjs` and call **`getGoogleAuthEnv(__dirname)`** so client IDs and allowed emails match the rest of the monorepo (see `.cursor/rules/google-oauth-env.mdc`).
    - Set **`experimental.outputFileTracingRoot`** to the monorepo root (same pattern as existing apps).
-   - List every shared package you import in **`transpilePackages`** (e.g. `@fintracker-vault/ui`, `types`, `config`, `utils`).
+   - List every shared package you import in **`transpilePackages`** (e.g. `@fintracker-vault/auth`, `@fintracker-vault/ui`, `types`, `config`, `utils`).
    - Add **`rewrites()`** for `/gas-proxy` if the app talks to GAS via the proxy (same as fintracker/vault/staff).
 3. **`package.json`**
    - Unique **`name`** (used by `pnpm --filter`).
-   - **`dev`** script with a free port; many apps use **`predev`** to run `pnpm --filter @fintracker-vault/ui run build` so `dist/` is current.
+   - **`dev`** script with a free port; **`predev`** should run **`pnpm --filter @fintracker-vault/ui run build && pnpm --filter @fintracker-vault/auth run build`** so `dist/` is current (same as existing apps).
 4. **Root `package.json`** — Add **`dev:<name>`** / **`build:<name>`** / **`dev:<name>:fresh`** scripts for discoverability (match existing naming).
 5. **Workspace** — `pnpm-workspace.yaml` already includes `packages/apps/*`; run `pnpm install` at root after adding the folder.
-6. **Auth** — If the app uses **`AppAuthGate`**: inject **`window.__FT_AUTH_ENV`** from `_document.tsx` (copy pattern from an existing app), add **`clientAuthEnv.ts`**, and pass **`appKind`** in `_app.tsx`. If you add a new **`appKind`**, update **`AppAuthGate`** (`brandName`, `iconAsset`, etc.) in `packages/shared/ui`.
+6. **Auth** — Add **`@fintracker-vault/auth`** as a dependency; copy **`src/lib/session.ts`** (set a unique **`ft_session_<app>`** cookie name), **`middleware.ts`** (import **`createFtMiddleware`** from **`@fintracker-vault/auth/middleware`** so the Edge bundle does not include **`jose`**), and **`src/pages/api/auth/*`** from an existing app. Set **`moduleResolution`: `"bundler"`** in the app **`tsconfig.json`** if you use the **`/middleware`** subpath (matches fintracker/vault/staff). If the app uses **`AppAuthGate`**: inject **`window.__FT_AUTH_ENV`** from `_document.tsx`, add **`clientAuthEnv.ts`**, and pass **`appKind`** in `_app.tsx`. If you add a new **`appKind`**, update **`AppAuthGate`** in `packages/shared/ui`.
 7. **Vercel** — New project, root directory `packages/apps/<name>`, env vars aligned with other apps, **`ENABLE_EXPERIMENTAL_COREPACK=1`**, `vercel.json` **`buildCommand`** using `pnpm --filter <package-name> run build`.
 
 ### Adding a new page (pages router)

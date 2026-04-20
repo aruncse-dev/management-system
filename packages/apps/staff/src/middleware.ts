@@ -1,15 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { createFtMiddleware, FT_MIDDLEWARE_MATCHER } from '@fintracker-vault/auth/middleware'
+import { getSessionOptions } from './lib/session'
 
-export function middleware(request: NextRequest) {
-  const pathnameRaw = request.nextUrl.pathname
-  if (pathnameRaw === '/gas-proxy' || pathnameRaw.startsWith('/gas-proxy/')) {
-    const url = request.nextUrl.clone()
-    url.pathname = pathnameRaw.replace(/^\/gas-proxy/, '/api/gas-proxy') || '/api/gas-proxy'
-    return NextResponse.rewrite(url)
-  }
-  return NextResponse.next()
-}
+export const middleware = createFtMiddleware({
+  getSessionOptions,
+})
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: [...FT_MIDDLEWARE_MATCHER],
 }

@@ -1,8 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
+import { getIronSession } from 'iron-session'
+import { getSessionOptions, type FtSessionData } from '../../../lib/session'
 
 function resolveGasUrl(): string | undefined {
-  // Same merge as next.config: repo `.env` / `.env.local`, `web/.env`, app `.env.local`
-  // Static path so Next/webpack can resolve the CJS helper (dynamic require breaks in the API bundle).
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { readMergedDotenv } = require('../../../../../resolve-google-env.cjs') as {
     readMergedDotenv: (appDir: string) => Record<string, string>
@@ -16,6 +16,11 @@ function resolveGasUrl(): string | undefined {
     fileEnv.NEXT_PUBLIC_GAS_URL ||
     undefined
   )
+}
+
+function resolveServerToken(): string | undefined {
+  const t = process.env.VITE_API_TOKEN || process.env.NEXT_PUBLIC_API_TOKEN
+  return t && String(t).trim() ? String(t).trim() : undefined
 }
 
 export const config = {
@@ -32,7 +37,6 @@ async function readBody(req: NextApiRequest): Promise<Buffer> {
   return Buffer.concat(chunks)
 }
 
-/** Apps Script and some proxies behave badly if the upstream fetch omits browser-like headers. */
 function buildUpstreamHeaders(req: NextApiRequest): Record<string, string> | undefined {
   const out: Record<string, string> = {}
   for (const name of ['user-agent', 'accept', 'accept-language']) {
@@ -45,11 +49,27 @@ function buildUpstreamHeaders(req: NextApiRequest): Record<string, string> | und
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  let sessionOptions
+  try {
+    sessionOptions = getSessionOptions()
+  } catch {
+    sessionOptions = undefined
+  }
+  if (sessionOptions) {
+    const session = await getIronSession<FtSessionData>(req, res, sessionOptions)
+    if (!session.email) {
+      res.status(401).json({ ok: false, error: 'Unauthorized' })
+      return
+    }
+  }
+
   const gasUrl = resolveGasUrl()
   if (!gasUrl) {
     res.status(500).json({ ok: false, error: 'GAS URL is not configured' })
     return
   }
+
+  const serverToken = resolveServerToken()
 
   const pathParts = Array.isArray(req.query.path) ? req.query.path : []
   const target = new URL(gasUrl)
@@ -59,14 +79,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   for (const [key, value] of Object.entries(req.query)) {
     if (key === 'path') continue
-    if (Array.isArray(value)) value.forEach((v) => target.searchParams.append(key, v))
+    if (key === 'token') continue
+    if (Array.isArray(value)) value.forEach(v => target.searchParams.append(key, v))
     else if (value !== undefined) target.searchParams.set(key, value)
   }
+  if (serverToken) target.searchParams.set('token', serverToken)
 
   const method = req.method || 'GET'
   const bodyAllowed = method !== 'GET' && method !== 'HEAD'
-  const bodyBuffer = bodyAllowed ? await readBody(req) : undefined
+  let bodyBuffer = bodyAllowed ? await readBody(req) : undefined
+  const ct = String(req.headers['content-type'] || '')
+  if (bodyBuffer && bodyBuffer.length > 0 && ct.includes('application/json')) {
+    try {
+      const parsed = JSON.parse(bodyBuffer.toString('utf8')) as Record<string, unknown>
+      delete parsed.token
+      if (serverToken) parsed.token = serverToken
+      bodyBuffer = Buffer.from(JSON.stringify(parsed), 'utf8')
+    } catch {
+      // use original bodyBuffer
+    }
+  }
   const body = bodyBuffer && bodyBuffer.length > 0 ? new Uint8Array(bodyBuffer) : undefined
+
   const upstream = await fetch(target.toString(), {
     method,
     headers: buildUpstreamHeaders(req),

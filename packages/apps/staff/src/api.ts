@@ -6,13 +6,12 @@ type ApiResponse<T> =
   | { ok: false; error: string; traceId?: string }
 
 const BASE = API_URL
-const TOKEN = (process.env.NEXT_PUBLIC_API_TOKEN || process.env.VITE_API_TOKEN) as string | undefined
 const DEBUG = process.env.NEXT_PUBLIC_DEBUG === 'true'
 const MODULE = 'staff'
 
 type CacheEntry = { action: string; params: Record<string, string>; data: unknown; savedAt: number }
 const GET_CACHE = new Map<string, CacheEntry>()
-const PERSIST_KEY = `staff:get-cache:${BASE}:${TOKEN ?? 'anon'}`
+const PERSIST_KEY = `staff:get-cache:${BASE}`
 
 function clearPersistedStorage() {
   if (typeof window === 'undefined') return
@@ -82,7 +81,7 @@ function makeCacheKey(action: string, params: Record<string, string>) {
     .sort()
     .map(k => `${k}=${params[k]}`)
     .join('&')
-  return `${BASE}|${action}|${TOKEN ?? ''}|${query}`
+  return `${BASE}|${action}|${query}`
 }
 
 function isSameParams(a: Record<string, string>, b: Record<string, string>) {
@@ -127,9 +126,8 @@ async function get<T>(
   url.searchParams.set('action', action)
   url.searchParams.set('traceId', traceId)
   if (DEBUG) url.searchParams.set('debug', 'true')
-  if (TOKEN) url.searchParams.set('token', TOKEN)
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
-  const res = await fetch(url.toString(), { redirect: 'follow' })
+  const res = await fetch(url.toString(), { credentials: 'same-origin', redirect: 'follow' })
   const data = await parseResponse<T>(res)
   if (shouldCache) {
     GET_CACHE.set(cacheKey, { action, params, data, savedAt: Date.now() })
@@ -145,10 +143,10 @@ async function post<T>(body: Record<string, unknown>): Promise<T> {
     ...body,
     traceId,
     ...(DEBUG && { debug: true }),
-    ...(TOKEN && { token: TOKEN }),
   }
   const res = await fetch(BASE, {
     method: 'POST',
+    credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
     redirect: 'follow',

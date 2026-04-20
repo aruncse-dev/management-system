@@ -24,13 +24,8 @@ const PAGE_TITLES: Record<ModuleId, string> = {
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter()
   const [lendingSheet, setLendingSheet] = useState('Lending')
-  const { googleClientId: gid, appPassword: pw, allowedEmailsRaw } = getClientAuthEnv()
+  const { googleClientId: gid } = getClientAuthEnv()
   const googleClientId = gid
-  const appPassword = pw
-  const allowedEmails = allowedEmailsRaw
-    .split(',')
-    .map(e => e.trim().toLowerCase())
-    .filter(Boolean)
 
   const moduleFromPath = useMemo<ModuleId | null>(() => {
     const p = router.pathname.toLowerCase()
@@ -73,12 +68,7 @@ export default function App({ Component, pageProps }: AppProps) {
         <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
         <meta name="theme-color" content="#1E5CC7" />
       </Head>
-      <AppAuthGate
-      appKind="fintracker"
-      googleClientId={googleClientId}
-      appPassword={appPassword}
-      allowedEmails={allowedEmails}
-    >
+      <AppAuthGate appKind="fintracker" googleClientId={googleClientId}>
       {({ onLogout }) => (
         <StoreProvider>
           <div className="with-app-shell">

@@ -2,12 +2,9 @@ import { useState, useEffect, useRef, type FormEvent, type CSSProperties, type R
 import { GoogleOAuthProvider, type CredentialResponse } from '@react-oauth/google'
 import { GoogleAuthCard, GoogleSignInButton } from './GoogleAuthCard'
 
-const AUTH_GOOGLE_COOKIE = 'ft_google_authed'
 const AUTH_MODE_KEY = 'ft_lock_mode'
 const LAST_ACTIVE_KEY = 'ft_last_active'
-const GOOGLE_AUTH_MAX_AGE = 7 * 24 * 60 * 60
 const IDLE_TIMEOUT_MS = 60 * 60 * 1000
-const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 
 type LockMode = 'google' | 'password'
 
@@ -18,54 +15,7 @@ export type AppAuthGateRender = (ctx: { onLogout: () => void }) => ReactNode
 export type AppAuthGateProps = {
   appKind: AppAuthKind
   googleClientId: string
-  appPassword: string
-  allowedEmails: string[]
   children: ReactNode | AppAuthGateRender
-}
-
-function setGoogleAuthCookie(value: string) {
-  document.cookie = `${AUTH_GOOGLE_COOKIE}=${value}; path=/; max-age=${GOOGLE_AUTH_MAX_AGE}; samesite=lax`
-}
-
-function getGoogleAuthCookie() {
-  if (typeof document === 'undefined') return ''
-  return document.cookie.split('; ').find(row => row.startsWith(`${AUTH_GOOGLE_COOKIE}=`))?.split('=')[1] || ''
-}
-
-function clearGoogleAuthCookie() {
-  document.cookie = `${AUTH_GOOGLE_COOKIE}=; path=/; max-age=0; samesite=lax`
-}
-
-/**
- * PIN is only for the 1h idle lock (we clear the session cookie then, but keep
- * `ft_lock_mode=password`). Every other locked state uses Google: first visit,
- * logout, or expired session.
- */
-function getInitialLockMode(): LockMode {
-  if (typeof window === 'undefined') return 'google'
-  const hasCookie = getGoogleAuthCookie() === '1'
-  const mode = localStorage.getItem(AUTH_MODE_KEY) as LockMode | null
-  if (mode === 'password' && !hasCookie) return 'password'
-  return 'google'
-}
-
-function readSessionAuthed(): boolean {
-  if (typeof window === 'undefined') return false
-  const unlocked = getGoogleAuthCookie() === '1'
-  const lastActive = Number(localStorage.getItem(LAST_ACTIVE_KEY) || '0')
-  return Boolean(unlocked && lastActive && Date.now() - lastActive <= SESSION_MAX_AGE_MS)
-}
-
-function decodeJwtPayload(token: string): Record<string, unknown> | null {
-  try {
-    const payload = token.split('.')[1]
-    if (!payload) return null
-    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/')
-    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=')
-    return JSON.parse(atob(padded))
-  } catch {
-    return null
-  }
 }
 
 function brandName(kind: AppAuthKind) {
@@ -74,7 +24,6 @@ function brandName(kind: AppAuthKind) {
   return 'FinTracker'
 }
 
-/** Transparent playstore export; rendered inside `.login-brand-mark` (circular white tile). Nav uses `icon-192` (launcher / round mask). */
 function iconAsset(kind: AppAuthKind) {
   if (kind === 'vault') return 'vault-rect.png'
   if (kind === 'staff') return 'staff-rect.png'
@@ -90,16 +39,12 @@ function LockScreen({
   onUnlock,
   appKind,
   googleClientId,
-  appPassword,
-  allowedEmails,
   oauthError,
 }: {
   mode: LockMode
   onUnlock: () => void
   appKind: AppAuthKind
   googleClientId: string
-  appPassword: string
-  allowedEmails: string[]
   oauthError?: string | null
 }) {
   const [error, setError] = useState('')
@@ -112,29 +57,28 @@ function LockScreen({
     if (apple) apple.content = displayName
   }, [displayName])
 
-  const handleCredential = (resp: CredentialResponse) => {
+  const handleCredential = async (resp: CredentialResponse) => {
     setError('')
     const token = resp.credential
     if (!token) return setError('Google sign-in did not return a token.')
-    const payload = decodeJwtPayload(token)
-    const email = String(payload?.email || '').trim().toLowerCase()
-    if (!email) return setError('Could not read Google account email.')
-    if (allowedEmails.length > 0 && !allowedEmails.includes(email)) {
-      return setError(`This Google account is not allowed for ${displayName}.`)
+    try {
+      const r = await fetch('/api/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ credential: token }),
+      })
+      const data = (await r.json().catch(() => ({}))) as { error?: string; email?: string }
+      if (!r.ok) {
+        return setError(data.error || 'Sign-in failed.')
+      }
+      localStorage.setItem(AUTH_MODE_KEY, 'google')
+      localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now()))
+      setError('')
+      onUnlock()
+    } catch {
+      setError('Sign-in request failed.')
     }
-    localStorage.setItem(AUTH_MODE_KEY, 'google')
-    localStorage.setItem('ft_email', email)
-    localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now()))
-    setGoogleAuthCookie('1')
-    setError('')
-    onUnlock()
-  }
-
-  const handlePasswordUnlock = () => {
-    localStorage.setItem(AUTH_MODE_KEY, 'password')
-    localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now()))
-    setGoogleAuthCookie('1')
-    onUnlock()
   }
 
   return (
@@ -169,10 +113,31 @@ function LockScreen({
       ) : (
         <div className="login-auth-card__pin">
           <PasswordLock
-            onUnlock={handlePasswordUnlock}
+            onSubmitPin={async pin => {
+              setError('')
+              let r: Response
+              try {
+                r = await fetch('/api/auth/verify-pin', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  credentials: 'same-origin',
+                  body: JSON.stringify({ pin }),
+                })
+              } catch {
+                setError('Request failed. Try again.')
+                throw new Error('network')
+              }
+              const data = (await r.json().catch(() => ({}))) as { error?: string }
+              if (!r.ok) {
+                setError(data.error || 'Incorrect PIN. Please try again.')
+                throw new Error('pin')
+              }
+              localStorage.setItem(AUTH_MODE_KEY, 'password')
+              localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now()))
+              onUnlock()
+            }}
             error={error}
             setError={setError}
-            appPassword={appPassword}
           />
         </div>
       )}
@@ -181,15 +146,13 @@ function LockScreen({
 }
 
 function PasswordLock({
-  onUnlock,
+  onSubmitPin,
   error,
   setError,
-  appPassword,
 }: {
-  onUnlock: () => void
+  onSubmitPin: (pin: string) => Promise<void>
   error: string
   setError: (v: string) => void
-  appPassword: string
 }) {
   const [password, setPassword] = useState(['', '', '', ''])
   const inputRefs = useRef<Array<HTMLInputElement | null>>([])
@@ -200,16 +163,15 @@ function PasswordLock({
     inputRefs.current[index]?.focus()
     inputRefs.current[index]?.select()
   }
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (password.join('') === appPassword) {
-      setError('')
-      onUnlock()
-      return
+    const pin = password.join('')
+    try {
+      await onSubmitPin(pin)
+    } catch {
+      setPassword(['', '', '', ''])
+      focusBox(0)
     }
-    setError('Incorrect password. Please try again.')
-    setPassword(['', '', '', ''])
-    focusBox(0)
   }
   return (
     <form onSubmit={handleSubmit} style={{ width: '100%', display: 'grid', gap: 12 }}>
@@ -277,27 +239,40 @@ function PasswordLock({
   )
 }
 
-export default function AppAuthGate({
-  appKind,
-  googleClientId,
-  appPassword,
-  allowedEmails,
-  children,
-}: AppAuthGateProps) {
+export default function AppAuthGate({ appKind, googleClientId, children }: AppAuthGateProps) {
   const clientId = (googleClientId || '').trim()
   const [authMode, setAuthMode] = useState<LockMode>('google')
   const [authed, setAuthed] = useState(false)
+  const [sessionLoading, setSessionLoading] = useState(true)
   const [oauthScriptError, setOauthScriptError] = useState<string | null>(null)
 
   useEffect(() => {
-    setAuthMode(getInitialLockMode())
-    setAuthed(readSessionAuthed())
+    fetch('/api/auth/session', { credentials: 'same-origin' })
+      .then(r => {
+        if (!r.ok) throw new Error(`session ${r.status}`)
+        return r.json() as Promise<{ authed?: boolean }>
+      })
+      .then((d: { authed?: boolean }) => {
+        const ok = Boolean(d.authed)
+        setAuthed(ok)
+        if (!ok) {
+          // No server session: PIN mode in localStorage is stale (e.g. cookies cleared but storage left,
+          // or "password" left from a previous tab). Idle lock without reload is set only by the timer below.
+          localStorage.removeItem(AUTH_MODE_KEY)
+          setAuthMode('google')
+        }
+      })
+      .catch(() => {
+        setAuthed(false)
+        localStorage.removeItem(AUTH_MODE_KEY)
+        setAuthMode('google')
+      })
+      .finally(() => setSessionLoading(false))
   }, [])
 
   useEffect(() => {
     if (!authed) return
     let timer = window.setTimeout(() => {
-      clearGoogleAuthCookie()
       localStorage.setItem(AUTH_MODE_KEY, 'password')
       setAuthMode('password')
       setAuthed(false)
@@ -306,7 +281,6 @@ export default function AppAuthGate({
       localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now()))
       window.clearTimeout(timer)
       timer = window.setTimeout(() => {
-        clearGoogleAuthCookie()
         localStorage.setItem(AUTH_MODE_KEY, 'password')
         setAuthMode('password')
         setAuthed(false)
@@ -331,29 +305,34 @@ export default function AppAuthGate({
     setAuthed(true)
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setOauthScriptError(null)
-    clearGoogleAuthCookie()
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' })
+    } catch {
+      /* ignore */
+    }
     localStorage.removeItem(LAST_ACTIVE_KEY)
-    localStorage.removeItem('ft_email')
     localStorage.setItem(AUTH_MODE_KEY, 'google')
     setAuthMode('google')
     setAuthed(false)
   }
 
-  if (!clientId && authMode === 'google') {
-    return (
-      <LockScreen
-        mode="google"
-        onUnlock={handleUnlock}
-        appKind={appKind}
-        googleClientId=""
-        appPassword={appPassword}
-        allowedEmails={allowedEmails}
-        oauthError={oauthScriptError}
-      />
-    )
-  }
+  const loadingUi = (
+    <div
+      className="login-auth-card"
+      style={{
+        minHeight: '100dvh',
+        display: 'grid',
+        placeItems: 'center',
+        padding: 24,
+        color: 'var(--text, #0f172a)',
+        fontWeight: 600,
+      }}
+    >
+      Loading…
+    </div>
+  )
 
   const inner = !authed ? (
     <LockScreen
@@ -361,8 +340,6 @@ export default function AppAuthGate({
       onUnlock={handleUnlock}
       appKind={appKind}
       googleClientId={clientId}
-      appPassword={appPassword}
-      allowedEmails={allowedEmails}
       oauthError={oauthScriptError}
     />
   ) : typeof children === 'function' ? (
@@ -370,6 +347,22 @@ export default function AppAuthGate({
   ) : (
     children
   )
+
+  if (sessionLoading) {
+    return loadingUi
+  }
+
+  if (!clientId) {
+    return (
+      <LockScreen
+        mode="google"
+        onUnlock={handleUnlock}
+        appKind={appKind}
+        googleClientId=""
+        oauthError={oauthScriptError}
+      />
+    )
+  }
 
   return (
     <GoogleOAuthProvider

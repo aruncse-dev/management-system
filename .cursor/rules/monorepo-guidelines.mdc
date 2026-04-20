@@ -22,6 +22,7 @@ Use this as **baseline context** for any feature work. Full detail lives in repo
 - **Imports** across packages: `@fintracker-vault/*` aliases from root `tsconfig.json`.
 - **New Next apps**: `packages/apps/resolve-google-env.cjs` + **`getGoogleAuthEnv(__dirname)`** in `next.config.js`; list all consumed packages in **`transpilePackages`**; mirror **`experimental.outputFileTracingRoot`** from existing apps.
 - **Shared UI** (`@fintracker-vault/ui`): after editing `packages/shared/ui/src`, run **`pnpm --filter @fintracker-vault/ui run build`** so consumers see updated `dist/`.
+- **Shared auth** (`@fintracker-vault/auth`): after editing `packages/shared/auth/src`, run **`pnpm --filter @fintracker-vault/auth run build`**; list **`@fintracker-vault/auth`** in **`transpilePackages`**. **`middleware.ts`** should import from **`@fintracker-vault/auth/middleware`** (separate entry) so the Edge bundle does not include **`jose`**.
 - **Staff / GAS API pattern**: GET caching + **`invalidateCache`** on mutations — see `packages/apps/staff/src/api.ts` and **`CLAUDE.md`** playbook.
 
 ## New work quick checklist

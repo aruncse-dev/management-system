@@ -8,7 +8,6 @@ export function performGoogleAppLogout() {
   document.cookie = `${AUTH_GOOGLE_COOKIE}=; path=/; max-age=0; samesite=lax`
   try {
     localStorage.removeItem('ft_last_active')
-    localStorage.removeItem('ft_email')
     localStorage.setItem('ft_lock_mode', 'google')
   } catch {
     /* ignore */

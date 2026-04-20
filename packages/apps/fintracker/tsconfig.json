@@ -1,6 +1,7 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
+    "moduleResolution": "bundler",
     "lib": [
       "ES2020",
       "DOM",
@@ -18,7 +19,9 @@
       "@fintracker-vault/config": ["../../shared/config/src"],
       "@fintracker-vault/config/*": ["../../shared/config/src/*"],
       "@fintracker-vault/utils": ["../../shared/utils/src"],
-      "@fintracker-vault/utils/*": ["../../shared/utils/src/*"]
+      "@fintracker-vault/utils/*": ["../../shared/utils/src/*"],
+      "@fintracker-vault/auth": ["../../shared/auth/src/index.ts"],
+      "@fintracker-vault/auth/middleware": ["../../shared/auth/src/middleware.ts"]
     },
     "noEmit": true,
     "incremental": true,

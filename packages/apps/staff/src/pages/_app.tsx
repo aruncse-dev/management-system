@@ -26,13 +26,8 @@ const STAFF_NAV_SECTIONS: SimpleAppNavSection[] = [
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter()
-  const { googleClientId: gid, appPassword: pw, allowedEmailsRaw } = getClientAuthEnv()
+  const { googleClientId: gid } = getClientAuthEnv()
   const googleClientId = gid
-  const appPassword = pw
-  const allowedEmails = allowedEmailsRaw
-    .split(',')
-    .map(e => e.trim().toLowerCase())
-    .filter(Boolean)
 
   const pageTitle = STAFF_PAGE_TITLES[router.pathname] || 'Staff'
 
@@ -43,12 +38,7 @@ export default function App({ Component, pageProps }: AppProps) {
         <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
         <meta name="theme-color" content="#1E5CC7" />
       </Head>
-      <AppAuthGate
-        appKind="staff"
-        googleClientId={googleClientId}
-        appPassword={appPassword}
-        allowedEmails={allowedEmails}
-      >
+      <AppAuthGate appKind="staff" googleClientId={googleClientId}>
         {({ onLogout }) => (
           <StaffWorkspaceProvider>
             <div className="with-app-shell">
