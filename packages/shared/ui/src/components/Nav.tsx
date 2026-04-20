@@ -28,7 +28,8 @@ export type AppNavArea = 'finance' | 'vault'
 
 interface Props {
   module: ModuleId
-  onModule: (id: ModuleId) => void
+  /** Optional lending sheet for this navigation (avoids stale state when opening Balances submenu). */
+  onModule: (id: ModuleId, lendingSheetForUrl?: string) => void
   lendingSheet?: string
   onLendingSheet?: (sheet: string) => void
   title?: string
@@ -193,8 +194,8 @@ export default function Nav({
                   type="button"
                   className={`nav-drawer-item${module === 'lending' && lendingSheet === sub.id ? ' active' : ''}`}
                   onClick={() => {
-                    onModule('lending')
                     onLendingSheet(sub.id)
+                    onModule('lending', sub.id)
                     setDrawerOpen(false)
                   }}
                 >

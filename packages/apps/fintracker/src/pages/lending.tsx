@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react'
+import { useRouter } from 'next/router'
 import { Search, LayoutDashboard, Handshake, ArrowDownLeft, BarChart3, Shield, User, ArrowUpRight, Plus } from 'lucide-react'
 import { api, RawLendingRow } from '../api'
 import { INR } from '../utils'
@@ -152,8 +153,12 @@ const EntryCard = memo(function EntryCard({
   )
 })
 
-export default function Lending({ sheetName, onTabChange }: LendingProps) {
-  const safeSheetName = String(sheetName ?? 'Lending')
+export default function Lending({ sheetName: sheetNameProp, onTabChange }: LendingProps) {
+  const router = useRouter()
+  const sheetQ = router.isReady ? router.query.sheet : undefined
+  const sheetFromQuery =
+    typeof sheetQ === 'string' ? sheetQ : Array.isArray(sheetQ) ? sheetQ[0] : undefined
+  const safeSheetName = String(sheetFromQuery ?? sheetNameProp ?? 'Lending').trim() || 'Lending'
   const [entries, setEntries] = useState<LendingEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')

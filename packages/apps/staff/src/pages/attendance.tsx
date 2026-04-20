@@ -314,18 +314,23 @@ export default function AttendancePage() {
                   const dateStr = `${year}-${pad2(monthIndex + 1)}-${pad2(d)}`
                   const vis = dayCellVisual(attendanceRows, dateStr)
                   const isToday = dateStr === todayYmd
+                  const isSelected = dayModalDate === dateStr
                   const entries = attendanceRows.filter(r => r.date === dateStr && r.worked)
                   const n = entries.length
                   const hasOt = entries.some(r => r.overtime)
                   let bg = 'var(--card)'
-                  let border = '1px solid var(--border)'
+                  let borderColor = 'var(--border)'
                   if (vis === 'ot') {
                     bg = 'rgba(245, 158, 11, 0.2)'
-                    border = '2px solid #D97706'
+                    borderColor = '#059669'
                   } else if (vis === 'work') {
                     bg = 'rgba(16, 185, 129, 0.18)'
-                    border = '2px solid #059669'
+                    borderColor = '#059669'
                   }
+                  const ringStyles: string[] = []
+                  if (isToday) ringStyles.push('0 0 0 1px var(--navy)')
+                  if (isSelected) ringStyles.push('0 0 0 3px rgba(30, 92, 199, 0.26)')
+                  const showRing = vis === 'empty'
                   let cellLabel: string
                   if (n === 0) cellLabel = String(d)
                   else if (n === 1 && hasOt) cellLabel = `${d} OT`
@@ -343,12 +348,13 @@ export default function AttendancePage() {
                         minHeight: 44,
                         borderRadius: 10,
                         background: bg,
-                        border,
+                        border: `1.5px solid ${borderColor}`,
+                        outline: 'none',
                         fontWeight: 600,
                         fontSize: 13,
                         color: 'var(--text)',
                         cursor: loading ? 'wait' : 'pointer',
-                        boxShadow: isToday ? '0 0 0 2px var(--navy)' : undefined,
+                        boxShadow: showRing && ringStyles.length ? ringStyles.join(', ') : undefined,
                       }}
                     >
                       {cellLabel}
