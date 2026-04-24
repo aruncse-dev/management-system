@@ -2,13 +2,13 @@
 //
 // Spreadsheet : FinanceTrackerAssets
 // Sheet       : Savings
-// Columns     : ID | Date | Account | Amount | Description | Type | ToAccount
+// Columns     : ID | Date | Account | Amount | Description | Type | ToAccount | Category
 //
 // All functions in this file are prefixed _savings_ to avoid naming collisions.
 // Entry points are _savingsHandleGet / _savingsHandlePost, called from Code.gs.
 
-const S_COL = { ID: 0, DATE: 1, ACCOUNT: 2, AMT: 3, DESC: 4, TYPE: 5, TO_ACCT: 6 };
-const S_HDR = ['ID', 'Date', 'Account', 'Amount', 'Description', 'Type', 'ToAccount'];
+const S_COL = { ID: 0, DATE: 1, ACCOUNT: 2, AMT: 3, DESC: 4, TYPE: 5, TO_ACCT: 6, CAT: 7 };
+const S_HDR = ['ID', 'Date', 'Account', 'Amount', 'Description', 'Type', 'ToAccount', 'Category'];
 const S_SHEET = 'Savings';
 
 // ── INTERNAL: ensure header row exists at row 1 ────────────────────────────────
@@ -89,11 +89,11 @@ function _savingsHandlePost(action, body) {
   Logger.log('_savingsHandlePost action: ' + action);
   if (action === 'addEntry') {
     Logger.log('Calling _savings_addEntry');
-    return _savings_addEntry(body.date, body.account, body.amount, body.desc, body.type, body.toAccount, body.sheetName);
+    return _savings_addEntry(body.date, body.account, body.amount, body.desc, body.type, body.toAccount, body.category, body.sheetName);
   }
   if (action === 'updateEntry') {
     Logger.log('Calling _savings_updateEntry');
-    return _savings_updateEntry(body.id, body.date, body.account, body.amount, body.desc, body.type, body.toAccount, body.sheetName);
+    return _savings_updateEntry(body.id, body.date, body.account, body.amount, body.desc, body.type, body.toAccount, body.category, body.sheetName);
   }
   if (action === 'deleteEntry') {
     Logger.log('Calling _savings_deleteEntry');
@@ -130,6 +130,7 @@ function _savings_getEntries(sheetName) {
         desc:      String(r[S_COL.DESC]    || '').trim(),
         type:      String(r[S_COL.TYPE]    || '').trim().toUpperCase(),
         toAccount: String(r[S_COL.TO_ACCT] || '').trim() || undefined,
+        category:  String(r[S_COL.CAT]     || '').trim() || '',
       }));
 
     Logger.log('_savings_getEntries: returning ' + result.length + ' valid entries');
@@ -140,7 +141,7 @@ function _savings_getEntries(sheetName) {
   }
 }
 
-function _savings_addEntry(date, account, amount, desc, type, toAccount, sheetName) {
+function _savings_addEntry(date, account, amount, desc, type, toAccount, category, sheetName) {
   try {
     Logger.log('_savings_addEntry: START date=' + date + ', account=' + account + ', amount=' + amount + ', type=' + type);
     const sh  = _savingsSheet(sheetName);
@@ -158,7 +159,8 @@ function _savings_addEntry(date, account, amount, desc, type, toAccount, sheetNa
       amt,
       String(desc || '').trim(),
       String(type || '').toUpperCase(),
-      String(toAccount || '').trim()
+      String(toAccount || '').trim(),
+      String(category || '').trim()
     ]);
 
     const rowCountAfter = sh.getLastRow();
@@ -176,7 +178,7 @@ function _savings_addEntry(date, account, amount, desc, type, toAccount, sheetNa
   }
 }
 
-function _savings_updateEntry(id, date, account, amount, desc, type, toAccount, sheetName) {
+function _savings_updateEntry(id, date, account, amount, desc, type, toAccount, category, sheetName) {
   try {
     Logger.log('_savings_updateEntry: START id=' + id + ', account=' + account + ', amount=' + amount);
     const sh   = _savingsSheet(sheetName);
@@ -213,7 +215,8 @@ function _savings_updateEntry(id, date, account, amount, desc, type, toAccount, 
       amt,
       String(desc || '').trim(),
       String(type || '').toUpperCase(),
-      String(toAccount || '').trim()
+      String(toAccount || '').trim(),
+      String(category || '').trim()
     ]]);
 
     const rowCountAfter = sh.getLastRow();

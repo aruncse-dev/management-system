@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Plus, LayoutDashboard, List, BarChart3, Wallet, Search, TrendingUp, AlertTriangle, ArrowUpRight, ArrowDownRight, Repeat2 } from 'lucide-react'
 import { api, RawSavingsRow } from '../api'
-import { THEME_COLORS } from '../config'
+import { CATEGORIES, THEME_COLORS } from '../config'
 import { INR } from '../utils'
 import { BalanceRow, FormField, KpiCard, KpiGrid, LoadingState, SearchField, SectionBlock, Spacer, TransactionCard } from '../ui'
 
@@ -25,6 +25,7 @@ interface SavingsEntry {
   desc: string
   type: SavingsType
   toAccount?: string
+  category?: string
 }
 
 interface SavingsFormState {
@@ -34,6 +35,7 @@ interface SavingsFormState {
   desc: string
   type: SavingsType
   toAccount: string
+  category: string
 }
 
 function todayISO() {
@@ -72,6 +74,7 @@ function makeEmptyForm(accounts: readonly string[]): SavingsFormState {
     desc: '',
     type: 'Income',
     toAccount: accounts[1] ?? accounts[0] ?? '',
+    category: '',
   }
 }
 
@@ -90,6 +93,7 @@ function parseRow(raw: RawSavingsRow, accounts: readonly string[]): SavingsEntry
     amount,
     desc: String(raw.desc ?? '').trim(),
     type: (type === 'INCOME' ? 'Income' : type === 'EXPENSE' ? 'Expense' : 'Transfer') as SavingsType,
+    category: String(raw.category ?? '').trim() || undefined,
   }
   if (type === 'TRANSFER') {
     const to = String(raw.toAccount ?? '').trim()
@@ -179,7 +183,7 @@ export default function SavingsPage({
       .filter(e => typeFilter === 'All' || e.type === typeFilter)
       .filter(e => {
         const q = search.toLowerCase()
-        return !q || e.desc.toLowerCase().includes(q) || e.account.toLowerCase().includes(q) || e.type.toLowerCase().includes(q)
+        return !q || e.desc.toLowerCase().includes(q) || e.account.toLowerCase().includes(q) || e.type.toLowerCase().includes(q) || (e.category?.toLowerCase().includes(q) ?? false)
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   }, [entries, typeFilter, search])
@@ -213,6 +217,7 @@ export default function SavingsPage({
       desc: e.desc,
       type: e.type,
       toAccount: e.toAccount ?? accounts.find(a => a !== e.account) ?? accounts[0] ?? '',
+      category: e.category ?? '',
     })
     setModalOpen(true)
   }
@@ -233,6 +238,7 @@ export default function SavingsPage({
       type: form.type === 'Income' ? 'INCOME' : form.type === 'Expense' ? 'EXPENSE' : 'TRANSFER',
     }
     if (form.type === 'Transfer') payload.toAccount = form.toAccount
+    if (form.type === 'Expense' && form.category) payload.category = form.category
     try {
       if (editEntry) await api.updateSavings({ ...payload, id: editEntry.id }, sheetName)
       else await api.addSavings(payload, sheetName)
@@ -344,24 +350,29 @@ export default function SavingsPage({
 
             {!loading && filteredEntries.length > 0 && (
               <div className="txn-cards">
-                {filteredEntries.map(e => (
-                  <TransactionCard
-                    key={e.id}
-                    title={
-                      e.type === 'Transfer' && e.toAccount
-                        ? e.desc?.trim()
-                          ? `${e.desc} · ${e.account} → ${e.toAccount}`
-                          : `${e.account} → ${e.toAccount}`
-                        : e.desc || e.account
-                    }
-                    amount={`${e.type === 'Income' ? '+' : e.type === 'Transfer' ? '↔' : '−'}${INR(e.amount)}`}
-                    type={e.type}
-                    date={e.date}
-                    tone={typeTone(e.type)}
-                    icon={e.type === 'Income' ? <ArrowDownRight size={14} /> : e.type === 'Transfer' ? <Repeat2 size={14} /> : <ArrowUpRight size={14} />}
-                    onClick={() => openEdit(e)}
-                  />
-                ))}
+                {filteredEntries.map(e => {
+                  let titleText = ''
+                  if (e.type === 'Transfer' && e.toAccount) {
+                    titleText = e.desc?.trim() ? `${e.desc} · ${e.account} → ${e.toAccount}` : `${e.account} → ${e.toAccount}`
+                  } else {
+                    titleText = e.desc || e.account
+                  }
+                  if (e.type === 'Expense' && e.category) {
+                    titleText = `${titleText} · ${e.category}`
+                  }
+                  return (
+                    <TransactionCard
+                      key={e.id}
+                      title={titleText}
+                      amount={`${e.type === 'Income' ? '+' : e.type === 'Transfer' ? '↔' : '−'}${INR(e.amount)}`}
+                      type={e.type}
+                      date={e.date}
+                      tone={typeTone(e.type)}
+                      icon={e.type === 'Income' ? <ArrowDownRight size={14} /> : e.type === 'Transfer' ? <Repeat2 size={14} /> : <ArrowUpRight size={14} />}
+                      onClick={() => openEdit(e)}
+                    />
+                  )
+                })}
               </div>
             )}
           </SectionBlock>
@@ -428,6 +439,14 @@ export default function SavingsPage({
                     <option value="Transfer">Transfer</option>
                   </select>
                 </FormField>
+                {form.type === 'Expense' && (
+                  <FormField label="Category">
+                    <select className="form-sel" value={form.category} onChange={e => setField('category', e.target.value)}>
+                      <option value="">Select category...</option>
+                      {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </FormField>
+                )}
                 {form.type === 'Transfer' && (
                   <FormField label="To Account">
                     <select className="form-sel" value={form.toAccount} onChange={e => setField('toAccount', e.target.value)}>

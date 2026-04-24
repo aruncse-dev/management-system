@@ -189,6 +189,7 @@ export interface RawSavingsRow {
   desc: string;
   type: string;
   toAccount?: string;
+  category?: string;
 }
 
 export interface RawGoldRow {

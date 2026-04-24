@@ -1,6 +1,6 @@
 import SavingsPage from './savingspage'
 
-const ACCOUNTS = ['Axis Bank', 'Indian Bank', 'Axis Credit Card'] as const
+const ACCOUNTS = ['Axis Bank', 'Indian Bank', 'Axis Credit Card', 'Cash'] as const
 
 export default function BommiPage() {
   return (
