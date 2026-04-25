@@ -3,7 +3,7 @@ import { Plus, LayoutDashboard, List, BarChart3, Wallet, Search, TrendingUp, Ale
 import { api, RawSavingsRow } from '../api'
 import { CATEGORIES, THEME_COLORS } from '../config'
 import { INR } from '../utils'
-import { BalanceRow, FormField, KpiCard, KpiGrid, LoadingState, SearchField, SectionBlock, Spacer, TransactionCard } from '../ui'
+import { BalanceRow, CatIcon, FormField, KpiCard, KpiGrid, LoadingState, SearchField, SectionBlock, Spacer, TransactionCard } from '../ui'
 
 type SavingsType = 'Income' | 'Expense' | 'Transfer'
 type SavingsTab = 'dashboard' | 'transactions'
@@ -74,7 +74,7 @@ function makeEmptyForm(accounts: readonly string[]): SavingsFormState {
     desc: '',
     type: 'Income',
     toAccount: accounts[1] ?? accounts[0] ?? '',
-    category: '',
+    category: 'Others',
   }
 }
 
@@ -93,7 +93,7 @@ function parseRow(raw: RawSavingsRow, accounts: readonly string[]): SavingsEntry
     amount,
     desc: String(raw.desc ?? '').trim(),
     type: (type === 'INCOME' ? 'Income' : type === 'EXPENSE' ? 'Expense' : 'Transfer') as SavingsType,
-    category: String(raw.category ?? '').trim() || undefined,
+    category: type === 'EXPENSE' ? (String(raw.category ?? '').trim() || 'Others') : undefined,
   }
   if (type === 'TRANSFER') {
     const to = String(raw.toAccount ?? '').trim()
@@ -217,7 +217,7 @@ export default function SavingsPage({
       desc: e.desc,
       type: e.type,
       toAccount: e.toAccount ?? accounts.find(a => a !== e.account) ?? accounts[0] ?? '',
-      category: e.category ?? '',
+      category: e.category ?? 'Others',
     })
     setModalOpen(true)
   }
@@ -238,7 +238,7 @@ export default function SavingsPage({
       type: form.type === 'Income' ? 'INCOME' : form.type === 'Expense' ? 'EXPENSE' : 'TRANSFER',
     }
     if (form.type === 'Transfer') payload.toAccount = form.toAccount
-    if (form.type === 'Expense' && form.category) payload.category = form.category
+    if (form.type === 'Expense') payload.category = form.category
     try {
       if (editEntry) await api.updateSavings({ ...payload, id: editEntry.id }, sheetName)
       else await api.addSavings(payload, sheetName)
@@ -357,13 +357,14 @@ export default function SavingsPage({
                   } else {
                     titleText = e.desc || e.account
                   }
-                  if (e.type === 'Expense' && e.category) {
-                    titleText = `${titleText} · ${e.category}`
-                  }
                   return (
                     <TransactionCard
                       key={e.id}
-                      title={titleText}
+                      title={
+                        e.type === 'Expense' && e.category
+                          ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><CatIcon cat={e.category} size={14} />{titleText}</span>
+                          : titleText
+                      }
                       amount={`${e.type === 'Income' ? '+' : e.type === 'Transfer' ? '↔' : '−'}${INR(e.amount)}`}
                       type={e.type}
                       date={e.date}
@@ -442,7 +443,6 @@ export default function SavingsPage({
                 {form.type === 'Expense' && (
                   <FormField label="Category">
                     <select className="form-sel" value={form.category} onChange={e => setField('category', e.target.value)}>
-                      <option value="">Select category...</option>
                       {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </FormField>
