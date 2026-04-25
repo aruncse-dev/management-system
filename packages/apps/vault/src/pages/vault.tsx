@@ -87,6 +87,9 @@ export function VaultBankingPage() {
   const [toast, setToast] = useState('')
   const [search, setSearch] = useState('')
   const [authCopy, setAuthCopy] = useState<{ label: string; text: string } | null>(null)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [deleteId, setDeleteId] = useState('')
+  const [deleteBankName, setDeleteBankName] = useState('')
 
   const load = async () => {
     setLoading(true)
@@ -158,18 +161,38 @@ export function VaultBankingPage() {
     }
   }
 
-  const remove = async (id: string) => {
-    if (!window.confirm('Delete this banking entry?')) return
+  const openDeleteModal = (id: string, bankName: string) => {
+    setDeleteId(id)
+    setDeleteBankName(bankName)
+    setDeleteModalOpen(true)
+  }
+
+  const closeDeleteModal = () => {
+    setDeleteModalOpen(false)
+    setDeleteId('')
+    setDeleteBankName('')
+  }
+
+  const confirmDelete = async () => {
     setSaving(true)
     try {
-      await api.deleteBankingEntry(id)
+      await api.deleteBankingEntry(deleteId)
       await load()
-      if (detail?.id === id) setDetail(null)
+      if (detail?.id === deleteId) setDetail(null)
+      setToast('Entry deleted')
+      window.setTimeout(() => setToast(''), 1400)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Delete failed')
     } finally {
       setSaving(false)
+      closeDeleteModal()
     }
+  }
+
+  const remove = async (id: string) => {
+    const entry = rows.find(row => row.id === id)
+    if (!entry) return
+    openDeleteModal(id, entry.account_holder_name || 'Banking Entry')
   }
 
   const copy = async (label: string, text: string) => {
@@ -346,7 +369,7 @@ export function VaultBankingPage() {
                 setDetail(null)
                 startEdit(detail)
               }}
-              leading={<button type="button" className="ui-kit-btn ui-kit-btn--soft" onClick={() => remove(detail.id)}>Delete</button>}
+              leading={<button type="button" className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={() => remove(detail.id)}>Delete</button>}
             />
           }
         >
@@ -384,6 +407,27 @@ export function VaultBankingPage() {
               }, 0)
             }}
           />
+        </ModalShell>
+      )}
+
+      {deleteModalOpen && (
+        <ModalShell
+          title="Delete Entry"
+          onClose={closeDeleteModal}
+          footer={
+            <ModalActions
+              primaryLabel="Delete"
+              secondaryLabel="Cancel"
+              destructive
+              onPrimary={confirmDelete}
+              onSecondary={closeDeleteModal}
+              disabled={saving}
+            />
+          }
+        >
+          <div style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.5 }}>
+            Delete <strong>{deleteBankName}</strong>?
+          </div>
         </ModalShell>
       )}
 

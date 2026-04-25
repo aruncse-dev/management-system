@@ -28,6 +28,7 @@ packages/apps/**/.env.local
 
 # Turbo
 .turbo/
+.plans/
 
 # OS
 Thumbs.db

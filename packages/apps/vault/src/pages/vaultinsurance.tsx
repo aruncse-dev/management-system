@@ -127,11 +127,11 @@ function sumLabel(policyType: string): string {
 function calcPolicyTerm(issueDate: string, maturityDate: string): string {
   if (!issueDate.trim() || !maturityDate.trim()) return '-'
   try {
-    const issue = new Date(issueDate)
-    const maturity = new Date(maturityDate)
-    if (isNaN(issue.getTime()) || isNaN(maturity.getTime())) return '-'
-    const diffMs = maturity.getTime() - issue.getTime()
-    const years = Math.round((diffMs / (365.25 * 24 * 3600 * 1000)) * 2) / 2
+    const [issueY, issueM, issueD] = issueDate.split('-').map(Number)
+    const [maturityY, maturityM, maturityD] = maturityDate.split('-').map(Number)
+    if (!issueY || !issueM || !issueD || !maturityY || !maturityM || !maturityD) return '-'
+    let years = maturityY - issueY
+    if (maturityM < issueM || (maturityM === issueM && maturityD < issueD)) years--
     return `${years} Years`
   } catch {
     return '-'
@@ -513,7 +513,7 @@ export default function VaultInsurancePage() {
                 startEdit(detail)
               }}
               onPrimary={() => setDetail(null)}
-              leading={<button type="button" className="ui-kit-btn ui-kit-btn--soft" onClick={() => openDeleteModal(detail.id, detail.plan_name)} disabled={saving}>Delete</button>}
+              leading={<button type="button" className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={() => openDeleteModal(detail.id, detail.plan_name)} disabled={saving}>Delete</button>}
             />
           }
         >
@@ -559,10 +559,11 @@ export default function VaultInsurancePage() {
           onClose={closeDeleteModal}
           footer={
             <ModalActions
-              secondaryLabel="Cancel"
               primaryLabel="Delete"
-              onSecondary={closeDeleteModal}
+              secondaryLabel="Cancel"
+              destructive
               onPrimary={confirmDelete}
+              onSecondary={closeDeleteModal}
               disabled={saving}
             />
           }
