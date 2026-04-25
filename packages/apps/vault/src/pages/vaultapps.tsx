@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { Check, Copy, Globe, GraduationCap, Layers3, Lock, Plus, Search, AppWindow } from 'lucide-react'
+import { Check, Copy, ExternalLink, Globe, GraduationCap, Layers3, Lock, Plus, Search, AppWindow } from 'lucide-react'
 import { api, type RawVaultAppRow } from '../api'
 import { FormField, ModalActions, ModalShell, SearchField, SectionBlock, Spacer, UiPill } from '../ui'
 
@@ -214,37 +214,76 @@ export default function VaultAppsPage() {
             </div>
           ) : (
             filteredRows.map(row => (
-              <button
+              <div
                 key={row.app_uuid}
-                type="button"
-                onClick={() => setDetail(row)}
                 style={{
-                  textAlign: 'left',
-                  border: '1px solid rgba(30, 92, 199, .12)',
-                  borderRadius: 18,
-                  background: 'linear-gradient(180deg, rgba(255,255,255,.96), rgba(243,248,255,.92))',
-                  padding: 10,
+                  position: 'relative',
                   aspectRatio: '1 / 1',
-                  display: 'grid',
-                  alignContent: 'center',
-                  justifyItems: 'center',
-                  gap: 10,
-                  cursor: 'pointer',
-                  boxShadow: '0 10px 24px rgba(15, 23, 42, .05)',
-                  transition: 'transform .15s ease, box-shadow .15s ease, border-color .15s ease',
                 }}
               >
-                <div style={{ display: 'grid', placeItems: 'center', gap: 8, minWidth: 0, textAlign: 'center', width: '100%' }}>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', padding: 0, margin: 0, color: '#1D4ED8', flexShrink: 0, lineHeight: 0, width: 52, height: 52 }}>
-                    {appIcon(row, 52)}
-                  </span>
-                  <div style={{ minWidth: 0, width: '100%', paddingInline: 4 }}>
-                    <div style={{ fontSize: 13, fontWeight: 750, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'normal', lineHeight: 1.25, textAlign: 'center' }}>
-                      {row.app_name || 'Untitled App'}
+                <button
+                  type="button"
+                  onClick={() => setDetail(row)}
+                  style={{
+                    textAlign: 'left',
+                    border: '1px solid rgba(30, 92, 199, .12)',
+                    borderRadius: 18,
+                    background: 'linear-gradient(180deg, rgba(255,255,255,.96), rgba(243,248,255,.92))',
+                    padding: 10,
+                    aspectRatio: '1 / 1',
+                    display: 'grid',
+                    alignContent: 'center',
+                    justifyItems: 'center',
+                    gap: 10,
+                    cursor: 'pointer',
+                    boxShadow: '0 10px 24px rgba(15, 23, 42, .05)',
+                    transition: 'transform .15s ease, box-shadow .15s ease, border-color .15s ease',
+                    width: '100%',
+                    height: '100%',
+                  }}
+                >
+                  <div style={{ display: 'grid', placeItems: 'center', gap: 8, minWidth: 0, textAlign: 'center', width: '100%' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', padding: 0, margin: 0, color: '#1D4ED8', flexShrink: 0, lineHeight: 0, width: 52, height: 52 }}>
+                      {appIcon(row, 52)}
+                    </span>
+                    <div style={{ minWidth: 0, width: '100%', paddingInline: 4 }}>
+                      <div style={{ fontSize: 13, fontWeight: 750, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'normal', lineHeight: 1.25, textAlign: 'center' }}>
+                        {row.app_name || 'Untitled App'}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </button>
+                </button>
+                {row.app_link && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      window.open(row.app_link, '_blank', 'noopener,noreferrer')
+                    }}
+                    style={{
+                      position: 'absolute',
+                      bottom: 6,
+                      right: 6,
+                      width: 28,
+                      height: 28,
+                      borderRadius: '50%',
+                      background: '#1D4ED8',
+                      color: '#FFF',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 4px 12px rgba(29, 78, 216, 0.3)',
+                      transition: 'transform .15s ease, box-shadow .15s ease',
+                    }}
+                    title="Open app"
+                    aria-label="Open app in new tab"
+                  >
+                    <ExternalLink size={14} />
+                  </button>
+                )}
+              </div>
             ))
           )}
         </div>

@@ -119,6 +119,25 @@ function policyTypeIcon(value: string) {
   return <ShieldPlus size={14} />
 }
 
+function sumLabel(policyType: string): string {
+  const v = policyType.trim().toLowerCase()
+  return v === 'health' ? 'Sum Insured' : 'Sum Assured'
+}
+
+function calcPolicyTerm(issueDate: string, maturityDate: string): string {
+  if (!issueDate.trim() || !maturityDate.trim()) return '-'
+  try {
+    const issue = new Date(issueDate)
+    const maturity = new Date(maturityDate)
+    if (isNaN(issue.getTime()) || isNaN(maturity.getTime())) return '-'
+    const diffMs = maturity.getTime() - issue.getTime()
+    const years = Math.round((diffMs / (365.25 * 24 * 3600 * 1000)) * 2) / 2
+    return `${years} Years`
+  } catch {
+    return '-'
+  }
+}
+
 function openInNewTab(url: string) {
   window.open(url, '_blank', 'noopener,noreferrer')
 }
@@ -135,6 +154,9 @@ export default function VaultInsurancePage() {
   const [saving, setSaving] = useState(false)
   const [detail, setDetail] = useState<RawInsuranceRow | null>(null)
   const [toast, setToast] = useState('')
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [deletePlanName, setDeletePlanName] = useState('')
+  const [deleteId, setDeleteId] = useState('')
 
   const load = async () => {
     setLoading(true)
@@ -204,7 +226,6 @@ export default function VaultInsurancePage() {
         premium_amount: form.premium_amount ? Number(form.premium_amount) : 0,
         premium_mode: form.premium_mode.trim(),
         payment_method: form.payment_method.trim(),
-        policy_term: form.policy_term.trim(),
         issue_date: form.issue_date.trim(),
         maturity_date: form.maturity_date.trim(),
         sum_assured: form.sum_assured ? Number(form.sum_assured) : 0,
@@ -226,16 +247,28 @@ export default function VaultInsurancePage() {
     }
   }
 
-  const remove = async (id: string) => {
-    if (!window.confirm('Delete this insurance policy?')) return
+  const openDeleteModal = (id: string, planName: string) => {
+    setDeleteId(id)
+    setDeletePlanName(planName)
+    setDeleteModalOpen(true)
+  }
+
+  const closeDeleteModal = () => {
+    setDeleteModalOpen(false)
+    setDeleteId('')
+    setDeletePlanName('')
+  }
+
+  const confirmDelete = async () => {
     setSaving(true)
     setError('')
     try {
-      await api.deleteInsuranceEntry(id)
+      await api.deleteInsuranceEntry(deleteId)
       await load()
-      if (detail?.id === id) setDetail(null)
+      if (detail?.id === deleteId) setDetail(null)
       setToast('Policy deleted')
       window.setTimeout(() => setToast(''), 1400)
+      closeDeleteModal()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Delete failed')
     } finally {
@@ -250,13 +283,13 @@ export default function VaultInsurancePage() {
     ['Insurer', detail.insurer],
     ['App Entry', apps.find(app => app.app_uuid === detail.app_uuid)?.app_name || detail.app_uuid || ''],
     ['Policy Number', detail.policy_number],
-    ['Policy Term', detail.policy_term],
+    ['Policy Term', calcPolicyTerm(detail.issue_date, detail.maturity_date)],
     ['Premium Amount', INRInput(String(detail.premium_amount ?? ''))],
     ['Premium Mode', detail.premium_mode],
     ['Payment Method', detail.payment_method],
     ['Issue Date', fmtDate(detail.issue_date)],
     ['Maturity Date', fmtDate(detail.maturity_date)],
-    ['Sum Assured', INRInput(String(detail.sum_assured ?? ''))],
+    [sumLabel(detail.policy_type), INRInput(String(detail.sum_assured ?? ''))],
     ['Cash Value', INRInput(String(detail.cash_value ?? ''))],
     ['Nominee Name', detail.nominee_name],
     ['Notes', detail.notes],
@@ -350,7 +383,7 @@ export default function VaultInsurancePage() {
                 secondaryGrid={{
                   leftLabel: 'Policy Number',
                   leftValue: row.policy_number || '-',
-                  centerLabel: 'Sum Assured',
+                  centerLabel: sumLabel(row.policy_type),
                   centerValue: INRInput(String(row.sum_assured ?? '')),
                   rightLabel: 'Mode',
                   rightValue: row.premium_mode || '-',
@@ -396,7 +429,7 @@ export default function VaultInsurancePage() {
               primaryLabel={mode === 'add' ? 'Add' : 'Save'}
               onSecondary={closeForm}
               onPrimary={save}
-              leading={mode === 'edit' ? <button type="button" className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={() => void remove(editingId)} disabled={saving}>Delete</button> : null}
+              leading={mode === 'edit' ? <button type="button" className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={() => openDeleteModal(editingId, form.plan_name)} disabled={saving}>Delete</button> : null}
               disabled={saving}
             />
           }
@@ -433,13 +466,17 @@ export default function VaultInsurancePage() {
               <input className="form-inp" inputMode="decimal" value={form.premium_amount} onChange={e => setForm(f => ({ ...f, premium_amount: e.target.value }))} />
             </FormField>
             <FormField label="Premium Mode">
-              <input className="form-inp" value={form.premium_mode} onChange={e => setForm(f => ({ ...f, premium_mode: e.target.value }))} />
+              <select className="form-inp" value={form.premium_mode} onChange={e => setForm(f => ({ ...f, premium_mode: e.target.value }))}>
+                <option value="">Select Mode</option>
+                <option value="Monthly">Monthly</option>
+                <option value="Quarterly">Quarterly</option>
+                <option value="Half-Yearly">Half-Yearly</option>
+                <option value="Yearly">Yearly</option>
+                <option value="Single Premium">Single Premium</option>
+              </select>
             </FormField>
             <FormField label="Payment Method">
               <input className="form-inp" value={form.payment_method} onChange={e => setForm(f => ({ ...f, payment_method: e.target.value }))} />
-            </FormField>
-            <FormField label="Policy Term">
-              <input className="form-inp" value={form.policy_term} onChange={e => setForm(f => ({ ...f, policy_term: e.target.value }))} placeholder="30 Years" />
             </FormField>
             <FormField label="Issue Date">
               <input className="form-inp" type="date" value={form.issue_date} onChange={e => setForm(f => ({ ...f, issue_date: e.target.value }))} />
@@ -447,7 +484,7 @@ export default function VaultInsurancePage() {
             <FormField label="Maturity Date">
               <input className="form-inp" type="date" value={form.maturity_date} onChange={e => setForm(f => ({ ...f, maturity_date: e.target.value }))} />
             </FormField>
-            <FormField label="Sum Assured">
+            <FormField label={sumLabel(form.policy_type)}>
               <input className="form-inp" inputMode="decimal" value={form.sum_assured} onChange={e => setForm(f => ({ ...f, sum_assured: e.target.value }))} />
             </FormField>
             <FormField label="Cash Value">
@@ -476,7 +513,7 @@ export default function VaultInsurancePage() {
                 startEdit(detail)
               }}
               onPrimary={() => setDetail(null)}
-              leading={<button type="button" className="ui-kit-btn ui-kit-btn--soft" onClick={() => void remove(detail.id)} disabled={saving}>Delete</button>}
+              leading={<button type="button" className="ui-kit-btn ui-kit-btn--soft" onClick={() => openDeleteModal(detail.id, detail.plan_name)} disabled={saving}>Delete</button>}
             />
           }
         >
@@ -514,6 +551,26 @@ export default function VaultInsurancePage() {
           <Check size={14} />
           <span>{toast}</span>
         </div>
+      )}
+
+      {deleteModalOpen && (
+        <ModalShell
+          title="Delete Policy"
+          onClose={closeDeleteModal}
+          footer={
+            <ModalActions
+              secondaryLabel="Cancel"
+              primaryLabel="Delete"
+              onSecondary={closeDeleteModal}
+              onPrimary={confirmDelete}
+              disabled={saving}
+            />
+          }
+        >
+          <div style={{ padding: 12, color: 'var(--text)' }}>
+            Delete <strong>{deletePlanName}</strong>?
+          </div>
+        </ModalShell>
       )}
     </div>
   )
