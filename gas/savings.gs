@@ -145,7 +145,8 @@ function _savings_getEntries(sheetName) {
 function _savings_addEntry(date, account, amount, desc, type, toAccount, category, sheetName) {
   try {
     Logger.log('_savings_addEntry: START date=' + date + ', account=' + account + ', amount=' + amount + ', type=' + type);
-    const sh  = _savingsSheet(sheetName);
+    const resolvedSheet = String(sheetName || S_SHEET).trim() || S_SHEET;
+    const sh  = _savingsSheet(resolvedSheet);
     Logger.log('_savings_addEntry: sheet obtained');
     const id  = Utilities.getUuid();
     const amt = parseFloat(amount) || 0;
@@ -172,7 +173,7 @@ function _savings_addEntry(date, account, amount, desc, type, toAccount, categor
     }
 
     Logger.log('_savings_addEntry: SUCCESS id=' + id);
-    CacheService.getScriptCache().remove('savings_entries_' + sheetName);
+    CacheService.getScriptCache().remove('savings_entries_' + resolvedSheet);
     return id;
   } catch(e) {
     Logger.log('_savings_addEntry ERROR: ' + e.message + ' | Stack: ' + e.stack);
@@ -183,13 +184,15 @@ function _savings_addEntry(date, account, amount, desc, type, toAccount, categor
 function _savings_updateEntry(id, date, account, amount, desc, type, toAccount, category, sheetName) {
   try {
     Logger.log('_savings_updateEntry: START id=' + id + ', account=' + account + ', amount=' + amount);
-    const sh   = _savingsSheet(sheetName);
+    const resolvedSheet = String(sheetName || S_SHEET).trim() || S_SHEET;
+    const sh   = _savingsSheet(resolvedSheet);
     Logger.log('_savings_updateEntry: sheet obtained');
     const vals = sh.getDataRange().getValues();
     const rowCountBefore = sh.getLastRow();
     Logger.log('_savings_updateEntry: data read, rows=' + vals.length + ', row count=' + rowCountBefore);
 
-    const targetId = String(id).trim();
+    const targetId = String(id || '').trim();
+    if (!targetId) throw new Error('Savings update failed: missing id');
     let targetRow = -1;
 
     for (let i = 1; i < vals.length; i++) {
@@ -204,7 +207,7 @@ function _savings_updateEntry(id, date, account, amount, desc, type, toAccount, 
     }
 
     if (targetRow === -1) {
-      throw new Error('Savings entry not found: ' + id);
+      throw new Error('Savings entry not found: ' + targetId + ' (sheet: ' + resolvedSheet + ')');
     }
 
     const amt = parseFloat(amount) || 0;
@@ -229,7 +232,7 @@ function _savings_updateEntry(id, date, account, amount, desc, type, toAccount, 
     }
 
     Logger.log('_savings_updateEntry: SUCCESS');
-    CacheService.getScriptCache().remove('savings_entries_' + sheetName);
+    CacheService.getScriptCache().remove('savings_entries_' + resolvedSheet);
     return true;
   } catch(e) {
     Logger.log('_savings_updateEntry ERROR: ' + e.message + ' | Stack: ' + e.stack);
@@ -240,16 +243,20 @@ function _savings_updateEntry(id, date, account, amount, desc, type, toAccount, 
 function _savings_deleteEntry(id, sheetName) {
   try {
     Logger.log('_savings_deleteEntry: id=' + id);
-    const sh   = _savingsSheet(sheetName);
+    const resolvedSheet = String(sheetName || S_SHEET).trim() || S_SHEET;
+    const sh   = _savingsSheet(resolvedSheet);
     const vals = sh.getDataRange().getValues();
     const rowCountBefore = sh.getLastRow();
     Logger.log('_savings_deleteEntry: row count before delete=' + rowCountBefore);
 
+    const targetId = String(id || '').trim();
+    if (!targetId) throw new Error('Savings delete failed: missing id');
     let targetRow = -1;
 
     // Find the target row (search backwards)
     for (let i = vals.length - 1; i >= 1; i--) {
-      if (String(vals[i][S_COL.ID]) === String(id)) {
+      const rowId = String(vals[i][S_COL.ID] || '').trim();
+      if (rowId === targetId) {
         targetRow = i + 1;
         Logger.log('_savings_deleteEntry: found entry at row ' + targetRow);
         break;
@@ -257,7 +264,7 @@ function _savings_deleteEntry(id, sheetName) {
     }
 
     if (targetRow === -1) {
-      throw new Error('Savings entry not found: ' + id);
+      throw new Error('Savings entry not found: ' + targetId + ' (sheet: ' + resolvedSheet + ')');
     }
 
     sh.deleteRow(targetRow);
@@ -270,7 +277,7 @@ function _savings_deleteEntry(id, sheetName) {
     }
 
     Logger.log('_savings_deleteEntry: success');
-    CacheService.getScriptCache().remove('savings_entries_' + sheetName);
+    CacheService.getScriptCache().remove('savings_entries_' + resolvedSheet);
     return true;
   } catch(e) {
     Logger.log('_savings_deleteEntry ERROR: ' + e.message + ' | Stack: ' + e.stack);

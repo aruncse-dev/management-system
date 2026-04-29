@@ -12,7 +12,7 @@ export default function Dashboard() {
   if (state.loading) return <div className="pg"><LoadingState /></div>
 
   const inc = sumType(rows, 'Income')
-  const exp = sumType(rows, 'Expense')
+  const exp = sumType(rows, 'Expense') + sumType(rows, 'Savings')
   const cc  = sumCC(rows)
   const ocr = sumOtherCr(rows)
   const flows = acctFlows(rows, openingBal)

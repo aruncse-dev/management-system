@@ -6,7 +6,7 @@ import { TXN_PAGE } from '../config'
 import { LoadingState, SectionBlock, TransactionCard } from '../ui'
 import { CatIcon } from '../ui'
 
-const FILTERS = ['All','Expense','Income','Transfer','Savings','ICICI','HDFC','Bommi','Ramya']
+const FILTERS = ['All','Expense','Income','Transfer','Savings','Cash','ICICI','HDFC','Bommi','Ramya']
 
 interface Props { onEdit: (r: Transaction) => void }
 

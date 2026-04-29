@@ -3,6 +3,9 @@ const VAULT_BANKING_SHEET = 'banking';
 const VAULT_APPS_HDR = ['ID', 'App Name', 'Category', 'Logo', 'App Link', 'Username', 'Password', 'Two Factor Enabled', 'Notes', 'Updated At'];
 const VAULT_APPS_SHEET = 'Apps';
 const VAULT_SPREADSHEET_NAME = 'FinTrackerVault';
+const VAULT_CACHE = CacheService.getScriptCache();
+const VAULT_BANKING_CACHE_KEY = 'vault_banking_entries';
+const VAULT_APPS_CACHE_KEY = 'vault_apps_entries';
 
 function _vault_getSpreadsheet() {
   const props = PropertiesService.getScriptProperties();
@@ -65,6 +68,8 @@ function _vault_saveSettings(vaultSpreadsheetId) {
     const props = PropertiesService.getScriptProperties();
     if (vaultSpreadsheetId) {
       props.setProperty('VAULT_SPREADSHEET_ID', String(vaultSpreadsheetId));
+      VAULT_CACHE.remove(VAULT_BANKING_CACHE_KEY);
+      VAULT_CACHE.remove(VAULT_APPS_CACHE_KEY);
     }
     return true;
   } catch(e) {
@@ -74,8 +79,9 @@ function _vault_saveSettings(vaultSpreadsheetId) {
 }
 
 function _vault_getEntries() {
-  const sh = _vault_getSheet();
-  const vals = sh.getDataRange().getValues();
+  const cached = VAULT_CACHE.get(VAULT_BANKING_CACHE_KEY);
+  const vals = cached ? JSON.parse(cached) : _vault_getSheet().getDataRange().getValues();
+  if (!cached) VAULT_CACHE.put(VAULT_BANKING_CACHE_KEY, JSON.stringify(vals), 300);
   if (vals.length <= 1) return [];
   return vals.slice(1).filter(r => r[0]).map(_vault_rowToObj);
 }
@@ -85,8 +91,9 @@ function _vault_getAppsSheet() {
 }
 
 function _vault_getApps() {
-  const sh = _vault_getAppsSheet();
-  const vals = sh.getDataRange().getValues();
+  const cached = VAULT_CACHE.get(VAULT_APPS_CACHE_KEY);
+  const vals = cached ? JSON.parse(cached) : _vault_getAppsSheet().getDataRange().getValues();
+  if (!cached) VAULT_CACHE.put(VAULT_APPS_CACHE_KEY, JSON.stringify(vals), 300);
   if (vals.length <= 1) return [];
   return vals.slice(1).filter(r => r[0]).map(_vault_appRowToObj);
 }
@@ -150,6 +157,7 @@ function _vault_addEntry(body) {
   } else {
     sh.appendRow(row);
   }
+  VAULT_CACHE.remove(VAULT_BANKING_CACHE_KEY);
   return id;
 }
 
@@ -176,6 +184,7 @@ function _vault_updateEntry(body) {
     String(body.app_uuid || ''),
     now,
   ]]);
+  VAULT_CACHE.remove(VAULT_BANKING_CACHE_KEY);
   return true;
 }
 
@@ -185,6 +194,7 @@ function _vault_deleteEntry(id) {
   const rowIdx = vals.findIndex((r, idx) => idx > 0 && String(r[0] || '') === id);
   if (rowIdx === -1) throw new Error('Record not found');
   sh.deleteRow(rowIdx + 1);
+  VAULT_CACHE.remove(VAULT_BANKING_CACHE_KEY);
   return true;
 }
 
@@ -229,6 +239,7 @@ function _vault_addApp(body) {
     String(body.notes || ''),
     now,
   ]);
+  VAULT_CACHE.remove(VAULT_APPS_CACHE_KEY);
   return appUuid;
 }
 
@@ -253,6 +264,7 @@ function _vault_updateApp(body) {
     new Date().toISOString(),
   ];
   sh.getRange(rowIdx + 1, 1, 1, VAULT_APPS_HDR.length).setValues([nextRow]);
+  VAULT_CACHE.remove(VAULT_APPS_CACHE_KEY);
   return true;
 }
 
@@ -261,5 +273,6 @@ function _vault_deleteApp(appUuid) {
   const rowIdx = _vault_findAppRow(sh, appUuid);
   if (rowIdx === -1) throw new Error('App not found');
   sh.deleteRow(rowIdx + 1);
+  VAULT_CACHE.remove(VAULT_APPS_CACHE_KEY);
   return true;
 }

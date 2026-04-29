@@ -256,8 +256,10 @@ export default function SavingsPage({
     if (!editEntry || deleting || saving) return
     setDeleting(true)
     setError('')
+    const deletingId = editEntry.id
     try {
-      await api.deleteSavings(editEntry.id, sheetName)
+      await api.deleteSavings(deletingId, sheetName)
+      setEntries(prev => prev.filter(entry => entry.id !== deletingId))
       api.invalidateCache({ action: 'getEntries', params: { module: 'savings', ...(sheetName !== 'Savings' ? { sheetName } : {}) } })
       closeModal()
       await loadData()

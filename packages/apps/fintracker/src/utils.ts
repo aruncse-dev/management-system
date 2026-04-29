@@ -81,16 +81,31 @@ export function budgetSummary(budget: Budget, cm: Record<string, number>) {
 }
 
 export function acctFlows(rows: Transaction[], openingBal: OpeningBal) {
+  const accountByLower = Object.fromEntries(ACCOUNTS.map(acc => [acc.toLowerCase(), acc])) as Record<string, string>
+  function normalizeAccount(name: string) {
+    return accountByLower[String(name || '').trim().toLowerCase()] || ''
+  }
+  function transferTarget(notes: string) {
+    const raw = String(notes || '').trim()
+    if (!raw) return ''
+    // Current format: "→Wallet · note", legacy: "-> Wallet", fallback: "... to Wallet"
+    const direct = raw.match(/^(?:→|->)\s*([^·|,]+?)(?:\s*[·|,].*)?$/)
+    if (direct?.[1]) return normalizeAccount(direct[1])
+    const any = raw.match(/\bto\s+(cash|hdfc bank|wallet)\b/i)
+    if (any?.[1]) return normalizeAccount(any[1])
+    return ''
+  }
+
   const result: Record<string, { inflow: number; outflow: number; current: number }> = {}
   ACCOUNTS.forEach(acc => {
     let inflow = 0, outflow = 0
     rows.forEach(r => {
       if (r.m === acc) {
         if (r.t === 'Income') inflow += r.a
-        else if (r.t === 'Expense') outflow += r.a
+        else if (r.t === 'Expense' || r.t === 'Savings') outflow += r.a
         else if (r.t === 'Transfer') outflow += r.a
       }
-      if (r.t === 'Transfer' && r.notes?.startsWith('→' + acc)) inflow += r.a
+      if (r.t === 'Transfer' && transferTarget(r.notes) === acc) inflow += r.a
     })
     const opening = openingBal[acc] || 0
     result[acc] = { inflow, outflow, current: opening + inflow - outflow }

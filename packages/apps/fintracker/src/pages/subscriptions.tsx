@@ -293,10 +293,13 @@ export default function SubscriptionsPage() {
   }
 
   const confirmDelete = async () => {
+    if (!deleteId) return
     setSaving(true)
     setError('')
+    const deletingId = deleteId
     try {
-      await api.deleteSubscriptionEntry(deleteId)
+      await api.deleteSubscriptionEntry(deletingId)
+      setRows(prev => prev.filter(row => row.id !== deletingId))
       await load()
       setToast('Subscription deleted')
       window.setTimeout(() => setToast(''), 1400)

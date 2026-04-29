@@ -22,6 +22,8 @@ const SUB_COL = {
   NOTES: 12,
   UPDATED: 13,
 };
+const SUB_CACHE = CacheService.getScriptCache();
+const SUB_CACHE_KEY = 'subscriptions_entries';
 
 function _subscriptionsHandleGet(action) {
   if (action === 'getEntries') return _subscriptions_getEntries();
@@ -62,8 +64,9 @@ function _subscriptionsEnsureHeader(sh) {
 }
 
 function _subscriptions_getEntries() {
-  const sh = _subscriptionsSheet();
-  const vals = sh.getDataRange().getValues();
+  const cached = SUB_CACHE.get(SUB_CACHE_KEY);
+  const vals = cached ? JSON.parse(cached) : _subscriptionsSheet().getDataRange().getValues();
+  if (!cached) SUB_CACHE.put(SUB_CACHE_KEY, JSON.stringify(vals), 300);
   if (vals.length <= 1) return [];
   return vals.slice(1).filter(r => r[0]).map(_subscriptions_rowToObj);
 }
@@ -150,6 +153,7 @@ function _subscriptions_addEntry(body) {
   const sh = _subscriptionsSheet();
   const id = Utilities.getUuid();
   sh.appendRow(_subscriptions_payloadToRow(body, id));
+  SUB_CACHE.remove(SUB_CACHE_KEY);
   return id;
 }
 
@@ -163,6 +167,7 @@ function _subscriptions_updateEntry(body) {
   const rowIdx = vals.findIndex((r, idx) => idx > 0 && String(r[0] || '').trim() === id);
   if (rowIdx === -1) throw new Error('Subscription not found');
   sh.getRange(rowIdx + 1, 1, 1, SUB_HDR.length).setValues([_subscriptions_payloadToRow(body, id)]);
+  SUB_CACHE.remove(SUB_CACHE_KEY);
   return true;
 }
 
@@ -174,5 +179,6 @@ function _subscriptions_deleteEntry(id) {
   const rowIdx = vals.findIndex((r, idx) => idx > 0 && String(r[0] || '').trim() === targetId);
   if (rowIdx === -1) throw new Error('Subscription not found');
   sh.deleteRow(rowIdx + 1);
+  SUB_CACHE.remove(SUB_CACHE_KEY);
   return true;
 }

@@ -450,8 +450,10 @@ export default function Gold() {
     if (savingItem || deletingItem) return;
     setDeletingItem(true);
     setError('');
+    const deletingId = editItem.id;
     try {
-      await api.deleteGold(editItem.id);
+      await api.deleteGold(deletingId);
+      setItems(prev => prev.filter(item => item.id !== deletingId));
       closeItemModal();
       await loadData(true);
     } catch (e) {
@@ -526,8 +528,10 @@ export default function Gold() {
     if (savingHistory || deletingHistory) return;
     setDeletingHistory(true);
     setError('');
+    const deletingId = editHistory.id;
     try {
-      await api.deleteGoldHistory(editHistory.id);
+      await api.deleteGoldHistory(deletingId);
+      setHistory(prev => prev.filter(item => item.id !== deletingId));
       closeHistoryModal();
       await loadData(true);
     } catch (e) {

@@ -5,6 +5,17 @@ var STAFF_HDR = ['ID', 'Name', 'Active', 'SalaryType', 'SalaryAmount'];
 var STAFF_COL = { ID: 0, NAME: 1, ACTIVE: 2, SALARY_TYPE: 3, SALARY_AMOUNT: 4 };
 var ATT_COL = { ENTRY_ID: 0, DATE: 1, STAFF_ID: 2, WORKED: 3, OVERTIME: 4 };
 var ATT_HDR = ['EntryID', 'Date', 'StaffID', 'Worked', 'Overtime'];
+var STAFF_CACHE = CacheService.getScriptCache();
+
+function _staff_getCachedTabData(tabName, cacheKey) {
+  var cached = STAFF_CACHE.get(cacheKey);
+  if (cached) return JSON.parse(cached);
+  var sh = _staff_getSpreadsheet().getSheetByName(tabName);
+  if (!sh) return [];
+  var vals = sh.getDataRange().getValues();
+  STAFF_CACHE.put(cacheKey, JSON.stringify(vals), 300);
+  return vals;
+}
 
 function _staff_getSpreadsheet() {
   var props = PropertiesService.getScriptProperties();
@@ -25,6 +36,8 @@ function _staff_saveSettings(staffAttendanceSpreadsheetId) {
   var v = String(staffAttendanceSpreadsheetId || '').trim();
   if (v) {
     props.setProperty('STAFF_ATTENDANCE_SHEET_ID', v);
+    STAFF_CACHE.remove('staff_list_rows');
+    STAFF_CACHE.remove('staff_months');
   }
   return true;
 }
@@ -124,8 +137,7 @@ function _staff_rowActive(r2) {
 
 function _staff_listStaff() {
   _staffEnsureStaffSheet();
-  var sh = _staff_getSpreadsheet().getSheetByName(STAFF_TAB);
-  var vals = sh.getDataRange().getValues();
+  var vals = _staff_getCachedTabData(STAFF_TAB, 'staff_list_rows');
   if (vals.length <= 1) return [];
   return vals.slice(1).filter(function (r) { return r[0]; }).map(function (r) {
     return {
@@ -147,6 +159,7 @@ function _staff_addStaff(body) {
   var sh = _staff_getSpreadsheet().getSheetByName(STAFF_TAB);
   var id = Utilities.getUuid();
   sh.appendRow([id, name, true, salaryType, salaryAmount]);
+  STAFF_CACHE.remove('staff_list_rows');
   return { id: id, name: name, active: true, salaryType: salaryType, salaryAmount: salaryAmount };
 }
 
@@ -165,6 +178,7 @@ function _staff_updateStaff(body) {
   for (i = 1; i < vals.length; i++) {
     if (String(vals[i][STAFF_COL.ID]) === id) {
       sh.getRange(i + 1, 1, 1, STAFF_HDR.length).setValues([[id, name, active, salaryType, salaryAmount]]);
+      STAFF_CACHE.remove('staff_list_rows');
       return { id: id, name: name, active: active, salaryType: salaryType, salaryAmount: salaryAmount };
     }
   }
@@ -172,8 +186,11 @@ function _staff_updateStaff(body) {
 }
 
 function _staff_getMonths() {
+  var cacheKey = 'staff_months';
+  var cached = STAFF_CACHE.get(cacheKey);
+  if (cached) return JSON.parse(cached);
   var ss = _staff_getSpreadsheet();
-  return ss
+  var data = ss
     .getSheets()
     .map(function (sh) {
       return sh.getName();
@@ -189,6 +206,8 @@ function _staff_getMonths() {
       var yd = parseInt(b.year, 10) - parseInt(a.year, 10);
       return yd !== 0 ? yd : MNS.indexOf(b.month) - MNS.indexOf(a.month);
     });
+  STAFF_CACHE.put(cacheKey, JSON.stringify(data), 300);
+  return data;
 }
 
 function _staff_ensureMonth(month, year) {
@@ -198,6 +217,8 @@ function _staff_ensureMonth(month, year) {
   if (!sh) {
     sh = ss.insertSheet(tab);
     sh.appendRow(ATT_HDR);
+    STAFF_CACHE.remove('staff_months');
+    STAFF_CACHE.remove('staff_attendance_' + tab);
     return true;
   }
   var first = sh.getRange(1, 1, 1, ATT_HDR.length).getValues()[0];
@@ -205,6 +226,8 @@ function _staff_ensureMonth(month, year) {
     sh.insertRowBefore(1);
     sh.getRange(1, 1, 1, ATT_HDR.length).setValues([ATT_HDR]);
   }
+  STAFF_CACHE.remove('staff_months');
+  STAFF_CACHE.remove('staff_attendance_' + tab);
   return true;
 }
 
@@ -232,10 +255,7 @@ function _staff_bool(v) {
 
 function _staff_getAttendance(month, year) {
   var tab = _name(month, year);
-  var ss = _staff_getSpreadsheet();
-  var sh = ss.getSheetByName(tab);
-  if (!sh) return [];
-  var vals = sh.getDataRange().getValues();
+  var vals = _staff_getCachedTabData(tab, 'staff_attendance_' + tab);
   if (vals.length < 2) return [];
   return vals
     .slice(1)
@@ -276,10 +296,12 @@ function _staff_setAttendance(body) {
     if (d === dateStr && sid === staffId) {
       if (!worked && !overtime) {
         sh.deleteRow(i + 1);
+        STAFF_CACHE.remove('staff_attendance_' + tab);
         return { entryId: '', date: dateStr, staffId: staffId, worked: false, overtime: false };
       }
       var entryId = String(vals[i][ATT_COL.ENTRY_ID] || Utilities.getUuid());
       sh.getRange(i + 1, 1, 1, ATT_HDR.length).setValues([[entryId, dateStr, staffId, worked, overtime]]);
+      STAFF_CACHE.remove('staff_attendance_' + tab);
       return { entryId: entryId, date: dateStr, staffId: staffId, worked: worked, overtime: overtime };
     }
   }
@@ -288,5 +310,6 @@ function _staff_setAttendance(body) {
   }
   var newId = Utilities.getUuid();
   sh.appendRow([newId, dateStr, staffId, worked, overtime]);
+  STAFF_CACHE.remove('staff_attendance_' + tab);
   return { entryId: newId, date: dateStr, staffId: staffId, worked: worked, overtime: overtime };
 }

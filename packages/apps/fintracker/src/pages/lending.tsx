@@ -252,8 +252,10 @@ export default function Lending({ sheetName: sheetNameProp, onTabChange }: Lendi
     if (!delConfirm) { setDelConfirm(true); return }
     if (!editEntry) return
     setSaving(true)
+    const deletingId = editEntry.id
     try {
-      await api.deleteLending(editEntry.id, safeSheetName)
+      await api.deleteLending(deletingId, safeSheetName)
+      setEntries(prev => prev.filter(entry => entry.id !== deletingId))
       api.invalidateCache({ action: 'getEntries', params: { module: 'lending', ...(safeSheetName && safeSheetName !== 'Lending' ? { sheetName: safeSheetName } : {}) } })
       setModalOpen(false)
       await loadData()

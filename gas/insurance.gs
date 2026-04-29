@@ -10,6 +10,8 @@ const I_COL = {
   ID: 0, TYPE: 1, PLAN: 2, INSURER: 3, APP: 4, POL_NO: 5, OWNER: 6, PREMIUM: 7, MODE: 8, PAYMENT: 9,
   ISSUE: 10, MATURITY: 11, SUM: 12, CASH: 13, NOMINEE: 14, NOTES: 15, UPDATED: 16,
 };
+const INS_CACHE = CacheService.getScriptCache();
+const INS_CACHE_KEY = 'insurance_entries';
 
 function _ensureInsuranceHeader(sh) {
   const lastRow = sh.getLastRow();
@@ -73,8 +75,9 @@ function _insurance_rowToObj(row) {
 }
 
 function _insurance_getEntries() {
-  const sh = _insuranceSheet();
-  const vals = sh.getDataRange().getValues();
+  const cached = INS_CACHE.get(INS_CACHE_KEY);
+  const vals = cached ? JSON.parse(cached) : _insuranceSheet().getDataRange().getValues();
+  if (!cached) INS_CACHE.put(INS_CACHE_KEY, JSON.stringify(vals), 300);
   if (vals.length <= 1) return [];
   return vals.slice(1).filter(r => r[0]).map(_insurance_rowToObj);
 }
@@ -106,6 +109,7 @@ function _insurance_addEntry(body) {
   const sh = _insuranceSheet();
   const id = Utilities.getUuid();
   sh.appendRow(_insurance_payloadToRow(body, id));
+  INS_CACHE.remove(INS_CACHE_KEY);
   return id;
 }
 
@@ -117,6 +121,7 @@ function _insurance_updateEntry(body) {
   const rowIdx = vals.findIndex((r, idx) => idx > 0 && String(r[0] || '') === id);
   if (rowIdx === -1) throw new Error('Insurance policy not found');
   sh.getRange(rowIdx + 1, 1, 1, I_HDR.length).setValues([_insurance_payloadToRow(body, id)]);
+  INS_CACHE.remove(INS_CACHE_KEY);
   return true;
 }
 
@@ -126,5 +131,6 @@ function _insurance_deleteEntry(id) {
   const rowIdx = vals.findIndex((r, idx) => idx > 0 && String(r[0] || '') === id);
   if (rowIdx === -1) throw new Error('Insurance policy not found');
   sh.deleteRow(rowIdx + 1);
+  INS_CACHE.remove(INS_CACHE_KEY);
   return true;
 }
