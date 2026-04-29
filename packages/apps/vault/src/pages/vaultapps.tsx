@@ -74,9 +74,8 @@ export default function VaultAppsPage() {
   const [detail, setDetail] = useState<RawVaultAppRow | null>(null)
   const [toast, setToast] = useState('')
   const [authCopy, setAuthCopy] = useState<{ label: string; text: string } | null>(null)
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [deleteUuid, setDeleteUuid] = useState('')
-  const [deleteAppName, setDeleteAppName] = useState('')
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -109,18 +108,24 @@ export default function VaultAppsPage() {
     setMode('add')
     setEditingUuid('')
     setForm(EMPTY_FORM)
+    setDeleteConfirm(false)
+    setDeleteUuid('')
   }
 
   const startEdit = (row: RawVaultAppRow) => {
     setMode('edit')
     setEditingUuid(row.app_uuid)
     setForm(toForm(row))
+    setDeleteConfirm(false)
+    setDeleteUuid(row.app_uuid)
   }
 
   const closeForm = () => {
     setMode(null)
     setEditingUuid('')
     setForm(EMPTY_FORM)
+    setDeleteConfirm(false)
+    setDeleteUuid('')
   }
 
   const save = async () => {
@@ -156,38 +161,32 @@ export default function VaultAppsPage() {
     }
   }
 
-  const openDeleteModal = (uuid: string, appName: string) => {
-    setDeleteUuid(uuid)
-    setDeleteAppName(appName)
-    setDeleteModalOpen(true)
-  }
-
-  const closeDeleteModal = () => {
-    setDeleteModalOpen(false)
-    setDeleteUuid('')
-    setDeleteAppName('')
-  }
-
-  const confirmDelete = async () => {
+  const confirmDelete = async (targetUuid: string) => {
+    if (!targetUuid) return
     setSaving(true)
     try {
-      await api.deleteApp(deleteUuid)
+      await api.deleteApp(targetUuid)
       await load()
-      if (detail?.app_uuid === deleteUuid) setDetail(null)
+      if (detail?.app_uuid === targetUuid) setDetail(null)
       setToast('App deleted')
       window.setTimeout(() => setToast(''), 1400)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Delete failed')
     } finally {
       setSaving(false)
-      closeDeleteModal()
+      setDeleteConfirm(false)
+      setDeleteUuid('')
     }
   }
 
   const remove = async (appUuid: string) => {
-    const app = rows.find(row => row.app_uuid === appUuid)
-    if (!app) return
-    openDeleteModal(appUuid, app.app_name || 'App')
+    if (!appUuid) return
+    if (!deleteConfirm || deleteUuid !== appUuid) {
+      setDeleteUuid(appUuid)
+      setDeleteConfirm(true)
+      return
+    }
+    await confirmDelete(appUuid)
   }
 
   const copy = async (label: string, text: string) => {
@@ -311,7 +310,7 @@ export default function VaultAppsPage() {
               primaryLabel={mode === 'add' ? 'Add' : 'Save'}
               onSecondary={closeForm}
               onPrimary={save}
-              leading={mode === 'edit' ? <button type="button" className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={() => remove(editingUuid)} disabled={saving}>Delete</button> : null}
+              leading={mode === 'edit' ? <button type="button" className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={() => void remove(editingUuid)} disabled={saving}>{saving ? 'Deleting…' : deleteConfirm && deleteUuid === editingUuid ? 'Confirm delete?' : 'Delete'}</button> : null}
               disabled={saving}
             />
           }
@@ -363,7 +362,7 @@ export default function VaultAppsPage() {
               onPrimary={() => {
                 if (detail.app_link) window.open(detail.app_link, '_blank', 'noopener,noreferrer')
               }}
-              leading={<button type="button" className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={() => remove(detail.app_uuid)} disabled={saving}>Delete</button>}
+              leading={<button type="button" className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={() => void remove(detail.app_uuid)} disabled={saving}>{saving ? 'Deleting…' : deleteConfirm && deleteUuid === detail.app_uuid ? 'Confirm delete?' : 'Delete'}</button>}
             />
           }
         >
@@ -394,27 +393,6 @@ export default function VaultAppsPage() {
               }, 0)
             }}
           />
-        </ModalShell>
-      )}
-
-      {deleteModalOpen && (
-        <ModalShell
-          title="Delete App"
-          onClose={closeDeleteModal}
-          footer={
-            <ModalActions
-              primaryLabel="Delete"
-              secondaryLabel="Cancel"
-              destructive
-              onPrimary={confirmDelete}
-              onSecondary={closeDeleteModal}
-              disabled={saving}
-            />
-          }
-        >
-          <div style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.5 }}>
-            Delete <strong>{deleteAppName}</strong>?
-          </div>
         </ModalShell>
       )}
 

@@ -154,9 +154,8 @@ export default function VaultInsurancePage() {
   const [saving, setSaving] = useState(false)
   const [detail, setDetail] = useState<RawInsuranceRow | null>(null)
   const [toast, setToast] = useState('')
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
-  const [deletePlanName, setDeletePlanName] = useState('')
   const [deleteId, setDeleteId] = useState('')
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -193,18 +192,24 @@ export default function VaultInsurancePage() {
     setMode('add')
     setEditingId('')
     setForm(EMPTY_FORM)
+    setDeleteConfirm(false)
+    setDeleteId('')
   }
 
   const startEdit = (row: RawInsuranceRow) => {
     setMode('edit')
     setEditingId(row.id)
     setForm(toForm(row))
+    setDeleteConfirm(false)
+    setDeleteId(row.id)
   }
 
   const closeForm = () => {
     setMode(null)
     setEditingId('')
     setForm(EMPTY_FORM)
+    setDeleteConfirm(false)
+    setDeleteId('')
   }
 
   const save = async () => {
@@ -247,33 +252,33 @@ export default function VaultInsurancePage() {
     }
   }
 
-  const openDeleteModal = (id: string, planName: string) => {
-    setDeleteId(id)
-    setDeletePlanName(planName)
-    setDeleteModalOpen(true)
-  }
-
-  const closeDeleteModal = () => {
-    setDeleteModalOpen(false)
-    setDeleteId('')
-    setDeletePlanName('')
-  }
-
-  const confirmDelete = async () => {
+  const confirmDelete = async (targetId: string) => {
+    if (!targetId) return
     setSaving(true)
     setError('')
     try {
-      await api.deleteInsuranceEntry(deleteId)
+      await api.deleteInsuranceEntry(targetId)
       await load()
-      if (detail?.id === deleteId) setDetail(null)
+      if (detail?.id === targetId) setDetail(null)
       setToast('Policy deleted')
       window.setTimeout(() => setToast(''), 1400)
-      closeDeleteModal()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Delete failed')
     } finally {
       setSaving(false)
+      setDeleteConfirm(false)
+      setDeleteId('')
     }
+  }
+
+  const requestDelete = async (targetId: string) => {
+    if (!targetId) return
+    if (!deleteConfirm || deleteId !== targetId) {
+      setDeleteId(targetId)
+      setDeleteConfirm(true)
+      return
+    }
+    await confirmDelete(targetId)
   }
 
   const detailRows = detail ? [
@@ -429,7 +434,7 @@ export default function VaultInsurancePage() {
               primaryLabel={mode === 'add' ? 'Add' : 'Save'}
               onSecondary={closeForm}
               onPrimary={save}
-              leading={mode === 'edit' ? <button type="button" className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={() => openDeleteModal(editingId, form.plan_name)} disabled={saving}>Delete</button> : null}
+              leading={mode === 'edit' ? <button type="button" className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={() => void requestDelete(editingId)} disabled={saving}>{saving ? 'Deleting…' : deleteConfirm && deleteId === editingId ? 'Confirm delete?' : 'Delete'}</button> : null}
               disabled={saving}
             />
           }
@@ -513,7 +518,7 @@ export default function VaultInsurancePage() {
                 startEdit(detail)
               }}
               onPrimary={() => setDetail(null)}
-              leading={<button type="button" className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={() => openDeleteModal(detail.id, detail.plan_name)} disabled={saving}>Delete</button>}
+              leading={<button type="button" className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={() => void requestDelete(detail.id)} disabled={saving}>{saving ? 'Deleting…' : deleteConfirm && deleteId === detail.id ? 'Confirm delete?' : 'Delete'}</button>}
             />
           }
         >
@@ -553,26 +558,6 @@ export default function VaultInsurancePage() {
         </div>
       )}
 
-      {deleteModalOpen && (
-        <ModalShell
-          title="Delete Policy"
-          onClose={closeDeleteModal}
-          footer={
-            <ModalActions
-              primaryLabel="Delete"
-              secondaryLabel="Cancel"
-              destructive
-              onPrimary={confirmDelete}
-              onSecondary={closeDeleteModal}
-              disabled={saving}
-            />
-          }
-        >
-          <div style={{ padding: 12, color: 'var(--text)' }}>
-            Delete <strong>{deletePlanName}</strong>?
-          </div>
-        </ModalShell>
-      )}
     </div>
   )
 }

@@ -271,6 +271,7 @@ export default function Gold() {
   const [form, setForm] = useState<GoldFormState>(emptyForm());
   const [savingItem, setSavingItem] = useState(false);
   const [deletingItem, setDeletingItem] = useState(false);
+  const [deleteItemConfirm, setDeleteItemConfirm] = useState(false);
 
   // History modal
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
@@ -278,6 +279,7 @@ export default function Gold() {
   const [editHistory, setEditHistory] = useState<GoldHistoryItem | null>(null);
   const [savingHistory, setSavingHistory] = useState(false);
   const [deletingHistory, setDeletingHistory] = useState(false);
+  const [deleteHistoryConfirm, setDeleteHistoryConfirm] = useState(false);
 
   // Derivations
   const totalItems = items.length;
@@ -388,6 +390,7 @@ export default function Gold() {
       location: i.location,
     });
     setItemsModalOpen(true);
+    setDeleteItemConfirm(false);
   }
 
   function openAddItem() {
@@ -395,6 +398,7 @@ export default function Gold() {
     setForm(emptyForm());
     setSavingItem(false);
     setDeletingItem(false);
+    setDeleteItemConfirm(false);
     setItemsModalOpen(true);
   }
 
@@ -404,6 +408,7 @@ export default function Gold() {
     setForm(emptyForm());
     setSavingItem(false);
     setDeletingItem(false);
+    setDeleteItemConfirm(false);
   }
 
   function setField<K extends keyof GoldFormState>(k: K, v: GoldFormState[K]) {
@@ -448,6 +453,10 @@ export default function Gold() {
   async function deleteItem() {
     if (!editItem) return;
     if (savingItem || deletingItem) return;
+    if (!deleteItemConfirm) {
+      setDeleteItemConfirm(true);
+      return;
+    }
     setDeletingItem(true);
     setError('');
     const deletingId = editItem.id;
@@ -474,6 +483,7 @@ export default function Gold() {
     setHistoryForm(emptyHistoryForm());
     setSavingHistory(false);
     setDeletingHistory(false);
+    setDeleteHistoryConfirm(false);
   }
 
   async function saveHistory() {
@@ -513,6 +523,7 @@ export default function Gold() {
       note: h.note || '',
     });
     setHistoryModalOpen(true);
+    setDeleteHistoryConfirm(false);
   }
 
   function openAddHistory() {
@@ -520,12 +531,17 @@ export default function Gold() {
     setHistoryForm(emptyHistoryForm());
     setSavingHistory(false);
     setDeletingHistory(false);
+    setDeleteHistoryConfirm(false);
     setHistoryModalOpen(true);
   }
 
   async function deleteHistory() {
     if (!editHistory) return;
     if (savingHistory || deletingHistory) return;
+    if (!deleteHistoryConfirm) {
+      setDeleteHistoryConfirm(true);
+      return;
+    }
     setDeletingHistory(true);
     setError('');
     const deletingId = editHistory.id;
@@ -817,7 +833,7 @@ export default function Gold() {
             <div className="modal-foot">
               {editItem && (
                 <button type="button" className="btn btn-sm btn-red" onClick={deleteItem} disabled={savingItem || deletingItem}>
-                  {deletingItem ? 'Deleting...' : 'Delete'}
+                  {deletingItem ? 'Deleting...' : deleteItemConfirm ? 'Confirm delete?' : 'Delete'}
                 </button>
               )}
               <div className="modal-foot-l" />
@@ -865,7 +881,7 @@ export default function Gold() {
             <div className="modal-foot">
               {editHistory && (
                 <button type="button" className="btn btn-sm btn-red" onClick={deleteHistory} disabled={savingHistory || deletingHistory}>
-                  {deletingHistory ? 'Deleting...' : 'Delete'}
+                  {deletingHistory ? 'Deleting...' : deleteHistoryConfirm ? 'Confirm delete?' : 'Delete'}
                 </button>
               )}
               <div className="modal-foot-l" />

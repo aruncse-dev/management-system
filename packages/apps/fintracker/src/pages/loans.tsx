@@ -300,17 +300,21 @@ export default function Loans() {
   const [emiEditItem, setEmiEditItem] = useState<CombinedLoan | null>(null)
   const [emiForm, setEmiForm] = useState<EmiFormState>(emptyEmiForm())
   const [emiSaving, setEmiSaving] = useState(false)
+  const [emiDeleteConfirm, setEmiDeleteConfirm] = useState(false)
   const [emiManuallyEdited, setEmiManuallyEdited] = useState(false)
   const [jewelModalOpen, setJewelModalOpen] = useState(false)
   const [jewelEditItem, setJewelEditItem] = useState<Extract<CombinedLoan, { kind: 'Jewel' }> | null>(null)
   const [jewelForm, setJewelForm] = useState<JewelFormState>(emptyJewelForm())
   const [jewelSaving, setJewelSaving] = useState(false)
+  const [jewelDeleteConfirm, setJewelDeleteConfirm] = useState(false)
   const [cashModalOpen, setCashModalOpen] = useState(false)
   const [cashEditItem, setCashEditItem] = useState<Extract<CombinedLoan, { kind: 'Cash' }> | null>(null)
   const [cashForm, setCashForm] = useState<CashFormState>(emptyCashForm())
   const [cashSaving, setCashSaving] = useState(false)
+  const [cashDeleteConfirm, setCashDeleteConfirm] = useState(false)
   const [repayModalOpen, setRepayModalOpen] = useState(false)
   const [repaySaving, setRepaySaving] = useState(false)
+  const [repayDeleteConfirm, setRepayDeleteConfirm] = useState(false)
   const [repayForm, setRepayForm] = useState<PaymentFormState>(emptyPaymentForm())
   const [repayType, setRepayType] = useState<'jewel' | 'cash'>('jewel')
   const [repayEditItem, setRepayEditItem] = useState<CombinedHistoryRow | null>(null)
@@ -441,6 +445,7 @@ export default function Loans() {
     setEmiEditItem(null)
     setEmiForm(emptyEmiForm())
     setEmiManuallyEdited(false)
+    setEmiDeleteConfirm(false)
     setEmiModalOpen(true)
   }
 
@@ -457,12 +462,14 @@ export default function Loans() {
       paid_emis: String(loan.paid_emis),
     })
     setEmiManuallyEdited(true)
+    setEmiDeleteConfirm(false)
     setEmiModalOpen(true)
   }
 
   function openAddJewel() {
     setJewelEditItem(null)
     setJewelForm(emptyJewelForm())
+    setJewelDeleteConfirm(false)
     setJewelModalOpen(true)
   }
 
@@ -478,6 +485,7 @@ export default function Loans() {
       paid_amount: String(loan.paid),
     })
     setJewelModalOpen(true)
+    setJewelDeleteConfirm(false)
   }
 
   function closeJewelModal() {
@@ -485,6 +493,7 @@ export default function Loans() {
     setJewelEditItem(null)
     setJewelForm(emptyJewelForm())
     setJewelSaving(false)
+    setJewelDeleteConfirm(false)
   }
 
   async function saveJewel() {
@@ -512,7 +521,11 @@ export default function Loans() {
   }
 
   async function deleteJewelLoan() {
-    if (!jewelEditItem || !window.confirm('Delete this jewel loan?')) return
+    if (!jewelEditItem) return
+    if (!jewelDeleteConfirm) {
+      setJewelDeleteConfirm(true)
+      return
+    }
     setJewelSaving(true)
     try {
       await api.deleteJewelLoan(jewelEditItem.id)
@@ -527,6 +540,7 @@ export default function Loans() {
   function openAddCash() {
     setCashEditItem(null)
     setCashForm(emptyCashForm())
+    setCashDeleteConfirm(false)
     setCashModalOpen(true)
   }
 
@@ -539,6 +553,7 @@ export default function Loans() {
       paid_amount: String(loan.paid),
     })
     setCashModalOpen(true)
+    setCashDeleteConfirm(false)
   }
 
   function closeCashModal() {
@@ -546,6 +561,7 @@ export default function Loans() {
     setCashEditItem(null)
     setCashForm(emptyCashForm())
     setCashSaving(false)
+    setCashDeleteConfirm(false)
   }
 
   async function saveCash() {
@@ -569,7 +585,11 @@ export default function Loans() {
   }
 
   async function deleteCashLoan() {
-    if (!cashEditItem || !window.confirm('Delete this cash loan?')) return
+    if (!cashEditItem) return
+    if (!cashDeleteConfirm) {
+      setCashDeleteConfirm(true)
+      return
+    }
     setCashSaving(true)
     try {
       await api.deleteCashLoan(cashEditItem.id)
@@ -590,6 +610,7 @@ export default function Loans() {
       note: '',
     })
     setRepayEditItem(null)
+    setRepayDeleteConfirm(false)
     setRepayModalOpen(true)
   }
 
@@ -603,6 +624,7 @@ export default function Loans() {
         amount: String(row.amount),
         note: row.subtitle,
       })
+      setRepayDeleteConfirm(false)
       setRepayModalOpen(true)
     }
   }
@@ -612,6 +634,7 @@ export default function Loans() {
     setRepayForm(emptyPaymentForm())
     setRepaySaving(false)
     setRepayEditItem(null)
+    setRepayDeleteConfirm(false)
   }
 
   async function saveRepayment() {
@@ -642,7 +665,11 @@ export default function Loans() {
   }
 
   async function deleteRepayment() {
-    if (!repayEditItem?.sourcePaymentId || !window.confirm('Delete this repayment?')) return
+    if (!repayEditItem?.sourcePaymentId) return
+    if (!repayDeleteConfirm) {
+      setRepayDeleteConfirm(true)
+      return
+    }
     setRepaySaving(true)
     try {
       if (repayType === 'cash') await api.deleteCashLoanHistory(repayEditItem.sourcePaymentId)
@@ -661,6 +688,7 @@ export default function Loans() {
     setEmiForm(emptyEmiForm())
     setEmiSaving(false)
     setEmiManuallyEdited(false)
+    setEmiDeleteConfirm(false)
   }
 
   useEffect(() => {
@@ -701,7 +729,11 @@ export default function Loans() {
   }
 
   async function deleteEmiLoan() {
-    if (!emiEditItem || !window.confirm('Delete this EMI loan?')) return
+    if (!emiEditItem) return
+    if (!emiDeleteConfirm) {
+      setEmiDeleteConfirm(true)
+      return
+    }
     setEmiSaving(true)
     try {
       await api.deleteEmi(emiEditItem.id)
@@ -1136,7 +1168,7 @@ export default function Loans() {
               onSecondary={closeEmiModal}
               leading={emiEditItem ? (
                 <button type="button" className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={deleteEmiLoan} disabled={emiSaving}>
-                  Delete
+                  {emiSaving ? 'Deleting…' : emiDeleteConfirm ? 'Confirm delete?' : 'Delete'}
                 </button>
               ) : null}
               disabled={emiSaving}
@@ -1184,7 +1216,7 @@ export default function Loans() {
               onSecondary={closeJewelModal}
               leading={jewelEditItem ? (
                 <button type="button" className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={deleteJewelLoan} disabled={jewelSaving}>
-                  Delete
+                  {jewelSaving ? 'Deleting…' : jewelDeleteConfirm ? 'Confirm delete?' : 'Delete'}
                 </button>
               ) : null}
               disabled={jewelSaving}
@@ -1215,7 +1247,7 @@ export default function Loans() {
               onSecondary={closeCashModal}
               leading={cashEditItem ? (
                 <button type="button" className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={deleteCashLoan} disabled={cashSaving}>
-                  Delete
+                  {cashSaving ? 'Deleting…' : cashDeleteConfirm ? 'Confirm delete?' : 'Delete'}
                 </button>
               ) : null}
               disabled={cashSaving}
@@ -1243,7 +1275,7 @@ export default function Loans() {
               onSecondary={closeRepayment}
               leading={repayEditItem ? (
                 <button type="button" className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={deleteRepayment} disabled={repaySaving}>
-                  Delete
+                  {repaySaving ? 'Deleting…' : repayDeleteConfirm ? 'Confirm delete?' : 'Delete'}
                 </button>
               ) : null}
               disabled={repaySaving}

@@ -66,6 +66,7 @@ export default function AttendancePage() {
   const [addStaffId, setAddStaffId] = useState('')
   const [addOt, setAddOt] = useState(false)
   const [modalBusy, setModalBusy] = useState(false)
+  const [deleteConfirmStaffId, setDeleteConfirmStaffId] = useState('')
   const monthRef = useRef(month)
   const yearRef = useRef(year)
   monthRef.current = month
@@ -193,10 +194,15 @@ export default function AttendancePage() {
 
   async function deleteEntry(staffId: string) {
     if (!dayModalDate || modalBusy) return
+    if (deleteConfirmStaffId !== staffId) {
+      setDeleteConfirmStaffId(staffId)
+      return
+    }
     setModalBusy(true)
     try {
       await api.setAttendance({ month, year, date: dayModalDate, staffId, worked: false, overtime: false })
       await refreshAttendance()
+      setDeleteConfirmStaffId('')
       showStatus('✓ Removed')
     } catch (e) {
       showStatus('⚠ ' + (e instanceof Error ? e.message : 'Delete failed'))
@@ -230,6 +236,7 @@ export default function AttendancePage() {
   function closeDayModal() {
     if (modalBusy) return
     setDayModalDate(null)
+    setDeleteConfirmStaffId('')
   }
 
   return (
@@ -415,7 +422,7 @@ export default function AttendancePage() {
                           disabled={modalBusy}
                           onClick={() => void deleteEntry(e.staffId)}
                         >
-                          Delete
+                          {modalBusy ? 'Deleting…' : deleteConfirmStaffId === e.staffId ? 'Confirm delete?' : 'Delete'}
                         </button>
                       </li>
                     )

@@ -143,6 +143,7 @@ export default function SavingsPage({
   const [form, setForm] = useState<SavingsFormState>(makeEmptyForm(accounts))
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [delConfirm, setDelConfirm] = useState(false)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -199,17 +200,20 @@ export default function SavingsPage({
     resetModal()
     setSaving(false)
     setDeleting(false)
+    setDelConfirm(false)
   }
 
   function openAdd() {
     resetModal()
     setError('')
+    setDelConfirm(false)
     setModalOpen(true)
   }
 
   function openEdit(e: SavingsEntry) {
     setEditEntry(e)
     setError('')
+    setDelConfirm(false)
     setForm({
       date: toDateInput(e.date),
       account: e.account,
@@ -254,6 +258,10 @@ export default function SavingsPage({
 
   async function del() {
     if (!editEntry || deleting || saving) return
+    if (!delConfirm) {
+      setDelConfirm(true)
+      return
+    }
     setDeleting(true)
     setError('')
     const deletingId = editEntry.id
@@ -462,7 +470,7 @@ export default function SavingsPage({
             <div className="modal-foot">
               {editEntry && (
                 <button type="button" className="btn btn-sm btn-red" onClick={del} disabled={saving || deleting}>
-                  {deleting ? 'Deleting...' : 'Delete'}
+                  {deleting ? 'Deleting...' : delConfirm ? 'Confirm delete?' : 'Delete'}
                 </button>
               )}
               <div className="modal-foot-l" />

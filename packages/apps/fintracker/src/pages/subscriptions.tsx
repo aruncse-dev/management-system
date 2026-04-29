@@ -140,9 +140,7 @@ export default function SubscriptionsPage() {
   const [editingId, setEditingId] = useState('')
   const [form, setForm] = useState<SubscriptionFormState>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
-  const [deleteId, setDeleteId] = useState('')
-  const [deleteName, setDeleteName] = useState('')
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [toast, setToast] = useState('')
 
   const load = async () => {
@@ -209,6 +207,7 @@ export default function SubscriptionsPage() {
     setMode('add')
     setEditingId('')
     setForm(EMPTY_FORM)
+    setDeleteConfirm(false)
   }
 
   const startEdit = (row: SubscriptionEntry) => {
@@ -227,12 +226,14 @@ export default function SubscriptionsPage() {
       app_uuid: row.app_uuid,
       notes: row.notes,
     })
+    setDeleteConfirm(false)
   }
 
   const closeForm = () => {
     setMode(null)
     setEditingId('')
     setForm(EMPTY_FORM)
+    setDeleteConfirm(false)
   }
 
   const save = async () => {
@@ -280,30 +281,21 @@ export default function SubscriptionsPage() {
     }
   }
 
-  const openDeleteModal = (id: string, name: string) => {
-    setDeleteId(id)
-    setDeleteName(name)
-    setDeleteModalOpen(true)
-  }
-
-  const closeDeleteModal = () => {
-    setDeleteModalOpen(false)
-    setDeleteId('')
-    setDeleteName('')
-  }
-
   const confirmDelete = async () => {
-    if (!deleteId) return
+    if (!deleteConfirm) {
+      setDeleteConfirm(true)
+      return
+    }
+    if (!editingId) return
     setSaving(true)
     setError('')
-    const deletingId = deleteId
+    const deletingId = editingId
     try {
       await api.deleteSubscriptionEntry(deletingId)
       setRows(prev => prev.filter(row => row.id !== deletingId))
       await load()
       setToast('Subscription deleted')
       window.setTimeout(() => setToast(''), 1400)
-      closeDeleteModal()
       closeForm()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Delete failed')
@@ -531,7 +523,7 @@ export default function SubscriptionsPage() {
               primaryLabel={mode === 'add' ? 'Add' : 'Save'}
               onSecondary={closeForm}
               onPrimary={save}
-              leading={mode === 'edit' ? <button type="button" className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={() => openDeleteModal(editingId, form.name)} disabled={saving}>Delete</button> : null}
+              leading={mode === 'edit' ? <button type="button" className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={confirmDelete} disabled={saving}>{saving ? 'Deleting…' : deleteConfirm ? 'Confirm delete?' : 'Delete'}</button> : null}
               disabled={saving}
             />
           }
@@ -590,27 +582,6 @@ export default function SubscriptionsPage() {
               </label>
             </FormField>
           </form>
-        </ModalShell>
-      )}
-
-      {deleteModalOpen && (
-        <ModalShell
-          title="Delete Subscription"
-          onClose={closeDeleteModal}
-          footer={
-            <ModalActions
-              primaryLabel="Delete"
-              secondaryLabel="Cancel"
-              destructive
-              onPrimary={confirmDelete}
-              onSecondary={closeDeleteModal}
-              disabled={saving}
-            />
-          }
-        >
-          <div style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.5 }}>
-            Delete <strong>{deleteName}</strong>?
-          </div>
         </ModalShell>
       )}
 
