@@ -346,7 +346,7 @@ export default function SubscriptionsPage() {
               <SectionBlock title="Overview" icon={<BarChart3 size={16} />}>
                 <KpiGrid variant="dash">
                   <KpiCard label="Total Subscriptions" value={rows.length} tone="navy" icon={<Repeat2 size={16} />} />
-                  <KpiCard label="Monthly (INR)" value={INR(monthlyINR)} tone="blue" icon={<IndianRupee size={16} />} subtitle={`1 USD = ₹${usdToInr.toFixed(0)}`} />
+                  <KpiCard label="Monthly (INR)" value={INR(monthlyINR)} tone="navy" icon={<IndianRupee size={16} />} subtitle={`1 USD = ₹${usdToInr.toFixed(0)}`} />
                   <KpiCard label="Yearly (INR)" value={INR(yearlyINR)} tone="navy" icon={<IndianRupee size={16} />} />
                   <KpiCard label="Due in 5 Days" value={dueSoonRows.length} tone={dueSoonRows.length > 0 ? 'red' : 'green'} icon={<Bell size={16} />} />
                 </KpiGrid>

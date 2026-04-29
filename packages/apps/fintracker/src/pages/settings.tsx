@@ -197,7 +197,7 @@ export default function Settings() {
                 />
               ))}
               {section.key === 'core' && (
-                <div style={{ paddingTop: 4, borderTop: '1px solid var(--muted-border)', paddingTop: 12 }}>
+                <div style={{ borderTop: '1px solid var(--muted-border)', paddingTop: 12 }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', marginBottom: 6 }}>USD → INR Rate</div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>
                     ₹{settings.usdToInr ? Number(settings.usdToInr).toFixed(2) : '—'}
