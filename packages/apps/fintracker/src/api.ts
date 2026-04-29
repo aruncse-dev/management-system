@@ -261,6 +261,7 @@ export interface RawCashLoanHistoryRow {
 
 export interface GoldSettings {
   goldRate: number;
+  usdToInr?: number;
   loansSpreadsheetId?: string;
   emiSheetName?: string;
   expensesSheetId?: string;
@@ -317,6 +318,23 @@ export interface RawInsuranceRow {
   sum_assured: number | string;
   cash_value: number | string;
   nominee_name: string;
+  notes: string;
+  updated_at?: string;
+}
+
+export interface RawSubscriptionRow {
+  id: string;
+  name: string;
+  category: string;
+  amount: number | string;
+  currency: string;
+  billing_cycle: string;
+  start_date: string;
+  end_date: string;
+  autopay: boolean;
+  status: string;
+  payment_method: string;
+  app_uuid?: string;
   notes: string;
   updated_at?: string;
 }
@@ -438,6 +456,22 @@ export const api = {
     const result = await post<boolean>({ module: 'insurance', action: 'deleteEntry', id })
     invalidateCache({ action: 'getEntries', params: { module: 'insurance' } })
     invalidateCache({ action: 'getEntry', params: { module: 'insurance', id } })
+    return result
+  },
+  getSubscriptionEntries: ()                   => get<RawSubscriptionRow[]>('getEntries', { module: 'subscriptions' }),
+  addSubscriptionEntry: async (p: Record<string, unknown>) => {
+    const result = await post<string>({ module: 'subscriptions', action: 'addEntry', ...p })
+    invalidateCache({ action: 'getEntries', params: { module: 'subscriptions' } })
+    return result
+  },
+  updateSubscriptionEntry: async (p: Record<string, unknown>) => {
+    const result = await post<boolean>({ module: 'subscriptions', action: 'updateEntry', ...p })
+    invalidateCache({ action: 'getEntries', params: { module: 'subscriptions' } })
+    return result
+  },
+  deleteSubscriptionEntry: async (id: string) => {
+    const result = await post<boolean>({ module: 'subscriptions', action: 'deleteEntry', id })
+    invalidateCache({ action: 'getEntries', params: { module: 'subscriptions' } })
     return result
   },
   getTokenStatus: ()                           => get<{ hasToken: boolean; tokenType?: string; hasAccessToken?: boolean; hasExtendedToken?: boolean; hasRefreshToken?: boolean; accessTokenExpiry?: string; extendedTokenExpiry?: string; expired?: boolean }>('getTokenStatus', { module: 'stocks' }, { cache: false }),

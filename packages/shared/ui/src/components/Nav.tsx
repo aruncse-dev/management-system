@@ -4,6 +4,7 @@ import {
   PiggyBank,
   Gem,
   TrendingUp,
+  Repeat2,
   Wallet,
   User,
   Settings,
@@ -17,6 +18,7 @@ export type ModuleId =
   | 'monthly'
   | 'lending'
   | 'savings'
+  | 'subscriptions'
   | 'bommi'
   | 'gold'
   | 'investments'
@@ -43,6 +45,7 @@ interface Props {
 const MODULES_LG: { id: ModuleId; icon: React.ReactNode; label: string }[] = [
   { id: 'monthly', icon: <CalendarDays size={18} />, label: 'Monthly Expenses' },
   { id: 'savings', icon: <PiggyBank size={18} />, label: 'Savings' },
+  { id: 'subscriptions', icon: <Repeat2 size={18} />, label: 'Subscriptions' },
   { id: 'bommi', icon: <PiggyBank size={18} />, label: 'Bommi' },
   { id: 'gold', icon: <Gem size={18} />, label: 'Gold' },
   { id: 'investments', icon: <TrendingUp size={18} />, label: 'Investments' },
@@ -125,7 +128,7 @@ export default function Nav({
           >
             Tracking
           </div>
-          {MODULES_LG.slice(0, 2).map(m => (
+          {MODULES_LG.slice(0, 3).map(m => (
             <button
               key={m.id}
               type="button"
@@ -155,7 +158,7 @@ export default function Nav({
           >
             Assets
           </div>
-          {MODULES_LG.slice(2).map(m => (
+          {MODULES_LG.slice(3).map(m => (
             <button
               key={m.id}
               type="button"

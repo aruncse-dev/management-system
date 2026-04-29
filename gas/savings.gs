@@ -106,10 +106,11 @@ function _savingsHandlePost(action, body) {
 function _savings_getEntries(sheetName) {
   try {
     Logger.log('_savings_getEntries: getting sheet');
-    const sh = _savingsSheet(sheetName);
+    const resolvedSheet = String(sheetName || S_SHEET).trim() || S_SHEET;
+    const sh = _savingsSheet(resolvedSheet);
     Logger.log('_savings_getEntries: sheet obtained, reading data');
 
-    const vals = sh.getDataRange().getValues();
+    const vals = _getCachedSheetData(resolvedSheet, 'savings_entries_' + resolvedSheet);
     Logger.log('_savings_getEntries: got ' + vals.length + ' rows');
 
     if (vals.length < 2) {
@@ -124,7 +125,7 @@ function _savings_getEntries(sheetName) {
       })
       .map(r => ({
         id:        String(r[S_COL.ID]      || ''),
-        date:      _fmtDate(r[S_COL.DATE]),
+        date:      _fmtDate(typeof r[S_COL.DATE] === 'string' ? new Date(r[S_COL.DATE]) : r[S_COL.DATE]),
         account:   String(r[S_COL.ACCOUNT] || '').trim(),
         amount:    parseFloat(r[S_COL.AMT]) || 0,
         desc:      String(r[S_COL.DESC]    || '').trim(),
@@ -171,6 +172,7 @@ function _savings_addEntry(date, account, amount, desc, type, toAccount, categor
     }
 
     Logger.log('_savings_addEntry: SUCCESS id=' + id);
+    CacheService.getScriptCache().remove('savings_entries_' + sheetName);
     return id;
   } catch(e) {
     Logger.log('_savings_addEntry ERROR: ' + e.message + ' | Stack: ' + e.stack);
@@ -227,6 +229,7 @@ function _savings_updateEntry(id, date, account, amount, desc, type, toAccount, 
     }
 
     Logger.log('_savings_updateEntry: SUCCESS');
+    CacheService.getScriptCache().remove('savings_entries_' + sheetName);
     return true;
   } catch(e) {
     Logger.log('_savings_updateEntry ERROR: ' + e.message + ' | Stack: ' + e.stack);
@@ -267,6 +270,7 @@ function _savings_deleteEntry(id, sheetName) {
     }
 
     Logger.log('_savings_deleteEntry: success');
+    CacheService.getScriptCache().remove('savings_entries_' + sheetName);
     return true;
   } catch(e) {
     Logger.log('_savings_deleteEntry ERROR: ' + e.message + ' | Stack: ' + e.stack);

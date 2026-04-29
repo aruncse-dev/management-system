@@ -37,6 +37,52 @@ const C_TRF_FG   = '#1D4ED8';
 const C_SAV_BG   = '#FFFBEB';   // soft amber row  — Savings
 const C_SAV_FG   = '#92400E';
 
+// ── SHEET DATA CACHING HELPER ─────────────────────────────────────────────────
+function _getCachedSheetData(sheetName, cacheKey) {
+  const cache = CacheService.getScriptCache();
+  const cached = cache.get(cacheKey);
+  if (cached) {
+    Logger.log('Cache HIT: ' + cacheKey);
+    return JSON.parse(cached);
+  }
+
+  // Determine which spreadsheet to use based on sheet name
+  const propertyKey =
+    (sheetName === 'Monthly') ? 'EXPENSES_SHEET_ID' :
+    (sheetName === 'Attendance') ? 'STAFF_ATTENDANCE_SHEET_ID' :
+    'ASSETS_SHEET_ID';
+  const ss = SpreadsheetApp.openById(_getSpreadsheetId(propertyKey));
+  const sh = ss.getSheetByName(sheetName);
+  if (!sh) {
+    throw new Error('Sheet "' + sheetName + '" not found in spreadsheet (property: ' + propertyKey + ')');
+  }
+  const data = sh.getDataRange().getValues();
+
+  cache.put(cacheKey, JSON.stringify(data), 300);
+  Logger.log('Cache MISS: ' + cacheKey + ' (300s TTL)');
+  return data;
+}
+
+// ── EXCHANGE RATE HELPER ──────────────────────────────────────────────────────
+function _fetchUsdToInrRate() {
+  const cache = PropertiesService.getScriptProperties();
+  const cached = cache.getProperty('USD_INR_RATE');
+  const cachedAt = Number(cache.getProperty('USD_INR_RATE_AT') || '0');
+  const ONE_HOUR = 60 * 60 * 1000;
+  if (cached && (Date.now() - cachedAt) < ONE_HOUR) return Number(cached);
+  try {
+    const resp = UrlFetchApp.fetch('https://api.frankfurter.app/latest?from=USD&to=INR');
+    const data = JSON.parse(resp.getContentText());
+    const rate = data.rates.INR;
+    cache.setProperty('USD_INR_RATE', String(rate));
+    cache.setProperty('USD_INR_RATE_AT', String(Date.now()));
+    return rate;
+  } catch(e) {
+    Logger.log('_fetchUsdToInrRate error: ' + e.message);
+    return Number(cached) || 85;
+  }
+}
+
 // ── ENTRY POINTS ──────────────────────────────────────────────────────────────
 function doGet(e) {
   // OAuth callback from Upstox (has 'code' param, no 'action' param)
@@ -101,6 +147,21 @@ function _handleUpstoxOAuthCallback(params) {
       '</body></html>'
     );
   }
+}
+
+function _setupWeeklyAuthRefresh() {
+  const triggers = ScriptApp.getProjectTriggers();
+  const hasAuthRefresh = triggers.some(t => t.getHandlerFunction() === 'authorizeFinTracker');
+  if (hasAuthRefresh) {
+    Logger.log('Weekly auth refresh trigger already exists');
+    return;
+  }
+  ScriptApp.newTrigger('authorizeFinTracker')
+    .timeBased()
+    .atHour(2)
+    .everyDays(7)
+    .create();
+  Logger.log('Weekly auth refresh trigger created');
 }
 
 function _checkToken(token) {
@@ -196,6 +257,10 @@ function _handleGet(p) {
     Logger.log('_handleGet: routing to insurance handler for action=' + p.action);
     return _insuranceHandleGet(p.action, p);
   }
+  if (p.module === 'subscriptions') {
+    Logger.log('_handleGet: routing to subscriptions handler for action=' + p.action);
+    return _subscriptionsHandleGet(p.action, p);
+  }
   if (p.module === 'settings') {
     Logger.log('_handleGet: routing to settings handler for action=' + p.action);
     if (p.action === 'get') {
@@ -203,7 +268,8 @@ function _handleGet(p) {
       const loansSettings = _loans_getSettings();
       const configSettings = _config_getSettings();
       const vaultSettings = _vault_getSettings();
-      return { ...configSettings, ...goldSettings, ...loansSettings, ...vaultSettings };
+      const usdToInr = _fetchUsdToInrRate();
+      return { ...configSettings, ...goldSettings, ...loansSettings, ...vaultSettings, usdToInr };
     }
     throw new Error('Unknown settings GET action: ' + p.action);
   }
@@ -260,6 +326,10 @@ function _handlePost(body) {
   if (body.module === 'insurance') {
     Logger.log('_handlePost: routing to insurance handler for action=' + body.action);
     return _insuranceHandlePost(body.action, body);
+  }
+  if (body.module === 'subscriptions') {
+    Logger.log('_handlePost: routing to subscriptions handler for action=' + body.action);
+    return _subscriptionsHandlePost(body.action, body);
   }
   if (body.module === 'settings') {
     Logger.log('_handlePost: routing to settings handler for action=' + body.action);

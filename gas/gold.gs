@@ -142,7 +142,7 @@ function _gold_getEntries() {
     const sh = _goldSheet();
     Logger.log('_gold_getEntries: sheet obtained, reading data');
 
-    const vals = sh.getDataRange().getValues();
+    const vals = _getCachedSheetData('Gold', 'gold_entries');
     Logger.log('_gold_getEntries: got ' + vals.length + ' rows');
 
     if (vals.length < 2) {
@@ -196,6 +196,7 @@ function _gold_addEntry(name, weight_g, pavan, person, location) {
     }
 
     Logger.log('_gold_addEntry: SUCCESS id=' + id);
+    CacheService.getScriptCache().remove('gold_entries');
     return id;
   } catch(e) {
     Logger.log('_gold_addEntry ERROR: ' + e.message + ' | Stack: ' + e.stack);
@@ -252,6 +253,7 @@ function _gold_updateEntry(id, name, weight_g, pavan, person, location) {
     }
 
     Logger.log('_gold_updateEntry: SUCCESS');
+    CacheService.getScriptCache().remove('gold_entries');
     return true;
   } catch(e) {
     Logger.log('_gold_updateEntry ERROR: ' + e.message + ' | Stack: ' + e.stack);
@@ -292,6 +294,7 @@ function _gold_deleteEntry(id) {
     }
 
     Logger.log('_gold_deleteEntry: success');
+    CacheService.getScriptCache().remove('gold_entries');
     return true;
   } catch(e) {
     Logger.log('_gold_deleteEntry ERROR: ' + e.message + ' | Stack: ' + e.stack);
@@ -371,7 +374,7 @@ function _gold_getHistory() {
 
     const result = vals.slice(1).map(r => ({
       id:       String(r[GH_COL.ID]       || ''),
-      date:     _fmtDate(r[GH_COL.DATE]),
+      date:     _fmtDate(typeof r[GH_COL.DATE] === 'string' ? new Date(r[GH_COL.DATE]) : r[GH_COL.DATE]),
       type:     String(r[GH_COL.TYPE]     || '').trim().toUpperCase(),
       name:     String(r[GH_COL.NAME]     || '').trim(),
       weight_g: parseFloat(r[GH_COL.WEIGHT_G]) || 0,

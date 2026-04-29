@@ -151,7 +151,7 @@ function _lending_getEntries(sheetName) {
     }
     Logger.log('_lending_getEntries: sheet obtained, reading data from "' + sheet + '"');
 
-    const vals = sh.getDataRange().getValues();
+    const vals = _getCachedSheetData(sheet, 'lending_entries_' + sheet);
     Logger.log('_lending_getEntries: got ' + vals.length + ' rows from sheet "' + sheet + '"');
 
     if (vals.length < 2) {
@@ -166,7 +166,7 @@ function _lending_getEntries(sheetName) {
       })
       .map(r => ({
         id:          String(r[L_COL.ID]   || ''),
-        date:        _fmtDate(r[L_COL.DATE]),
+        date:        _fmtDate(typeof r[L_COL.DATE] === 'string' ? new Date(r[L_COL.DATE]) : r[L_COL.DATE]),
         name:        String(r[L_COL.NAME] || '').trim(),
         amount:      parseFloat(r[L_COL.AMT]) || 0,
         type:        String(r[L_COL.TYPE] || '').trim().toUpperCase(),
@@ -208,6 +208,7 @@ function _lending_addEntry(date, name, amount, type, description, sheetName) {
     }
 
     Logger.log('_lending_addEntry: SUCCESS id=' + id);
+    CacheService.getScriptCache().remove('lending_entries_' + sheet);
     return id;
   } catch(e) {
     Logger.log('_lending_addEntry ERROR: ' + e.message + ' | Stack: ' + e.stack);
@@ -268,6 +269,7 @@ function _lending_updateEntry(id, date, name, amount, type, description, sheetNa
     }
 
     Logger.log('_lending_updateEntry: SUCCESS');
+    CacheService.getScriptCache().remove('lending_entries_' + sheet);
     return true;
   } catch(e) {
     Logger.log('_lending_updateEntry ERROR: ' + e.message + ' | Stack: ' + e.stack);
@@ -315,6 +317,7 @@ function _lending_deleteEntry(id, sheetName) {
     }
 
     Logger.log('_lending_deleteEntry: success');
+    CacheService.getScriptCache().remove('lending_entries_' + sheet);
     return true;
   } catch(e) {
     Logger.log('_lending_deleteEntry ERROR: ' + e.message + ' | Stack: ' + e.stack);
