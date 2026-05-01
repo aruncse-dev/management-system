@@ -455,7 +455,7 @@ export default function Loans() {
       name: loan.name,
       bank: loan.bank,
       principal: String(loan.principal),
-      rate: '0',
+      rate: String(loan.rate ?? ''),
       start_date: formatDateForInput(loan.startDate),
       tenure_months: String(loan.tenure_months),
       emi_amount: String(loan.emi_amount),

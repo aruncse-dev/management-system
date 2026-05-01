@@ -4,7 +4,7 @@ import { MNS } from '../config'
 import { api } from '../api'
 import { useStaffWorkspace } from '../StaffWorkspaceContext'
 import type { AttendanceRow, StaffMember } from '../types'
-import { FormField, KpiCard, KpiGrid, LoadingState, ModalShell, SectionBlock, Spacer, UiPill } from '../ui'
+import { FormField, KpiCard, KpiGrid, LoadingState, ModalShell, SectionBlock, SectionChip, Spacer } from '../ui'
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
 
@@ -289,7 +289,7 @@ export default function AttendancePage() {
               </KpiGrid>
             </div>
             <Spacer size={12} />
-            <SectionBlock title="Calendar" icon={<Calendar size={16} />} right={<UiPill tone="muted">{month}</UiPill>}>
+            <SectionBlock title="Calendar" icon={<Calendar size={16} />} right={<SectionChip>{month}</SectionChip>}>
               <div
                 style={{
                   display: 'grid',

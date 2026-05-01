@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, memo } from 'react'
+import { useState, useEffect, useLayoutEffect, useCallback, useMemo, memo } from 'react'
 import { useRouter } from 'next/router'
 import { Search, LayoutDashboard, Handshake, ArrowDownLeft, BarChart3, Shield, User, ArrowUpRight, Plus } from 'lucide-react'
 import { api, RawLendingRow } from '../api'
@@ -185,6 +185,20 @@ export default function Lending({ sheetName: sheetNameProp, onTabChange }: Lendi
     }
   }, [safeSheetName])
 
+  useLayoutEffect(() => {
+    setEntries([])
+    setSearch('')
+    setError('')
+    setModalOpen(false)
+    setEditEntry(null)
+    setForm(emptyForm())
+    setDelConfirm(false)
+    setSaving(false)
+    setPersonModalOpen(false)
+    setPersonModalName(null)
+    setActiveTab('dashboard')
+  }, [safeSheetName])
+
   useEffect(() => { loadData() }, [loadData])
 
   useEffect(() => { onTabChange?.(activeTab) }, [activeTab, onTabChange])
@@ -305,8 +319,6 @@ export default function Lending({ sheetName: sheetNameProp, onTabChange }: Lendi
   const shouldUseDescriptionAsTitle = (entry: LendingEntry) =>
     !entry.name.trim() || entry.name.trim().toLowerCase() === 'vijaya amma'
 
-  const isVijayaAmma = safeSheetName.trim().toLowerCase() === 'vijaya amma'
-  const sheetTone = isVijayaAmma ? 'amber' : 'navy'
 
   return (
     <div className="ui-kit-page-shell">
@@ -340,11 +352,7 @@ export default function Lending({ sheetName: sheetNameProp, onTabChange }: Lendi
       <div className="pg">
         {activeTab === 'dashboard' ? (
           <>
-            <SectionBlock
-              title="Metrics"
-              icon={<BarChart3 size={14} />}
-              right={<SectionChip tone={sheetTone}>{safeSheetName}</SectionChip>}
-            >
+            <SectionBlock title="Metrics" icon={<BarChart3 size={14} />}>
               <KpiGrid>
                 <KpiCard label="Given" value={INR(totalLent)} tone="navy" icon={<ArrowUpRight size={14} />} />
                 <KpiCard label="Received" value={INR(totalRepaid)} tone="green" icon={<ArrowDownLeft size={14} />} />
@@ -353,11 +361,7 @@ export default function Lending({ sheetName: sheetNameProp, onTabChange }: Lendi
               </KpiGrid>
             </SectionBlock>
 
-            <SectionBlock
-              title="People"
-              icon={<Handshake size={14} />}
-              right={<SectionChip tone={sheetTone}>{filteredPeople.length}</SectionChip>}
-            >
+            <SectionBlock title="People" icon={<Handshake size={14} />} right={<SectionChip>{filteredPeople.length}</SectionChip>}>
               <div className="ui-stack">
                 <SearchField
                   value={search}
@@ -396,7 +400,7 @@ export default function Lending({ sheetName: sheetNameProp, onTabChange }: Lendi
             <SectionBlock
               title="Entries"
               icon={<Search size={14} />}
-              right={<SectionChip tone={sheetTone}>{activeTab === 'lended' ? filteredLendedEntries.length : filteredReceivedEntries.length}</SectionChip>}
+              right={<SectionChip>{activeTab === 'lended' ? filteredLendedEntries.length : filteredReceivedEntries.length}</SectionChip>}
             >
               <SearchField
                 value={search}

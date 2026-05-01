@@ -3,7 +3,7 @@ import { useStore, usePage } from '../store'
 import { Transaction } from '../types'
 import { fd, INR } from '../utils'
 import { TXN_PAGE } from '../config'
-import { LoadingState, SectionBlock, TransactionCard } from '../ui'
+import { LoadingState, SectionBlock, SectionChip, TransactionCard } from '../ui'
 import { CatIcon } from '../ui'
 
 const FILTERS = ['All','Expense','Income','Transfer','Savings','Cash','ICICI','HDFC','Bommi','Ramya']
@@ -31,7 +31,7 @@ export default function Transactions({ onEdit }: Props) {
 
   return (
     <div className="pg ui-kit-page-shell monthly-subpage">
-      <SectionBlock title="Transactions" icon={<Pencil size={14} />} right={<span className="ui-kit-section-chip ui-tone-muted">{shown} / {total}</span>}>
+      <SectionBlock title="Transactions" icon={<Pencil size={14} />} right={<SectionChip>{shown} / {total}</SectionChip>}>
         <div className="ui-stack">
           <div style={{ position: 'relative' }}>
             <input

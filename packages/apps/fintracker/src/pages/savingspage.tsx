@@ -4,7 +4,7 @@ import { api, RawSavingsRow } from '../api'
 import { CATEGORIES, THEME_COLORS } from '../config'
 import { INR, mergeCategoriesWithBudgetNames } from '../utils'
 import { useStore } from '../store'
-import { BalanceRow, CatIcon, FormField, KpiCard, KpiGrid, LoadingState, SearchField, SectionBlock, Spacer, TransactionCard } from '../ui'
+import { BalanceRow, CatIcon, FormField, KpiCard, KpiGrid, LoadingState, SearchField, SectionBlock, SectionChip, Spacer, TransactionCard } from '../ui'
 
 type SavingsType = 'Income' | 'Expense' | 'Transfer'
 type SavingsTab = 'dashboard' | 'transactions'
@@ -309,11 +309,13 @@ export default function SavingsPage({
         {activeTab === 'dashboard' && (
           <>
             <SectionBlock title={`${title} Metrics`} icon={<BarChart3 size={14} />} right={loading ? <LoadingState variant="inline" /> : null}>
-              <KpiGrid>
-                <KpiCard label="Total Balance" value={signedINR(totalBalance)} tone="navy" icon={<Wallet size={14} />} />
-                <KpiCard label="Total Income" value={INR(totalIncome)} tone="green" icon={<TrendingUp size={14} />} />
-                <KpiCard label="Total Expenses" value={INR(totalExpenses)} tone="red" icon={<AlertTriangle size={14} />} />
-              </KpiGrid>
+              <div className="savings-page-metrics">
+                <KpiGrid>
+                  <KpiCard full label="Total Balance" value={signedINR(totalBalance)} tone="navy" icon={<Wallet size={14} />} />
+                  <KpiCard label="Total Income" value={INR(totalIncome)} tone="green" icon={<TrendingUp size={14} />} />
+                  <KpiCard label="Total Expenses" value={INR(totalExpenses)} tone="red" icon={<AlertTriangle size={14} />} />
+                </KpiGrid>
+              </div>
             </SectionBlock>
 
             <Spacer size={6} />
@@ -337,7 +339,7 @@ export default function SavingsPage({
         )}
 
         {activeTab === 'transactions' && (
-          <SectionBlock title="Entries" icon={<LayoutDashboard size={14} />} right={<span className="ui-kit-section-chip ui-tone-muted">{filteredEntries.length}</span>}>
+          <SectionBlock title="Entries" icon={<LayoutDashboard size={14} />} right={<SectionChip>{filteredEntries.length}</SectionChip>}>
             <SearchField
               value={search}
               placeholder="Search desc, account, type..."
@@ -373,19 +375,23 @@ export default function SavingsPage({
                   } else {
                     titleText = e.desc || e.account
                   }
+                  const txnIcon =
+                    e.type === 'Income'
+                      ? <ArrowDownRight size={14} />
+                      : e.type === 'Transfer'
+                        ? <Repeat2 size={14} />
+                        : e.category
+                          ? <CatIcon cat={e.category} size={14} />
+                          : <ArrowUpRight size={14} />
                   return (
                     <TransactionCard
                       key={e.id}
-                      title={
-                        e.type === 'Expense' && e.category
-                          ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><CatIcon cat={e.category} size={14} />{titleText}</span>
-                          : titleText
-                      }
+                      title={titleText}
                       amount={`${e.type === 'Income' ? '+' : e.type === 'Transfer' ? '↔' : '−'}${INR(e.amount)}`}
                       type={e.type}
                       date={e.date}
                       tone={typeTone(e.type)}
-                      icon={e.type === 'Income' ? <ArrowDownRight size={14} /> : e.type === 'Transfer' ? <Repeat2 size={14} /> : <ArrowUpRight size={14} />}
+                      icon={txnIcon}
                       onClick={() => openEdit(e)}
                     />
                   )

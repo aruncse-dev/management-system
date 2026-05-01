@@ -4,7 +4,7 @@ import { api, RawGoldRow, RawGoldHistoryRow } from '../api';
 import { INR } from '../utils';
 import { THEME_COLORS } from '../config';
 import { RightLegendDonut } from '../ui'
-import { FormField, KpiCard, KpiGrid, LoadingState, ListStack, SearchField, SectionBlock } from '../ui';
+import { FormField, KpiCard, KpiGrid, LoadingState, ListStack, SearchField, SectionBlock, SectionChip } from '../ui';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // TYPES & CONSTANTS
@@ -655,7 +655,7 @@ export default function Gold() {
             <SectionBlock
               title="Entries"
               icon={<List size={14} />}
-              right={<span className="ui-kit-section-chip ui-tone-muted">{filteredItems.length}</span>}
+              right={<SectionChip>{filteredItems.length}</SectionChip>}
             >
               <SearchField value={itemsSearch} placeholder="Search name, person, location…" onChange={setItemsSearch} onClear={() => setItemsSearch('')} />
             </SectionBlock>
@@ -736,7 +736,7 @@ export default function Gold() {
             <SectionBlock
               title="Entries"
               icon={<Clock size={14} />}
-              right={<span className="ui-kit-section-chip ui-tone-muted">{filteredHistory.length}</span>}
+              right={<SectionChip>{filteredHistory.length}</SectionChip>}
             >
               <SearchField value={historySearch} placeholder="Search name, type, note…" onChange={setHistorySearch} onClear={() => setHistorySearch('')} />
             </SectionBlock>

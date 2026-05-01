@@ -18,7 +18,6 @@ import {
   SectionChip,
   SectionTitle,
   Spacer,
-  UiPill,
 } from '../ui'
 import { RightLegendDonut } from '../ui'
 
@@ -53,18 +52,18 @@ export default function Components() {
         title="UI Kit"
         subtitle="Component library & patterns"
         icon={<Shield size={13} />}
-        right={<UiPill tone="navy">Preview</UiPill>}
+        right={<SectionChip>Preview</SectionChip>}
       />
       <Spacer size={16} />
 
       <div style={{ display: 'grid', gap: 16 }}>
-      <SectionBlock title="Section styles" icon={<Shield size={13} />} rightChip={<SectionChip tone="muted">Titles</SectionChip>}>
+      <SectionBlock title="Section styles" icon={<Shield size={13} />} rightChip={<SectionChip>Titles</SectionChip>}>
         <div className="ui-stack">
           <SectionTitle
             title="Primary title"
             subtitle="A compact heading with supporting text."
             icon={<Shield size={13} />}
-            right={<UiPill tone="navy">Action</UiPill>}
+            right={<SectionChip>Action</SectionChip>}
           />
           <InfoCallout title="Reusable callout" tone="muted">
             Shared helper blocks should live here once, instead of being repeated on every screen.
@@ -72,7 +71,7 @@ export default function Components() {
         </div>
       </SectionBlock>
 
-      <SectionBlock title="Navigation" icon={<LayoutGrid size={13} />} right={<SectionChip tone="muted">Tabs</SectionChip>}>
+      <SectionBlock title="Navigation" icon={<LayoutGrid size={13} />} right={<SectionChip>Tabs</SectionChip>}>
         <div className="ui-stack">
           <nav className="bottom-nav">
             {TABS.map(tab => (
@@ -102,7 +101,7 @@ export default function Components() {
         </div>
       </SectionBlock>
 
-      <SectionBlock title="Metrics" icon={<Wallet size={13} />} rightChip={<SectionChip tone="green">KPIs</SectionChip>}>
+      <SectionBlock title="Metrics" icon={<Wallet size={13} />} rightChip={<SectionChip>KPIs</SectionChip>}>
         <KpiGrid>
           <KpiCard label="Balance" value="₹1,28,500" tone="navy" icon={<Wallet size={13} />} />
           <KpiCard label="Savings" value="₹29,300" tone="green" icon={<TrendingUp size={13} />} />
@@ -111,7 +110,7 @@ export default function Components() {
         </KpiGrid>
       </SectionBlock>
 
-      <SectionBlock title="Summary Chart" icon={<ChartPie size={13} />} right={<UiPill tone="navy">Donut</UiPill>}>
+      <SectionBlock title="Summary Chart" icon={<ChartPie size={13} />} right={<SectionChip>Donut</SectionChip>}>
         <div className="ui-stack">
           <div className="ui-kit-card" style={{ padding: 12 }}>
             <RightLegendDonut
@@ -149,7 +148,7 @@ export default function Components() {
         </div>
       </SectionBlock>
 
-      <SectionBlock title="Inputs and filters" icon={<Wallet size={14} />} right={<UiPill tone="muted">Controls</UiPill>}>
+      <SectionBlock title="Inputs and filters" icon={<Wallet size={14} />} right={<SectionChip>Controls</SectionChip>}>
         <div className="ui-stack">
           <FormField label="Search">
             <SearchField value={search} placeholder="Search items..." onChange={setSearch} onClear={() => setSearch('')} />
@@ -159,7 +158,7 @@ export default function Components() {
         </div>
       </SectionBlock>
 
-      <SectionBlock title="Rows" icon={<CreditCard size={13} />} rightChip={<SectionChip tone="muted">Entries</SectionChip>}>
+      <SectionBlock title="Rows" icon={<CreditCard size={13} />} rightChip={<SectionChip>Entries</SectionChip>}>
         <div className="ui-stack">
           <HoldingCard
             title="Nestack"
@@ -181,7 +180,7 @@ export default function Components() {
         </div>
       </SectionBlock>
 
-      <SectionBlock title="Holding cards" icon={<TrendingUp size={13} />} rightChip={<SectionChip tone="green">2 items</SectionChip>}>
+      <SectionBlock title="Holding cards" icon={<TrendingUp size={13} />} rightChip={<SectionChip>2 items</SectionChip>}>
         <div className="ui-stack">
           <HoldingCard
             title="INFY"
@@ -203,7 +202,7 @@ export default function Components() {
         </div>
       </SectionBlock>
 
-      <SectionBlock title="Actions" icon={<PencilLine size={13} />} right={<UiPill tone="muted">Modal</UiPill>}>
+      <SectionBlock title="Actions" icon={<PencilLine size={13} />} right={<SectionChip>Modal</SectionChip>}>
         <div className="settings-actions">
           <button type="button" className="ui-kit-btn ui-kit-btn--soft" onClick={() => setModalMode('add')}>
             <Plus size={14} /> Add

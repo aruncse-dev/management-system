@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import { Loader2, Link2, Unlink2, SlidersHorizontal, Database, RotateCcw } from 'lucide-react';
 import { api } from '../api';
-import { LoadingState, SectionBlock, SectionTitle, Spacer, UiCard, UiPill } from '../ui';
+import { LoadingState, SectionBlock, SectionChip, SectionTitle, Spacer, UiCard } from '../ui';
 import { SettingsSectionCard, type SettingField } from '../ui'
 
 interface SettingsSection {
@@ -161,7 +161,7 @@ export default function Settings() {
         <SectionTitle
           title="Settings"
           icon={<SlidersHorizontal size={16} />}
-          right={<UiPill tone="muted">Live Config</UiPill>}
+          right={<SectionChip>Live Config</SectionChip>}
         />
         <div className="settings-status-grid">
           <StatusBox

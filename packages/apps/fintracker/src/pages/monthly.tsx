@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { ChevronLeft, ChevronRight, RefreshCw, X as XIcon } from 'lucide-react'
+import { ChevronLeft, ChevronRight, X as XIcon } from 'lucide-react'
 import { useStore } from '../store'
 import { api } from '../api'
 import { BottomNav, TransactionModal } from '../ui'
@@ -44,7 +44,6 @@ export default function Monthly() {
       }
       const rows = await api.getData(month, year)
       dispatch({ type: 'SET_ROWS', payload: rows })
-      showStatus('✓ ' + month + ' ' + year)
     } catch (e) {
       showStatus('⚠ ' + (e instanceof Error ? e.message : 'Load failed'))
     } finally {
@@ -116,9 +115,6 @@ export default function Monthly() {
           </div>
           <button className="nav-arrow" onClick={() => changeMonth(1)}><ChevronRight size={16} /></button>
         </div>
-        <button className="nav-sync" onClick={() => loadMonth(state.month, state.year)} disabled={state.loading}>
-          {state.loading ? '…' : <RefreshCw size={13} />}
-        </button>
       </nav>
 
       <BottomNav tab={tab} onTab={(id) => setTab(id)} />

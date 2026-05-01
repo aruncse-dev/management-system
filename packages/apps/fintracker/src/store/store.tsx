@@ -38,7 +38,17 @@ const initial: AppState = {
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case 'SET_LOADING':     return { ...state, loading: action.payload };
-    case 'SET_MONTH':       return { ...state, ...action.payload, txnPage: 1, filter: 'All', catFilter: '', search: '' };
+    case 'SET_MONTH':
+      return {
+        ...state,
+        ...action.payload,
+        rows: [],
+        loading: true,
+        txnPage: 1,
+        filter: 'All',
+        catFilter: '',
+        search: '',
+      };
     case 'SET_ROWS':        return { ...state, rows: action.payload.map(r => ({ ...r, _k: dateKey(r.date) })).sort((a,b) => (b._k||0)-(a._k||0)) };
     case 'SET_MONTHS':      return { ...state, months: action.payload };
     case 'SET_BUDGET': {

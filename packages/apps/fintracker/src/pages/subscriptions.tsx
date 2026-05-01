@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Check, Plus, Repeat2, Search, BarChart3, Bell, IndianRupee } from 'lucide-react'
 import { api, type RawSubscriptionRow, type RawVaultAppRow, type GoldSettings } from '../api'
-import { FormField, LoadingState, ModalActions, ModalShell, SearchField, SectionBlock, Spacer, UiPill, KpiCard, KpiGrid } from '../ui'
+import { CatIcon, FormField, LoadingState, ModalActions, ModalShell, SearchField, SectionBlock, SectionChip, Spacer, KpiCard, KpiGrid } from '../ui'
 import { INR, mergeCategoriesWithBudgetNames } from '../utils'
 import { CATEGORIES, ALL_MODES } from '../constants'
 import { useStore } from '../store'
@@ -431,7 +431,7 @@ export default function SubscriptionsPage() {
               <SectionBlock
                 title="Autopay alerts"
                 icon={<Bell size={16} />}
-                right={<UiPill tone="navy">{autopayRenewalAlerts.length}</UiPill>}
+                right={<SectionChip>{autopayRenewalAlerts.length}</SectionChip>}
               >
                 <div className="ui-stack">
                   {autopayRenewalAlerts.map(({ row, date, daysLeft }) => {
@@ -478,7 +478,7 @@ export default function SubscriptionsPage() {
           <SectionBlock
             title="All Subscriptions"
             icon={<Repeat2 size={16} />}
-            right={loading ? <LoadingState variant="inline" /> : <UiPill tone="navy">{rows.length}</UiPill>}
+            right={loading ? <LoadingState variant="inline" /> : <SectionChip>{rows.length}</SectionChip>}
           >
             <div className="ui-stack">
               <SearchField
@@ -520,12 +520,16 @@ export default function SubscriptionsPage() {
                         <div className="ui-kit-holding-card-title">
                           <span>{row.name || 'Untitled Subscription'}</span>
                         </div>
-                        <div className="ui-kit-holding-card-subtitle">
-                          {row.category || 'Subscription'} {linkedApp ? `· ${linkedApp.app_name}` : ''}
-                        </div>
+                        {linkedApp ? (
+                          <div className="ui-kit-holding-card-subtitle">{linkedApp.app_name}</div>
+                        ) : null}
                       </div>
                       <div className="ui-kit-holding-card-head-right">
-                        <span className="ui-pill ui-tone-green">Active</span>
+                        <div className="ui-kit-holding-icon ui-kit-holding-icon--bg ui-tone-navy">
+                          <span style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--muted)', flexShrink: 0 }}>
+                            <CatIcon cat={row.category || 'Others'} size={14} />
+                          </span>
+                        </div>
                       </div>
                     </div>
                     <div className="ui-kit-holding-card-grid">

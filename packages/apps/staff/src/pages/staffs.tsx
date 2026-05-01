@@ -10,9 +10,9 @@ import {
   ModalShell,
   SearchField,
   SectionBlock,
+  SectionChip,
   Spacer,
   TransactionCard,
-  UiPill,
 } from '../ui'
 
 const fabStyle = {
@@ -131,7 +131,7 @@ export default function StaffsPage() {
 
   return (
     <div className="ui-kit-page-shell" style={{ paddingTop: 0 }}>
-      <SectionBlock title="Staff" icon={<Users size={16} />} right={<UiPill tone="navy">{rows.length}</UiPill>}>
+      <SectionBlock title="Staff" icon={<Users size={16} />} right={<SectionChip>{rows.length}</SectionChip>}>
         <div className="ui-stack">
           {showSearch ? (
             <SearchField
