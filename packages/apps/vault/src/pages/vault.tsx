@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Check, Copy, ExternalLink, Landmark, Plus, Search } from 'lucide-react'
 import { api, type RawBankingRow } from '../api'
-import { FormField, HoldingCard, ModalActions, ModalShell, SearchField, SectionBlock, Spacer, UiPill } from '../ui'
+import { FormField, HoldingCard, ModalActions, ModalShell, SearchField, SectionBlock, SectionChip, Spacer } from '../ui'
 
 type BankingFormState = {
   account_holder_name: string
@@ -222,7 +222,7 @@ export function VaultBankingPage() {
 
   return (
     <div className="ui-kit-page-shell" style={{ paddingTop: 0 }}>
-      <SectionBlock title="Banking" icon={<Landmark size={16} />} right={<UiPill tone="navy">{summary}</UiPill>}>
+      <SectionBlock title="Banking" icon={<Landmark size={16} />} right={<SectionChip>{summary}</SectionChip>}>
         <div className="ui-stack">
           <SearchField
             value={search}

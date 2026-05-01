@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Check, Copy, Search, ShieldPlus, Plus, HeartPulse, Shield, Sparkles } from 'lucide-react'
 import { api, type RawInsuranceRow } from '../api'
-import { FormField, HoldingCard, ModalActions, ModalShell, SearchField, SectionBlock, Spacer, UiPill } from '../ui'
+import { FormField, HoldingCard, ModalActions, ModalShell, SearchField, SectionBlock, SectionChip, Spacer } from '../ui'
 import { INR } from '../utils'
 
 type InsuranceFormState = {
@@ -305,7 +305,7 @@ export default function VaultInsurancePage() {
       <SectionBlock
         title="Insurance"
         icon={<ShieldPlus size={16} />}
-        right={<UiPill tone="navy">{rows.length}</UiPill>}
+        right={<SectionChip>{rows.length}</SectionChip>}
       >
         <div className="ui-stack">
           <SearchField

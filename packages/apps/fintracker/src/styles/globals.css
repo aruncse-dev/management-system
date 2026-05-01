@@ -424,6 +424,9 @@ button, input, select, textarea {
 .savings-page .ui-kit-section-block:first-of-type {
   margin-top: 0;
 }
+.savings-page .savings-page-metrics .dash-grid > .ui-kit-kpi--full {
+  grid-column: 1 / -1;
+}
 .monthly-subpage .kpis,
 .monthly-subpage .cc-g,
 .monthly-subpage .cr-g3,

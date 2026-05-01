@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Database, ExternalLink, SlidersHorizontal } from 'lucide-react'
 import { api } from '../api'
 import type { StaffSettings } from '../types'
-import { LoadingState, SectionBlock, SectionTitle, Spacer, UiPill } from '../ui'
+import { LoadingState, SectionBlock, SectionChip, SectionTitle, Spacer } from '../ui'
 import { SettingsSectionCard, type SettingField } from '../ui'
 
 interface SettingsSection {
@@ -87,7 +87,7 @@ export default function StaffSettingsPage() {
         <SectionTitle
           title="Settings"
           icon={<SlidersHorizontal size={16} />}
-          right={<UiPill tone="muted">Live Config</UiPill>}
+          right={<SectionChip>Live Config</SectionChip>}
         />
         <div className="settings-status-grid">
           <StatusBox

@@ -3,7 +3,7 @@ import { useStore } from '../store'
 import { INR } from '../utils'
 import { CC_MODES, OTHER_CR, ALL_CR, MNS } from '../constants'
 import { CreditCard, Users, CircleDollarSign, Banknote, Layers3, Users2 } from 'lucide-react'
-import { UiPill, KpiCard, KpiGrid, SectionBlock } from '../ui'
+import { KpiCard, KpiGrid, SectionBlock, SectionChip } from '../ui'
 
 const CC_CYCLE_DAY = 19
 
@@ -35,7 +35,7 @@ export default function Credits() {
       <SectionBlock
         title="Credit Summary"
         icon={<CircleDollarSign size={14} />}
-        right={<UiPill tone="muted">{cycleLabel(month, year)}</UiPill>}
+        right={<SectionChip>{cycleLabel(month, year)}</SectionChip>}
       >
         <KpiGrid variant="compact">
           <KpiCard label="Overall" value={INR(overall)} tone="red" icon={<Banknote size={14} />} />

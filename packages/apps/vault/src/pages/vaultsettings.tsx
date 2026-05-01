@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { SlidersHorizontal, Database } from 'lucide-react'
 import { api, type VaultSettings } from '../api'
-import { LoadingState, SectionBlock, SectionTitle, Spacer, UiPill } from '../ui'
+import { LoadingState, SectionBlock, SectionChip, SectionTitle, Spacer } from '../ui'
 import { SettingsSectionCard, type SettingField } from '../ui'
 
 interface SettingsSection {
@@ -87,7 +87,7 @@ export default function RecordsSettings() {
         <SectionTitle
           title="Settings"
           icon={<SlidersHorizontal size={16} />}
-          right={<UiPill tone="muted">Live Config</UiPill>}
+          right={<SectionChip>Live Config</SectionChip>}
         />
         <div className="settings-status-grid">
           <StatusBox
