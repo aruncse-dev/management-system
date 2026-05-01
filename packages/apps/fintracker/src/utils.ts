@@ -1,5 +1,5 @@
-import { ACCOUNTS, CC_MODES, OTHER_CR, ALL_CR, MNS } from './config'
-import type { Budget, OpeningBal, Transaction } from './types'
+import { ACCOUNTS, CC_MODES, OTHER_CR, ALL_CR, MNS, CATEGORIES, INCOME_CATS } from './config'
+import type { Budget, BudgetEntry, OpeningBal, Transaction } from './types'
 
 export function INR(n: number) {
   return '₹' + Math.round(Math.abs(n)).toLocaleString('en-IN')
@@ -27,21 +27,53 @@ export function dateKey(s: string) {
   return parseInt('20' + m[3]) * 10000 + (mo + 1) * 100 + parseInt(m[1])
 }
 
-export function catIcon(cat: string) {
-  const icons: Record<string, string> = {
-    'Long Term Loan':'🏠','Jewel Loan':'💍','Insurance':'🛡️','SIP/Savings':'📈',
-    'Emergency Fund':'🚨','Rent':'🏘️','Vijaya Amma':'👵','Staff Salary':'👷',
-    'Groceries':'🛒','Rice':'🍚','Milk':'🥛','Vegetables':'🥦','Fruits':'🍎',
-    'Food/Eating Out':'🍽️','Snacks':'🍿','Meat':'🥩','Education':'🎓','Kids':'👶',
-    'Health & Medical':'💊','Amma':'🙏','Body Care':'🧴','Dress':'👗',
-    'Entertainment':'🎬','Travel':'✈️','Gifts/Functions':'🎁','Home Care':'🏡',
-    'Maintenance':'🔧','Internet/Recharge':'📱','Electricity':'⚡','Cylinder':'🔥',
-    'Car':'🚗','Daily Expenses':'💰','NGO':'❤️','Others':'📦',
-    'Salary':'💵','Cashback':'💳','Other Income':'💸',
-    'Cash':'💵','HDFC Bank':'🏦','Wallet':'👛',
-    'ICICI':'💳','HDFC':'💳','Bommi':'🤝','Ramya':'🤝',
+/** Accepts `BudgetEntry[]` or legacy `{ [category]: amount }` from older GAS responses. */
+/** Append budget line names not already in `staticList` (stable order: static first). */
+export function mergeCategoriesWithBudgetNames(staticList: readonly string[], budget: Budget): string[] {
+  const seen = new Set(staticList.map(s => String(s)))
+  const out = [...staticList]
+  for (const e of budget) {
+    const n = String(e.name ?? '').trim()
+    if (n && !seen.has(n)) {
+      seen.add(n)
+      out.push(n)
+    }
   }
-  return icons[cat] || '📌'
+  return out
+}
+
+export function expenseCategoriesWithBudget(budget: Budget): string[] {
+  return mergeCategoriesWithBudgetNames(CATEGORIES, budget)
+}
+
+export function incomeCategoriesWithBudget(budget: Budget): string[] {
+  return mergeCategoriesWithBudgetNames([...CATEGORIES, ...INCOME_CATS], budget)
+}
+
+export function coerceBudget(raw: unknown): Budget {
+  if (Array.isArray(raw)) {
+    return raw
+      .map((e: unknown): BudgetEntry | null => {
+        if (!e || typeof e !== 'object') return null
+        const o = e as Record<string, unknown>
+        const name = String(o.name ?? '').trim()
+        if (!name) return null
+        return {
+          id: String(o.id ?? ''),
+          name,
+          amount: Number(o.amount) || 0,
+        }
+      })
+      .filter((e): e is BudgetEntry => e != null)
+  }
+  if (raw && typeof raw === 'object') {
+    return Object.entries(raw as Record<string, unknown>).map(([name, amount]) => ({
+      id: `legacy:${name}`,
+      name,
+      amount: Number(amount) || 0,
+    }))
+  }
+  return []
 }
 
 export function catMap(rows: Transaction[], _budget?: Budget) {
@@ -65,10 +97,10 @@ export function sumOtherCr(rows: Transaction[]) {
 }
 
 export function budgetSummary(budget: Budget, cm: Record<string, number>) {
-  const active = Object.entries(budget).filter(([, b]) => b > 0)
-  const totalBudget = active.reduce((s, [, b]) => s + b, 0)
-  const totalSpent = active.reduce((s, [c]) => s + (cm[c] || 0), 0)
-  const ovCount = active.filter(([c, b]) => (cm[c] || 0) > b).length
+  const rows = budget.filter(e => e.name.trim())
+  const totalBudget = rows.reduce((s, e) => s + e.amount, 0)
+  const totalSpent = rows.reduce((s, e) => s + (cm[e.name] || 0), 0)
+  const ovCount = rows.filter(e => (cm[e.name] || 0) > e.amount).length
   const totalOver = totalSpent > totalBudget
   const totalPct = totalBudget ? Math.min((totalSpent / totalBudget) * 100, 100) : 0
   const tCol = totalOver ? 'var(--rm)' : 'var(--gm)'

@@ -1,4 +1,4 @@
-import { Budget, MonthRef, OpeningBal, Transaction } from './types';
+import { Budget, BudgetEntry, MonthRef, OpeningBal, Transaction } from './types';
 import { API_URL } from './constants';
 
 type ApiResponse<T> = { ok: true; data: T; traceId?: string; debug?: Record<string, unknown> } | { ok: false; error: string; traceId?: string };
@@ -253,8 +253,9 @@ export const api = {
   updateRow:     (p: Record<string, unknown>)   => post<boolean>({ action: 'updateRow', ...p }),
   deleteRow:     (month: string, year: string, id: string) => post<boolean>({ action: 'deleteRow', month, year, id }),
   saveBudget:        (budgets: Budget)              => post<boolean>({ action: 'saveBudget', budgets }),
-  updateBudgetEntry: (cat: string, amt: number)    => post<boolean>({ action: 'updateBudgetEntry', cat, amt }),
-  deleteBudgetEntry: (cat: string)                 => post<boolean>({ action: 'deleteBudgetEntry', cat }),
+  addBudgetEntry:    (name: string, amt: number)   => post<BudgetEntry>({ action: 'addBudgetEntry', name, amt }),
+  updateBudgetEntry: (id: string, name: string, amt: number) => post<boolean>({ action: 'updateBudgetEntry', id, name, amt }),
+  deleteBudgetEntry: (id: string)                  => post<boolean>({ action: 'deleteBudgetEntry', id }),
   saveOpeningBal:(data: OpeningBal)             => post<boolean>({ action: 'saveOpeningBal', data }),
   getLending:    (sheetName?: string)          => get<RawLendingRow[]>('getEntries', { module: 'lending', ...(sheetName && sheetName !== 'Lending' && { sheetName }) }),
   addLending:    (p: Record<string, unknown>, sheetName?: string)  => post<string>({ module: 'lending', action: 'addEntry', ...(sheetName && sheetName !== 'Lending' && { sheetName }), ...p }),

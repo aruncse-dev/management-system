@@ -13,9 +13,12 @@ export interface MonthRef {
     month: string;
     year: string;
 }
-export interface Budget {
-    [category: string]: number;
+export interface BudgetEntry {
+    id: string;
+    name: string;
+    amount: number;
 }
+export type Budget = BudgetEntry[];
 export interface OpeningBal {
     [account: string]: number;
 }

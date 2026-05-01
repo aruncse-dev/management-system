@@ -32,23 +32,6 @@ export function dateKey(s: string) {
   return parseInt('20' + m[3]) * 10000 + (mo + 1) * 100 + parseInt(m[1])
 }
 
-export function catIcon(cat: string) {
-  const icons: Record<string, string> = {
-    'Long Term Loan':'🏠','Jewel Loan':'💍','Insurance':'🛡️','SIP/Savings':'📈',
-    'Emergency Fund':'🚨','Rent':'🏘️','Vijaya Amma':'👵','Staff Salary':'👷',
-    'Groceries':'🛒','Rice':'🍚','Milk':'🥛','Vegetables':'🥦','Fruits':'🍎',
-    'Food/Eating Out':'🍽️','Snacks':'🍿','Meat':'🥩','Education':'🎓','Kids':'👶',
-    'Health & Medical':'💊','Amma':'🙏','Body Care':'🧴','Dress':'👗',
-    'Entertainment':'🎬','Travel':'✈️','Gifts/Functions':'🎁','Home Care':'🏡',
-    'Maintenance':'🔧','Internet/Recharge':'📱','Electricity':'⚡','Cylinder':'🔥',
-    'Car':'🚗','Daily Expenses':'💰','NGO':'❤️','Others':'📦',
-    'Salary':'💵','Cashback':'💳','Other Income':'💸',
-    'Cash':'💵','HDFC Bank':'🏦','Wallet':'👛',
-    'ICICI':'💳','HDFC':'💳','Bommi':'🤝','Ramya':'🤝',
-  }
-  return icons[cat] || '📌'
-}
-
 export function catMap(rows: Transaction[], _budget?: Budget) {
   const cm: Record<string, number> = {}
   rows.filter(r => r.t === 'Expense').forEach(r => {
@@ -70,10 +53,10 @@ export function sumOtherCr(rows: Transaction[]) {
 }
 
 export function budgetSummary(budget: Budget, cm: Record<string, number>) {
-  const active = Object.entries(budget).filter(([, b]) => b > 0)
-  const totalBudget = active.reduce((s, [, b]) => s + b, 0)
-  const totalSpent = active.reduce((s, [c]) => s + (cm[c] || 0), 0)
-  const ovCount = active.filter(([c, b]) => (cm[c] || 0) > b).length
+  const rows = budget.filter(e => e.name.trim())
+  const totalBudget = rows.reduce((s, e) => s + e.amount, 0)
+  const totalSpent = rows.reduce((s, e) => s + (cm[e.name] || 0), 0)
+  const ovCount = rows.filter(e => (cm[e.name] || 0) > e.amount).length
   const totalOver = totalSpent > totalBudget
   const totalPct = totalBudget ? Math.min((totalSpent / totalBudget) * 100, 100) : 0
   const tCol = totalOver ? 'var(--rm)' : 'var(--gm)'

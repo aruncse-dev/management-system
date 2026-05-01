@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
-import { ChevronLeft, ChevronRight, RefreshCw, X as XIcon, Check } from 'lucide-react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { ChevronLeft, ChevronRight, RefreshCw, X as XIcon } from 'lucide-react'
 import { useStore } from '../store'
 import { api } from '../api'
 import { BottomNav, TransactionModal } from '../ui'
@@ -8,8 +8,8 @@ import Transactions from './transactions'
 import Budget from './budget'
 import Credits from './credits'
 import Accounts from './accounts'
-import { CATEGORIES } from '../config'
 import { MNS } from '../config'
+import { expenseCategoriesWithBudget, incomeCategoriesWithBudget } from '../utils'
 
 type TabId = 'dash' | 'txns' | 'bud' | 'cc' | 'acct'
 
@@ -27,7 +27,7 @@ export default function Monthly() {
   const [editRow, setEditRow] = useState<typeof state.rows[0] | null>(null)
   const [status, setStatus] = useState('')
   const [budgetAddOpen, setBudgetAddOpen] = useState(false)
-  const [budgetCat, setBudgetCat] = useState<string>(CATEGORIES[0])
+  const [budgetName, setBudgetName] = useState('')
   const [budgetVal, setBudgetVal] = useState('')
   const [budgetSaving, setBudgetSaving] = useState(false)
 
@@ -53,19 +53,20 @@ export default function Monthly() {
   }, [dispatch, showStatus])
 
   useEffect(() => {
-    ;(async () => {
-      try {
-        const init = await api.init()
-        dispatch({ type: 'SET_MONTHS', payload: init.months })
-        dispatch({ type: 'SET_BUDGET', payload: init.budget })
-        dispatch({ type: 'SET_OPENING_BAL', payload: init.openingBal })
-        await loadMonth(state.month, state.year)
-      } catch (e) {
-        showStatus('⚠ ' + (e instanceof Error ? e.message : 'Failed to connect to backend'))
-        dispatch({ type: 'SET_LOADING', payload: false })
-      }
-    })()
+    void loadMonth(state.month, state.year).catch(() => {
+      showStatus('⚠ Failed to connect to backend')
+      dispatch({ type: 'SET_LOADING', payload: false })
+    })
   }, []) // eslint-disable-line
+
+  const expenseCategoryOptions = useMemo(
+    () => expenseCategoriesWithBudget(state.budget),
+    [state.budget],
+  )
+  const incomeCategoryOptions = useMemo(
+    () => incomeCategoriesWithBudget(state.budget),
+    [state.budget],
+  )
 
   const changeMonth = useCallback(async (dir: 1 | -1) => {
     const idx = MNS.indexOf(state.month as typeof MNS[number])
@@ -80,23 +81,27 @@ export default function Monthly() {
 
   const addBudget = useCallback(async () => {
     const val = parseFloat(budgetVal)
-    if (!budgetCat || isNaN(val) || val <= 0) {
-      showStatus('⚠ Enter category and amount')
+    const name = budgetName.trim()
+    if (!name || isNaN(val) || val < 0) {
+      showStatus('⚠ Enter name and a valid amount')
       return
     }
     setBudgetSaving(true)
     try {
-      await api.updateBudgetEntry(budgetCat, val)
-      dispatch({ type: 'SET_BUDGET', payload: { ...state.budget, [budgetCat]: val } })
+      const entry = await api.addBudgetEntry(name, val)
+      api.invalidateCache({ action: 'getBudget' })
+      api.invalidateCache({ action: 'init' })
+      dispatch({ type: 'SET_BUDGET', payload: [...state.budget, entry] })
       showStatus('✓ Budget saved')
       setBudgetAddOpen(false)
+      setBudgetName('')
       setBudgetVal('')
     } catch (e) {
       showStatus('⚠ ' + (e instanceof Error ? e.message : 'Save failed'))
     } finally {
       setBudgetSaving(false)
     }
-  }, [budgetCat, budgetVal, dispatch, showStatus, state.budget])
+  }, [budgetName, budgetVal, dispatch, showStatus, state.budget])
 
   return (
     <div className="monthly-wrap">
@@ -149,21 +154,26 @@ export default function Monthly() {
             </div>
             <div className="modal-body">
               <div>
-                <div style={{fontSize:12,fontWeight:600,color:'var(--muted)',marginBottom:5,textTransform:'uppercase',letterSpacing:.4}}>Category</div>
-                <select className="form-sel" value={budgetCat} onChange={e => setBudgetCat(e.target.value)}>
-                  {CATEGORIES.map(c => <option key={c}>{c}</option>)}
-                </select>
+                <div style={{fontSize:12,fontWeight:600,color:'var(--muted)',marginBottom:5,textTransform:'uppercase',letterSpacing:.4}}>Budget name</div>
+                <input
+                  className="form-inp"
+                  type="text"
+                  placeholder="e.g. Groceries"
+                  value={budgetName}
+                  onChange={e => setBudgetName(e.target.value)}
+                  autoFocus
+                />
               </div>
               <div>
                 <div style={{fontSize:12,fontWeight:600,color:'var(--muted)',marginBottom:5,textTransform:'uppercase',letterSpacing:.4}}>Budget Amount (₹)</div>
-                <input className="form-inp" type="number" placeholder="0" value={budgetVal} onChange={e => setBudgetVal(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addBudget() }} autoFocus />
+                <input className="form-inp" type="number" placeholder="0" value={budgetVal} onChange={e => setBudgetVal(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addBudget() }} />
               </div>
             </div>
             <div className="modal-foot">
               <div className="modal-foot-l" />
               <button className="btn btn-sm btn-cancel" onClick={() => setBudgetAddOpen(false)}>Cancel</button>
               <button className="btn btn-sm btn-green" onClick={addBudget} disabled={budgetSaving}>
-                <Check size={13} />{budgetSaving ? '…' : 'Save'}
+                {budgetSaving ? '…' : 'Save'}
               </button>
             </div>
           </div>
@@ -175,6 +185,8 @@ export default function Monthly() {
           row={editRow}
           month={state.month} year={state.year}
           api={api}
+          expenseCategoryOptions={expenseCategoryOptions}
+          incomeCategoryOptions={incomeCategoryOptions}
           onClose={() => setModalOpen(false)}
           onSaved={async () => {
             setModalOpen(false)

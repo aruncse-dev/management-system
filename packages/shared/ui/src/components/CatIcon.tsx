@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { resolveCategoryIconKey } from '@fintracker-vault/config'
 import {
   Car,
   Gem,
@@ -42,6 +43,8 @@ interface Props {
 }
 
 export default function CatIcon({ cat, size = 16 }: Props) {
+  const resolved = resolveCategoryIconKey(cat) ?? cat
+
   const iconMap: Record<string, ReactNode> = {
     'Long Term Loan': <Car size={size} />,
     'Jewel Loan': <Gem size={size} />,
@@ -89,7 +92,7 @@ export default function CatIcon({ cat, size = 16 }: Props) {
     Ramya: <User size={size} />,
   }
 
-  const icon = iconMap[cat] || <Tag size={size} />
+  const icon = iconMap[resolved] || <Tag size={size} />
 
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--muted)', flexShrink: 0 }}>

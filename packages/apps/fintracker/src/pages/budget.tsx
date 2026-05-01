@@ -3,39 +3,39 @@ import { Pencil, Trash2, X as XIcon, AlertTriangle, Package } from 'lucide-react
 import { useStore } from '../store'
 import { catMap, budgetSummary, INR } from '../utils'
 import { api } from '../api'
-import { CATEGORIES } from '../config'
 import { CatIcon } from '../ui'
 import { KpiCard, KpiGrid, SectionBlock, UiCard } from '../ui'
 
 interface Props { showStatus: (msg: string) => void; onCategoryClick: (cat: string) => void }
 
-type ModalMode = 'add' | 'edit' | 'delete' | 'reset' | null
-interface ModalState { mode: ModalMode; cat: string; val: string }
+type ModalMode = 'add' | 'edit' | 'delete' | null
+interface ModalState { mode: ModalMode; id: string; cat: string; val: string }
 
 export default function Budget({ showStatus, onCategoryClick }: Props) {
   const { state, dispatch } = useStore()
   const { budget, rows } = state
   const cm = catMap(rows, budget)
   const { totalBudget, totalSpent, ovCount, totalOver } = budgetSummary(budget, cm)
-  const active = Object.entries(budget).filter(([,b]) => b > 0)
-  const [modal, setModal] = useState<ModalState>({ mode: null, cat: '', val: '' })
+  const listed = budget.filter(e => e.name.trim())
+  const [modal, setModal] = useState<ModalState>({ mode: null, id: '', cat: '', val: '' })
   const [saving, setSaving] = useState(false)
   const [catSheet, setCatSheet] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const remaining = totalBudget - totalSpent
-  function openEdit(cat: string, budg: number) { setModal({ mode: 'edit', cat, val: String(budg) }) }
-  function openDelete(cat: string) { setModal({ mode: 'delete', cat, val: '' }) }
-  function closeModal() { setModal({ mode: null, cat: '', val: '' }) }
+  function openEdit(id: string, cat: string, budg: number) { setModal({ mode: 'edit', id, cat, val: String(budg) }) }
+  function openDelete(id: string, cat: string) { setModal({ mode: 'delete', id, cat, val: '' }) }
+  function closeModal() { setModal({ mode: null, id: '', cat: '', val: '' }) }
 
   async function confirmAdd() {
     const val = parseFloat(modal.val)
-    if (!modal.cat || isNaN(val) || val <= 0) { showStatus('⚠ Enter category and amount'); return }
+    const name = modal.cat.trim()
+    if (!name || isNaN(val) || val < 0) { showStatus('⚠ Enter name and a valid amount'); return }
     setSaving(true)
     try {
-      await api.updateBudgetEntry(modal.cat, val)
+      const entry = await api.addBudgetEntry(name, val)
       api.invalidateCache({ action: 'getBudget' })
       api.invalidateCache({ action: 'init' })
-      dispatch({ type:'SET_BUDGET', payload: { ...budget, [modal.cat]: val } })
+      dispatch({ type:'SET_BUDGET', payload: [...budget, entry] })
       showStatus('✓ Budget saved')
       closeModal()
     } catch (e) { showStatus('⚠ ' + (e instanceof Error ? e.message : 'Save failed')) }
@@ -44,13 +44,17 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
 
   async function confirmEdit() {
     const val = parseFloat(modal.val)
-    if (isNaN(val) || val <= 0) { closeModal(); return }
+    const name = modal.cat.trim()
+    if (!name || isNaN(val) || val < 0) { closeModal(); return }
     setSaving(true)
     try {
-      await api.updateBudgetEntry(modal.cat, val)
+      await api.updateBudgetEntry(modal.id, name, val)
       api.invalidateCache({ action: 'getBudget' })
       api.invalidateCache({ action: 'init' })
-      dispatch({ type:'SET_BUDGET', payload: { ...budget, [modal.cat]: val } })
+      dispatch({
+        type:'SET_BUDGET',
+        payload: budget.map(e => e.id === modal.id ? { ...e, name, amount: val } : e),
+      })
       showStatus('✓ Budget updated')
       closeModal()
     } catch (e) { showStatus('⚠ ' + (e instanceof Error ? e.message : 'Save failed')) }
@@ -60,12 +64,10 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
   async function confirmDelete() {
     setSaving(true)
     try {
-      await api.deleteBudgetEntry(modal.cat)
+      await api.deleteBudgetEntry(modal.id)
       api.invalidateCache({ action: 'getBudget' })
       api.invalidateCache({ action: 'init' })
-      const nb = { ...budget }
-      delete nb[modal.cat]
-      dispatch({ type:'SET_BUDGET', payload: nb })
+      dispatch({ type:'SET_BUDGET', payload: budget.filter(e => e.id !== modal.id) })
       showStatus('✓ Budget removed')
       closeModal()
     } catch (e) { showStatus('⚠ ' + (e instanceof Error ? e.message : 'Delete failed')) }
@@ -100,21 +102,21 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
 
       <SectionBlock title="Categories" icon={<AlertTriangle size={14} />}>
         <div className="budget-list">
-        {active.filter(([cat]) => cat.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>(cm[b[0]]||0)-(cm[a[0]]||0)).map(([cat, budg]) => {
+        {listed.filter(e => e.name.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>(cm[b.name]||0)-(cm[a.name]||0)).map(({ id, name: cat, amount: budg }) => {
           const spent = cm[cat] || 0
           const over = spent > budg
-          const remaining = budg - spent
+          const rowRemaining = budg - spent
           const pct = budg > 0 ? (spent / budg) * 100 : 0
           const status = over ? 'OVER' : pct >= 90 ? 'CRITICAL' : pct >= 75 ? 'NEAR' : 'OK'
           const badgeClass = over ? 'budget-badge over' : pct >= 90 ? 'budget-badge critical' : pct >= 75 ? 'budget-badge near' : 'budget-badge ok'
           return (
             <UiCard
-              key={cat}
+              key={id}
               title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><CatIcon cat={cat} size={14} />{cat}</span>}
               right={<div className="budget-row-actions">
                 <span className={badgeClass}>{status}</span>
-                <button className="icon-btn" onClick={(e) => { e.stopPropagation(); openEdit(cat, budg) }} aria-label={`Edit ${cat}`} title={`Edit ${cat}`}><Pencil size={13} /></button>
-                <button className="icon-btn" style={{color:'var(--red)'}} onClick={(e) => { e.stopPropagation(); openDelete(cat) }} aria-label={`Delete ${cat}`} title={`Delete ${cat}`}><Trash2 size={13} /></button>
+                <button className="icon-btn" onClick={(e) => { e.stopPropagation(); openEdit(id, cat, budg) }} aria-label={`Edit ${cat}`} title={`Edit ${cat}`}><Pencil size={13} /></button>
+                <button className="icon-btn" style={{color:'var(--red)'}} onClick={(e) => { e.stopPropagation(); openDelete(id, cat) }} aria-label={`Delete ${cat}`} title={`Delete ${cat}`}><Trash2 size={13} /></button>
               </div>}
             >
               <div className="budget-row-grid" onClick={() => setCatSheet(cat)} style={{ cursor: 'pointer' }}>
@@ -128,14 +130,14 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
                 </div>
                 <div className="budget-mini-right">
                   <div className="budget-mini-lbl">{over ? 'Over' : 'Left'}</div>
-                  <div className="budget-mini-val" style={{ color: over ? 'var(--red)' : 'var(--gm)' }}>{INR(Math.abs(remaining))}</div>
+                  <div className="budget-mini-val" style={{ color: over ? 'var(--red)' : 'var(--gm)' }}>{INR(Math.abs(rowRemaining))}</div>
                 </div>
               </div>
             </UiCard>
           )
         })}
-        {!active.length && <div className="lb">No budget categories. Click "+ Add".</div>}
-        {active.length > 0 && !active.filter(([cat]) => cat.toLowerCase().includes(search.toLowerCase())).length && <div className="lb">No matching categories.</div>}
+        {!listed.length && <div className="lb">No budget categories. Click "+ Add".</div>}
+        {listed.length > 0 && !listed.filter(e => e.name.toLowerCase().includes(search.toLowerCase())).length && <div className="lb">No matching categories.</div>}
         </div>
       </SectionBlock>
 
@@ -175,23 +177,22 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
                 <button className="modal-close" onClick={closeModal}><XIcon size={16} /></button>
               </div>
               <div className="modal-body">
-                {modal.mode === 'add' ? (
-                  <div>
-                    <div style={{fontSize:12,fontWeight:600,color:'var(--muted)',marginBottom:5,textTransform:'uppercase',letterSpacing:.4}}>Category</div>
-                    <select className="form-sel" value={modal.cat} onChange={e => setModal(m => ({...m, cat: e.target.value}))}>
-                      {CATEGORIES.map(c => <option key={c}>{c}</option>)}
-                    </select>
-                  </div>
-                ) : (
-                  <div style={{fontSize:15,fontWeight:700,color:'var(--text)',display:'flex',alignItems:'center',gap:6}}>
-                    <CatIcon cat={modal.cat} size={14} />{modal.cat}
-                  </div>
-                )}
+                <div>
+                  <div style={{fontSize:12,fontWeight:600,color:'var(--muted)',marginBottom:5,textTransform:'uppercase',letterSpacing:.4}}>Budget name</div>
+                  <input
+                    className="form-inp"
+                    type="text"
+                    placeholder={modal.mode === 'add' ? 'e.g. Groceries' : ''}
+                    value={modal.cat}
+                    onChange={e => setModal(m => ({ ...m, cat: e.target.value }))}
+                    autoFocus={modal.mode === 'add'}
+                  />
+                </div>
                 <div>
                   <div style={{fontSize:12,fontWeight:600,color:'var(--muted)',marginBottom:5,textTransform:'uppercase',letterSpacing:.4}}>Budget Amount (₹)</div>
                   <input
                     className="form-inp" type="number" placeholder="0"
-                    value={modal.val} autoFocus
+                    value={modal.val} autoFocus={modal.mode === 'edit'}
                     onChange={e => setModal(m => ({...m, val: e.target.value}))}
                     onKeyDown={e => { if (e.key === 'Enter') { modal.mode === 'add' ? confirmAdd() : confirmEdit() } }}
                   />
@@ -210,7 +211,11 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
       </div>
 
       {/* Category Transaction Bottom Sheet */}
-      {catSheet && (
+      {catSheet && (() => {
+        const sheetBudg = budget.find(e => e.name === catSheet)?.amount ?? 0
+        const sheetSpent = cm[catSheet] || 0
+        const sheetOver = sheetSpent > sheetBudg
+        return (
         <div className={`modal-bg ${catSheet ? 'open' : ''}`} onClick={() => setCatSheet(null)} style={{position:'fixed',inset:0,zIndex:1000}}>
           <div className="sheet-panel" onClick={e => e.stopPropagation()}>
             <div className="sheet-hd modal-hd--blue">
@@ -221,16 +226,16 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
               <div className="sheet-stats" style={{gridTemplateColumns:'1fr 1fr 1fr'}}>
               <div className="card" style={{padding:'10px 12px'}}>
                 <div className="lbl">Budget</div>
-                <div style={{fontSize:14,fontWeight:700,color:'var(--text)',marginTop:4}}>{INR(budget[catSheet] || 0)}</div>
+                <div style={{fontSize:14,fontWeight:700,color:'var(--text)',marginTop:4}}>{INR(sheetBudg)}</div>
               </div>
               <div className="card" style={{padding:'10px 12px'}}>
                 <div className="lbl">Spent</div>
-                <div style={{fontSize:14,fontWeight:700,color:'var(--text)',marginTop:4}}>{INR(cm[catSheet] || 0)}</div>
+                <div style={{fontSize:14,fontWeight:700,color:'var(--text)',marginTop:4}}>{INR(sheetSpent)}</div>
               </div>
-              <div className="card" style={{padding:'10px 12px',background:(cm[catSheet] || 0) > (budget[catSheet] || 0)?'rgba(239,68,68,.08)':'rgba(34,197,94,.08)'}}>
-                <div className="lbl">{(cm[catSheet] || 0) > (budget[catSheet] || 0)?'Over':'Left'}</div>
-                <div style={{fontSize:14,fontWeight:700,color:(cm[catSheet] || 0) > (budget[catSheet] || 0)?'var(--rm)':'var(--gm)',marginTop:4}}>
-                  {INR(Math.abs((budget[catSheet] || 0) - (cm[catSheet] || 0)))}
+              <div className="card" style={{padding:'10px 12px',background: sheetOver ? 'rgba(239,68,68,.08)' : 'rgba(34,197,94,.08)'}}>
+                <div className="lbl">{sheetOver ? 'Over' : 'Left'}</div>
+                <div style={{fontSize:14,fontWeight:700,color: sheetOver ? 'var(--rm)' : 'var(--gm)',marginTop:4}}>
+                  {INR(Math.abs(sheetBudg - sheetSpent))}
                 </div>
               </div>
             </div>
@@ -258,7 +263,8 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   )
 }

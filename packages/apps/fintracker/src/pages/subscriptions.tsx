@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Check, Plus, Repeat2, Search, BarChart3, Bell, IndianRupee } from 'lucide-react'
 import { api, type RawSubscriptionRow, type RawVaultAppRow, type GoldSettings } from '../api'
 import { FormField, LoadingState, ModalActions, ModalShell, SearchField, SectionBlock, Spacer, UiPill, KpiCard, KpiGrid } from '../ui'
-import { INR } from '../utils'
+import { INR, mergeCategoriesWithBudgetNames } from '../utils'
 import { CATEGORIES, ALL_MODES } from '../constants'
+import { useStore } from '../store'
 
 type SubscriptionFormState = {
   name: string
@@ -157,6 +158,11 @@ function normalizeRow(row: RawSubscriptionRow): SubscriptionEntry {
 }
 
 export default function SubscriptionsPage() {
+  const { state: appState } = useStore()
+  const subscriptionCategories = useMemo(
+    () => mergeCategoriesWithBudgetNames(CATEGORIES, appState.budget),
+    [appState.budget],
+  )
   const [rows, setRows] = useState<SubscriptionEntry[]>([])
   const [apps, setApps] = useState<RawVaultAppRow[]>([])
   const [usdToInr, setUsdToInr] = useState(85)
@@ -602,7 +608,7 @@ export default function SubscriptionsPage() {
             <FormField label="Category">
               <select className="form-inp" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
                 <option value="">Select</option>
-                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                {subscriptionCategories.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </FormField>
             <FormField label="Amount">
