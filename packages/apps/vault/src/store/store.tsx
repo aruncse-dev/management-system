@@ -18,7 +18,7 @@ type Action =
 const { month, year } = currentMonthYear();
 
 const initial: AppState = {
-  month, year, rows: [], budget: {}, openingBal: {},
+  month, year, rows: [], budget: [], openingBal: {},
   months: [], loading: true, txnPage: 1, filter: 'All', catFilter: '', search: '',
 };
 

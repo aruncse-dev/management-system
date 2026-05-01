@@ -20,6 +20,10 @@ interface Props {
   onSaved: () => void
   showStatus: (msg: string) => void
   api: TransactionModalApi
+  /** Expense categories (e.g. `CATEGORIES` ∪ budget names). Defaults to `CATEGORIES` from config. */
+  expenseCategoryOptions?: readonly string[]
+  /** Income categories (e.g. `ALL_CATS` ∪ budget names). Defaults to merged config lists. */
+  incomeCategoryOptions?: readonly string[]
 }
 
 function todayISO() {
@@ -54,7 +58,17 @@ function isoFromGas(s: string) {
   return `20${m[3]}-${months[m[2]]}-${m[1].padStart(2, '0')}`
 }
 
-export default function TransactionModal({ row, month, year, onClose, onSaved, showStatus, api }: Props) {
+export default function TransactionModal({
+  row,
+  month,
+  year,
+  onClose,
+  onSaved,
+  showStatus,
+  api,
+  expenseCategoryOptions,
+  incomeCategoryOptions,
+}: Props) {
   const isEdit = !!row
   const [form, setForm] = useState<TransactionForm>({
     date: row ? isoFromGas(row.date) : todayISO(),
@@ -71,7 +85,10 @@ export default function TransactionModal({ row, month, year, onClose, onSaved, s
   const [delConfirm, setDelConfirm] = useState(false)
 
   const isTransfer = form.t === 'Transfer'
-  const cats = form.t === 'Income' ? ALL_CATS : CATEGORIES
+  const cats =
+    form.t === 'Income'
+      ? (incomeCategoryOptions ?? ALL_CATS)
+      : (expenseCategoryOptions ?? CATEGORIES)
 
   function set(k: keyof TransactionForm, v: string) {
     setForm(f => ({ ...f, [k]: v }))

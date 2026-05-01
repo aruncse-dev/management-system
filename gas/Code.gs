@@ -366,16 +366,21 @@ function _handlePost(body) {
     return deleteRow(body.month, body.year, body.id);
   if (action === 'saveBudget')
     return saveBudget(body.budgets);
+  if (action === 'addBudgetEntry')
+    return addBudgetEntry(body.name, body.amt);
   if (action === 'updateBudgetEntry')
-    return updateBudgetEntry(body.cat, body.amt);
+    return updateBudgetEntry(body.id, body.name, body.amt);
   if (action === 'deleteBudgetEntry')
-    return deleteBudgetEntry(body.cat);
+    return deleteBudgetEntry(body.id);
   if (action === 'saveOpeningBal')
     return saveAccountOpeningBalances(body.data);
   if (action === 'ensureMonth')
     return ensureMonth(body.month, body.year);
-  if (action === 'resetBudget')
-    return saveBudget(_defaultBudgets()) && _defaultBudgets();
+  if (action === 'resetBudget') {
+    const def = _defaultBudgets();
+    saveBudget(def);
+    return def;
+  }
   if (action === 'configure')
     return _configure(body.expensesSheetId, body.assetsSheetId);
   if (action === 'gemini')
@@ -498,67 +503,103 @@ function deleteRow(month, year, id) {
 }
 
 // ── PUBLIC: BUDGET ────────────────────────────────────────────────────────────
+/** @returns {Array<{id:string,name:string,amount:number}>|null} null if already new format */
+function _legacyBudgetRowsToEntries(vals) {
+  const h = vals[0] || [];
+  if (String(h[0]).trim().toLowerCase() === 'id') return null;
+  const entries = [];
+  for (let i = 1; i < vals.length; i++) {
+    const r = vals[i];
+    const name = String(r[0] || '').trim();
+    if (!name) continue;
+    entries.push({ id: Utilities.getUuid(), name: name, amount: parseFloat(r[1]) || 0 });
+  }
+  return entries;
+}
+
 function getBudget() {
-  const sh   = _getOrCreate(B_TAB, ['Category', 'Budget']);
+  const sh = _getOrCreate(B_TAB, ['ID', 'Category', 'Budget']);
   const vals = sh.getDataRange().getValues();
-  const out  = {};
-  vals.slice(1).forEach(r => { if (r[0]) out[String(r[0])] = parseFloat(r[1]) || 0; });
-  if (!Object.keys(out).length) {
+  const legacy = _legacyBudgetRowsToEntries(vals);
+  if (legacy !== null) {
+    if (legacy.length) {
+      saveBudget(legacy);
+      return getBudget();
+    }
     const def = _defaultBudgets();
     saveBudget(def);
-    return def;
+    return getBudget();
+  }
+  const out = [];
+  vals.slice(1).forEach(function (r) {
+    if (r[1])
+      out.push({
+        id: String(r[0] || ''),
+        name: String(r[1]),
+        amount: parseFloat(r[2]) || 0
+      });
+  });
+  if (!out.length) {
+    const def = _defaultBudgets();
+    saveBudget(def);
+    return getBudget();
   }
   return out;
 }
 
-function saveBudget(budgets) {
-  const sh = _getOrCreate(B_TAB, ['Category', 'Budget']);
-
-  // Safety guard: refuse to overwrite a larger existing budget with suspiciously
-  // few entries — this prevents partial-state saves from wiping real data.
-  const existing = sh.getLastRow() - 1; // subtract header row
-  const incoming = Object.keys(budgets).length;
+function saveBudget(entries) {
+  const sh = _getOrCreate(B_TAB, ['ID', 'Category', 'Budget']);
+  const existing = sh.getLastRow() - 1;
+  const incoming = entries.length;
   if (existing > 5 && incoming < existing * 0.5) {
     throw new Error(
-      'Save blocked: incoming budget has ' + incoming + ' entries but sheet has ' +
-      existing + '. Reload the app and try again.'
+      'Save blocked: incoming ' + incoming + ' entries but sheet has ' +
+        existing + '. Reload the app and try again.'
     );
   }
-
   sh.clearContents();
-  sh.appendRow(['Category', 'Budget']);
-  _styleHeader(sh, 2);
-  const rows = Object.entries(budgets);
-  rows.forEach(([cat, amt]) => sh.appendRow([cat, parseFloat(amt) || 0]));
+  sh.appendRow(['ID', 'Category', 'Budget']);
+  _styleHeader(sh, 3);
+  entries.forEach(function (e) {
+    sh.appendRow([e.id || Utilities.getUuid(), e.name, parseFloat(e.amount) || 0]);
+  });
   return true;
 }
 
-// Update or insert a single budget row by category name — never clears the sheet.
-function updateBudgetEntry(cat, amt) {
-  const sh = _getOrCreate(B_TAB, ['Category', 'Budget']);
+function addBudgetEntry(name, amt) {
+  getBudget();
+  const sh = _getOrCreate(B_TAB, ['ID', 'Category', 'Budget']);
+  const id = Utilities.getUuid();
+  const amount = parseFloat(amt) || 0;
+  sh.appendRow([id, String(name || '').trim(), amount]);
+  return { id: id, name: String(name || '').trim(), amount: amount };
+}
+
+function updateBudgetEntry(id, name, amt) {
+  getBudget();
+  const sh = _getOrCreate(B_TAB, ['ID', 'Category', 'Budget']);
   const vals = sh.getDataRange().getValues();
   for (let i = 1; i < vals.length; i++) {
-    if (String(vals[i][0]) === String(cat)) {
-      sh.getRange(i + 1, 2).setValue(parseFloat(amt) || 0);
+    if (String(vals[i][0]) === String(id)) {
+      sh.getRange(i + 1, 2).setValue(String(name || '').trim());
+      sh.getRange(i + 1, 3).setValue(parseFloat(amt) || 0);
       return true;
     }
   }
-  // Not found — append a new row
-  sh.appendRow([cat, parseFloat(amt) || 0]);
-  return true;
+  throw new Error('Budget entry not found: ' + id);
 }
 
-// Delete a single budget row by category name — never touches other rows.
-function deleteBudgetEntry(cat) {
-  const sh = _getOrCreate(B_TAB, ['Category', 'Budget']);
+function deleteBudgetEntry(id) {
+  getBudget();
+  const sh = _getOrCreate(B_TAB, ['ID', 'Category', 'Budget']);
   const vals = sh.getDataRange().getValues();
   for (let i = vals.length - 1; i >= 1; i--) {
-    if (String(vals[i][0]) === String(cat)) {
+    if (String(vals[i][0]) === String(id)) {
       sh.deleteRow(i + 1);
       return true;
     }
   }
-  throw new Error('Budget category not found: ' + cat);
+  throw new Error('Budget entry not found: ' + id);
 }
 
 // ── PUBLIC: ACCOUNT OPENING BALANCES ─────────────────────────────────────────
@@ -746,26 +787,41 @@ function _records_saveSettings(recordsSpreadsheetId) {
 // ── DEFAULTS ──────────────────────────────────────────────────────────────────
 // Budget plan for ₹2,38,000 income
 function _defaultBudgets() {
-  return {
-    // ── FIXED ─────────────────────────────────────────────────────────────────
-    'Jewel Loan':30000, 'Long Term Loan':56000,
-    'Insurance':9700,
-    'SIP/Savings':11500, 'Rent':5500,
-    'Vijaya Amma':6500, 'Staff Salary':18000, 'Internet/Recharge':1900,
-    // ── VARIABLE ──────────────────────────────────────────────────────────────
-    'Emergency Fund':6000,
-    // Food
-    'Groceries':18000, 'Milk':6000, 'Vegetables':3500, 'Fruits':2000,
-    'Food/Eating Out':3500, 'Snacks':1500, 'Meat':4000,
-    // Family
-    'Education':6500, 'Kids':3000, 'Health & Medical':4500, 'Amma':5000,
-    // Personal
-    'Body Care':3000, 'Dress':2000,
-    // Lifestyle
-    'Entertainment':1500, 'Travel':4500, 'Gifts/Functions':2000, 'Home Care':3500, 'Maintenance':3000,
-    // Utilities
-    'Electricity':3500, 'Cylinder':2000, 'Car':2000, 'Daily Expenses':2500,
-    // Buffer
-    'Others':5000,
-  };
+  function row(n, a) {
+    return { id: Utilities.getUuid(), name: n, amount: a };
+  }
+  return [
+    row('Jewel Loan', 30000),
+    row('Long Term Loan', 56000),
+    row('Insurance', 9700),
+    row('SIP/Savings', 11500),
+    row('Rent', 5500),
+    row('Vijaya Amma', 6500),
+    row('Staff Salary', 18000),
+    row('Internet/Recharge', 1900),
+    row('Emergency Fund', 6000),
+    row('Groceries', 18000),
+    row('Milk', 6000),
+    row('Vegetables', 3500),
+    row('Fruits', 2000),
+    row('Food/Eating Out', 3500),
+    row('Snacks', 1500),
+    row('Meat', 4000),
+    row('Education', 6500),
+    row('Kids', 3000),
+    row('Health & Medical', 4500),
+    row('Amma', 5000),
+    row('Body Care', 3000),
+    row('Dress', 2000),
+    row('Entertainment', 1500),
+    row('Travel', 4500),
+    row('Gifts/Functions', 2000),
+    row('Home Care', 3500),
+    row('Maintenance', 3000),
+    row('Electricity', 3500),
+    row('Cylinder', 2000),
+    row('Car', 2000),
+    row('Daily Expenses', 2500),
+    row('Others', 5000)
+  ];
 }

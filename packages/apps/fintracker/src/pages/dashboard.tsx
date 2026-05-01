@@ -26,10 +26,10 @@ export default function Dashboard() {
     return { acc, current }
   })
 
-  const overspent = Object.entries(budget)
-    .filter(([c,b]) => b>0 && (cm[c]||0)>b)
-    .map(([c,b]) => ({ c, b, s: cm[c]||0 }))
-    .sort((a,b) => (b.s-b.b)-(a.s-a.b))
+  const overspent = budget
+    .filter(e => e.name.trim() && (cm[e.name] || 0) > e.amount)
+    .map(e => ({ c: e.name, b: e.amount, s: cm[e.name] || 0 }))
+    .sort((a, b) => (b.s - b.b) - (a.s - a.b))
 
   const incExpData = [
     {label:'Income', v:inc, col:'#22C55E'},

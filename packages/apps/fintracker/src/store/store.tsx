@@ -1,7 +1,20 @@
-import React, { createContext, useContext, useReducer } from 'react';
+import React, { createContext, useContext, useEffect, useReducer } from 'react';
 import { AppState, Transaction, Budget, OpeningBal, MonthRef } from '../types';
 import { dateKey, currentMonthYear } from './utils';
+import { coerceBudget } from '../utils';
 import { TXN_PAGE } from './constants';
+import { loadInitDataDeduped } from '../api';
+
+const BUDGET_LS_KEY = 'ft_fintracker_budget_v1';
+
+function persistBudgetToStorage(b: Budget) {
+  try {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(BUDGET_LS_KEY, JSON.stringify(b));
+  } catch {
+    /* quota / private mode */
+  }
+}
 
 type Action =
   | { type: 'SET_LOADING'; payload: boolean }
@@ -18,7 +31,7 @@ type Action =
 const { month, year } = currentMonthYear();
 
 const initial: AppState = {
-  month, year, rows: [], budget: {}, openingBal: {},
+  month, year, rows: [], budget: [], openingBal: {},
   months: [], loading: true, txnPage: 1, filter: 'All', catFilter: '', search: '',
 };
 
@@ -28,7 +41,11 @@ function reducer(state: AppState, action: Action): AppState {
     case 'SET_MONTH':       return { ...state, ...action.payload, txnPage: 1, filter: 'All', catFilter: '', search: '' };
     case 'SET_ROWS':        return { ...state, rows: action.payload.map(r => ({ ...r, _k: dateKey(r.date) })).sort((a,b) => (b._k||0)-(a._k||0)) };
     case 'SET_MONTHS':      return { ...state, months: action.payload };
-    case 'SET_BUDGET':      return { ...state, budget: action.payload };
+    case 'SET_BUDGET': {
+      const budget = coerceBudget(action.payload);
+      persistBudgetToStorage(budget);
+      return { ...state, budget };
+    }
     case 'SET_OPENING_BAL': return { ...state, openingBal: action.payload };
     case 'SET_FILTER':      return { ...state, filter: action.payload, catFilter: '', txnPage: 1 };
     case 'SET_CAT_FILTER':  return { ...state, catFilter: action.payload, filter: 'All', txnPage: 1 };
@@ -42,6 +59,19 @@ const Ctx = createContext<{ state: AppState; dispatch: React.Dispatch<Action> } 
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initial);
+
+  useEffect(() => {
+    void loadInitDataDeduped()
+      .then((init) => {
+        dispatch({ type: 'SET_MONTHS', payload: init.months });
+        dispatch({ type: 'SET_BUDGET', payload: init.budget });
+        dispatch({ type: 'SET_OPENING_BAL', payload: init.openingBal });
+      })
+      .catch(() => {
+        /* auth / network — pages may show their own errors */
+      });
+  }, []);
+
   return <Ctx.Provider value={{ state, dispatch }}>{children}</Ctx.Provider>;
 }
 

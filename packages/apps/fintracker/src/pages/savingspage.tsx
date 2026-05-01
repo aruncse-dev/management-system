@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Plus, LayoutDashboard, List, BarChart3, Wallet, Search, TrendingUp, AlertTriangle, ArrowUpRight, ArrowDownRight, Repeat2 } from 'lucide-react'
 import { api, RawSavingsRow } from '../api'
 import { CATEGORIES, THEME_COLORS } from '../config'
-import { INR } from '../utils'
+import { INR, mergeCategoriesWithBudgetNames } from '../utils'
+import { useStore } from '../store'
 import { BalanceRow, CatIcon, FormField, KpiCard, KpiGrid, LoadingState, SearchField, SectionBlock, Spacer, TransactionCard } from '../ui'
 
 type SavingsType = 'Income' | 'Expense' | 'Transfer'
@@ -132,6 +133,11 @@ export default function SavingsPage({
   title = 'Savings',
   addButtonTitle,
 }: SavingsPageConfig) {
+  const { state: appState } = useStore()
+  const savingsExpenseCategories = useMemo(
+    () => mergeCategoriesWithBudgetNames(CATEGORIES, appState.budget),
+    [appState.budget],
+  )
   const [entries, setEntries] = useState<SavingsEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -453,7 +459,7 @@ export default function SavingsPage({
                 {form.type === 'Expense' && (
                   <FormField label="Category">
                     <select className="form-sel" value={form.category} onChange={e => setField('category', e.target.value)}>
-                      {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                      {savingsExpenseCategories.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </FormField>
                 )}
