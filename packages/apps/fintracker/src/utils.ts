@@ -2,12 +2,7 @@ import { ACCOUNTS, CC_MODES, OTHER_CR, ALL_CR, MNS } from './config'
 import type { Budget, OpeningBal, Transaction } from './types'
 
 export function INR(n: number) {
-  const abs = Math.abs(n)
-  const hasDecimals = abs % 1 !== 0
-  if (hasDecimals) {
-    return '₹' + abs.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
-  }
-  return '₹' + Math.round(abs).toLocaleString('en-IN')
+  return '₹' + Math.round(Math.abs(n)).toLocaleString('en-IN')
 }
 
 export function fd(s: string) {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Check, Plus, Repeat2, Search, BarChart3, Bell, IndianRupee } from 'lucide-react'
 import { api, type RawSubscriptionRow, type RawVaultAppRow, type GoldSettings } from '../api'
-import { FormField, ModalActions, ModalShell, SearchField, SectionBlock, Spacer, UiPill, KpiCard, KpiGrid } from '../ui'
+import { FormField, LoadingState, ModalActions, ModalShell, SearchField, SectionBlock, Spacer, UiPill, KpiCard, KpiGrid } from '../ui'
 import { INR } from '../utils'
 import { CATEGORIES, ALL_MODES } from '../constants'
 
@@ -74,9 +74,28 @@ function parseDate(value: string) {
 }
 
 function addCycle(date: Date, cycle: string) {
+  const c = cycle.trim().toLowerCase()
   const next = new Date(date.getTime())
-  if (cycle === 'yearly') next.setFullYear(next.getFullYear() + 1)
+  if (c === 'yearly') next.setFullYear(next.getFullYear() + 1)
+  else if (c === 'quarterly') next.setMonth(next.getMonth() + 3)
+  else if (c === 'weekly') next.setDate(next.getDate() + 7)
   else next.setMonth(next.getMonth() + 1)
+  return next
+}
+
+/** Next billing date: autopay rolls forward; without autopay, no date if the cycle end is already past. */
+function resolveNextRenewal(row: SubscriptionEntry, now = new Date()) {
+  const cycle = row.billing_cycle.trim().toLowerCase()
+  const start = parseDate(row.start_date)
+  if (!start) return null
+  let next = parseDate(row.end_date) || addCycle(start, cycle)
+  if (row.autopay) {
+    while (next < now) {
+      next = addCycle(next, cycle)
+    }
+    return next
+  }
+  if (next < now) return null
   return next
 }
 
@@ -87,15 +106,10 @@ function toIsoDate(date: Date) {
   return `${y}-${m}-${d}`
 }
 
-function resolveNextRenewal(row: SubscriptionEntry, now = new Date()) {
-  const cycle = row.billing_cycle.trim().toLowerCase()
-  const start = parseDate(row.start_date)
-  if (!start) return null
-  let next = parseDate(row.end_date) || addCycle(start, cycle)
-  while (next < now) {
-    next = addCycle(next, cycle)
-  }
-  return next
+function toShortDate(date: Date) {
+  const d = String(date.getDate()).padStart(2, '0')
+  const mon = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][date.getMonth()]
+  return `${d} ${mon}`
 }
 
 function daysUntil(date: Date, now = new Date()) {
@@ -103,11 +117,25 @@ function daysUntil(date: Date, now = new Date()) {
   return Math.ceil(ms / (1000 * 60 * 60 * 24))
 }
 
+/** Autopay alert card: ≤7d red, 8–14d amber, else green. */
+function autopayAlertTone(daysLeft: number): 'red' | 'amber' | 'green' {
+  if (daysLeft <= 7) return 'red'
+  if (daysLeft <= 14) return 'amber'
+  return 'green'
+}
+
 function amountLabel(amount: number, currency: string) {
   const c = currency.trim().toUpperCase()
-  if (c === 'USD') return `$${amount.toFixed(2)}`
+  if (c === 'USD') return `$${Math.round(amount).toLocaleString('en-US')}`
   return INR(amount)
 }
+
+function rowAmountInr(row: SubscriptionEntry, usdToInr: number): number {
+  const amt = Number(row.amount) || 0
+  return (row.currency || 'INR').trim().toUpperCase() === 'USD' ? amt * usdToInr : amt
+}
+
+const AUTOPAY_ALERT_DAYS = 30
 
 function normalizeRow(row: RawSubscriptionRow): SubscriptionEntry {
   return {
@@ -178,29 +206,56 @@ export default function SubscriptionsPage() {
     ].join(' ').toLowerCase().includes(q))
   }, [rows, search, apps])
 
-  const monthlyINR = useMemo(() =>
-    rows.reduce((sum, row) => {
-      const cycle = row.billing_cycle.trim().toLowerCase()
-      const monthly = cycle === 'yearly' ? row.amount / 12 : row.amount
-      const inr = (row.currency || 'INR').toUpperCase() === 'USD' ? monthly * usdToInr : monthly
-      return sum + inr
-    }, 0), [rows, usdToInr])
+  const monthlyPlanSumINR = useMemo(
+    () =>
+      rows
+        .filter(r => r.billing_cycle.trim().toLowerCase() === 'monthly')
+        .reduce((s, r) => s + rowAmountInr(r, usdToInr), 0),
+    [rows, usdToInr]
+  )
 
-  const yearlyINR = useMemo(() =>
-    rows.reduce((sum, row) => {
-      const cycle = row.billing_cycle.trim().toLowerCase()
-      const yearly = cycle === 'yearly' ? row.amount : row.amount * 12
-      const inr = (row.currency || 'INR').toUpperCase() === 'USD' ? yearly * usdToInr : yearly
-      return sum + inr
-    }, 0), [rows, usdToInr])
+  const yearlyPlanSumINR = useMemo(
+    () =>
+      rows
+        .filter(r => r.billing_cycle.trim().toLowerCase() === 'yearly')
+        .reduce((s, r) => s + rowAmountInr(r, usdToInr), 0),
+    [rows, usdToInr]
+  )
 
-  const dueSoonRows = useMemo(() => {
+  const weeklyQuarterlyEquivMonthlyINR = useMemo(
+    () =>
+      rows.reduce((s, r) => {
+        const c = r.billing_cycle.trim().toLowerCase()
+        const inr = rowAmountInr(r, usdToInr)
+        if (c === 'weekly') return s + inr * (52 / 12)
+        if (c === 'quarterly') return s + inr / 3
+        return s
+      }, 0),
+    [rows, usdToInr]
+  )
+
+  const annualOutlookINR = useMemo(
+    () => monthlyPlanSumINR * 12 + yearlyPlanSumINR + weeklyQuarterlyEquivMonthlyINR * 12,
+    [monthlyPlanSumINR, yearlyPlanSumINR, weeklyQuarterlyEquivMonthlyINR]
+  )
+
+  const autopayRenewalAlerts = useMemo(() => {
     const now = new Date()
+    type AlertItem = { row: SubscriptionEntry; date: Date; daysLeft: number }
     return rows
-      .filter(row => row.status.trim().toLowerCase() === 'active')
-      .map(row => ({ row, date: resolveNextRenewal(row, now) }))
-      .filter(item => item.date !== null && daysUntil(item.date as Date, now) >= 0 && daysUntil(item.date as Date, now) <= 5)
-      .sort((a, b) => (a.date as Date).getTime() - (b.date as Date).getTime()) as Array<{ row: SubscriptionEntry; date: Date }>
+      .filter(row => row.status.trim().toLowerCase() === 'active' && row.autopay)
+      .map((row): AlertItem | null => {
+        const date = resolveNextRenewal(row, now)
+        if (!date) return null
+        const daysLeft = daysUntil(date, now)
+        if (daysLeft < 0 || daysLeft > AUTOPAY_ALERT_DAYS) return null
+        return { row, date, daysLeft }
+      })
+      .filter((item): item is AlertItem => item !== null)
+      .sort(
+        (a, b) =>
+          a.date.getTime() - b.date.getTime() || a.row.name.localeCompare(b.row.name)
+      )
   }, [rows])
 
   const startAdd = () => {
@@ -331,70 +386,82 @@ export default function SubscriptionsPage() {
 
       {tab === 'dashboard' && (
         <>
-          {loading ? (
-            <div className="ui-kit-loading ui-kit-loading--page">Loading…</div>
-          ) : (
+          <SectionBlock
+            title="Summary"
+            icon={<BarChart3 size={16} />}
+            right={loading ? <LoadingState variant="inline" /> : null}
+          >
+            <KpiGrid variant="dash">
+              <KpiCard
+                label="Total subscriptions"
+                value={loading ? '—' : rows.length}
+                tone="navy"
+                icon={<Repeat2 size={16} />}
+              />
+              <KpiCard
+                label="Monthly plans"
+                value={loading ? '—' : INR(monthlyPlanSumINR)}
+                tone="navy"
+                icon={<IndianRupee size={16} />}
+              />
+              <KpiCard
+                label="Yearly plans"
+                value={loading ? '—' : INR(yearlyPlanSumINR)}
+                tone="navy"
+                icon={<IndianRupee size={16} />}
+              />
+              <KpiCard
+                label="Annual outlook"
+                value={loading ? '—' : INR(annualOutlookINR)}
+                tone="navy"
+                icon={<IndianRupee size={16} />}
+              />
+            </KpiGrid>
+          </SectionBlock>
+          <Spacer size={12} />
+
+          {!loading && autopayRenewalAlerts.length > 0 && (
             <>
-              <SectionBlock title="Overview" icon={<BarChart3 size={16} />}>
-                <KpiGrid variant="dash">
-                  <KpiCard label="Total Subscriptions" value={rows.length} tone="navy" icon={<Repeat2 size={16} />} />
-                  <KpiCard label="Monthly (INR)" value={INR(monthlyINR)} tone="navy" icon={<IndianRupee size={16} />} subtitle={`1 USD = ₹${usdToInr.toFixed(0)}`} />
-                  <KpiCard label="Yearly (INR)" value={INR(yearlyINR)} tone="navy" icon={<IndianRupee size={16} />} />
-                  <KpiCard label="Due in 5 Days" value={dueSoonRows.length} tone={dueSoonRows.length > 0 ? 'red' : 'green'} icon={<Bell size={16} />} />
-                </KpiGrid>
+              <SectionBlock
+                title="Autopay alerts"
+                icon={<Bell size={16} />}
+                right={<UiPill tone="navy">{autopayRenewalAlerts.length}</UiPill>}
+              >
+                <div className="ui-stack">
+                  {autopayRenewalAlerts.map(({ row, date, daysLeft }) => {
+                    const tone = autopayAlertTone(daysLeft)
+                    const pillTone = tone === 'amber' ? 'ui-tone-amber' : tone === 'red' ? 'ui-tone-red' : 'ui-tone-green'
+                    return (
+                      <button
+                        key={row.id}
+                        type="button"
+                        className="ui-kit-holding-card ui-kit-holding-card--btn"
+                        onClick={() => startEdit(row)}
+                        style={{ textAlign: 'left', padding: '10px 12px' }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                          <span
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 700,
+                              color: 'var(--text)',
+                              minWidth: 0,
+                              flex: 1,
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                          >
+                            {row.name || 'Untitled'} · {toShortDate(date)} · {amountLabel(row.amount || 0, row.currency)}
+                          </span>
+                          <span className={`ui-pill ${pillTone}`}>{daysLeft}d</span>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
               </SectionBlock>
               <Spacer size={12} />
-
-              {dueSoonRows.length > 0 && (
-                <>
-                  <SectionBlock title="Due Soon" icon={<Bell size={16} />}>
-                    <div className="ui-stack">
-                      {dueSoonRows.map(({ row, date }) => {
-                        const linkedApp = apps.find(app => app.app_uuid === row.app_uuid)
-                        const daysLeft = daysUntil(date, new Date())
-                        return (
-                          <button
-                            key={row.id}
-                            type="button"
-                            className="ui-kit-holding-card ui-kit-holding-card--btn ui-kit-holding-card--accent-red"
-                            onClick={() => startEdit(row)}
-                            style={{ textAlign: 'left' }}
-                          >
-                            <div className="ui-kit-holding-card-head">
-                              <div>
-                                <div className="ui-kit-holding-card-title">
-                                  <span>{row.name || 'Untitled Subscription'}</span>
-                                </div>
-                                <div className="ui-kit-holding-card-subtitle">
-                                  {row.category || 'Subscription'} {linkedApp ? `· ${linkedApp.app_name}` : ''}
-                                </div>
-                              </div>
-                              <div className="ui-kit-holding-card-head-right">
-                                <span className="ui-pill ui-tone-red">{daysLeft} day{daysLeft !== 1 ? 's' : ''}</span>
-                              </div>
-                            </div>
-                            <div className="ui-kit-holding-card-grid">
-                              <div className="ui-kit-holding-stat">
-                                <span>Amount</span>
-                                <strong>{amountLabel(row.amount || 0, row.currency)}</strong>
-                              </div>
-                              <div className="ui-kit-holding-stat ui-kit-holding-stat--center">
-                                <span>Due Date</span>
-                                <strong>{toIsoDate(date)}</strong>
-                              </div>
-                              <div className="ui-kit-holding-stat ui-kit-holding-stat--right">
-                                <span>Cycle</span>
-                                <strong>{row.billing_cycle || '-'}</strong>
-                              </div>
-                            </div>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </SectionBlock>
-                  <Spacer size={12} />
-                </>
-              )}
             </>
           )}
         </>
@@ -402,91 +469,91 @@ export default function SubscriptionsPage() {
 
       {tab === 'subscriptions' && (
         <>
-          {loading ? (
-            <div className="ui-kit-loading ui-kit-loading--page">Loading…</div>
-          ) : (
-            <>
-              <SectionBlock
-                title="All Subscriptions"
-                icon={<Repeat2 size={16} />}
-                right={<UiPill tone="navy">{rows.length}</UiPill>}
-              >
-                <div className="ui-stack">
-                  <SearchField
-                    value={search}
-                    placeholder="Search subscriptions..."
-                    onChange={setSearch}
-                    onClear={() => setSearch('')}
-                    prefix={<Search size={14} />}
-                  />
-                </div>
-              </SectionBlock>
-              <Spacer size={12} />
+          <SectionBlock
+            title="All Subscriptions"
+            icon={<Repeat2 size={16} />}
+            right={loading ? <LoadingState variant="inline" /> : <UiPill tone="navy">{rows.length}</UiPill>}
+          >
+            <div className="ui-stack">
+              <SearchField
+                value={search}
+                placeholder="Search subscriptions..."
+                onChange={setSearch}
+                onClear={() => setSearch('')}
+                prefix={<Search size={14} />}
+              />
+            </div>
+          </SectionBlock>
+          <Spacer size={12} />
 
-              <div className="ui-stack">
-                {filteredRows.length === 0 ? (
-                  <div style={{ padding: '18px 14px', color: 'var(--muted)', fontSize: 13, fontWeight: 600, textAlign: 'center' }}>
-                    No subscriptions found. Add one with the plus button.
-                  </div>
-                ) : (
-                  filteredRows.map(row => {
-                    const linkedApp = apps.find(app => app.app_uuid === row.app_uuid)
-                    const nextRenewalDate = resolveNextRenewal(row)
-                    return (
-                      <button
-                        key={row.id}
-                        type="button"
-                        className="ui-kit-holding-card ui-kit-holding-card--btn ui-kit-holding-card--accent-navy"
-                        onClick={() => startEdit(row)}
-                        style={{ textAlign: 'left' }}
-                      >
-                        <div className="ui-kit-holding-card-head">
-                          <div>
-                            <div className="ui-kit-holding-card-title">
-                              <span>{row.name || 'Untitled Subscription'}</span>
-                            </div>
-                            <div className="ui-kit-holding-card-subtitle">
-                              {row.category || 'Subscription'} {linkedApp ? `· ${linkedApp.app_name}` : ''}
-                            </div>
-                          </div>
-                          <div className="ui-kit-holding-card-head-right">
-                            <span className="ui-pill ui-tone-green">Active</span>
-                          </div>
-                        </div>
-                        <div className="ui-kit-holding-card-grid">
-                          <div className="ui-kit-holding-stat">
-                            <span>Amount</span>
-                            <strong>{amountLabel(row.amount || 0, row.currency)}</strong>
-                          </div>
-                          <div className="ui-kit-holding-stat ui-kit-holding-stat--center">
-                            <span>Start</span>
-                            <strong>{row.start_date || '-'}</strong>
-                          </div>
-                          <div className="ui-kit-holding-stat ui-kit-holding-stat--right">
-                            <span>Renewal</span>
-                            <strong>{nextRenewalDate ? toIsoDate(nextRenewalDate) : '-'}</strong>
-                          </div>
-                        </div>
-                        <div className="ui-kit-holding-card-grid">
-                          <div className="ui-kit-holding-stat">
-                            <span>Cycle</span>
-                            <strong>{row.billing_cycle || '-'}</strong>
-                          </div>
-                          <div className="ui-kit-holding-stat ui-kit-holding-stat--center">
-                            <span>End Date</span>
-                            <strong>{row.end_date || '-'}</strong>
-                          </div>
-                          <div className="ui-kit-holding-stat ui-kit-holding-stat--right">
-                            <span>Auto Renew</span>
-                            <strong>{row.autopay ? 'Yes' : 'No'}</strong>
-                          </div>
-                        </div>
-                      </button>
-                    )
-                  })
-                )}
+          {loading && <LoadingState variant="section" />}
+
+          {!loading && filteredRows.length === 0 && (
+            <div className="ui-stack">
+              <div style={{ padding: '18px 14px', color: 'var(--muted)', fontSize: 13, fontWeight: 600, textAlign: 'center' }}>
+                No subscriptions found. Add one with the plus button.
               </div>
-            </>
+            </div>
+          )}
+
+          {!loading && filteredRows.length > 0 && (
+            <div className="ui-stack">
+              {filteredRows.map(row => {
+                const linkedApp = apps.find(app => app.app_uuid === row.app_uuid)
+                const nextRenewalDate = resolveNextRenewal(row)
+                return (
+                  <button
+                    key={row.id}
+                    type="button"
+                    className="ui-kit-holding-card ui-kit-holding-card--btn ui-kit-holding-card--accent-navy"
+                    onClick={() => startEdit(row)}
+                    style={{ textAlign: 'left' }}
+                  >
+                    <div className="ui-kit-holding-card-head">
+                      <div>
+                        <div className="ui-kit-holding-card-title">
+                          <span>{row.name || 'Untitled Subscription'}</span>
+                        </div>
+                        <div className="ui-kit-holding-card-subtitle">
+                          {row.category || 'Subscription'} {linkedApp ? `· ${linkedApp.app_name}` : ''}
+                        </div>
+                      </div>
+                      <div className="ui-kit-holding-card-head-right">
+                        <span className="ui-pill ui-tone-green">Active</span>
+                      </div>
+                    </div>
+                    <div className="ui-kit-holding-card-grid">
+                      <div className="ui-kit-holding-stat">
+                        <span>Amount</span>
+                        <strong>{amountLabel(row.amount || 0, row.currency)}</strong>
+                      </div>
+                      <div className="ui-kit-holding-stat ui-kit-holding-stat--center">
+                        <span>Start</span>
+                        <strong>{row.start_date || '-'}</strong>
+                      </div>
+                      <div className="ui-kit-holding-stat ui-kit-holding-stat--right">
+                        <span>Renewal</span>
+                        <strong>{nextRenewalDate ? toIsoDate(nextRenewalDate) : '-'}</strong>
+                      </div>
+                    </div>
+                    <div className="ui-kit-holding-card-grid">
+                      <div className="ui-kit-holding-stat">
+                        <span>Cycle</span>
+                        <strong>{row.billing_cycle || '-'}</strong>
+                      </div>
+                      <div className="ui-kit-holding-stat ui-kit-holding-stat--center">
+                        <span>End Date</span>
+                        <strong>{row.end_date || '-'}</strong>
+                      </div>
+                      <div className="ui-kit-holding-stat ui-kit-holding-stat--right">
+                        <span>Auto Renew</span>
+                        <strong>{row.autopay ? 'Yes' : 'No'}</strong>
+                      </div>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
           )}
         </>
       )}
@@ -534,7 +601,7 @@ export default function SubscriptionsPage() {
             </FormField>
             <FormField label="Category">
               <select className="form-inp" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
-                <option value="">— Select —</option>
+                <option value="">Select</option>
                 {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </FormField>
@@ -543,8 +610,8 @@ export default function SubscriptionsPage() {
             </FormField>
             <FormField label="Currency">
               <select className="form-inp" value={form.currency} onChange={e => setForm(f => ({ ...f, currency: e.target.value }))}>
-                <option value="INR">INR — Indian Rupee</option>
-                <option value="USD">USD — US Dollar</option>
+                <option value="INR">INR</option>
+                <option value="USD">USD</option>
               </select>
             </FormField>
             <FormField label="Billing Cycle">
@@ -560,7 +627,7 @@ export default function SubscriptionsPage() {
             </FormField>
             <FormField label="Payment Method">
               <select className="form-inp" value={form.payment_method} onChange={e => setForm(f => ({ ...f, payment_method: e.target.value }))}>
-                <option value="">— Select —</option>
+                <option value="">Select</option>
                 {ALL_MODES.map(m => <option key={m} value={m}>{m}</option>)}
               </select>
             </FormField>
