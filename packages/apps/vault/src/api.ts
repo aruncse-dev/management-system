@@ -230,6 +230,80 @@ export interface RawInsuranceRow {
   nominee_name: string;
   notes: string;
   updated_at?: string;
+  person_uuid?: string;
+}
+
+export interface PersonRow {
+  person_uuid: string;
+  name: string;
+  relation: string;
+  dob: string;
+  gender: string;
+  notes: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface DocumentRow {
+  doc_uuid: string;
+  person_uuid: string;
+  doc_type: string;
+  doc_number: string;
+  drive_url: string;
+  expiry: string;
+  notes: string;
+  created_at?: string;
+}
+
+export interface HealthVitalRow {
+  vital_uuid: string;
+  person_uuid: string;
+  recorded_at: string;
+  height_cm: number;
+  weight_kg: number;
+  systolic: number;
+  diastolic: number;
+  blood_sugar: number;
+  notes: string;
+}
+
+export interface IllnessRow {
+  illness_uuid: string;
+  person_uuid: string;
+  name: string;
+  diagnosed_on: string;
+  status: string;
+  notes: string;
+}
+
+export interface MedicationRow {
+  med_uuid: string;
+  person_uuid: string;
+  illness_uuid: string;
+  name: string;
+  dosage: string;
+  frequency: string;
+  start_date: string;
+  end_date: string;
+  reminder_times: string;
+  notes: string;
+}
+
+export interface HabitRow {
+  habit_uuid: string;
+  person_uuid: string;
+  name: string;
+  category: string;
+  target_frequency: string;
+  created_at?: string;
+}
+
+export interface HabitLogRow {
+  log_uuid: string;
+  habit_uuid: string;
+  person_uuid: string;
+  log_date: string;
+  completed: boolean;
 }
 
 export interface RawHolding {
@@ -352,6 +426,50 @@ export const api = {
     invalidateCache({ action: 'getEntry', params: { module: 'insurance', id } })
     return result
   },
+  getPersons: () => get<PersonRow[]>('getEntries', { module: 'persons' }),
+  getPerson: (personUuid: string) => get<PersonRow>('getEntry', { module: 'persons', person_uuid: personUuid }),
+  addPerson: (p: Record<string, unknown>) => post<string>({ module: 'persons', action: 'addEntry', ...p }),
+  updatePerson: (p: Record<string, unknown>) => post<boolean>({ module: 'persons', action: 'updateEntry', ...p }),
+  deletePerson: (personUuid: string) => post<boolean>({ module: 'persons', action: 'deleteEntry', person_uuid: personUuid }),
+
+  getDocuments: (personUuid?: string) =>
+    get<DocumentRow[]>('getEntries', { module: 'documents', ...(personUuid ? { person_uuid: personUuid } : {}) }),
+  addDocument: (p: Record<string, unknown>) => post<string>({ module: 'documents', action: 'addEntry', ...p }),
+  updateDocument: (p: Record<string, unknown>) => post<boolean>({ module: 'documents', action: 'updateEntry', ...p }),
+  deleteDocument: (docUuid: string) => post<boolean>({ module: 'documents', action: 'deleteEntry', doc_uuid: docUuid }),
+
+  getHealthVitals: (personUuid?: string) =>
+    get<HealthVitalRow[]>('getVitals', { module: 'health', ...(personUuid ? { person_uuid: personUuid } : {}) }),
+  addHealthVital: (p: Record<string, unknown>) => post<string>({ module: 'health', action: 'addVital', ...p }),
+  deleteHealthVital: (vitalUuid: string) => post<boolean>({ module: 'health', action: 'deleteVital', vital_uuid: vitalUuid }),
+
+  getIllnesses: (personUuid?: string) =>
+    get<IllnessRow[]>('getIllnesses', { module: 'health', ...(personUuid ? { person_uuid: personUuid } : {}) }),
+  addIllness: (p: Record<string, unknown>) => post<string>({ module: 'health', action: 'addIllness', ...p }),
+  updateIllness: (p: Record<string, unknown>) => post<boolean>({ module: 'health', action: 'updateIllness', ...p }),
+  deleteIllness: (illnessUuid: string) => post<boolean>({ module: 'health', action: 'deleteIllness', illness_uuid: illnessUuid }),
+
+  getMedications: (personUuid?: string) =>
+    get<MedicationRow[]>('getMedications', { module: 'health', ...(personUuid ? { person_uuid: personUuid } : {}) }),
+  addMedication: (p: Record<string, unknown>) => post<string>({ module: 'health', action: 'addMedication', ...p }),
+  updateMedication: (p: Record<string, unknown>) => post<boolean>({ module: 'health', action: 'updateMedication', ...p }),
+  deleteMedication: (medUuid: string) => post<boolean>({ module: 'health', action: 'deleteMedication', med_uuid: medUuid }),
+
+  getHabits: (personUuid?: string) =>
+    get<HabitRow[]>('getHabits', { module: 'habits', ...(personUuid ? { person_uuid: personUuid } : {}) }),
+  getHabitLogs: (params: { habit_uuid?: string; person_uuid?: string; from?: string; to?: string }) =>
+    get<HabitLogRow[]>('getHabitLogs', {
+      module: 'habits',
+      ...(params.habit_uuid ? { habit_uuid: params.habit_uuid } : {}),
+      ...(params.person_uuid ? { person_uuid: params.person_uuid } : {}),
+      ...(params.from ? { from: params.from } : {}),
+      ...(params.to ? { to: params.to } : {}),
+    }),
+  addHabit: (p: Record<string, unknown>) => post<string>({ module: 'habits', action: 'addHabit', ...p }),
+  updateHabit: (p: Record<string, unknown>) => post<boolean>({ module: 'habits', action: 'updateHabit', ...p }),
+  deleteHabit: (habitUuid: string) => post<boolean>({ module: 'habits', action: 'deleteHabit', habit_uuid: habitUuid }),
+  logHabit: (p: Record<string, unknown>) => post<boolean>({ module: 'habits', action: 'logHabit', ...p }),
+
   getTokenStatus: ()                           => get<{ hasToken: boolean; tokenType?: string; hasAccessToken?: boolean; hasExtendedToken?: boolean; hasRefreshToken?: boolean; accessTokenExpiry?: string; extendedTokenExpiry?: string; expired?: boolean }>('getTokenStatus', { module: 'stocks' }, { cache: false }),
   getUpstoxAuthUrl: ()                         => get<{ authUrl: string }>('getAuthUrl', { module: 'stocks' }, { cache: false }),
   setUpstoxToken: (token: string)              => post<boolean>({ module: 'stocks', action: 'setToken', token }),

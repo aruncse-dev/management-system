@@ -13,7 +13,7 @@ export default function HomePage() {
       .then(r => r.json())
       .then((d: { authed?: boolean }) => {
         if (cancelled || !d.authed) return
-        void router.replace('/monthly')
+        void router.replace('/monthly?tab=dash')
       })
     return () => {
       cancelled = true

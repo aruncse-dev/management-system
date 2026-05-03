@@ -1,7 +1,16 @@
 import type { AppProps } from 'next/app'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
-import { Grid2X2, Landmark, Settings as SettingsIcon, Shield } from 'lucide-react'
+import {
+  FileText,
+  Grid2X2,
+  HeartPulse,
+  Landmark,
+  Settings as SettingsIcon,
+  Shield,
+  Target,
+  Users,
+} from 'lucide-react'
 import { AppAuthGate, SimpleAppNav, type SimpleAppNavSection } from '@fintracker-vault/ui'
 import { StoreProvider } from '../store'
 import { getClientAuthEnv } from '../clientAuthEnv'
@@ -13,6 +22,10 @@ const VAULT_PAGE_TITLES: Record<string, string> = {
   '/vaultinsurance': 'Insurance',
   '/vaultapps': 'Apps',
   '/vaultsettings': 'Settings',
+  '/vaultpersons': 'Persons',
+  '/vaultdocuments': 'Documents',
+  '/vaulthealth': 'Health',
+  '/vaulthabits': 'Habits',
 }
 
 const VAULT_NAV_SECTIONS: SimpleAppNavSection[] = [
@@ -20,9 +33,26 @@ const VAULT_NAV_SECTIONS: SimpleAppNavSection[] = [
     heading: 'Vault',
     items: [
       { path: '/vault', label: 'Banking', icon: <Landmark size={18} /> },
-      { path: '/vaultinsurance', label: 'Insurance', icon: <Shield size={18} /> },
       { path: '/vaultapps', label: 'Apps', icon: <Grid2X2 size={18} /> },
     ],
+  },
+  {
+    heading: 'Family',
+    items: [
+      { path: '/vaultpersons', label: 'Persons', icon: <Users size={18} /> },
+      { path: '/vaultdocuments', label: 'Documents', icon: <FileText size={18} /> },
+    ],
+  },
+  {
+    heading: 'Wellness',
+    items: [
+      { path: '/vaulthealth', label: 'Health', icon: <HeartPulse size={18} /> },
+      { path: '/vaulthabits', label: 'Habits', icon: <Target size={18} /> },
+    ],
+  },
+  {
+    heading: 'Coverage',
+    items: [{ path: '/vaultinsurance', label: 'Insurance', icon: <Shield size={18} /> }],
   },
 ]
 

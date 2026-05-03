@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Check, Copy, Search, ShieldPlus, Plus, HeartPulse, Shield, Sparkles } from 'lucide-react'
-import { api, type RawInsuranceRow } from '../api'
+import { api, type PersonRow, type RawInsuranceRow } from '../api'
 import { FormField, HoldingCard, ModalActions, ModalShell, SearchField, SectionBlock, SectionChip, Spacer } from '../ui'
 import { INR } from '../utils'
 
@@ -22,6 +22,7 @@ type InsuranceFormState = {
   cash_value: string
   nominee_name: string
   notes: string
+  person_uuid: string
 }
 
 const EMPTY_FORM: InsuranceFormState = {
@@ -42,6 +43,7 @@ const EMPTY_FORM: InsuranceFormState = {
   cash_value: '',
   nominee_name: '',
   notes: '',
+  person_uuid: '',
 }
 
 function toForm(row: RawInsuranceRow): InsuranceFormState {
@@ -63,6 +65,7 @@ function toForm(row: RawInsuranceRow): InsuranceFormState {
     cash_value: row.cash_value === undefined || row.cash_value === null ? '' : String(row.cash_value),
     nominee_name: row.nominee_name || '',
     notes: row.notes || '',
+    person_uuid: row.person_uuid || '',
   }
 }
 
@@ -144,6 +147,7 @@ function openInNewTab(url: string) {
 
 export default function VaultInsurancePage() {
   const [rows, setRows] = useState<RawInsuranceRow[]>([])
+  const [persons, setPersons] = useState<PersonRow[]>([])
   const [apps, setApps] = useState<Array<{ app_uuid: string; app_name: string; app_link?: string; logo?: string }>>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -161,8 +165,9 @@ export default function VaultInsurancePage() {
     setLoading(true)
     setError('')
     try {
-      const [insuranceRows, appRows] = await Promise.all([api.getInsuranceEntries(), api.getApps()])
+      const [insuranceRows, appRows, personRows] = await Promise.all([api.getInsuranceEntries(), api.getApps(), api.getPersons()])
       setRows(insuranceRows)
+      setPersons(personRows)
       setApps(appRows.map(app => ({ app_uuid: app.app_uuid, app_name: app.app_name, app_link: app.app_link, logo: app.logo })))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load insurance')
@@ -172,6 +177,12 @@ export default function VaultInsurancePage() {
   }
 
   useEffect(() => { void load() }, [])
+
+  const personName = useMemo(() => {
+    const m = new Map<string, string>()
+    persons.forEach(pr => m.set(pr.person_uuid, pr.name || ''))
+    return m
+  }, [persons])
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -185,8 +196,10 @@ export default function VaultInsurancePage() {
       row.policy_owner,
       row.nominee_name,
       row.notes,
+      row.person_uuid,
+      personName.get(row.person_uuid || '') || '',
     ].join(' ').toLowerCase().includes(q))
-  }, [rows, search])
+  }, [rows, search, personName])
 
   const startAdd = () => {
     setMode('add')
@@ -237,6 +250,7 @@ export default function VaultInsurancePage() {
         cash_value: form.cash_value ? Number(form.cash_value) : 0,
         nominee_name: form.nominee_name.trim(),
         notes: form.notes.trim(),
+        person_uuid: form.person_uuid.trim(),
       }
       if (mode === 'edit') {
         await api.updateInsuranceEntry({ ...payload, id: editingId })
@@ -285,6 +299,7 @@ export default function VaultInsurancePage() {
     ['Plan Name', detail.plan_name],
     ['Policy Type', policyTypeLabel(detail.policy_type)],
     ['Policy Owner', detail.policy_owner],
+    ['Person', (detail.person_uuid && personName.get(detail.person_uuid)) || detail.person_uuid || ''],
     ['Insurer', detail.insurer],
     ['App Entry', apps.find(app => app.app_uuid === detail.app_uuid)?.app_name || detail.app_uuid || ''],
     ['Policy Number', detail.policy_number],
@@ -335,7 +350,7 @@ export default function VaultInsurancePage() {
             filteredRows.map(row => (
               <HoldingCard
                 key={row.id}
-                title={row.policy_owner || 'Untitled Policy'}
+                title={(row.person_uuid && personName.get(row.person_uuid)) || row.policy_owner || 'Untitled Policy'}
                 subtitle={row.insurer || 'Insurance'}
                 leftLabel="Premium"
                 leftValue={INRInput(String(row.premium_amount ?? ''))}
@@ -466,6 +481,14 @@ export default function VaultInsurancePage() {
             </FormField>
             <FormField label="Policy Owner">
               <input className="form-inp" value={form.policy_owner} onChange={e => setForm(f => ({ ...f, policy_owner: e.target.value }))} />
+            </FormField>
+            <FormField label="Person (registry)">
+              <select className="form-inp" value={form.person_uuid} onChange={e => setForm(f => ({ ...f, person_uuid: e.target.value }))}>
+                <option value="">None</option>
+                {persons.map(pr => (
+                  <option key={pr.person_uuid} value={pr.person_uuid}>{pr.name}</option>
+                ))}
+              </select>
             </FormField>
             <FormField label="Premium Amount">
               <input className="form-inp" inputMode="decimal" value={form.premium_amount} onChange={e => setForm(f => ({ ...f, premium_amount: e.target.value }))} />

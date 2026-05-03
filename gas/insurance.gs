@@ -5,10 +5,10 @@
 // Columns     : ID | Policy Type | Plan Name | Insurer | App ID | Policy Number | Policy Owner | Premium Amount | Premium Mode | Payment Method | Issue Date | Maturity Date | Sum Assured | Cash Value | Nominee Name | Notes | Updated At
 
 const I_SHEET = 'Insurance';
-const I_HDR = ['ID', 'Policy Type', 'Plan Name', 'Insurer', 'App ID', 'Policy Number', 'Policy Owner', 'Premium Amount', 'Premium Mode', 'Payment Method', 'Issue Date', 'Maturity Date', 'Sum Assured', 'Cash Value', 'Nominee Name', 'Notes', 'Updated At'];
+const I_HDR = ['ID', 'Policy Type', 'Plan Name', 'Insurer', 'App ID', 'Policy Number', 'Policy Owner', 'Premium Amount', 'Premium Mode', 'Payment Method', 'Issue Date', 'Maturity Date', 'Sum Assured', 'Cash Value', 'Nominee Name', 'Notes', 'Updated At', 'Person UUID'];
 const I_COL = {
   ID: 0, TYPE: 1, PLAN: 2, INSURER: 3, APP: 4, POL_NO: 5, OWNER: 6, PREMIUM: 7, MODE: 8, PAYMENT: 9,
-  ISSUE: 10, MATURITY: 11, SUM: 12, CASH: 13, NOMINEE: 14, NOTES: 15, UPDATED: 16,
+  ISSUE: 10, MATURITY: 11, SUM: 12, CASH: 13, NOMINEE: 14, NOTES: 15, UPDATED: 16, PERSON_UUID: 17,
 };
 const INS_CACHE = CacheService.getScriptCache();
 const INS_CACHE_KEY = 'insurance_entries';
@@ -20,6 +20,13 @@ function _ensureInsuranceHeader(sh) {
     return;
   }
   try {
+    const lastCol = sh.getLastColumn();
+    if (lastCol < I_HDR.length) {
+      for (let c = lastCol; c < I_HDR.length; c++) {
+        sh.getRange(1, c + 1).setValue(I_HDR[c]);
+      }
+      Logger.log('_ensureInsuranceHeader: extended header to ' + I_HDR.length + ' cols');
+    }
     const firstRow = sh.getRange(1, 1, 1, I_HDR.length).getValues()[0];
     const isHeader = I_HDR.every((col, i) => String(firstRow[i] || '').trim() === col);
     if (!isHeader) Logger.log('_ensureInsuranceHeader: header mismatch, preserving data');
@@ -71,6 +78,7 @@ function _insurance_rowToObj(row) {
     nominee_name: String(row[I_COL.NOMINEE] || '').trim(),
     notes: String(row[I_COL.NOTES] || '').trim(),
     updated_at: String(row[I_COL.UPDATED] || '').trim(),
+    person_uuid: String(row[I_COL.PERSON_UUID] || '').trim(),
   };
 }
 
@@ -102,6 +110,7 @@ function _insurance_payloadToRow(body, existingId) {
     String(body.nominee_name || '').trim(),
     String(body.notes || '').trim(),
     now,
+    String(body.person_uuid || '').trim(),
   ];
 }
 
