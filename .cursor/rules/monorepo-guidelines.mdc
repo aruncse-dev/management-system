@@ -14,9 +14,11 @@ Use this as **baseline context** for any feature work. Full detail lives in repo
 | [`AGENTS.md`](../../AGENTS.md) | Agent/developer entry: invariants, app ports, links |
 | [`CLAUDE.md`](../../CLAUDE.md) | Architecture, env, deployment, **Developer and agent playbook** (new apps, pages, API caching, shared UI) |
 | [`.cursor/rules/google-oauth-env.mdc`](./google-oauth-env.mdc) | Google client ID / allowlist env names — **do not invent new keys** |
+| [`.cursor/rules/git-pr-only-main.mdc`](./git-pr-only-main.mdc) | **Git:** PR-only updates to `main` — **no direct push** |
 
 ## Non-negotiables
 
+- **Git / `main`:** Use a **branch + PR** for every change; **do not push commits directly to `main`**. See [`.cursor/rules/git-pr-only-main.mdc`](./git-pr-only-main.mdc).
 - Run **`pnpm type-check`** at repo root before pushing (`.git/hooks/pre-push`).
 - **Global CSS** only in `src/pages/_app.tsx` or `_document.tsx` — not in page components.
 - **Imports** across packages: `@fintracker-vault/*` aliases from root `tsconfig.json`.

@@ -239,9 +239,15 @@ Older builds stored **`ft_google_authed`** and relied on client-only checks. Aft
 curl https://fintracker.vercel.app
 curl https://vault.vercel.app
 
-# Check pre-push hook prevents broken code
-git push origin main  # Should run type-check first
+# Push your feature branch (pre-push runs type-check); merge via PR — not direct pushes to main
+git push -u origin <branch>
 ```
+
+### GitHub: protected `main`
+
+- **Policy:** All work lands on **`main` only through a merged pull request** — no direct pushes of new commits to `main`. Agents follow [`.cursor/rules/git-pr-only-main.mdc`](.cursor/rules/git-pr-only-main.mdc); humans follow the same rule.
+- **Enforcement:** Enable **branch protection** on `main` in GitHub (**Settings → Branches → Branch protection rule**): turn on **Require a pull request before merging**, optionally **Do not allow bypassing** for admins if you want zero exceptions. Status checks can be added later when CI exists.
+- **Tags:** Pushing release tags (`git push origin v1.2.3`) does not violate branch protection.
 
 ### Tags & GitHub Releases
 

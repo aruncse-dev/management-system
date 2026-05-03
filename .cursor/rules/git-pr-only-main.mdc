@@ -1,0 +1,32 @@
+---
+description: Git workflow — PR-based merges to main; never push commits directly to main
+alwaysApply: true
+---
+
+# Git: pull requests only for `main`
+
+These rules apply to **all agents and automation** touching this repo.
+
+## Do not push directly to `main`
+
+- **Never** `git push origin main` with new commits (no fast-forward feature pushes to `main`).
+- **`main`** is updated only by **merging a pull request** (merge commit, squash, or rebase per team preference—default here: **merge**).
+- Remote **`main`** is protected on GitHub; direct pushes should be **rejected** once protection is enabled.
+
+## Agent workflow for any change
+
+1. `git checkout main && git pull origin main`
+2. `git checkout -b <type>/<short-slug>` (e.g. `fix/login-redirect`, `feat/vault-export`)
+3. Implement, run **`pnpm type-check`** (and tests if relevant).
+4. `git add …` → `git commit -m "…"`
+5. `git push -u origin <branch>`
+6. Open a **PR** into `main` (`gh pr create` or GitHub UI) and **merge** after review (or self-review for solo maintainer).
+7. Optionally tag a release on `main` after merge per **`CLAUDE.md`** (Tags & GitHub Releases).
+
+## Exceptions
+
+- **Only** when the repository owner explicitly instructs an emergency bypass (e.g. revert hotfix with documented reason). Otherwise always use a PR.
+
+## Tags
+
+- Pushing **tags** (`git push origin v1.2.3`) is allowed and expected for releases; that is not a branch push to `main`.
