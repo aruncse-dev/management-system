@@ -1989,3 +1989,31 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
   background: rgba(255, 255, 255, 0.12);
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
+
+/* Vault — documents list: open-link control inside TransactionCard (nested in button) */
+.vault-doc-preview-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--navy);
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+}
+.vault-doc-preview-cell--icon-only {
+  padding: 4px;
+  margin: -2px 0;
+  border-radius: 10px;
+}
+.vault-doc-preview-cell--icon-only:hover,
+.vault-doc-preview-cell--icon-only:focus-visible {
+  background: rgba(30, 92, 199, 0.1);
+  text-decoration: none;
+}
+.vault-doc-preview-empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  opacity: 0.45;
+}

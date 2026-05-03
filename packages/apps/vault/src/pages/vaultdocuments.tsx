@@ -1,9 +1,49 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { ExternalLink, FileText, Plus, Search } from 'lucide-react'
+import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import {
+  Baby,
+  Car,
+  Copy,
+  Download,
+  ExternalLink,
+  FileText,
+  IdCard,
+  Link2Off,
+  Plane,
+  Plus,
+  Search,
+  Vote,
+  Wallet,
+} from 'lucide-react'
 import { api, type DocumentRow, type PersonRow } from '../api'
-import { FormField, ModalActions, ModalShell, SearchField, SectionBlock, SectionChip, Spacer } from '../ui'
+import { FormField, ModalActions, ModalShell, SearchField, SectionBlock, SectionChip, Spacer, TransactionCard } from '../ui'
 
 const DOC_TYPES = ['Aadhaar', 'PAN', 'Passport', 'DL', 'Voter ID', 'Birth Certificate', 'Other'] as const
+
+const DOC_ICON_SIZE = 16
+
+/** Card header icon by document type (matches `DOC_TYPES` + common variants). */
+function documentTypeIcon(docType: string): ReactNode {
+  const key = docType.trim().toLowerCase()
+  const s = DOC_ICON_SIZE
+  switch (key) {
+    case 'aadhaar':
+      return <IdCard size={s} />
+    case 'pan':
+      return <Wallet size={s} />
+    case 'passport':
+      return <Plane size={s} />
+    case 'dl':
+    case 'driving license':
+    case 'driver license':
+      return <Car size={s} />
+    case 'voter id':
+      return <Vote size={s} />
+    case 'birth certificate':
+      return <Baby size={s} />
+    default:
+      return <FileText size={s} />
+  }
+}
 
 type FormState = {
   doc_uuid: string
@@ -37,6 +77,55 @@ function toForm(row: DocumentRow): FormState {
   }
 }
 
+function DocumentDrivePreview({ url }: { url: string }) {
+  const t = url.trim()
+  if (!t) {
+    return (
+      <span className="vault-doc-preview-empty" aria-label="No document link">
+        <Link2Off size={15} aria-hidden />
+      </span>
+    )
+  }
+  const open = (e: MouseEvent) => {
+    e.stopPropagation()
+    window.open(t, '_blank', 'noopener,noreferrer')
+  }
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      e.stopPropagation()
+      window.open(t, '_blank', 'noopener,noreferrer')
+    }
+  }
+  return (
+    <span
+      role="link"
+      tabIndex={0}
+      className="vault-doc-preview-cell vault-doc-preview-cell--icon-only"
+      onClick={open}
+      onKeyDown={onKey}
+      title={t}
+      aria-label="Open document link in new tab"
+    >
+      <ExternalLink size={16} aria-hidden />
+    </span>
+  )
+}
+
+function expiryTone(expiry: string): 'red' | 'amber' | 'navy' {
+  if (!expiry.trim()) return 'navy'
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const raw = expiry.trim()
+  const exp = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? new Date(`${raw}T00:00:00`) : new Date(raw)
+  if (Number.isNaN(exp.getTime())) return 'navy'
+  exp.setHours(0, 0, 0, 0)
+  const diff = Math.floor((exp.getTime() - today.getTime()) / 86400000)
+  if (diff < 30) return 'red'
+  if (diff < 90) return 'amber'
+  return 'navy'
+}
+
 export default function VaultDocumentsPage() {
   const [persons, setPersons] = useState<PersonRow[]>([])
   const [rows, setRows] = useState<DocumentRow[]>([])
@@ -47,15 +136,14 @@ export default function VaultDocumentsPage() {
   const [mode, setMode] = useState<'add' | 'edit' | null>(null)
   const [form, setForm] = useState<FormState>(EMPTY)
   const [saving, setSaving] = useState(false)
+  const [copied, setCopied] = useState<string | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
 
   const load = async () => {
     setLoading(true)
     setError('')
     try {
-      const [p, d] = await Promise.all([
-        api.getPersons(),
-        api.getDocuments(filterPerson || undefined),
-      ])
+      const [p, d] = await Promise.all([api.getPersons(), api.getDocuments()])
       setPersons(p)
       setRows(d)
     } catch (e) {
@@ -65,7 +153,7 @@ export default function VaultDocumentsPage() {
     }
   }
 
-  useEffect(() => { void load() }, [filterPerson])
+  useEffect(() => { void load() }, [])
 
   const nameById = useMemo(() => {
     const m = new Map<string, string>()
@@ -73,20 +161,35 @@ export default function VaultDocumentsPage() {
     return m
   }, [persons])
 
+  const rowsAfterPerson = useMemo(() => {
+    if (!filterPerson) return rows
+    return rows.filter(r => r.person_uuid === filterPerson)
+  }, [rows, filterPerson])
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return rows
-    return rows.filter(r =>
+    if (!q) return rowsAfterPerson
+    return rowsAfterPerson.filter(r =>
       [r.doc_type, r.doc_number, r.drive_url, r.notes, nameById.get(r.person_uuid)].join(' ').toLowerCase().includes(q),
     )
-  }, [rows, search, nameById])
+  }, [rowsAfterPerson, search, nameById])
 
   const closeForm = () => {
     setMode(null)
     setForm(EMPTY)
+    setCopied(null)
+    setDeleteConfirm(false)
+  }
+
+  const copyDocNumber = (text: string, uuid: string) => {
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopied(uuid)
+      window.setTimeout(() => setCopied(null), 1500)
+    })
   }
 
   const save = async () => {
+    setDeleteConfirm(false)
     if (!form.person_uuid.trim()) {
       setError('Person is required')
       return
@@ -123,10 +226,10 @@ export default function VaultDocumentsPage() {
     }
   }
 
-  const requestDelete = async () => {
+  const confirmDeleteDocument = async () => {
     if (mode !== 'edit' || !form.doc_uuid) return
-    if (!window.confirm('Delete this document row?')) return
     setSaving(true)
+    setError('')
     try {
       await api.deleteDocument(form.doc_uuid)
       await load()
@@ -135,12 +238,24 @@ export default function VaultDocumentsPage() {
       setError(e instanceof Error ? e.message : 'Delete failed')
     } finally {
       setSaving(false)
+      setDeleteConfirm(false)
     }
   }
 
+  const requestDelete = async () => {
+    if (mode !== 'edit' || !form.doc_uuid) return
+    if (!deleteConfirm) {
+      setDeleteConfirm(true)
+      return
+    }
+    await confirmDeleteDocument()
+  }
+
+  const copyKey = mode === 'add' ? '_new' : form.doc_uuid
+
   return (
-    <div className="ui-kit-page-shell" style={{ paddingTop: 0 }}>
-      <SectionBlock title="Documents" icon={<FileText size={16} />} right={<SectionChip>{rows.length}</SectionChip>}>
+    <div className="ui-kit-page-shell monthly-subpage" style={{ paddingTop: 0 }}>
+      <SectionBlock title="Documents" icon={<FileText size={16} />} right={<SectionChip>{filtered.length}</SectionChip>}>
         <div className="ui-stack">
           <FormField label="Filter by person">
             <select className="form-inp" value={filterPerson} onChange={e => setFilterPerson(e.target.value)}>
@@ -155,24 +270,21 @@ export default function VaultDocumentsPage() {
           {loading ? (
             <div className="muted" style={{ fontSize: 13 }}>Loading…</div>
           ) : (
-            <div className="ui-stack" style={{ gap: 8 }}>
+            <div className="txn-cards">
               {filtered.map(r => (
-                <div key={r.doc_uuid} className="card" style={{ padding: 12, border: '1px solid var(--border)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' }}>
-                    <div>
-                      <div style={{ fontWeight: 600 }}>{r.doc_type} · {r.doc_number || '—'}</div>
-                      <div style={{ fontSize: 12, color: 'var(--muted)' }}>{nameById.get(r.person_uuid) || r.person_uuid}</div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      {r.drive_url.trim() && (
-                        <button type="button" className="ui-kit-btn ui-kit-btn--soft" onClick={() => window.open(r.drive_url, '_blank', 'noopener,noreferrer')}>
-                          <ExternalLink size={14} />
-                        </button>
-                      )}
-                      <button type="button" className="ui-kit-btn ui-kit-btn--soft" onClick={() => { setMode('edit'); setForm(toForm(r)); setError('') }}>Edit</button>
-                    </div>
-                  </div>
-                </div>
+                <TransactionCard
+                  key={r.doc_uuid}
+                  title={nameById.get(r.person_uuid) || '—'}
+                  amount={r.doc_number || '—'}
+                  amountLabel="Doc No"
+                  type={<DocumentDrivePreview url={r.drive_url || ''} />}
+                  typeLabel="Preview"
+                  date={r.doc_type || '—'}
+                  dateLabel="Document type"
+                  tone={expiryTone(r.expiry || '')}
+                  icon={documentTypeIcon(r.doc_type)}
+                  onClick={() => { setMode('edit'); setForm(toForm(r)); setError(''); setCopied(null); setDeleteConfirm(false) }}
+                />
               ))}
             </div>
           )}
@@ -182,7 +294,7 @@ export default function VaultDocumentsPage() {
       <button
         type="button"
         className="ui-kit-btn ui-kit-btn--solid"
-        onClick={() => { setMode('add'); setForm({ ...EMPTY, person_uuid: filterPerson }); setError('') }}
+        onClick={() => { setMode('add'); setForm({ ...EMPTY, person_uuid: filterPerson }); setError(''); setCopied(null); setDeleteConfirm(false) }}
         style={{
           position: 'fixed',
           right: 16,
@@ -212,7 +324,9 @@ export default function VaultDocumentsPage() {
               onSecondary={closeForm}
               onPrimary={() => void save()}
               leading={mode === 'edit' ? (
-                <button type="button" className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={() => void requestDelete()} disabled={saving}>Delete</button>
+                <button type="button" className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={() => void requestDelete()} disabled={saving}>
+                  {saving ? 'Deleting…' : deleteConfirm ? 'Confirm delete?' : 'Delete'}
+                </button>
               ) : null}
               disabled={saving}
             />
@@ -235,10 +349,33 @@ export default function VaultDocumentsPage() {
               </select>
             </FormField>
             <FormField label="Document number">
-              <input className="form-inp" value={form.doc_number} onChange={e => setForm(f => ({ ...f, doc_number: e.target.value }))} />
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input className="form-inp" style={{ flex: 1 }} value={form.doc_number} onChange={e => setForm(f => ({ ...f, doc_number: e.target.value }))} />
+                {form.doc_number.trim() ? (
+                  <button type="button" className="ui-kit-btn ui-kit-btn--soft" title="Copy" onClick={() => copyDocNumber(form.doc_number.trim(), copyKey)}>
+                    <Copy size={14} />
+                    {copied === copyKey ? <span style={{ marginLeft: 4, fontSize: 11 }}>Copied</span> : null}
+                  </button>
+                ) : null}
+              </div>
             </FormField>
             <FormField label="Drive URL">
-              <input className="form-inp" value={form.drive_url} onChange={e => setForm(f => ({ ...f, drive_url: e.target.value }))} placeholder="https://…" />
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input className="form-inp" style={{ flex: 1 }} value={form.drive_url} onChange={e => setForm(f => ({ ...f, drive_url: e.target.value }))} placeholder="https://…" />
+                {form.drive_url.trim() ? (
+                  <a
+                    href={form.drive_url.trim()}
+                    download
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ui-kit-btn ui-kit-btn--soft"
+                    style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}
+                    title="Open / download"
+                  >
+                    <Download size={14} />
+                  </a>
+                ) : null}
+              </div>
             </FormField>
             <FormField label="Expiry (YYYY-MM-DD)">
               <input className="form-inp" value={form.expiry} onChange={e => setForm(f => ({ ...f, expiry: e.target.value }))} />

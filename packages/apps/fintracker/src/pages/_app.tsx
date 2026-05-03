@@ -46,6 +46,7 @@ export default function App({ Component, pageProps }: AppProps) {
       if (tab === 'acct') return 'accounts'
       return 'dashboard'
     }
+    if (p === '/accounts') return 'accounts'
     if (p === '/lending') return 'lending'
     if (p === '/savings' || p === '/savingspage') return 'savings'
     if (p === '/subscriptions') return 'subscriptions'

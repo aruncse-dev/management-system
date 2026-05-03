@@ -235,6 +235,61 @@
 .ui-kit-holding-card--accent-amber {
   border-left: 5px solid #D97706;
 }
+.ui-kit-holding-card--accent-navy {
+  border-left: 5px solid var(--navy);
+}
+.ui-kit-holding-icon--bg.ui-tone-muted {
+  background: rgba(107, 114, 128, 0.12);
+}
+.ui-kit-holding-card-with-link {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--r);
+  overflow: hidden;
+  box-shadow: var(--sh);
+}
+.ui-kit-holding-card-with-link > .ui-kit-holding-card {
+  border-radius: 0;
+  box-shadow: none;
+}
+.ui-kit-holding-card-with-link > .ui-kit-holding-card.ui-kit-holding-card--stacked {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.ui-kit-holding-card-linkrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--navy);
+  text-decoration: none;
+  background: rgba(30, 92, 199, 0.06);
+  border-top: 1px solid var(--border);
+}
+.ui-kit-holding-card-linkrow:hover {
+  background: rgba(30, 92, 199, 0.1);
+}
+.ui-kit-holding-card-previewlink {
+  font-weight: 600;
+  font-size: 13px;
+}
+.ui-kit-holding-card-linkrow-icon {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+.ui-kit-holding-card-preview-label {
+  letter-spacing: 0.02em;
+}
+.ui-kit-holding-card-link-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .lending-entry-card {
   border: 1px solid var(--border);
 }

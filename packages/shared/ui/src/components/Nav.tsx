@@ -1,11 +1,7 @@
 import { useState } from 'react'
 import {
-  BarChart3,
   CalendarDays,
-  CreditCard,
   Gem,
-  IndianRupee,
-  Landmark,
   LayoutGrid,
   Layers3,
   LogOut,
@@ -66,28 +62,44 @@ function brandName(area: AppNavArea) {
   return area === 'vault' ? 'Vault' : 'FinTracker'
 }
 
-type NavItem = { id: ModuleId; icon: React.ReactNode; label: string }
+type NavItem = {
+  id: ModuleId
+  icon: React.ReactNode
+  label: string
+  /** Drawer highlight when current module is any of these (routes/pages unchanged). */
+  activeFor?: readonly ModuleId[]
+}
+
+function navItemActive(current: ModuleId, item: NavItem) {
+  if (item.activeFor?.length) return item.activeFor.includes(current)
+  return current === item.id
+}
 
 const TRACKING: NavItem[] = [
-  { id: 'dashboard', icon: <BarChart3 size={18} />, label: 'Dashboard' },
-  { id: 'budget', icon: <IndianRupee size={18} />, label: 'Budget' },
-  { id: 'transactions', icon: <CalendarDays size={18} />, label: 'Transactions' },
+  {
+    id: 'dashboard',
+    icon: <CalendarDays size={18} />,
+    label: 'Monthly Expenses',
+    activeFor: ['dashboard', 'budget', 'transactions'],
+  },
 ]
 
 const ASSETS: NavItem[] = [
   { id: 'savings', icon: <PiggyBank size={18} />, label: 'Savings' },
   { id: 'gold', icon: <Gem size={18} />, label: 'Gold' },
   { id: 'bommi', icon: <PiggyBank size={18} />, label: 'Bommi' },
-  { id: 'accounts', icon: <Landmark size={18} />, label: 'Accounts' },
 ]
 
 const INVESTMENTS: NavItem[] = [
-  { id: 'investments', icon: <TrendingUp size={18} />, label: 'Investments' },
-  { id: 'stocks', icon: <TrendingUp size={18} />, label: 'Stocks' },
-  { id: 'mutualfunds', icon: <TrendingUp size={18} />, label: 'Mutual Funds' },
+  {
+    id: 'investments',
+    icon: <TrendingUp size={18} />,
+    label: 'Stocks & Mutual Funds',
+    activeFor: ['investments', 'stocks', 'mutualfunds'],
+  },
 ]
 
-const CREDIT_EXTRA: NavItem[] = [{ id: 'loans', icon: <Layers3 size={18} />, label: 'All Loans' }, { id: 'credits', icon: <CreditCard size={18} />, label: 'Credits' }]
+const CREDIT_EXTRA: NavItem[] = [{ id: 'loans', icon: <Layers3 size={18} />, label: 'All Loans' }]
 
 const SERVICES: NavItem[] = [{ id: 'subscriptions', icon: <Repeat2 size={18} />, label: 'Subscriptions' }]
 
@@ -126,7 +138,7 @@ export default function Nav({
           <button
             key={m.id}
             type="button"
-            className={`nav-drawer-item${module === m.id ? ' active' : ''}`}
+            className={`nav-drawer-item${navItemActive(module, m) ? ' active' : ''}`}
             onClick={() => {
               onModule(m.id)
               setDrawerOpen(false)
@@ -211,7 +223,7 @@ export default function Nav({
             <button
               key={m.id}
               type="button"
-              className={`nav-drawer-item${module === m.id ? ' active' : ''}`}
+              className={`nav-drawer-item${navItemActive(module, m) ? ' active' : ''}`}
               onClick={() => {
                 onModule(m.id)
                 setDrawerOpen(false)

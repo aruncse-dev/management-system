@@ -1,5 +1,5 @@
 import { useEffect, type ReactNode } from 'react'
-import { Loader2 } from 'lucide-react'
+import { ExternalLink, Loader2 } from 'lucide-react'
 import type { UiTone } from './uiTone'
 import { UiCard } from './UiCard'
 
@@ -687,6 +687,7 @@ export function TransactionCard({
   amountLabel = 'Amount',
   typeLabel = 'Type',
   dateLabel = 'Date',
+  linkUrl,
 }: {
   title: ReactNode
   amount: ReactNode
@@ -702,26 +703,29 @@ export function TransactionCard({
   typeLabel?: string
   /** Column header above `date` (default: Date). */
   dateLabel?: string
+  /** Optional URL: shows icon + “Preview” below the grid (full URL in `title`; opens in new tab; does not trigger `onClick`). */
+  linkUrl?: string
 }) {
-  return (
-    <button
-      type="button"
-      className={`ui-kit-holding-card ui-kit-holding-card--accent-${tone} ui-kit-holding-card--btn txn-entry-card ${className}`.trim()}
-      onClick={onClick}
-    >
+  const trimmedLink = linkUrl?.trim() ?? ''
+  const hasLink = trimmedLink.length > 0
+
+  const btnClass = `ui-kit-holding-card ui-kit-holding-card--accent-${tone} ui-kit-holding-card--btn txn-entry-card${hasLink ? ' ui-kit-holding-card--stacked' : ''}${className ? ` ${className}` : ''}`.trim()
+
+  const iconWrap = (
+    <div className={`ui-kit-holding-icon ui-kit-holding-icon--bg ui-tone-${tone}`}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--muted)', flexShrink: 0 }}>{icon}</span>
+    </div>
+  )
+
+  const body = (
+    <>
       <div className="ui-kit-holding-card-head">
         <div>
           <div className="ui-kit-holding-card-title">
             <span>{title}</span>
           </div>
         </div>
-        <div className="ui-kit-holding-card-head-right">
-          <div className={`ui-kit-holding-icon ui-kit-holding-icon--bg ui-tone-${tone}`}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--muted)', flexShrink: 0 }}>
-              {icon}
-            </span>
-          </div>
-        </div>
+        <div className="ui-kit-holding-card-head-right">{iconWrap}</div>
       </div>
       <div className="ui-kit-holding-card-grid">
         <div className="ui-kit-holding-stat">
@@ -737,7 +741,34 @@ export function TransactionCard({
           <strong>{date}</strong>
         </div>
       </div>
-    </button>
+    </>
+  )
+
+  if (!hasLink) {
+    return (
+      <button type="button" className={btnClass} onClick={onClick}>
+        {body}
+      </button>
+    )
+  }
+
+  return (
+    <div className="ui-kit-holding-card-with-link">
+      <button type="button" className={btnClass} onClick={onClick}>
+        {body}
+      </button>
+      <a
+        className="ui-kit-holding-card-linkrow ui-kit-holding-card-previewlink"
+        href={trimmedLink}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={trimmedLink}
+        onClick={e => e.stopPropagation()}
+      >
+        <ExternalLink size={14} className="ui-kit-holding-card-linkrow-icon" aria-hidden />
+        <span className="ui-kit-holding-card-preview-label">Preview</span>
+      </a>
+    </div>
   )
 }
 
