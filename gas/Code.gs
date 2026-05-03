@@ -257,6 +257,22 @@ function _handleGet(p) {
     Logger.log('_handleGet: routing to insurance handler for action=' + p.action);
     return _insuranceHandleGet(p.action, p);
   }
+  if (p.module === 'persons') {
+    Logger.log('_handleGet: routing to persons handler for action=' + p.action);
+    return _personsHandleGet(p.action, p);
+  }
+  if (p.module === 'documents') {
+    Logger.log('_handleGet: routing to documents handler for action=' + p.action);
+    return _documentsHandleGet(p.action, p);
+  }
+  if (p.module === 'health') {
+    Logger.log('_handleGet: routing to health handler for action=' + p.action);
+    return _healthHandleGet(p.action, p);
+  }
+  if (p.module === 'habits') {
+    Logger.log('_handleGet: routing to habits handler for action=' + p.action);
+    return _habitsHandleGet(p.action, p);
+  }
   if (p.module === 'subscriptions') {
     Logger.log('_handleGet: routing to subscriptions handler for action=' + p.action);
     return _subscriptionsHandleGet(p.action, p);
@@ -326,6 +342,22 @@ function _handlePost(body) {
   if (body.module === 'insurance') {
     Logger.log('_handlePost: routing to insurance handler for action=' + body.action);
     return _insuranceHandlePost(body.action, body);
+  }
+  if (body.module === 'persons') {
+    Logger.log('_handlePost: routing to persons handler for action=' + body.action);
+    return _personsHandlePost(body.action, body);
+  }
+  if (body.module === 'documents') {
+    Logger.log('_handlePost: routing to documents handler for action=' + body.action);
+    return _documentsHandlePost(body.action, body);
+  }
+  if (body.module === 'health') {
+    Logger.log('_handlePost: routing to health handler for action=' + body.action);
+    return _healthHandlePost(body.action, body);
+  }
+  if (body.module === 'habits') {
+    Logger.log('_handlePost: routing to habits handler for action=' + body.action);
+    return _habitsHandlePost(body.action, body);
   }
   if (body.module === 'subscriptions') {
     Logger.log('_handlePost: routing to subscriptions handler for action=' + body.action);

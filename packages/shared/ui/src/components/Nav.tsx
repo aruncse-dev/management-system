@@ -1,27 +1,37 @@
 import { useState } from 'react'
 import {
+  BarChart3,
   CalendarDays,
-  PiggyBank,
+  CreditCard,
   Gem,
-  TrendingUp,
-  Repeat2,
-  Wallet,
-  User,
-  Settings,
+  IndianRupee,
+  Landmark,
   LayoutGrid,
-  LogOut,
   Layers3,
+  LogOut,
+  PiggyBank,
+  Repeat2,
+  Settings,
+  TrendingUp,
+  User,
+  Wallet,
 } from 'lucide-react'
 import React from 'react'
 
 export type ModuleId =
-  | 'monthly'
+  | 'dashboard'
+  | 'budget'
+  | 'transactions'
+  | 'credits'
+  | 'accounts'
   | 'lending'
   | 'savings'
   | 'subscriptions'
   | 'bommi'
   | 'gold'
   | 'investments'
+  | 'stocks'
+  | 'mutualfunds'
   | 'loans'
   | 'settings'
   | 'components'
@@ -30,33 +40,20 @@ export type AppNavArea = 'finance' | 'vault'
 
 interface Props {
   module: ModuleId
-  /** Optional lending sheet for this navigation (avoids stale state when opening Balances submenu). */
   onModule: (id: ModuleId, lendingSheetForUrl?: string) => void
   lendingSheet?: string
   onLendingSheet?: (sheet: string) => void
   title?: string
   onLogout?: () => void
-  /** Drives default icon file (`finance` vs `vault`). */
   area?: AppNavArea
-  /** Display name in drawer / alt text (defaults from `area`). */
   appName?: string
 }
-
-const MODULES_LG: { id: ModuleId; icon: React.ReactNode; label: string }[] = [
-  { id: 'monthly', icon: <CalendarDays size={18} />, label: 'Monthly Expenses' },
-  { id: 'savings', icon: <PiggyBank size={18} />, label: 'Savings' },
-  { id: 'subscriptions', icon: <Repeat2 size={18} />, label: 'Subscriptions' },
-  { id: 'bommi', icon: <PiggyBank size={18} />, label: 'Bommi' },
-  { id: 'gold', icon: <Gem size={18} />, label: 'Gold' },
-  { id: 'investments', icon: <TrendingUp size={18} />, label: 'Investments' },
-]
 
 const LENDING_SUBMENU = [
   { id: 'Lending', label: 'Lending', icon: <Wallet size={18} /> },
   { id: 'Vijaya Amma', label: 'Vijaya Amma', icon: <User size={18} /> },
 ]
 
-/** Public URL for a static asset (same contract as app `getAppAssetUrl`). */
 function getAppAssetUrl(_area: AppNavArea, asset: string): string {
   return `/${asset.replace(/^\//, '')}`
 }
@@ -68,6 +65,31 @@ function getAppIconAsset(area: AppNavArea): string {
 function brandName(area: AppNavArea) {
   return area === 'vault' ? 'Vault' : 'FinTracker'
 }
+
+type NavItem = { id: ModuleId; icon: React.ReactNode; label: string }
+
+const TRACKING: NavItem[] = [
+  { id: 'dashboard', icon: <BarChart3 size={18} />, label: 'Dashboard' },
+  { id: 'budget', icon: <IndianRupee size={18} />, label: 'Budget' },
+  { id: 'transactions', icon: <CalendarDays size={18} />, label: 'Transactions' },
+]
+
+const ASSETS: NavItem[] = [
+  { id: 'savings', icon: <PiggyBank size={18} />, label: 'Savings' },
+  { id: 'gold', icon: <Gem size={18} />, label: 'Gold' },
+  { id: 'bommi', icon: <PiggyBank size={18} />, label: 'Bommi' },
+  { id: 'accounts', icon: <Landmark size={18} />, label: 'Accounts' },
+]
+
+const INVESTMENTS: NavItem[] = [
+  { id: 'investments', icon: <TrendingUp size={18} />, label: 'Investments' },
+  { id: 'stocks', icon: <TrendingUp size={18} />, label: 'Stocks' },
+  { id: 'mutualfunds', icon: <TrendingUp size={18} />, label: 'Mutual Funds' },
+]
+
+const CREDIT_EXTRA: NavItem[] = [{ id: 'loans', icon: <Layers3 size={18} />, label: 'All Loans' }, { id: 'credits', icon: <CreditCard size={18} />, label: 'Credits' }]
+
+const SERVICES: NavItem[] = [{ id: 'subscriptions', icon: <Repeat2 size={18} />, label: 'Subscriptions' }]
 
 export default function Nav({
   module,
@@ -83,6 +105,40 @@ export default function Nav({
   const iconSrc = getAppAssetUrl(area, getAppIconAsset(area))
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
+
+  function section(titleLabel: string, items: NavItem[]) {
+    return (
+      <div style={{ paddingTop: 8, paddingBottom: 6 }}>
+        <div
+          style={{
+            fontSize: 12,
+            fontWeight: 600,
+            color: 'rgba(255, 255, 255, 0.5)',
+            textTransform: 'uppercase',
+            letterSpacing: '.04em',
+            padding: '8px 14px 4px 14px',
+            marginBottom: 2,
+          }}
+        >
+          {titleLabel}
+        </div>
+        {items.map(m => (
+          <button
+            key={m.id}
+            type="button"
+            className={`nav-drawer-item${module === m.id ? ' active' : ''}`}
+            onClick={() => {
+              onModule(m.id)
+              setDrawerOpen(false)
+            }}
+          >
+            {m.icon}
+            <span>{m.label}</span>
+          </button>
+        ))}
+      </div>
+    )
+  }
 
   return (
     <>
@@ -114,35 +170,9 @@ export default function Nav({
           </button>
         </div>
 
-        <div style={{ paddingTop: 8, paddingBottom: 6 }}>
-          <div
-            style={{
-              fontSize: 12,
-              fontWeight: 600,
-              color: 'rgba(255, 255, 255, 0.5)',
-              textTransform: 'uppercase',
-              letterSpacing: '.04em',
-              padding: '8px 14px 4px 14px',
-              marginBottom: 2,
-            }}
-          >
-            Tracking
-          </div>
-          {MODULES_LG.slice(0, 3).map(m => (
-            <button
-              key={m.id}
-              type="button"
-              className={`nav-drawer-item${module === m.id ? ' active' : ''}`}
-              onClick={() => {
-                onModule(m.id)
-                setDrawerOpen(false)
-              }}
-            >
-              {m.icon}
-              <span>{m.label}</span>
-            </button>
-          ))}
-        </div>
+        {section('Tracking', TRACKING)}
+        {section('Assets', ASSETS)}
+        {section('Investments', INVESTMENTS)}
 
         <div style={{ paddingTop: 8, paddingBottom: 6 }}>
           <div
@@ -156,39 +186,8 @@ export default function Nav({
               marginBottom: 2,
             }}
           >
-            Assets
+            Credit
           </div>
-          {MODULES_LG.slice(3).map(m => (
-            <button
-              key={m.id}
-              type="button"
-              className={`nav-drawer-item${module === m.id ? ' active' : ''}`}
-              onClick={() => {
-                onModule(m.id)
-                setDrawerOpen(false)
-              }}
-            >
-              {m.icon}
-              <span>{m.label}</span>
-            </button>
-          ))}
-        </div>
-
-        <div style={{ paddingTop: 8, paddingBottom: 6 }}>
-          <div
-            style={{
-              fontSize: 12,
-              fontWeight: 600,
-              color: 'rgba(255, 255, 255, 0.5)',
-              textTransform: 'uppercase',
-              letterSpacing: '.04em',
-              padding: '8px 14px 4px 14px',
-              marginBottom: 2,
-            }}
-          >
-            Balances
-          </div>
-
           {onLendingSheet && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
               {LENDING_SUBMENU.map(sub => (
@@ -208,34 +207,23 @@ export default function Nav({
               ))}
             </div>
           )}
+          {CREDIT_EXTRA.map(m => (
+            <button
+              key={m.id}
+              type="button"
+              className={`nav-drawer-item${module === m.id ? ' active' : ''}`}
+              onClick={() => {
+                onModule(m.id)
+                setDrawerOpen(false)
+              }}
+            >
+              {m.icon}
+              <span>{m.label}</span>
+            </button>
+          ))}
         </div>
 
-        <div style={{ paddingTop: 8, paddingBottom: 6 }}>
-          <div
-            style={{
-              fontSize: 12,
-              fontWeight: 600,
-              color: 'rgba(255, 255, 255, 0.5)',
-              textTransform: 'uppercase',
-              letterSpacing: '.04em',
-              padding: '8px 14px 4px 14px',
-              marginBottom: 2,
-            }}
-          >
-            Loans
-          </div>
-          <button
-            type="button"
-            className={`nav-drawer-item${module === 'loans' ? ' active' : ''}`}
-            onClick={() => {
-              onModule('loans')
-              setDrawerOpen(false)
-            }}
-          >
-            <Layers3 size={18} />
-            <span>All Loans</span>
-          </button>
-        </div>
+        {section('Services', SERVICES)}
 
         <div style={{ paddingTop: 12, paddingBottom: 8 }}>
           <button
@@ -253,7 +241,7 @@ export default function Nav({
             type="button"
             className={`nav-drawer-item${module === 'components' ? ' active' : ''}`}
             onClick={() => {
-              onModule('components' as ModuleId)
+              onModule('components')
               setDrawerOpen(false)
             }}
           >

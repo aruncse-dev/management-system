@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ChevronLeft, ChevronRight, X as XIcon } from 'lucide-react'
+import { useRouter } from 'next/router'
 import { useStore } from '../store'
 import { api } from '../api'
 import { BottomNav, TransactionModal } from '../ui'
@@ -20,7 +21,10 @@ function cycleSubtitle(month: string) {
   return `${CC_CYCLE_DAY} ${MNS[prevMi]} – ${CC_CYCLE_DAY - 1} ${month}`
 }
 
+const TAB_Q: Record<TabId, string> = { dash: 'dash', txns: 'txns', bud: 'bud', cc: 'cc', acct: 'acct' }
+
 export default function Monthly() {
+  const router = useRouter()
   const { state, dispatch } = useStore()
   const [tab, setTab] = useState<TabId>('dash')
   const [modalOpen, setModalOpen] = useState(false)
@@ -30,6 +34,29 @@ export default function Monthly() {
   const [budgetName, setBudgetName] = useState('')
   const [budgetVal, setBudgetVal] = useState('')
   const [budgetSaving, setBudgetSaving] = useState(false)
+
+  const goTab = useCallback(
+    (id: TabId) => {
+      setTab(id)
+      void router.replace({ pathname: '/monthly', query: { tab: TAB_Q[id] } }, undefined, { shallow: true })
+    },
+    [router],
+  )
+
+  useEffect(() => {
+    if (!router.isReady || router.pathname !== '/monthly') return
+    const q = router.query.tab
+    const raw = typeof q === 'string' ? q : Array.isArray(q) ? q[0] : undefined
+    const fromQuery: Record<string, TabId> = { dash: 'dash', txns: 'txns', bud: 'bud', cc: 'cc', acct: 'acct' }
+    if (raw && fromQuery[raw]) {
+      setTab(fromQuery[raw])
+      return
+    }
+    setTab('dash')
+    if (raw === undefined) {
+      void router.replace({ pathname: '/monthly', query: { tab: 'dash' } }, undefined, { shallow: true })
+    }
+  }, [router.isReady, router.pathname, router.query.tab, router])
 
   const showStatus = useCallback((msg: string) => {
     setStatus(msg)
@@ -117,12 +144,12 @@ export default function Monthly() {
         </div>
       </nav>
 
-      <BottomNav tab={tab} onTab={(id) => setTab(id)} />
+      <BottomNav tab={tab} onTab={goTab} />
 
       <main>
         {tab === 'dash' && <Dashboard />}
         {tab === 'txns' && <Transactions onEdit={r => { setEditRow(r); setModalOpen(true) }} />}
-        {tab === 'bud'  && <Budget showStatus={showStatus} onCategoryClick={cat => { dispatch({ type:'SET_CAT_FILTER', payload:cat }); setTab('txns') }} />}
+        {tab === 'bud'  && <Budget showStatus={showStatus} onCategoryClick={cat => { dispatch({ type:'SET_CAT_FILTER', payload:cat }); goTab('txns') }} />}
         {tab === 'cc'   && <Credits />}
         {tab === 'acct' && <Accounts showStatus={showStatus} />}
       </main>

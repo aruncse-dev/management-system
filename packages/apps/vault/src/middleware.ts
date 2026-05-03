@@ -1,7 +1,16 @@
 import { createFtMiddleware, FT_MIDDLEWARE_MATCHER } from '@fintracker-vault/auth/middleware'
 import { getSessionOptions } from './lib/session'
 
-const LOWERCASE_ROUTES = new Set(['/vault', '/vaultinsurance', '/vaultapps', '/vaultsettings'])
+const LOWERCASE_ROUTES = new Set([
+  '/vault',
+  '/vaultinsurance',
+  '/vaultapps',
+  '/vaultsettings',
+  '/vaultpersons',
+  '/vaultdocuments',
+  '/vaulthealth',
+  '/vaulthabits',
+])
 
 export const middleware = createFtMiddleware({
   getSessionOptions,
