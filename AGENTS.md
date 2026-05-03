@@ -9,6 +9,7 @@ Use this file as the **first stop** for Cursor agents and new contributors. The 
 | Monorepo layout, commands, auth, deployment | [`CLAUDE.md`](./CLAUDE.md) |
 | **New apps, pages, API caching, shared UI workflow** | [`CLAUDE.md` → Developer and agent playbook](./CLAUDE.md#developer-and-agent-playbook) |
 | Google OAuth / client ID env names (do not invent new keys) | [`.cursor/rules/google-oauth-env.mdc`](./.cursor/rules/google-oauth-env.mdc) |
+| **Tags & GitHub Releases** (semver, bump, tag, CI) | [`CLAUDE.md` → Deployment → Tags & GitHub Releases](./CLAUDE.md#tags--github-releases) |
 
 ## Non-negotiables
 
@@ -28,6 +29,11 @@ Use this file as the **first stop** for Cursor agents and new contributors. The 
 | Staff | `packages/apps/staff` | 3002 |
 
 Root scripts: `pnpm dev`, `pnpm dev:fintracker`, `pnpm dev:vault`, `pnpm dev:staff`, `pnpm dev:fresh`.
+
+## Releases (quick)
+
+1. `pnpm release:bump patch|minor|major` — bumps root + fintracker + vault + staff `version`.
+2. Merge to `main`, then `pnpm release:tag --push` — annotated `vX.Y.Z` tag; GitHub Actions opens a Release with notes.
 
 ---
 

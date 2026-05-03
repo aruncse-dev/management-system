@@ -39,7 +39,8 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,json,md}\"",
     "clean": "turbo clean && rm -rf node_modules && pnpm store prune",
     "deps:check": "node packages/tools/scripts/validate-deps.js",
-    "version:bump": "node packages/tools/scripts/version-bump.js"
+    "release:bump": "node packages/tools/scripts/release-bump.mjs",
+    "release:tag": "node packages/tools/scripts/release-tag.mjs"
   },
   "devDependencies": {
     "prettier": "^3.0.0",
