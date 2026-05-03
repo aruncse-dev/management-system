@@ -243,6 +243,24 @@ curl https://vault.vercel.app
 git push origin main  # Should run type-check first
 ```
 
+### Tags & GitHub Releases
+
+**Version source of truth:** Root `package.json` `version` (semver `x.y.z`). The three Next apps (`fintracker`, `vault`, `staff`) use the **same** `version` when cutting a release.
+
+**Git tag:** Annotated tag `v` + semver (e.g. `v1.1.0`). The tag must match root `package.json` on the commit you tag (usually `main` after the version bump merges).
+
+**Release workflow**
+
+1. Bump: `pnpm release:bump patch` (or `minor` / `major`). Commits the root + three app `package.json` files—open a PR or commit on `main` as you prefer.
+2. Tag: On updated `main`, run `pnpm release:tag --push`. This creates the annotated tag and pushes it to `origin`.
+3. **Automation:** [`.github/workflows/release.yml`](.github/workflows/release.yml) runs on pushes to tags matching `v*.*.*` and creates a **GitHub Release** with auto-generated notes (default `GITHUB_TOKEN`).
+
+**Scripts:** [`packages/tools/scripts/release-bump.mjs`](packages/tools/scripts/release-bump.mjs), [`packages/tools/scripts/release-tag.mjs`](packages/tools/scripts/release-tag.mjs).
+
+**Legacy tags:** Some older tags may use `vYYYYMMDD`; they do not trigger the semver release workflow. Prefer `vX.Y.Z` for app releases.
+
+**Note:** Do not bump `packages/shared/*` `version` for app-only releases unless you are actually publishing those packages.
+
 ---
 
 ## Code Patterns & Conventions
