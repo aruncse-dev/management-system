@@ -7,7 +7,7 @@
  * - Allowlist: VITE_ALLOWED_EMAILS, NEXT_PUBLIC_ALLOWED_EMAILS, ALLOWED_EMAILS
  *
  * Each app’s next.config.js calls getGoogleAuthEnv(__dirname).
- * API routes can use readMergedDotenv(process.cwd()) for VITE_GAS_URL etc. (cwd = app package root).
+ * API routes can use readMergedDotenv(process.cwd()) for shared server env values (cwd = app package root).
  */
 const fs = require('fs')
 const path = require('path')

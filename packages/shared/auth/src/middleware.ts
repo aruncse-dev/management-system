@@ -19,44 +19,6 @@ export function defaultIsPublicPath(pathname: string): boolean {
   return false
 }
 
-/**
- * GAS proxy: always requires a valid iron-session + email. Never leaves the proxy open when SESSION_SECRET is missing.
- */
-export async function handleGasProxy(
-  request: NextRequest,
-  pathnameRaw: string,
-  getSessionOptions: GetFtSessionOptions,
-): Promise<NextResponse | null> {
-  const isBrowserProxy = pathnameRaw === '/gas-proxy' || pathnameRaw.startsWith('/gas-proxy/')
-  const isApiProxy = pathnameRaw === '/api/gas-proxy' || pathnameRaw.startsWith('/api/gas-proxy/')
-  if (!isBrowserProxy && !isApiProxy) return null
-
-  let sessionOpts: SessionOptions
-  try {
-    sessionOpts = getSessionOptions()
-  } catch {
-    return NextResponse.json({ ok: false, error: SESSION_SETUP_MESSAGE }, { status: 503 })
-  }
-
-  if (isBrowserProxy) {
-    const url = request.nextUrl.clone()
-    url.pathname = pathnameRaw.replace(/^\/gas-proxy/, '/api/gas-proxy') || '/api/gas-proxy'
-    const response = NextResponse.rewrite(url)
-    const session = await getIronSession<FtSessionData>(request, response, sessionOpts)
-    if (!session.email) {
-      return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-    }
-    return response
-  }
-
-  const response = NextResponse.next()
-  const session = await getIronSession<FtSessionData>(request, response, sessionOpts)
-  if (!session.email) {
-    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-  }
-  return response
-}
-
 export type CreateFtMiddlewareOptions = {
   getSessionOptions: GetFtSessionOptions
   /** If pathname matches these (case-insensitive) and URL casing differs, 308 redirect to lowercase */
@@ -74,9 +36,6 @@ export function createFtMiddleware(options: CreateFtMiddlewareOptions) {
     if (pathnameRaw.startsWith('/_next')) {
       return NextResponse.next()
     }
-
-    const gas = await handleGasProxy(request, pathnameRaw, getSessionOptions)
-    if (gas) return gas
 
     if (lowercaseRoutes && lowercaseRoutes.size > 0) {
       const pathname = stripTrailingSlash(pathnameRaw)

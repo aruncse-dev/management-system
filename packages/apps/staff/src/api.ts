@@ -5,7 +5,7 @@ type ApiResponse<T> =
   | { ok: true; data: T; traceId?: string; debug?: Record<string, unknown> }
   | { ok: false; error: string; traceId?: string }
 
-const BASE = API_URL
+const BASE = API_URL // default same-origin /api from config.ts
 const DEBUG = process.env.NEXT_PUBLIC_DEBUG === 'true'
 const MODULE = 'staff'
 

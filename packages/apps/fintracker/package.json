@@ -17,6 +17,7 @@
   "dependencies": {
     "@fintracker-vault/auth": "workspace:*",
     "@fintracker-vault/config": "workspace:*",
+    "@fintracker-vault/db": "workspace:*",
     "@fintracker-vault/types": "workspace:*",
     "@fintracker-vault/ui": "workspace:*",
     "@fintracker-vault/utils": "workspace:*",

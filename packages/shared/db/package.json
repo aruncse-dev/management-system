@@ -1,0 +1,24 @@
+{
+  "name": "@fintracker-vault/db",
+  "version": "1.0.0",
+  "description": "Shared Drizzle schema and Neon DB client",
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "type-check": "tsc --noEmit",
+    "drizzle:push": "drizzle-kit push",
+    "drizzle:generate": "drizzle-kit generate"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^0.10.4",
+    "drizzle-orm": "^0.44.2"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.4",
+    "typescript": "^5.9.3"
+  }
+}

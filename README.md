@@ -1,11 +1,11 @@
 # FinTracker & Vault
 
-Two personal finance apps built with **Next.js 14** + **Google Sheets** (via Google Apps Script). Deployed to Vercel.
+Three apps in a monorepo built with **Next.js 14** and shared packages, now migrating to **Neon Postgres + Next.js API** backend.
 
 - **FinTracker** — Financial tracking: monthly expenses, gold, investments, loans, savings
 - **Vault** — Secure storage: insurance, passwords, documents
 
-Both apps share UI components via a pnpm monorepo. Backend runs on Google Apps Script, frontend on Vercel.
+All apps share UI/components via a pnpm monorepo. Frontend runs on Vercel.
 
 ---
 
@@ -30,14 +30,13 @@ pnpm dev:fresh
 
 ### Create `.env.local` Files
 
-Create `packages/apps/fintracker/.env.local` and `packages/apps/vault/.env.local`:
+Create app `.env.local` files (fintracker / vault / staff):
 
 ```env
 VITE_GOOGLE_CLIENT_ID=your-oauth-client-id
-VITE_GAS_URL=https://script.google.com/macros/s/...your-gas-url.../exec
-VITE_API_TOKEN=your-gas-api-token
+DATABASE_URL=postgresql://...your-neon-connection-string...
 VITE_ALLOWED_EMAILS=your@email.com
-VITE_SHEET_ID=your-google-sheet-id
+ADMIN_EMAILS=admin@email.com
 ```
 
 (`.env.local` files are gitignored — never committed)
@@ -57,10 +56,9 @@ Frontend (Next.js 14, Vercel)
     ├── ui/           (React components, AppAuthGate)
     └── utils/        (formatters, validators)
            ↓
-Backend (Google Apps Script)
-    ├── JSON REST API (?action=...)
-           ↓
-    Google Sheets (your spreadsheet)
+Backend (Next.js API + Neon Postgres)
+    ├── API routes in each app
+    └── Shared schema package: @fintracker-vault/db
 ```
 
 **See [CLAUDE.md](./CLAUDE.md) for full architecture, code guidelines, and development tips.**
@@ -76,8 +74,8 @@ Backend (Google Apps Script)
 | Shared Packages | TypeScript, tsup |
 | Build Tool | Turborepo (monorepo orchestration) |
 | Auth | Google OAuth 2.0 |
-| Backend | Google Apps Script (JSON API) |
-| Database | Google Sheets |
+| Backend | Next.js API Routes |
+| Database | Neon PostgreSQL |
 | Deployment | Vercel (auto-deploy on push) |
 
 ---
@@ -111,9 +109,9 @@ Both apps deploy to Vercel automatically on push to `main`.
 2. Set Root Directory: `packages/apps/fintracker` (or `vault`)
 3. Add environment variables in Vercel project settings:
    - `VITE_GOOGLE_CLIENT_ID`
-   - `VITE_GAS_URL`
-   - `VITE_API_TOKEN`
+   - `DATABASE_URL`
    - `VITE_ALLOWED_EMAILS`
+   - `ADMIN_EMAILS` (fintracker admin panel)
 4. Enable corepack: Set `ENABLE_EXPERIMENTAL_COREPACK=1`
 
 ---
@@ -122,7 +120,7 @@ Both apps deploy to Vercel automatically on push to `main`.
 
 - **Google OAuth** — Sign in with Google, email-based access control
 - **Idle timeout** → PIN lock after 1 hour of inactivity
-- **Real-time sync** — Data synced to Google Sheets automatically
+- **Server-backed auth** — Google login + server session controls API access
 - **Responsive design** — Mobile-optimized with Tailwind CSS
 - **Shared components** — Code reuse via monorepo pattern
 - **TypeScript** — Full type safety across all packages
@@ -132,13 +130,10 @@ Both apps deploy to Vercel automatically on push to `main`.
 ## FAQ
 
 **Q: Is my data secure?**
-- A: Data lives in your Google Sheets (you own it). Auth is simplified for personal use. See [CLAUDE.md](./CLAUDE.md) for security details.
+- A: Data lives in your DB and is protected by server-side session checks. See [CLAUDE.md](./CLAUDE.md) for security details.
 
-**Q: Can I customize account names?**
-- A: Yes. Modify `gas/Code.gs` (backend) and `packages/apps/*/src/constants.ts` (frontend).
-
-**Q: How do I redeploy Google Apps Script?**
-- A: `./deploy.sh` (requires clasp login). See `gas/SETUP.md` for details.
+**Q: How do I restore the old GAS setup temporarily?**
+- A: Follow [docs/gas-recovery.md](./docs/gas-recovery.md) to restore from tag or archive zip.
 
 **Q: How do I add a new page?**
 - A: Create a file in `packages/apps/fintracker/src/pages/` (or vault). Next.js auto-routes it.
@@ -148,7 +143,7 @@ Both apps deploy to Vercel automatically on push to `main`.
 ## More Info
 
 - **Architecture & Code Guidelines:** [CLAUDE.md](./CLAUDE.md)
-- **GAS Setup:** [gas/SETUP.md](./gas/SETUP.md)
+- **GAS Recovery:** [docs/gas-recovery.md](./docs/gas-recovery.md)
 
 ---
 

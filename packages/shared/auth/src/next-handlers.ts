@@ -6,10 +6,19 @@ import type { GetFtSessionOptions } from './session'
 
 const JWKS = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'))
 
+type GoogleAuthHooks = {
+  onVerified?: (args: { email: string; displayName?: string }) => Promise<
+    | { allowed: true }
+    | { allowed: false; error?: string; statusCode?: number }
+  >
+  skipAllowlistCheck?: boolean
+}
+
 export async function handleGoogleAuthPost(
   req: NextApiRequest,
   res: NextApiResponse,
   getSessionOptions: GetFtSessionOptions,
+  hooks?: GoogleAuthHooks,
 ) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST')
@@ -67,8 +76,21 @@ export async function handleGoogleAuthPost(
     .split(',')
     .map(e => e.trim().toLowerCase())
     .filter(Boolean)
-  if (allowed.length > 0 && !allowed.includes(email)) {
+  if (!hooks?.skipAllowlistCheck && allowed.length > 0 && !allowed.includes(email)) {
     return res.status(403).json({ ok: false, error: 'Email not allowed' })
+  }
+
+  if (hooks?.onVerified) {
+    const displayName =
+      typeof (body as { displayName?: unknown }).displayName === 'string'
+        ? (body as { displayName: string }).displayName
+        : undefined
+    const verdict = await hooks.onVerified({ email, displayName })
+    if (!verdict.allowed) {
+      return res
+        .status(verdict.statusCode ?? 403)
+        .json({ ok: false, error: verdict.error || 'Access denied' })
+    }
   }
 
   const session = await getIronSession<FtSessionData>(req, res, sessionOptions)

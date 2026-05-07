@@ -21,7 +21,9 @@
       "@fintracker-vault/utils": ["../../shared/utils/src/index.ts"],
       "@fintracker-vault/utils/*": ["../../shared/utils/src/*"],
       "@fintracker-vault/auth": ["../../shared/auth/src/index.ts"],
-      "@fintracker-vault/auth/middleware": ["../../shared/auth/src/middleware.ts"]
+      "@fintracker-vault/auth/middleware": ["../../shared/auth/src/middleware.ts"],
+      "@fintracker-vault/db": ["../../shared/db/src/index.ts"],
+      "@fintracker-vault/db/*": ["../../shared/db/src/*"]
     },
     "noEmit": true,
     "incremental": true,

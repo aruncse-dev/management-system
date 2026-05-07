@@ -19,6 +19,7 @@ const LOWERCASE_ROUTES = new Set([
   '/stocks',
   '/savingspage',
   '/dashboard',
+  '/admin',
 ])
 
 export const middleware = createFtMiddleware({

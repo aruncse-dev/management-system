@@ -3,7 +3,7 @@ import { API_URL } from './constants';
 
 type ApiResponse<T> = { ok: true; data: T; traceId?: string; debug?: Record<string, unknown> } | { ok: false; error: string; traceId?: string };
 
-// Dev: Vite proxy (/gas-proxy), Prod: Cloudflare Worker (via VITE_API_URL)
+// App API base comes from config.ts (default: same-origin /api)
 const BASE = API_URL;
 const DEBUG = process.env.NEXT_PUBLIC_DEBUG === 'true';
 
