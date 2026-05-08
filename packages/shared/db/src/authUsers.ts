@@ -1,6 +1,6 @@
-import { and, asc, eq } from 'drizzle-orm'
+import { and, asc, eq, isNotNull } from 'drizzle-orm'
 import { getDb } from './neon'
-import { orgMembers, organizations } from './schema/orgs'
+import { organizations } from './schema/orgs'
 import { users } from './schema/users'
 
 export async function getUserFromDb(email: string) {
@@ -24,12 +24,14 @@ export function isAdminEmail(email: string): boolean {
 export async function upsertUser(email: string, displayName?: string) {
   const db = getDb()
   const normalizedEmail = email.toLowerCase()
+  const userId = 'usr_' + normalizedEmail.replace(/[^a-z0-9]/g, '_')
   await db
     .insert(users)
     .values({
+      id: userId,
       email: normalizedEmail,
       displayName: displayName ?? normalizedEmail.split('@')[0] ?? normalizedEmail,
-      role: isAdminEmail(normalizedEmail) ? 'admin' : 'user',
+      role: isAdminEmail(normalizedEmail) ? 'admin' : 'member',
       status: 'active',
       useDb: false,
     })
@@ -47,13 +49,14 @@ export async function listOrgsForUserEmail(email: string): Promise<{ id: string;
   const db = getDb()
   return db
     .select({ id: organizations.id, name: organizations.name })
-    .from(orgMembers)
-    .innerJoin(organizations, eq(orgMembers.orgId, organizations.id))
+    .from(users)
+    .innerJoin(organizations, eq(users.orgId, organizations.id))
     .where(
       and(
-        eq(orgMembers.userEmail, email.toLowerCase()),
-        eq(orgMembers.status, 'active'),
+        eq(users.email, email.toLowerCase()),
+        eq(users.status, 'active'),
         eq(organizations.status, 'active'),
+        isNotNull(users.orgId),
       ),
     )
     .orderBy(asc(organizations.name))

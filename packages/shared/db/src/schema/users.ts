@@ -1,11 +1,18 @@
 import { boolean, jsonb, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
+import { organizations } from './orgs'
 
-/** User profile only — org-scoped menus live on `org_menu_assignments` + `menu_catalog`. */
+/** User profile with org membership and authentication. */
 export const users = pgTable('users', {
-  email: text('email').primaryKey(),
+  id: text('id').primaryKey(),
+  email: text('email').notNull().unique(),
   displayName: text('display_name'),
-  role: text('role').default('user').notNull(),
+  orgId: text('org_id').references(() => organizations.id, { onDelete: 'set null' }),
+  /** User role within org: `member`, `org_admin`, etc. */
+  role: text('role').default('member').notNull(),
   status: text('status').default('active').notNull(),
+  /** Auth token — track for session management (e.g., OAuth token, session ID). */
+  token: text('token'),
+  lastTokenAt: timestamp('last_token_at'),
   settings: jsonb('settings'),
   useDb: boolean('use_db').default(false).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
