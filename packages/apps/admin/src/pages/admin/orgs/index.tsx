@@ -1,7 +1,7 @@
 import Head from 'next/head'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Plus, Search } from 'lucide-react'
-import { LoadingState, ModalShell, ModalActions, SearchField, SectionChip } from '@fintracker-vault/ui'
+import { Plus, Search, LayoutGrid } from 'lucide-react'
+import { LoadingState, ModalShell, ModalActions, SearchField, SectionChip, SectionBlock, Spacer } from '@fintracker-vault/ui'
 
 type OrgRow = {
   id: string
@@ -308,36 +308,19 @@ export default function AdminOrgsPage() {
       <Head>
         <title>Organizations · Admin</title>
       </Head>
-      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-        <div style={{ padding: '1.5rem 1rem', background: 'var(--admin-bg, #f0f5ff)', borderBottom: '1px solid var(--admin-border, #e5e7eb)' }}>
-          <div style={{ maxWidth: '56rem', margin: '0 auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>Organizations</h1>
-                <p style={{ margin: '0.25rem 0 0 0', color: '#6b7280', fontSize: '0.9rem' }}>
-                  Manage organizations and their app menus
-                </p>
-              </div>
-              <SectionChip>{rows.length}</SectionChip>
-            </div>
-          </div>
-        </div>
+      <div className="ui-kit-page-shell">
+        <div style={{ maxWidth: '56rem', margin: '0 auto', padding: '0 1rem' }}>
+          {error && <p style={{ color: '#b91c1c', marginBottom: '1rem', fontSize: '0.9rem', marginTop: '1rem' }}>⚠ {error}</p>}
 
-        <div style={{ flex: 1, padding: '1.5rem 1rem' }}>
-          <div style={{ maxWidth: '56rem', margin: '0 auto' }}>
-            {error && <p style={{ color: '#b91c1c', marginBottom: '1rem', fontSize: '0.9rem' }}>⚠ {error}</p>}
-
-            {loading && <LoadingState variant="page" />}
-
-            {!loading && rows.length === 0 && (
-              <div style={{ textAlign: 'center', color: '#6b7280', padding: '2rem 0' }}>
-                <p>No organizations yet. Create one with the button below.</p>
-              </div>
-            )}
-
-            {!loading && rows.length > 0 && (
-              <>
-                {rows.length > 5 && (
+          <SectionBlock
+            title="Organizations"
+            icon={<LayoutGrid size={16} />}
+            rightChip={<SectionChip>{rows.length}</SectionChip>}
+            right={loading ? <LoadingState variant="inline" /> : null}
+          >
+            <div>
+              {rows.length > 5 && (
+                <>
                   <SearchField
                     value={q}
                     placeholder="Search organizations..."
@@ -345,9 +328,20 @@ export default function AdminOrgsPage() {
                     onClear={() => setQ('')}
                     prefix={<Search size={15} />}
                   />
-                )}
+                  <Spacer size={8} />
+                </>
+              )}
 
-                <div style={{ display: 'grid', gap: '0.75rem', marginTop: '1rem' }}>
+              {loading && <LoadingState variant="section" />}
+
+              {!loading && rows.length === 0 && (
+                <div style={{ textAlign: 'center', color: '#6b7280', padding: '2rem 0' }}>
+                  <p>No organizations yet. Create one with the button below.</p>
+                </div>
+              )}
+
+              {!loading && rows.length > 0 && (
+                <div className="ui-stack">
                   {filtered.map(o => (
                     <button
                       key={o.id}
@@ -355,10 +349,9 @@ export default function AdminOrgsPage() {
                       onClick={() => void startEdit(o.id)}
                       style={{
                         padding: '1rem',
-                        border: '1px solid var(--admin-border, #e5e7eb)',
-                        borderLeft: '5px solid var(--navy, #1e5cc7)',
+                        border: '1px solid var(--border, #e5e7eb)',
                         borderRadius: '8px',
-                        background: 'var(--admin-card, #fff)',
+                        background: 'var(--card-bg, #fff)',
                         cursor: 'pointer',
                         textAlign: 'left',
                         transition: 'box-shadow 0.2s',
@@ -375,34 +368,35 @@ export default function AdminOrgsPage() {
                     </button>
                   ))}
                 </div>
-              </>
-            )}
-          </div>
+              )}
+            </div>
+          </SectionBlock>
         </div>
+      </div>
 
-        <button
-          type="button"
-          onClick={startAdd}
-          style={{
-            position: 'fixed',
-            bottom: '1.5rem',
-            right: '1.5rem',
-            width: '56px',
-            height: '56px',
-            borderRadius: '999px',
-            background: '#1e5cc7',
-            color: '#fff',
-            border: 'none',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 16px 32px rgba(30, 92, 199, 0.24)',
-          }}
-          title="Add organization"
-        >
-          <Plus size={24} />
-        </button>
+      <button
+        type="button"
+        onClick={startAdd}
+        style={{
+          position: 'fixed',
+          bottom: '1.5rem',
+          right: '1.5rem',
+          width: '56px',
+          height: '56px',
+          borderRadius: '999px',
+          background: '#1e5cc7',
+          color: '#fff',
+          border: 'none',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 16px 32px rgba(30, 92, 199, 0.24)',
+        }}
+        title="Add organization"
+      >
+        <Plus size={24} />
+      </button>
 
         {mode && (
           <ModalShell
@@ -603,7 +597,6 @@ export default function AdminOrgsPage() {
             </form>
           </ModalShell>
         )}
-      </div>
     </>
   )
 }
