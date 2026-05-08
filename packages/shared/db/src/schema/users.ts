@@ -3,11 +3,10 @@ import { organizations } from './orgs'
 
 /** User profile with org membership and authentication. */
 export const users = pgTable('users', {
-  id: text('id').primaryKey(),
-  email: text('email').notNull().unique(),
+  email: text('email').primaryKey(),
   displayName: text('display_name'),
   orgId: text('org_id').references(() => organizations.id, { onDelete: 'set null' }),
-  /** User role within org: `member`, `org_admin`, etc. */
+  /** User role: `member` (within org), `org_admin` (manages org), `admin` (platform admin). */
   role: text('role').default('member').notNull(),
   status: text('status').default('active').notNull(),
   /** Auth token — track for session management (e.g., OAuth token, session ID). */

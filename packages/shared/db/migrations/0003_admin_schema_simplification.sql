@@ -12,104 +12,53 @@ ALTER TABLE organizations ADD COLUMN IF NOT EXISTS enabled_menus jsonb DEFAULT '
 -- Structure of enabled_apps: ["fintracker", "vault", "staff"]
 -- Structure of enabled_menus: {"fintracker": ["dashboard", "budget"], "vault": ["vault", "persons"]}
 
--- Step 2: Migrate data from org_menu_assignments to organizations.enabled_menus
-DO $$
-DECLARE
-  org_rec RECORD;
-  menu_data jsonb;
-  menu_row RECORD;
-  app_id text;
-BEGIN
-  FOR org_rec IN SELECT DISTINCT o.id, o.name FROM organizations o LOOP
-    -- Build app-based menu structure
-    menu_data := '{}'::jsonb;
-
-    FOR app_id IN
-      SELECT DISTINCT ma.app_id
-      FROM menu_apps ma
-      WHERE ma.menu_id IN (
-        SELECT menu_id FROM org_menu_assignments
-        WHERE org_id = org_rec.id AND enabled = true
-      )
-    LOOP
-      -- Get enabled menus for this app
-      SELECT jsonb_agg(oma.menu_id) INTO menu_data[app_id]
-      FROM org_menu_assignments oma
-      WHERE oma.org_id = org_rec.id
-        AND oma.enabled = true
-        AND oma.menu_id IN (
-          SELECT menu_id FROM menu_apps WHERE app_id = app_id
-        );
-    END LOOP;
-
-    UPDATE organizations
-    SET enabled_menus = menu_data
-    WHERE id = org_rec.id;
-  END LOOP;
-END $$;
-
--- Step 3: Set enabled_apps based on which menus each org has
+-- Step 2: Initialize enabled_apps and enabled_menus to empty arrays (will be set during org configuration)
+-- For now, all orgs get all apps by default
 UPDATE organizations
-SET enabled_apps = (
-  SELECT jsonb_agg(DISTINCT app_slug ORDER BY app_slug)
-  FROM (
-    SELECT DISTINCT a.slug AS app_slug
-    FROM apps a
-    WHERE a.slug IN (
-      SELECT jsonb_object_keys(organizations.enabled_menus)
-    )
-  ) AS app_list
-);
+SET enabled_apps = '["fintracker", "vault", "staff"]'::jsonb
+WHERE enabled_apps IS NULL OR enabled_apps = '[]'::jsonb;
 
--- Step 4: Add new columns to users table
-ALTER TABLE users ADD COLUMN IF NOT EXISTS id text;
+UPDATE organizations
+SET enabled_menus = '{"fintracker": [], "vault": [], "staff": []}'::jsonb
+WHERE enabled_menus IS NULL OR enabled_menus = '{}'::jsonb;
+
+-- Step 4: Add new columns to users table (keeping email as PK due to many FK references)
 ALTER TABLE users ADD COLUMN IF NOT EXISTS org_id text;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS token text;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS last_token_at timestamp;
 
--- Step 5: Create a temporary mapping for org_members → users
--- For each org_member, create/update a user record
+-- Add FK constraint from users to organizations (if not exists)
 DO $$
-DECLARE
-  member_rec RECORD;
 BEGIN
-  FOR member_rec IN
-    SELECT DISTINCT om.id, om.org_id, om.user_email, om.role, u.display_name
-    FROM org_members om
-    LEFT JOIN users u ON u.email = om.user_email
-  LOOP
-    -- Update user if exists, add org_id and role
-    UPDATE users
-    SET org_id = member_rec.org_id,
-        role = member_rec.role
-    WHERE email = member_rec.user_email;
-  END LOOP;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'users_org_id_fkey'
+  ) THEN
+    ALTER TABLE users
+      ADD CONSTRAINT users_org_id_fkey
+      FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE SET NULL;
+  END IF;
 END $$;
 
--- Step 6: Make email unique (if not already) and add unique constraint on id
-ALTER TABLE users ALTER COLUMN email DROP NOT NULL;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS id text UNIQUE;
+-- Step 5: Migrate org_members → users (if table still exists)
+-- (Org_members table may have been dropped already; this is idempotent)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'org_members') THEN
+    UPDATE users u
+    SET org_id = om.org_id,
+        role = om.role
+    FROM org_members om
+    WHERE u.email = om.user_email AND u.org_id IS NULL;
+  END IF;
+END $$;
 
--- Backfill id column with uuid if not set
-UPDATE users SET id = 'usr_' || substr(md5(email), 1, 16) WHERE id IS NULL;
-
--- Make id primary and email non-primary
-ALTER TABLE users ADD CONSTRAINT users_pk PRIMARY KEY (id);
-ALTER TABLE users ALTER COLUMN email DROP DEFAULT;
-ALTER TABLE users ADD CONSTRAINT users_email_uq UNIQUE (email);
-
--- Step 7: Remove old org_members table (it's now denormalized into users)
+-- Step 6: Drop old org_members table (now denormalized into users via org_id + role)
 DROP TABLE IF EXISTS org_members CASCADE;
 
--- Step 8: Add foreign key from users to organizations
-ALTER TABLE users
-  ADD CONSTRAINT users_org_id_fkey
-  FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE SET NULL;
-
--- Step 9: Drop old org_menu_assignments table (menus are now in organizations.enabled_menus)
+-- Step 7: Drop old org_menu_assignments table (menus now denormalized into organizations.enabled_menus)
 DROP TABLE IF EXISTS org_menu_assignments CASCADE;
 
--- Step 10: Drop menu_apps table (menus-to-apps mapping is now static, not needed in DB)
+-- Step 8: Drop menu_apps table (menus-to-apps mapping is now static, not DB-driven)
 DROP TABLE IF EXISTS menu_apps CASCADE;
 
 -- Step 11: Record migration

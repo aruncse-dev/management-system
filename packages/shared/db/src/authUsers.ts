@@ -24,11 +24,9 @@ export function isAdminEmail(email: string): boolean {
 export async function upsertUser(email: string, displayName?: string) {
   const db = getDb()
   const normalizedEmail = email.toLowerCase()
-  const userId = 'usr_' + normalizedEmail.replace(/[^a-z0-9]/g, '_')
   await db
     .insert(users)
     .values({
-      id: userId,
       email: normalizedEmail,
       displayName: displayName ?? normalizedEmail.split('@')[0] ?? normalizedEmail,
       role: isAdminEmail(normalizedEmail) ? 'admin' : 'member',
