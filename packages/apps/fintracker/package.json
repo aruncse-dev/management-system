@@ -21,6 +21,7 @@
     "@fintracker-vault/types": "workspace:*",
     "@fintracker-vault/ui": "workspace:*",
     "@fintracker-vault/utils": "workspace:*",
+    "@react-oauth/google": "^0.12.1",
     "iron-session": "^8.0.1",
     "lucide-react": "^0.460.0",
     "next": "^14.0.0",

@@ -27,7 +27,8 @@
       "require": "./dist/theme/index.cjs",
       "types": "./dist/theme/index.d.ts"
     },
-    "./styles": "./src/styles/globals.css"
+    "./styles": "./src/styles/globals.css",
+    "./styles/admin": "./src/styles/admin.css"
   },
   "scripts": {
     "dev": "tsc --watch",

@@ -15,9 +15,11 @@ async function parseResponse<T>(res: Response): Promise<T> {
   const text = await res.text();
   if (text.trim().startsWith('<')) {
     const isLoginPage = text.includes('accounts.google.com');
-    throw new Error(isLoginPage
-      ? 'GAS access restricted — go to script.google.com → Deploy → Manage deployments → set "Who has access" to Anyone'
-      : 'GAS not deployed — run ./deploy.sh');
+    throw new Error(
+      isLoginPage
+        ? 'Received a sign-in page instead of API JSON — sign in to the app and ensure /api routes are reachable.'
+        : 'Unexpected HTML from API — check NEXT_PUBLIC_API_URL, server logs, and DATABASE_URL.',
+    );
   }
   const json: ApiResponse<T> = JSON.parse(text);
   if (!json.ok) {

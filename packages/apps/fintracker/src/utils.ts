@@ -27,7 +27,7 @@ export function dateKey(s: string) {
   return parseInt('20' + m[3]) * 10000 + (mo + 1) * 100 + parseInt(m[1])
 }
 
-/** Accepts `BudgetEntry[]` or legacy `{ [category]: amount }` from older GAS responses. */
+/** Accepts `BudgetEntry[]` or legacy `{ [category]: amount }` map shape. */
 /** Append budget line names not already in `staticList` (stable order: static first). */
 export function mergeCategoriesWithBudgetNames(staticList: readonly string[], budget: Budget): string[] {
   const seen = new Set(staticList.map(s => String(s)))

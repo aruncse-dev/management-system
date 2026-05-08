@@ -1,7 +1,7 @@
 import type { SessionOptions } from 'iron-session'
 import { getIronSession } from 'iron-session'
 import { NextRequest, NextResponse } from 'next/server'
-import type { FtSessionData } from './session'
+import type { FtAdminSessionData, FtSessionData } from './session'
 import type { GetFtSessionOptions } from './session'
 
 const SESSION_SETUP_MESSAGE =
@@ -24,11 +24,19 @@ export type CreateFtMiddlewareOptions = {
   /** If pathname matches these (case-insensitive) and URL casing differs, 308 redirect to lowercase */
   lowercaseRoutes?: Set<string>
   isPublicPath?: (pathname: string) => boolean
+  /**
+   * Optional separate session for a platform admin area (`/admin`, `/api/admin/*`).
+   * Requires `isPublicPath` to include `/admin/login` and `isPublicAdminApi` for auth endpoints.
+   */
+  adminConsole?: {
+    getAdminSessionOptions: GetFtSessionOptions
+    isPublicAdminApi: (pathname: string, method: string) => boolean
+  }
 }
 
 export function createFtMiddleware(options: CreateFtMiddlewareOptions) {
   const isPublicPath = options.isPublicPath ?? defaultIsPublicPath
-  const { getSessionOptions, lowercaseRoutes } = options
+  const { getSessionOptions, lowercaseRoutes, adminConsole } = options
 
   return async function middleware(request: NextRequest): Promise<NextResponse> {
     const pathnameRaw = request.nextUrl.pathname
@@ -49,6 +57,54 @@ export function createFtMiddleware(options: CreateFtMiddlewareOptions) {
 
     if (isPublicPath(pathnameRaw)) {
       return NextResponse.next()
+    }
+
+    if (adminConsole) {
+      const { getAdminSessionOptions, isPublicAdminApi } = adminConsole
+      const method = request.method
+
+      if (pathnameRaw.startsWith('/api/admin/')) {
+        if (isPublicAdminApi(pathnameRaw, method)) {
+          return NextResponse.next()
+        }
+        let adminOpts: SessionOptions
+        try {
+          adminOpts = getAdminSessionOptions()
+        } catch {
+          if (process.env.NODE_ENV === 'development') {
+            // eslint-disable-next-line no-console
+            console.error('[@fintracker-vault/auth] Admin SESSION_SECRET missing or invalid.')
+            return NextResponse.json({ ok: false, error: SESSION_SETUP_MESSAGE }, { status: 503 })
+          }
+          return NextResponse.next()
+        }
+        const adminRes = NextResponse.next()
+        const adminSession = await getIronSession<FtAdminSessionData>(request, adminRes, adminOpts)
+        const adminAuthed = Boolean(adminSession.authedAt && adminSession.email)
+        if (!adminAuthed) {
+          return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        return adminRes
+      }
+
+      if (pathnameRaw === '/admin' || pathnameRaw.startsWith('/admin/')) {
+        let adminOpts: SessionOptions
+        try {
+          adminOpts = getAdminSessionOptions()
+        } catch {
+          return NextResponse.next()
+        }
+        const adminRes = NextResponse.next()
+        const adminSession = await getIronSession<FtAdminSessionData>(request, adminRes, adminOpts)
+        const adminAuthed = Boolean(adminSession.authedAt && adminSession.email)
+        if (!adminAuthed) {
+          const url = request.nextUrl.clone()
+          url.pathname = '/admin/login'
+          url.searchParams.set('next', pathnameRaw)
+          return NextResponse.redirect(url)
+        }
+        return adminRes
+      }
     }
 
     let sessionOpts: SessionOptions

@@ -202,7 +202,7 @@ export default function Settings() {
                   <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>
                     ₹{settings.usdToInr ? Number(settings.usdToInr).toFixed(2) : '—'}
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>Live rate · refreshes hourly via GAS</div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>Live rate (when connected to settings API)</div>
                 </div>
               )}
             </div>

@@ -2,7 +2,8 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { getIronSession } from 'iron-session'
 import { eq } from 'drizzle-orm'
 import type { FtSessionData } from '@fintracker-vault/auth'
-import { getDb, users } from '@fintracker-vault/db'
+import { getDb, getEnabledOrgMenu, users } from '@fintracker-vault/db'
+import { applyDefaultOrgToSession, listOrgsForUserEmail } from '../../../lib/dbAuth'
 import { getSessionOptions } from '../../../lib/session'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -19,6 +20,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!user) {
       return res.status(404).json({ ok: false, error: 'User not found' })
     }
+    const orgs = await listOrgsForUserEmail(email)
+    const prevOrg = session.activeOrgId
+    await applyDefaultOrgToSession(session, email)
+    if (session.activeOrgId !== prevOrg) {
+      await session.save()
+    }
+    let menu: Awaited<ReturnType<typeof getEnabledOrgMenu>> = []
+    if (session.activeOrgId) {
+      menu = await getEnabledOrgMenu(session.activeOrgId, 'fintracker')
+    }
+
     return res.status(200).json({
       ok: true,
       data: {
@@ -26,9 +38,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         displayName: user.displayName,
         role: user.role,
         status: user.status,
-        modules: user.modules,
-        menuConfig: user.menuConfig,
+        settings: user.settings,
         useDb: user.useDb,
+        orgs,
+        activeOrgId: session.activeOrgId ?? null,
+        menu,
       },
     })
   }
@@ -38,13 +52,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const displayName = typeof (body as { displayName?: unknown }).displayName === 'string'
       ? (body as { displayName: string }).displayName
       : undefined
-    const menuConfig = (body as { menuConfig?: unknown }).menuConfig
+    const settings = (body as { settings?: unknown }).settings
 
     await db
       .update(users)
       .set({
         displayName,
-        menuConfig: menuConfig === undefined ? undefined : menuConfig,
+        settings: settings === undefined ? undefined : settings,
         updatedAt: new Date(),
       })
       .where(eq(users.email, email))

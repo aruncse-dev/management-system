@@ -8,7 +8,8 @@ This file is a concise, generic guide for anyone working in this repository.
 - `README.md` — primary developer guide (setup, architecture, deployment)
 - `.cursor/rules/google-oauth-env.mdc` — allowed Google OAuth env keys
 - `.cursor/rules/git-pr-only-main.mdc` — PR-only workflow for `main`
-- `docs/gas-recovery.md` — restore legacy GAS stack from tag/zip if required
+- `docs/gas-recovery.md` — legacy Google Apps Script (removed from tree; recover from tag/zip only if needed)
+- `docs/neon-schema-migrations.md` — ordered SQL migrations for Neon (`schema_migrations`)
 
 ## Repo Overview
 

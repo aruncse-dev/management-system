@@ -57,9 +57,4 @@ export const CR_COLORS = {
   Others: decorColor('Others', 4),
 }
 
-export const API_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  process.env.API_URL ||
-  process.env.VITE_API_URL ||
-  '/api'
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api'

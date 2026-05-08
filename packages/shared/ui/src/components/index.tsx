@@ -780,7 +780,13 @@ export * from './FinanceUI'
 export * from './RightLegendDonut'
 export { default as BottomNav } from './BottomNav'
 export { default as ErrorScreen } from './ErrorScreen'
-export { default as Nav, type ModuleId, type AppNavArea } from './Nav'
+export {
+  default as Nav,
+  type ModuleId,
+  type AppNavArea,
+  type NavDynamicMenuItem,
+  type NavDynamicMenuSection,
+} from './Nav'
 export {
   default as SimpleAppNav,
   performGoogleAppLogout,
@@ -801,3 +807,6 @@ export {
   LOGIN_BRAND_MARK_STYLE,
   type GoogleAuthCardProps,
 } from './GoogleAuthCard'
+export { ConfirmDialog } from './ConfirmDialog'
+export { FabButton, FormCard, DataPageHeader, AdminDataListSearch } from './AdminShell'
+export { DynamicLucide } from './DynamicLucide'

@@ -1,12 +1,11 @@
 import { boolean, jsonb, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
 
+/** User profile only — org-scoped menus live on `org_menu_assignments` + `menu_catalog`. */
 export const users = pgTable('users', {
   email: text('email').primaryKey(),
   displayName: text('display_name'),
   role: text('role').default('user').notNull(),
   status: text('status').default('active').notNull(),
-  modules: text('modules').array().default([]).notNull(),
-  menuConfig: jsonb('menu_config'),
   settings: jsonb('settings'),
   useDb: boolean('use_db').default(false).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
