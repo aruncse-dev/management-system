@@ -1,18 +1,20 @@
-import { integer, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
+/**
+ * Apps table has been removed (migration 0004).
+ * All apps are now static (fintracker, vault, staff) defined in adminStaticData.ts
+ * Use appsRepo.ts functions to access app data from static configuration.
+ */
 
-/** Deployed product surface (FinTracker, Vault, Staff, …). */
-export const apps = pgTable('apps', {
-  id: text('id').primaryKey(),
-  slug: text('slug').notNull().unique(),
-  name: text('name').notNull(),
-  description: text('description'),
-  /** Optional lucide icon name for admin lists. */
-  icon: text('icon'),
-  sortOrder: integer('sort_order').default(0).notNull(),
-  status: text('status').default('active').notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
-})
+// Legacy type definitions for compatibility
+export type AppRow = {
+  id: string
+  slug: string
+  name: string
+  description: string | null
+  icon: string | null
+  sortOrder: number
+  status: string
+  createdAt: Date
+  updatedAt: Date
+}
 
-export type AppRow = typeof apps.$inferSelect
-export type NewAppRow = typeof apps.$inferInsert
+export type NewAppRow = Omit<AppRow, 'createdAt' | 'updatedAt'>

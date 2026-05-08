@@ -1,59 +1,81 @@
-import { asc, eq } from 'drizzle-orm'
-import { getDb } from './neon'
-import { apps, type AppRow, type NewAppRow } from './schema/apps'
+import { STATIC_APPS, APP_CONFIG } from './adminStaticData'
+
+/**
+ * Static app data — apps are defined in code, not configurable.
+ * Use STATIC_APPS and APP_CONFIG from adminStaticData.ts
+ */
+
+export type AppRow = {
+  id: string
+  slug: string
+  name: string
+  description: string | null
+  icon: string | null
+  sortOrder: number
+  status: string
+  createdAt: Date
+  updatedAt: Date
+}
 
 export async function listApps(): Promise<AppRow[]> {
-  const db = getDb()
-  return db.select().from(apps).orderBy(asc(apps.sortOrder), asc(apps.name))
+  // Return static apps in order
+  return STATIC_APPS.map((slug, idx) => ({
+    id: slug,
+    slug,
+    name: APP_CONFIG[slug].name,
+    description: APP_CONFIG[slug].description,
+    icon: APP_CONFIG[slug].icon,
+    sortOrder: idx,
+    status: 'active',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }))
 }
 
 export async function getAppById(id: string): Promise<AppRow | undefined> {
-  const db = getDb()
-  const [row] = await db.select().from(apps).where(eq(apps.id, id)).limit(1)
-  return row
-}
-
-export async function getAppBySlug(slug: string): Promise<AppRow | undefined> {
-  const db = getDb()
-  const [row] = await db.select().from(apps).where(eq(apps.slug, slug)).limit(1)
-  return row
-}
-
-export async function createApp(input: Omit<NewAppRow, 'createdAt' | 'updatedAt'>): Promise<AppRow> {
-  const db = getDb()
-  const id = input.id ?? input.slug
-  const row: NewAppRow = {
-    ...input,
-    id,
-    slug: input.slug,
-    sortOrder: input.sortOrder ?? 0,
-    status: input.status ?? 'active',
+  const slugIndex = STATIC_APPS.indexOf(id as keyof typeof APP_CONFIG)
+  if (slugIndex === -1) return undefined
+  const slug = STATIC_APPS[slugIndex] as keyof typeof APP_CONFIG
+  const config = APP_CONFIG[slug]
+  return {
+    id: slug,
+    slug,
+    name: config.name,
+    description: config.description,
+    icon: config.icon,
+    sortOrder: slugIndex,
+    status: 'active',
     createdAt: new Date(),
     updatedAt: new Date(),
   }
-  await db.insert(apps).values(row)
-  const created = await getAppById(id)
-  if (!created) throw new Error('Failed to create app')
-  return created
 }
 
-export async function updateApp(
-  id: string,
-  patch: Partial<Pick<AppRow, 'name' | 'description' | 'icon' | 'sortOrder' | 'status' | 'slug'>>,
-): Promise<AppRow | undefined> {
-  const db = getDb()
-  const clean = Object.fromEntries(
-    Object.entries(patch).filter(([, v]) => v !== undefined),
-  ) as Partial<Pick<AppRow, 'name' | 'description' | 'icon' | 'sortOrder' | 'status' | 'slug'>>
-  if (Object.keys(clean).length === 0) return getAppById(id)
-  await db
-    .update(apps)
-    .set({ ...clean, updatedAt: new Date() })
-    .where(eq(apps.id, id))
-  return getAppById(id)
+export async function getAppBySlug(slug: string): Promise<AppRow | undefined> {
+  if (!STATIC_APPS.includes(slug as keyof typeof APP_CONFIG)) return undefined
+  const slugIndex = STATIC_APPS.indexOf(slug as keyof typeof APP_CONFIG)
+  const config = APP_CONFIG[slug as keyof typeof APP_CONFIG]
+  return {
+    id: slug,
+    slug,
+    name: config.name,
+    description: config.description,
+    icon: config.icon,
+    sortOrder: slugIndex,
+    status: 'active',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }
 }
 
-export async function deleteApp(id: string): Promise<void> {
-  const db = getDb()
-  await db.delete(apps).where(eq(apps.id, id))
+// Create, update, delete are no-ops for static data
+export async function createApp(): Promise<AppRow> {
+  throw new Error('Apps are static and cannot be created')
+}
+
+export async function updateApp(): Promise<AppRow | undefined> {
+  throw new Error('Apps are static and cannot be updated')
+}
+
+export async function deleteApp(): Promise<void> {
+  throw new Error('Apps are static and cannot be deleted')
 }

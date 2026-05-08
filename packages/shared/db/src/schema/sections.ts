@@ -1,13 +1,16 @@
-import { integer, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
+/**
+ * Menu sections table has been removed (migration 0004).
+ * All menu sections are now static, defined in adminStaticData.ts STATIC_MENUS structure.
+ * Use menuSectionsRepo.ts functions to access section data from static configuration.
+ */
 
-/** Global drawer / nav section headers (grouping for menu_catalog). */
-export const menuSections = pgTable('menu_sections', {
-  id: text('id').primaryKey(),
-  slug: text('slug').notNull().unique(),
-  label: text('label').notNull(),
-  sortOrder: integer('sort_order').default(0).notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-})
+// Legacy type definitions for compatibility
+export type MenuSectionRow = {
+  id: string
+  slug: string
+  label: string
+  sortOrder: number
+  createdAt: Date
+}
 
-export type MenuSectionRow = typeof menuSections.$inferSelect
-export type NewMenuSectionRow = typeof menuSections.$inferInsert
+export type NewMenuSectionRow = Omit<MenuSectionRow, 'createdAt'>
