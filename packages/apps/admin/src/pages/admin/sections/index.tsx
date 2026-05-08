@@ -1,14 +1,7 @@
 import Head from 'next/head'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Search } from 'lucide-react'
-import {
-  ConfirmDialog,
-  DataPageHeader,
-  FabButton,
-  AdminDataListSearch,
-  SectionChip,
-  LoadingState,
-} from '@fintracker-vault/ui'
+import { Plus, Search } from 'lucide-react'
+import { LoadingState, ModalShell, ModalActions, SearchField, SectionChip } from '@fintracker-vault/ui'
 
 type SectionRow = {
   id: string
@@ -23,20 +16,11 @@ export default function AdminSectionsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  const [createOpen, setCreateOpen] = useState(false)
-  const [savingCreate, setSavingCreate] = useState(false)
-  const [createSlug, setCreateSlug] = useState('')
-  const [createLabel, setCreateLabel] = useState('')
-
-  const [editOpen, setEditOpen] = useState(false)
-  const [editLoading, setEditLoading] = useState(false)
-  const [savingEdit, setSavingEdit] = useState(false)
-  const [editId, setEditId] = useState('')
-  const [editSlug, setEditSlug] = useState('')
-  const [editLabel, setEditLabel] = useState('')
-
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
-  const [deleting, setDeleting] = useState(false)
+  const [mode, setMode] = useState<'add' | 'edit' | null>(null)
+  const [editingId, setEditingId] = useState('')
+  const [form, setForm] = useState({ slug: '', label: '' })
+  const [saving, setSaving] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -60,103 +44,100 @@ export default function AdminSectionsPage() {
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase()
     if (!term) return rows
-    return rows.filter(
-      s =>
-        s.label.toLowerCase().includes(term) ||
-        s.slug.toLowerCase().includes(term),
-    )
+    return rows.filter(s => s.label.toLowerCase().includes(term) || s.slug.toLowerCase().includes(term))
   }, [rows, q])
 
-  async function createSection(e: FormEvent) {
-    e.preventDefault()
-    if (!createSlug.trim() || !createLabel.trim()) {
+  function startAdd() {
+    setMode('add')
+    setEditingId('')
+    setForm({ slug: '', label: '' })
+    setDeleteConfirm(false)
+  }
+
+  function startEdit(row: SectionRow) {
+    setMode('edit')
+    setEditingId(row.id)
+    setForm({ slug: row.slug, label: row.label })
+    setDeleteConfirm(false)
+  }
+
+  function closeForm() {
+    setMode(null)
+    setEditingId('')
+    setForm({ slug: '', label: '' })
+    setDeleteConfirm(false)
+  }
+
+  async function save() {
+    if (!form.slug.trim() || !form.label.trim()) {
       setError('Slug and label are required')
       return
     }
-    setSavingCreate(true)
+
+    setSaving(true)
     setError('')
     try {
-      const res = await fetch('/api/admin/sections', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          slug: createSlug.trim(),
-          label: createLabel.trim(),
-          sortOrder: rows.length,
-        }),
-      })
-      const json = await res.json()
-      if (!json.ok) throw new Error(json.error || 'Create failed')
-      setCreateOpen(false)
-      setCreateSlug('')
-      setCreateLabel('')
-      await load()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Create failed')
-    } finally {
-      setSavingCreate(false)
-    }
-  }
+      if (mode === 'add') {
+        const res = await fetch('/api/admin/sections', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            slug: form.slug.trim(),
+            label: form.label.trim(),
+            sortOrder: rows.length,
+          }),
+        })
+        const json = await res.json()
+        if (!json.ok) throw new Error(json.error || 'Create failed')
+      } else if (mode === 'edit') {
+        const res = await fetch(`/api/admin/sections/${encodeURIComponent(editingId)}`, {
+          method: 'PUT',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            slug: form.slug.trim(),
+            label: form.label.trim(),
+          }),
+        })
+        const json = await res.json()
+        if (!json.ok) throw new Error(json.error || 'Save failed')
+      }
 
-  async function openEdit(sectionId: string) {
-    const section = rows.find(s => s.id === sectionId)
-    if (!section) return
-    setEditOpen(true)
-    setEditId(sectionId)
-    setEditSlug(section.slug)
-    setEditLabel(section.label)
-  }
-
-  async function saveEdit(e: FormEvent) {
-    e.preventDefault()
-    if (!editId || !editSlug.trim() || !editLabel.trim()) {
-      setError('Slug and label are required')
-      return
-    }
-    setSavingEdit(true)
-    setError('')
-    try {
-      const res = await fetch(`/api/admin/sections/${encodeURIComponent(editId)}`, {
-        method: 'PUT',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          slug: editSlug.trim(),
-          label: editLabel.trim(),
-        }),
-      })
-      const json = await res.json()
-      if (!json.ok) throw new Error(json.error || 'Save failed')
-      setEditOpen(false)
-      setEditId('')
       await load()
+      closeForm()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed')
     } finally {
-      setSavingEdit(false)
+      setSaving(false)
     }
   }
 
+  function confirmDelete() {
+    if (!deleteConfirm) {
+      setDeleteConfirm(true)
+      return
+    }
+    void deleteSection()
+  }
+
   async function deleteSection() {
-    if (!editId) return
-    setDeleting(true)
+    if (!editingId) return
+    setSaving(true)
     setError('')
     try {
-      const res = await fetch(`/api/admin/sections/${encodeURIComponent(editId)}`, {
+      const res = await fetch(`/api/admin/sections/${encodeURIComponent(editingId)}`, {
         method: 'DELETE',
         credentials: 'same-origin',
       })
       const json = await res.json()
       if (!json.ok) throw new Error(json.error || 'Delete failed')
-      setConfirmDeleteOpen(false)
-      setEditOpen(false)
-      setEditId('')
       await load()
+      closeForm()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Delete failed')
     } finally {
-      setDeleting(false)
+      setSaving(false)
     }
   }
 
@@ -165,299 +146,184 @@ export default function AdminSectionsPage() {
       <Head>
         <title>Sections · Admin</title>
       </Head>
-      <div className="admin-page">
-        <DataPageHeader title="Menu Sections" right={<SectionChip>{rows.length}</SectionChip>} />
+      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+        <div style={{ padding: '1.5rem 1rem', background: 'var(--admin-bg, #f0f5ff)', borderBottom: '1px solid var(--admin-border, #e5e7eb)' }}>
+          <div style={{ maxWidth: '56rem', margin: '0 auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>Menu Sections</h1>
+                <p style={{ margin: '0.25rem 0 0 0', color: '#6b7280', fontSize: '0.9rem' }}>
+                  Organize menu items into sections
+                </p>
+              </div>
+              <SectionChip>{rows.length}</SectionChip>
+            </div>
+          </div>
+        </div>
 
-        {error && <p style={{ color: '#b91c1c', marginBottom: '1rem' }}>{error}</p>}
+        <div style={{ flex: 1, padding: '1.5rem 1rem' }}>
+          <div style={{ maxWidth: '56rem', margin: '0 auto' }}>
+            {error && <p style={{ color: '#b91c1c', marginBottom: '1rem', fontSize: '0.9rem' }}>⚠ {error}</p>}
 
-        <section>
-          {rows.length > 5 && (
-            <AdminDataListSearch
-              itemCount={rows.length}
-              value={q}
-              onChange={setQ}
-              placeholder="Search sections..."
-              ariaLabel="Search sections"
-            />
-          )}
+            {loading && <LoadingState variant="page" />}
 
-          {loading && <LoadingState variant="page" />}
+            {!loading && rows.length === 0 && (
+              <div style={{ textAlign: 'center', color: '#6b7280', padding: '2rem 0' }}>
+                <p>No sections yet. Create one with the button below.</p>
+              </div>
+            )}
 
-          {!loading && rows.length === 0 && (
-            <p style={{ color: '#6b7280', textAlign: 'center', padding: '2rem 0' }}>
-              No sections yet.
-            </p>
-          )}
+            {!loading && rows.length > 0 && (
+              <>
+                {rows.length > 5 && (
+                  <SearchField
+                    value={q}
+                    placeholder="Search sections..."
+                    onChange={setQ}
+                    onClear={() => setQ('')}
+                    prefix={<Search size={15} />}
+                  />
+                )}
 
-          {!loading && filtered.length > 0 && (
-            <div className="admin-card-list">
-              {filtered.map(s => (
-                <div key={s.id} className="admin-card-item">
-                  <div className="admin-card-item__body">
-                    <h3 className="admin-card-item__title">{s.label}</h3>
-                    <p className="admin-card-item__meta">Slug: {s.slug}</p>
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div style={{ display: 'grid', gap: '0.75rem', marginTop: '1rem' }}>
+                  {filtered.map(s => (
                     <button
-                      className="admin-btn"
-                      onClick={() => void openEdit(s.id)}
+                      key={s.id}
+                      type="button"
+                      onClick={() => startEdit(s)}
                       style={{
-                        padding: '0.4rem 0.8rem',
-                        fontSize: '0.85rem',
-                        border: 'none',
+                        padding: '1rem',
+                        border: '1px solid var(--admin-border, #e5e7eb)',
+                        borderLeft: '5px solid var(--navy, #1e5cc7)',
                         borderRadius: '8px',
-                        background: '#1e5cc7',
-                        color: '#fff',
+                        background: 'var(--admin-card, #fff)',
                         cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'box-shadow 0.2s',
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 1px 6px rgba(62, 113, 202, 0.06)')}
+                      onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}
+                    >
+                      <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0f172a', marginBottom: '0.25rem' }}>
+                        {s.label}
+                      </div>
+                      <div style={{ color: '#6b7280', fontSize: '0.8rem' }}>
+                        Slug: {s.slug}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={startAdd}
+          style={{
+            position: 'fixed',
+            bottom: '1.5rem',
+            right: '1.5rem',
+            width: '56px',
+            height: '56px',
+            borderRadius: '999px',
+            background: '#1e5cc7',
+            color: '#fff',
+            border: 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 16px 32px rgba(30, 92, 199, 0.24)',
+            fontSize: '1.25rem',
+            fontWeight: 700,
+          }}
+          title="Add section"
+        >
+          <Plus size={24} />
+        </button>
+
+        {mode && (
+          <ModalShell
+            title={mode === 'add' ? 'Add Section' : 'Edit Section'}
+            onClose={closeForm}
+            footer={
+              <ModalActions
+                secondaryLabel="Cancel"
+                primaryLabel={mode === 'add' ? 'Add' : 'Save'}
+                onSecondary={closeForm}
+                onPrimary={save}
+                leading={
+                  mode === 'edit' ? (
+                    <button
+                      type="button"
+                      className="ui-kit-btn ui-kit-btn--solid btn-red"
+                      onClick={confirmDelete}
+                      disabled={saving}
+                      style={{
+                        background: '#b91c1c',
+                        color: '#fff',
+                        border: 'none',
+                        padding: '0.5rem 1rem',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        fontWeight: 600,
                       }}
                     >
-                      Edit
+                      {saving ? 'Deleting…' : deleteConfirm ? 'Confirm delete?' : 'Delete'}
                     </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <FabButton label="Add section" onClick={() => setCreateOpen(true)} />
-      </div>
-
-      {/* Create Modal */}
-      {createOpen && (
-        <div
-          className="modal-bg open admin-modal-wrap"
-          onClick={() => setCreateOpen(false)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 50,
-          }}
-        >
-          <div className="modal-shell" onClick={e => e.stopPropagation()}>
-            <div
-              className="modal-hd modal-hd--blue"
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '1rem',
-                background: '#1e5cc7',
-                color: '#fff',
-                borderRadius: '8px 8px 0 0',
-              }}
-            >
-              <span className="modal-title">Add Section</span>
-              <button
-                className="modal-close"
-                onClick={() => setCreateOpen(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#fff',
-                  fontSize: '1.5rem',
-                  cursor: 'pointer',
-                }}
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="modal-body">
-              <form onSubmit={createSection} className="admin-form">
-                <label>
+                  ) : null
+                }
+                disabled={saving}
+              />
+            }
+          >
+            <form onSubmit={(e: FormEvent) => { e.preventDefault(); void save() }} style={{ display: 'grid', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: '0.5rem', color: '#0f172a' }}>
                   Slug *
-                  <input
-                    type="text"
-                    value={createSlug}
-                    onChange={e => setCreateSlug(e.target.value)}
-                    placeholder="e.g., finances"
-                    required
-                    autoFocus
-                  />
                 </label>
-                <label>
+                <input
+                  type="text"
+                  value={form.slug}
+                  onChange={e => setForm(f => ({ ...f, slug: e.target.value }))}
+                  placeholder="e.g., finances"
+                  autoFocus
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem 0.75rem',
+                    border: '1px solid #ccc',
+                    borderRadius: '6px',
+                    fontSize: '0.9rem',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: '0.5rem', color: '#0f172a' }}>
                   Label *
-                  <input
-                    type="text"
-                    value={createLabel}
-                    onChange={e => setCreateLabel(e.target.value)}
-                    placeholder="e.g., Finances"
-                    required
-                  />
                 </label>
-                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                  <button
-                    type="button"
-                    className="admin-btn"
-                    onClick={() => setCreateOpen(false)}
-                    style={{
-                      background: '#e5e7eb',
-                      color: '#0f172a',
-                      padding: '0.5rem 1rem',
-                      border: 'none',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="admin-btn"
-                    disabled={savingCreate}
-                    style={{
-                      background: '#1e5cc7',
-                      color: '#fff',
-                      padding: '0.5rem 1rem',
-                      border: 'none',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {savingCreate ? 'Creating…' : 'Create'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Modal */}
-      {editOpen && (
-        <div
-          className="modal-bg open admin-modal-wrap"
-          onClick={() => setEditOpen(false)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 50,
-          }}
-        >
-          <div className="modal-shell" onClick={e => e.stopPropagation()}>
-            <div
-              className="modal-hd modal-hd--blue"
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '1rem',
-                background: '#1e5cc7',
-                color: '#fff',
-                borderRadius: '8px 8px 0 0',
-              }}
-            >
-              <span className="modal-title">Edit Section</span>
-              <button
-                className="modal-close"
-                onClick={() => setEditOpen(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#fff',
-                  fontSize: '1.5rem',
-                  cursor: 'pointer',
-                }}
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="modal-body">
-              <form onSubmit={saveEdit} className="admin-form">
-                <label>
-                  Slug
-                  <input
-                    type="text"
-                    value={editSlug}
-                    onChange={e => setEditSlug(e.target.value)}
-                    required
-                  />
-                </label>
-                <label>
-                  Label
-                  <input
-                    type="text"
-                    value={editLabel}
-                    onChange={e => setEditLabel(e.target.value)}
-                    required
-                  />
-                </label>
-                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                  <button
-                    type="button"
-                    className="admin-btn-danger"
-                    onClick={() => setConfirmDeleteOpen(true)}
-                    disabled={deleting || savingEdit}
-                    style={{
-                      marginRight: 'auto',
-                      padding: '0.5rem 1rem',
-                      border: 'none',
-                      borderRadius: '8px',
-                      background: '#b91c1c',
-                      color: '#fff',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Delete
-                  </button>
-                  <button
-                    type="button"
-                    className="admin-btn"
-                    onClick={() => setEditOpen(false)}
-                    disabled={savingEdit}
-                    style={{
-                      background: '#e5e7eb',
-                      color: '#0f172a',
-                      padding: '0.5rem 1rem',
-                      border: 'none',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="admin-btn"
-                    disabled={savingEdit}
-                    style={{
-                      background: '#1e5cc7',
-                      color: '#fff',
-                      padding: '0.5rem 1rem',
-                      border: 'none',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {savingEdit ? 'Saving…' : 'Save'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <ConfirmDialog
-        open={confirmDeleteOpen}
-        title="Delete section?"
-        description="This will remove the section. Menus in this section may become unorganized."
-        confirmText="Delete"
-        tone="danger"
-        busy={deleting}
-        onCancel={() => setConfirmDeleteOpen(false)}
-        onConfirm={() => void deleteSection()}
-      />
+                <input
+                  type="text"
+                  value={form.label}
+                  onChange={e => setForm(f => ({ ...f, label: e.target.value }))}
+                  placeholder="e.g., Finances"
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem 0.75rem',
+                    border: '1px solid #ccc',
+                    borderRadius: '6px',
+                    fontSize: '0.9rem',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+            </form>
+          </ModalShell>
+        )}
+      </div>
     </>
   )
 }

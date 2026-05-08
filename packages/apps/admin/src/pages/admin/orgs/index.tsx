@@ -1,21 +1,13 @@
 import Head from 'next/head'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { LayoutGrid, Search } from 'lucide-react'
-import {
-  ConfirmDialog,
-  DataPageHeader,
-  FabButton,
-  AdminDataListSearch,
-  SectionChip,
-  LoadingState,
-} from '@fintracker-vault/ui'
+import { Plus, Search } from 'lucide-react'
+import { LoadingState, ModalShell, ModalActions, SearchField, SectionChip } from '@fintracker-vault/ui'
 
 type OrgRow = {
   id: string
   name: string
   slug: string | null
   status: string
-  notes: string | null
   createdAt: string
 }
 
@@ -33,10 +25,6 @@ type MenuRow = {
   enabled?: boolean
 }
 
-type MenusByApp = Record<string, MenuRow[]>
-type EnabledByApp = Record<string, string[]>
-type SelectedApps = Record<string, boolean>
-
 export default function AdminOrgsPage() {
   const [rows, setRows] = useState<OrgRow[]>([])
   const [apps, setApps] = useState<AppRow[]>([])
@@ -44,33 +32,16 @@ export default function AdminOrgsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  // Create modal state
-  const [createStep, setCreateStep] = useState<1 | 2 | 3>(1)
-  const [createOpen, setCreateOpen] = useState(false)
-  const [savingCreate, setSavingCreate] = useState(false)
-  const [createName, setCreateName] = useState('')
-  const [createSlug, setCreateSlug] = useState('')
-  const [createSelectedApps, setCreateSelectedApps] = useState<SelectedApps>({})
-  const [createAppTab, setCreateAppTab] = useState('fintracker')
-  const [createMenusByApp, setCreateMenusByApp] = useState<MenusByApp>({})
-  const [createEnabledByApp, setCreateEnabledByApp] = useState<EnabledByApp>({})
-
-  // Edit modal state
-  const [editOpen, setEditOpen] = useState(false)
-  const [editLoading, setEditLoading] = useState(false)
-  const [savingEdit, setSavingEdit] = useState(false)
-  const [editOrgId, setEditOrgId] = useState('')
-  const [editName, setEditName] = useState('')
-  const [editSlug, setEditSlug] = useState('')
-  const [editStatus, setEditStatus] = useState('active')
-  const [editSelectedApps, setEditSelectedApps] = useState<SelectedApps>({})
-  const [editAppTab, setEditAppTab] = useState('fintracker')
-  const [editMenusByApp, setEditMenusByApp] = useState<MenusByApp>({})
-  const [editEnabledByApp, setEditEnabledByApp] = useState<EnabledByApp>({})
-
-  // Delete confirmation
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
-  const [deleting, setDeleting] = useState(false)
+  const [mode, setMode] = useState<'add' | 'edit' | null>(null)
+  const [step, setStep] = useState<1 | 2 | 3>(1)
+  const [editingId, setEditingId] = useState('')
+  const [form, setForm] = useState({ name: '', slug: '' })
+  const [selectedApps, setSelectedApps] = useState<Record<string, boolean>>({})
+  const [appTab, setAppTab] = useState('')
+  const [menusByApp, setMenusByApp] = useState<Record<string, MenuRow[]>>({})
+  const [enabledByApp, setEnabledByApp] = useState<Record<string, string[]>>({})
+  const [saving, setSaving] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -117,144 +88,53 @@ export default function AdminOrgsPage() {
       .slice(0, 64)
   }
 
-  async function loadCatalogMenusForApp(appSlug: string, isCreate: boolean) {
-    const menusByApp = isCreate ? createMenusByApp : editMenusByApp
+  function startAdd() {
+    setMode('add')
+    setStep(1)
+    setEditingId('')
+    setForm({ name: '', slug: '' })
+    setSelectedApps({})
+    setMenusByApp({})
+    setEnabledByApp({})
+    setAppTab(apps[0]?.slug || '')
+    setDeleteConfirm(false)
+  }
+
+  async function loadMenusForApp(appSlug: string) {
     if (!appSlug || menusByApp[appSlug]) return
-    const r = await fetch(`/api/admin/menus?app=${encodeURIComponent(appSlug)}`, {
-      credentials: 'same-origin',
-    })
-    const j = await r.json()
-    if (!j.ok) throw new Error(j.error || `Failed to load ${appSlug} menus`)
-    const mapped = ((j.data || []) as MenuRow[]).map(m => ({
-      id: m.id,
-      label: m.label,
-      path: m.path,
-      sectionLabel: m.sectionLabel,
-    }))
-    if (isCreate) {
-      setCreateMenusByApp(prev => ({ ...prev, [appSlug]: mapped }))
-      setCreateEnabledByApp(prev => ({ ...prev, [appSlug]: prev[appSlug] || [] }))
-    } else {
-      setEditMenusByApp(prev => ({ ...prev, [appSlug]: mapped }))
-      setEditEnabledByApp(prev => ({ ...prev, [appSlug]: prev[appSlug] || [] }))
-    }
-  }
-
-  useEffect(() => {
-    if (!createOpen || createStep !== 3) return
-    const selectedAppSlugs = apps.filter(a => createSelectedApps[a.slug]).map(a => a.slug)
-    Promise.all(selectedAppSlugs.map(slug => loadCatalogMenusForApp(slug, true))).catch(e => {
-      setError(e instanceof Error ? e.message : 'Failed to load menus')
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [createOpen, createStep])
-
-  useEffect(() => {
-    if (!editOpen) return
-    const selectedAppSlugs = apps.filter(a => editSelectedApps[a.slug]).map(a => a.slug)
-    Promise.all(selectedAppSlugs.map(slug => loadCatalogMenusForApp(slug, false))).catch(e => {
-      setError(e instanceof Error ? e.message : 'Failed to load menus')
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editOpen, editSelectedApps])
-
-  function toggleCreateApp(appSlug: string) {
-    setCreateSelectedApps(prev => ({ ...prev, [appSlug]: !prev[appSlug] }))
-  }
-
-  function toggleCreateMenu(appSlug: string, menuId: string) {
-    setCreateEnabledByApp(prev => {
-      const selected = new Set(prev[appSlug] || [])
-      if (selected.has(menuId)) selected.delete(menuId)
-      else selected.add(menuId)
-      return { ...prev, [appSlug]: [...selected] }
-    })
-  }
-
-  function toggleEditApp(appSlug: string) {
-    setEditSelectedApps(prev => ({ ...prev, [appSlug]: !prev[appSlug] }))
-  }
-
-  function toggleEditMenu(appSlug: string, menuId: string) {
-    setEditEnabledByApp(prev => {
-      const selected = new Set(prev[appSlug] || [])
-      if (selected.has(menuId)) selected.delete(menuId)
-      else selected.add(menuId)
-      return { ...prev, [appSlug]: [...selected] }
-    })
-  }
-
-  function openCreateModal() {
-    setCreateOpen(true)
-    setCreateStep(1)
-    setCreateName('')
-    setCreateSlug('')
-    setCreateSelectedApps({})
-    setCreateMenusByApp({})
-    setCreateEnabledByApp({})
-    setCreateAppTab(apps[0]?.slug || 'fintracker')
-    setError('')
-  }
-
-  async function createOrg() {
-    if (!createName.trim()) {
-      setError('Name is required')
-      return
-    }
-    setSavingCreate(true)
-    setError('')
     try {
-      const r = await fetch('/api/admin/orgs', {
-        method: 'POST',
+      const r = await fetch(`/api/admin/menus?app=${encodeURIComponent(appSlug)}`, {
         credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: createName.trim(),
-          slug: createSlug.trim() || null,
-        }),
       })
       const j = await r.json()
-      if (!j.ok) throw new Error(j.error || 'Create failed')
-      const id = j.data?.id as string | undefined
-      if (!id) throw new Error('Create failed: missing organization id')
-
-      const selectedAppSlugs = apps.filter(a => createSelectedApps[a.slug]).map(a => a.slug)
-      for (const appSlug of selectedAppSlugs) {
-        const enabledMenuIds = createEnabledByApp[appSlug] || []
-        const menuRes = await fetch(`/api/admin/orgs/${encodeURIComponent(id)}/menu`, {
-          method: 'PUT',
-          credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ appSlug, enabledMenuIds }),
-        })
-        const menuJson = await menuRes.json()
-        if (!menuJson.ok) throw new Error(menuJson.error || `Failed to assign menus for ${appSlug}`)
-      }
-
-      setCreateOpen(false)
-      await load()
+      if (!j.ok) throw new Error(j.error || `Failed to load ${appSlug} menus`)
+      const mapped = ((j.data || []) as MenuRow[]).map(m => ({
+        id: m.id,
+        label: m.label,
+        path: m.path,
+        sectionLabel: m.sectionLabel,
+      }))
+      setMenusByApp(prev => ({ ...prev, [appSlug]: mapped }))
+      setEnabledByApp(prev => ({ ...prev, [appSlug]: prev[appSlug] || [] }))
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Create failed')
-    } finally {
-      setSavingCreate(false)
+      setError(e instanceof Error ? e.message : 'Failed to load menus')
     }
   }
 
-  async function openEditModal(orgId: string) {
-    setEditOpen(true)
-    setEditLoading(true)
-    setError('')
+  async function startEdit(orgId: string) {
+    const org = rows.find(o => o.id === orgId)
+    if (!org) return
+    setMode('edit')
+    setStep(1)
+    setEditingId(orgId)
+    setForm({ name: org.name, slug: org.slug || '' })
+    setSelectedApps({})
+    setMenusByApp({})
+    setEnabledByApp({})
+    setAppTab(apps[0]?.slug || '')
+    setDeleteConfirm(false)
+
     try {
-      const orgRes = await fetch(`/api/admin/orgs/${encodeURIComponent(orgId)}`, {
-        credentials: 'same-origin',
-      })
-      const orgJson = await orgRes.json()
-      if (!orgJson.ok) throw new Error(orgJson.error || 'Failed to load organization')
-
-      const selectedApps: SelectedApps = {}
-      const menusByApp: MenusByApp = {}
-      const enabledByApp: EnabledByApp = {}
-
       for (const app of apps) {
         const menuRes = await fetch(
           `/api/admin/orgs/${encodeURIComponent(orgId)}/menu?app=${encodeURIComponent(app.slug)}`,
@@ -264,89 +144,162 @@ export default function AdminOrgsPage() {
         if (!menuJson.ok) throw new Error(menuJson.error || `Failed to load ${app.slug} menus`)
         const menuRows = (menuJson.data || []) as MenuRow[]
         if (menuRows.length > 0) {
-          selectedApps[app.slug] = true
-          menusByApp[app.slug] = menuRows
-          enabledByApp[app.slug] = menuRows.filter(m => Boolean(m.enabled)).map(m => m.id)
+          setSelectedApps(prev => ({ ...prev, [app.slug]: true }))
+          setMenusByApp(prev => ({ ...prev, [app.slug]: menuRows }))
+          setEnabledByApp(prev => ({
+            ...prev,
+            [app.slug]: menuRows.filter(m => m.enabled).map(m => m.id),
+          }))
         }
       }
-
-      setEditOrgId(orgId)
-      setEditName(orgJson.data.name || '')
-      setEditSlug(orgJson.data.slug || '')
-      setEditStatus(orgJson.data.status || 'active')
-      setEditSelectedApps(selectedApps)
-      setEditMenusByApp(menusByApp)
-      setEditEnabledByApp(enabledByApp)
-      setEditAppTab(apps[0]?.slug || 'fintracker')
     } catch (e) {
-      setEditOpen(false)
       setError(e instanceof Error ? e.message : 'Load failed')
-    } finally {
-      setEditLoading(false)
     }
   }
 
-  async function saveEdit() {
-    if (!editOrgId || !editName.trim()) {
+  function closeForm() {
+    setMode(null)
+    setStep(1)
+    setEditingId('')
+    setForm({ name: '', slug: '' })
+    setSelectedApps({})
+    setMenusByApp({})
+    setEnabledByApp({})
+    setDeleteConfirm(false)
+  }
+
+  function nextStep() {
+    if (step === 1 && !form.name.trim()) {
       setError('Name is required')
       return
     }
-    setSavingEdit(true)
+    if (step === 2 && !Object.values(selectedApps).some(v => v)) {
+      setError('Select at least one app')
+      return
+    }
+    setError('')
+    const selectedAppSlugs = apps.filter(a => selectedApps[a.slug]).map(a => a.slug)
+    if (step === 2) {
+      Promise.all(selectedAppSlugs.map(slug => loadMenusForApp(slug))).catch(e => {
+        setError(e instanceof Error ? e.message : 'Failed to load menus')
+      })
+    }
+    setStep((s) => (s === 1 ? 2 : 3) as 1 | 2 | 3)
+  }
+
+  function prevStep() {
+    setError('')
+    setStep((s) => (s === 3 ? 2 : 1) as 1 | 2 | 3)
+  }
+
+  function toggleApp(appSlug: string) {
+    setSelectedApps(prev => ({ ...prev, [appSlug]: !prev[appSlug] }))
+  }
+
+  function toggleMenu(appSlug: string, menuId: string) {
+    setEnabledByApp(prev => {
+      const selected = new Set(prev[appSlug] || [])
+      if (selected.has(menuId)) selected.delete(menuId)
+      else selected.add(menuId)
+      return { ...prev, [appSlug]: [...selected] }
+    })
+  }
+
+  async function save() {
+    if (!form.name.trim()) {
+      setError('Name is required')
+      return
+    }
+
+    setSaving(true)
     setError('')
     try {
-      const r = await fetch(`/api/admin/orgs/${encodeURIComponent(editOrgId)}`, {
-        method: 'PUT',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: editName.trim(),
-          slug: editSlug.trim() || null,
-          status: editStatus,
-        }),
-      })
-      const j = await r.json()
-      if (!j.ok) throw new Error(j.error || 'Save failed')
+      if (mode === 'add') {
+        const r = await fetch('/api/admin/orgs', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: form.name.trim(), slug: form.slug.trim() || null }),
+        })
+        const j = await r.json()
+        if (!j.ok) throw new Error(j.error || 'Create failed')
+        const id = j.data?.id as string | undefined
+        if (!id) throw new Error('Create failed: missing organization id')
 
-      const selectedAppSlugs = apps.filter(a => editSelectedApps[a.slug]).map(a => a.slug)
-      for (const appSlug of selectedAppSlugs) {
-        const enabledMenuIds = editEnabledByApp[appSlug] || []
-        const menuRes = await fetch(`/api/admin/orgs/${encodeURIComponent(editOrgId)}/menu`, {
+        const selectedAppSlugs = apps.filter(a => selectedApps[a.slug]).map(a => a.slug)
+        for (const appSlug of selectedAppSlugs) {
+          const enabledMenuIds = enabledByApp[appSlug] || []
+          const menuRes = await fetch(`/api/admin/orgs/${encodeURIComponent(id)}/menu`, {
+            method: 'PUT',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ appSlug, enabledMenuIds }),
+          })
+          const menuJson = await menuRes.json()
+          if (!menuJson.ok) throw new Error(menuJson.error || `Failed to assign menus for ${appSlug}`)
+        }
+      } else if (mode === 'edit') {
+        const r = await fetch(`/api/admin/orgs/${encodeURIComponent(editingId)}`, {
           method: 'PUT',
           credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ appSlug, enabledMenuIds }),
+          body: JSON.stringify({
+            name: form.name.trim(),
+            slug: form.slug.trim() || null,
+            status: 'active',
+          }),
         })
-        const menuJson = await menuRes.json()
-        if (!menuJson.ok) throw new Error(menuJson.error || `Failed to save ${appSlug} menus`)
+        const j = await r.json()
+        if (!j.ok) throw new Error(j.error || 'Save failed')
+
+        const selectedAppSlugs = apps.filter(a => selectedApps[a.slug]).map(a => a.slug)
+        for (const appSlug of selectedAppSlugs) {
+          const enabledMenuIds = enabledByApp[appSlug] || []
+          const menuRes = await fetch(`/api/admin/orgs/${encodeURIComponent(editingId)}/menu`, {
+            method: 'PUT',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ appSlug, enabledMenuIds }),
+          })
+          const menuJson = await menuRes.json()
+          if (!menuJson.ok) throw new Error(menuJson.error || `Failed to save ${appSlug} menus`)
+        }
       }
 
-      setEditOpen(false)
       await load()
+      closeForm()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed')
     } finally {
-      setSavingEdit(false)
+      setSaving(false)
     }
   }
 
+  function confirmDelete() {
+    if (!deleteConfirm) {
+      setDeleteConfirm(true)
+      return
+    }
+    void deleteOrg()
+  }
+
   async function deleteOrg() {
-    if (!editOrgId) return
-    setDeleting(true)
+    if (!editingId) return
+    setSaving(true)
     setError('')
     try {
-      const r = await fetch(`/api/admin/orgs/${encodeURIComponent(editOrgId)}`, {
+      const r = await fetch(`/api/admin/orgs/${encodeURIComponent(editingId)}`, {
         method: 'DELETE',
         credentials: 'same-origin',
       })
       const j = await r.json()
       if (!j.ok) throw new Error(j.error || 'Delete failed')
-      setConfirmDeleteOpen(false)
-      setEditOpen(false)
       await load()
+      closeForm()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Delete failed')
     } finally {
-      setDeleting(false)
+      setSaving(false)
     }
   }
 
@@ -355,241 +308,249 @@ export default function AdminOrgsPage() {
       <Head>
         <title>Organizations · Admin</title>
       </Head>
-      <div className="admin-page">
-        <DataPageHeader title="Organizations" right={<SectionChip>{rows.length}</SectionChip>} />
-
-        {error && <p style={{ color: '#b91c1c', marginBottom: '1rem' }}>{error}</p>}
-
-        <section>
-          {rows.length > 5 && (
-            <AdminDataListSearch
-              itemCount={rows.length}
-              value={q}
-              onChange={setQ}
-              placeholder="Search organizations..."
-              ariaLabel="Search organizations"
-            />
-          )}
-
-          {loading && <LoadingState variant="page" />}
-
-          {!loading && rows.length === 0 && (
-            <p style={{ color: '#6b7280', textAlign: 'center', padding: '2rem 0' }}>
-              No organizations yet.
-            </p>
-          )}
-
-          {!loading && filtered.length > 0 && (
-            <div className="admin-card-list">
-              {filtered.map(o => (
-                <div key={o.id} className="admin-card-item">
-                  <div className="admin-card-item__body">
-                    <h3 className="admin-card-item__title">{o.name}</h3>
-                    <p className="admin-card-item__meta">
-                      {o.slug ? `Slug: ${o.slug}` : 'No slug'} • {o.status}
-                    </p>
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button
-                      className="admin-btn"
-                      onClick={() => void openEditModal(o.id)}
-                      style={{
-                        padding: '0.4rem 0.8rem',
-                        fontSize: '0.85rem',
-                        border: 'none',
-                        borderRadius: '8px',
-                        background: '#1e5cc7',
-                        color: '#fff',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Edit
-                    </button>
-                  </div>
-                </div>
-              ))}
+      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+        <div style={{ padding: '1.5rem 1rem', background: 'var(--admin-bg, #f0f5ff)', borderBottom: '1px solid var(--admin-border, #e5e7eb)' }}>
+          <div style={{ maxWidth: '56rem', margin: '0 auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>Organizations</h1>
+                <p style={{ margin: '0.25rem 0 0 0', color: '#6b7280', fontSize: '0.9rem' }}>
+                  Manage organizations and their app menus
+                </p>
+              </div>
+              <SectionChip>{rows.length}</SectionChip>
             </div>
-          )}
-        </section>
+          </div>
+        </div>
 
-        <FabButton label="Add organization" onClick={openCreateModal} />
-      </div>
+        <div style={{ flex: 1, padding: '1.5rem 1rem' }}>
+          <div style={{ maxWidth: '56rem', margin: '0 auto' }}>
+            {error && <p style={{ color: '#b91c1c', marginBottom: '1rem', fontSize: '0.9rem' }}>⚠ {error}</p>}
 
-      {/* Create Modal */}
-      {createOpen && (
-        <div
-          className="modal-bg open admin-modal-wrap"
-          onClick={() => setCreateOpen(false)}
+            {loading && <LoadingState variant="page" />}
+
+            {!loading && rows.length === 0 && (
+              <div style={{ textAlign: 'center', color: '#6b7280', padding: '2rem 0' }}>
+                <p>No organizations yet. Create one with the button below.</p>
+              </div>
+            )}
+
+            {!loading && rows.length > 0 && (
+              <>
+                {rows.length > 5 && (
+                  <SearchField
+                    value={q}
+                    placeholder="Search organizations..."
+                    onChange={setQ}
+                    onClear={() => setQ('')}
+                    prefix={<Search size={15} />}
+                  />
+                )}
+
+                <div style={{ display: 'grid', gap: '0.75rem', marginTop: '1rem' }}>
+                  {filtered.map(o => (
+                    <button
+                      key={o.id}
+                      type="button"
+                      onClick={() => void startEdit(o.id)}
+                      style={{
+                        padding: '1rem',
+                        border: '1px solid var(--admin-border, #e5e7eb)',
+                        borderLeft: '5px solid var(--navy, #1e5cc7)',
+                        borderRadius: '8px',
+                        background: 'var(--admin-card, #fff)',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'box-shadow 0.2s',
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 1px 6px rgba(62, 113, 202, 0.06)')}
+                      onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}
+                    >
+                      <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0f172a', marginBottom: '0.25rem' }}>
+                        {o.name}
+                      </div>
+                      <div style={{ color: '#6b7280', fontSize: '0.8rem' }}>
+                        {o.slug ? `Slug: ${o.slug}` : 'No slug'} • {o.status}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={startAdd}
           style={{
             position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.5)',
+            bottom: '1.5rem',
+            right: '1.5rem',
+            width: '56px',
+            height: '56px',
+            borderRadius: '999px',
+            background: '#1e5cc7',
+            color: '#fff',
+            border: 'none',
+            cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 50,
+            boxShadow: '0 16px 32px rgba(30, 92, 199, 0.24)',
           }}
+          title="Add organization"
         >
-          <div className="modal-shell" onClick={e => e.stopPropagation()}>
-            <div
-              className="modal-hd modal-hd--blue"
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '1rem',
-                background: '#1e5cc7',
-                color: '#fff',
-                borderRadius: '8px 8px 0 0',
+          <Plus size={24} />
+        </button>
+
+        {mode && (
+          <ModalShell
+            title={mode === 'add' ? `Add Organization - Step ${step}/3` : `Edit Organization`}
+            onClose={closeForm}
+            footer={
+              <ModalActions
+                secondaryLabel={step > 1 ? 'Back' : 'Cancel'}
+                primaryLabel={step === 3 ? (mode === 'add' ? 'Create' : 'Save') : 'Next'}
+                onSecondary={step > 1 ? prevStep : closeForm}
+                onPrimary={step === 3 ? save : nextStep}
+                leading={
+                  mode === 'edit' ? (
+                    <button
+                      type="button"
+                      onClick={confirmDelete}
+                      disabled={saving}
+                      style={{
+                        background: '#b91c1c',
+                        color: '#fff',
+                        border: 'none',
+                        padding: '0.5rem 1rem',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        fontWeight: 600,
+                      }}
+                    >
+                      {saving ? 'Deleting…' : deleteConfirm ? 'Confirm delete?' : 'Delete'}
+                    </button>
+                  ) : null
+                }
+                disabled={saving}
+              />
+            }
+          >
+            <form
+              onSubmit={(e: FormEvent) => {
+                e.preventDefault()
+                if (step === 3) void save()
+                else nextStep()
               }}
+              style={{ display: 'grid', gap: '1rem' }}
             >
-              <span className="modal-title">
-                {createStep === 1
-                  ? 'Organization Details'
-                  : createStep === 2
-                    ? 'Select Apps'
-                    : 'Choose Menus'}
-              </span>
-              <button
-                className="modal-close"
-                onClick={() => setCreateOpen(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#fff',
-                  fontSize: '1.5rem',
-                  cursor: 'pointer',
-                }}
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="modal-body">
-              {createStep === 1 && (
-                <form
-                  className="admin-form"
-                  onSubmit={e => {
-                    e.preventDefault()
-                    setCreateStep(2)
-                  }}
-                >
-                  <label>
-                    Organization Name *
-                    <input
-                      type="text"
-                      value={createName}
-                      onChange={e => setCreateName(e.target.value)}
-                      placeholder="e.g., Acme Corp"
-                      required
-                      autoFocus
-                    />
-                  </label>
-                  <label>
-                    Slug (optional)
-                    <input
-                      type="text"
-                      value={createSlug}
-                      onChange={e => setCreateSlug(e.target.value)}
-                      placeholder="auto-generated from name"
-                    />
-                  </label>
-                  <p style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '-0.5rem' }}>
-                    {createSlug.trim() ? `Slug: ${autoSlug(createSlug)}` : createName.trim() ? `Slug: ${autoSlug(createName)}` : ''}
-                  </p>
-                  <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                    <button
-                      type="button"
-                      className="admin-btn"
-                      onClick={() => setCreateOpen(false)}
-                      style={{
-                        background: '#e5e7eb',
-                        color: '#0f172a',
-                        padding: '0.5rem 1rem',
-                        border: 'none',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Cancel
-                    </button>
-                    <button type="submit" className="admin-btn">
-                      Next
-                    </button>
-                  </div>
-                </form>
-              )}
-
-              {createStep === 2 && (
-                <form
-                  className="admin-form"
-                  onSubmit={e => {
-                    e.preventDefault()
-                    const hasSelection = apps.some(a => createSelectedApps[a.slug])
-                    if (!hasSelection) {
-                      setError('Select at least one app')
-                      return
-                    }
-                    setCreateStep(3)
-                  }}
-                >
-                  <p style={{ marginBottom: '1rem', fontWeight: 600 }}>Select apps for this organization:</p>
-                  {apps.map(a => (
-                    <label key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                      <input
-                        type="checkbox"
-                        checked={createSelectedApps[a.slug] || false}
-                        onChange={() => toggleCreateApp(a.slug)}
-                      />
-                      <span>{a.name}</span>
+              {step === 1 && (
+                <>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: '0.5rem', color: '#0f172a' }}>
+                      Name *
                     </label>
-                  ))}
-                  <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                    <button
-                      type="button"
-                      className="admin-btn"
-                      onClick={() => setCreateStep(1)}
+                    <input
+                      type="text"
+                      value={form.name}
+                      onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                      placeholder="e.g., Acme Corp"
+                      autoFocus
                       style={{
-                        background: '#e5e7eb',
-                        color: '#0f172a',
-                        padding: '0.5rem 1rem',
-                        border: 'none',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
+                        width: '100%',
+                        padding: '0.5rem 0.75rem',
+                        border: '1px solid #ccc',
+                        borderRadius: '6px',
+                        fontSize: '0.9rem',
+                        boxSizing: 'border-box',
                       }}
-                    >
-                      Back
-                    </button>
-                    <button type="submit" className="admin-btn">
-                      Next
-                    </button>
+                    />
                   </div>
-                </form>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: '0.5rem', color: '#0f172a' }}>
+                      Slug (optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={form.slug}
+                      onChange={e => setForm(f => ({ ...f, slug: e.target.value }))}
+                      placeholder="auto-generated from name"
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem 0.75rem',
+                        border: '1px solid #ccc',
+                        borderRadius: '6px',
+                        fontSize: '0.9rem',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                    <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.5rem' }}>
+                      {form.slug.trim() ? `Slug: ${autoSlug(form.slug)}` : form.name.trim() ? `Slug: ${autoSlug(form.name)}` : ''}
+                    </p>
+                  </div>
+                </>
               )}
 
-              {createStep === 3 && (
-                <div className="admin-form">
-                  <p style={{ marginBottom: '1rem', fontWeight: 600 }}>Choose menus per app:</p>
+              {step === 2 && (
+                <div>
+                  <p style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '1rem', color: '#0f172a' }}>
+                    Select apps for this organization:
+                  </p>
+                  <div style={{ display: 'grid', gap: '0.75rem' }}>
+                    {apps.map(a => (
+                      <label
+                        key={a.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.75rem',
+                          padding: '0.75rem',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          background: '#f9fafb',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedApps[a.slug] || false}
+                          onChange={() => toggleApp(a.slug)}
+                          style={{ width: '1rem', height: '1rem', cursor: 'pointer' }}
+                        />
+                        <span style={{ flex: 1, fontWeight: 600, color: '#0f172a' }}>{a.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-                  <div className="admin-internal-tabs" style={{ marginBottom: '1.5rem' }}>
+              {step === 3 && (
+                <div>
+                  <p style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '1rem', color: '#0f172a' }}>
+                    Choose menus per app:
+                  </p>
+
+                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
                     {apps
-                      .filter(a => createSelectedApps[a.slug])
+                      .filter(a => selectedApps[a.slug])
                       .map(a => (
                         <button
                           key={a.id}
                           type="button"
-                          className={createAppTab === a.slug ? 'active' : ''}
-                          onClick={() => setCreateAppTab(a.slug)}
+                          onClick={() => setAppTab(a.slug)}
                           style={{
                             padding: '0.5rem 1rem',
                             border: 'none',
-                            borderRadius: '8px',
-                            background: createAppTab === a.slug ? '#1e5cc7' : '#e5e7eb',
-                            color: createAppTab === a.slug ? '#fff' : '#0f172a',
+                            borderRadius: '6px',
+                            background: appTab === a.slug ? '#1e5cc7' : '#e5e7eb',
+                            color: appTab === a.slug ? '#fff' : '#0f172a',
                             cursor: 'pointer',
                             fontSize: '0.9rem',
                             fontWeight: 600,
-                            marginRight: '0.5rem',
+                            whiteSpace: 'nowrap',
                           }}
                         >
                           {a.name}
@@ -597,253 +558,52 @@ export default function AdminOrgsPage() {
                       ))}
                   </div>
 
-                  <div style={{ marginBottom: '1rem' }}>
-                    <p style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '0.75rem' }}>
-                      {createAppTab} menus{' '}
-                      <SectionChip>{(createEnabledByApp[createAppTab] || []).length}</SectionChip>
-                    </p>
-                    <div className="admin-menu-grid">
-                      {(createMenusByApp[createAppTab] || []).map(m => (
-                        <label key={m.id} className="admin-menu-item">
-                          <input
-                            type="checkbox"
-                            checked={(createEnabledByApp[createAppTab] || []).includes(m.id)}
-                            onChange={() => toggleCreateMenu(createAppTab, m.id)}
-                          />
-                          <span>
-                            {m.label} <span className="admin-meta">({m.sectionLabel})</span>
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-                    <button
-                      type="button"
-                      className="admin-btn"
-                      onClick={() => setCreateStep(2)}
-                      disabled={savingCreate}
-                      style={{
-                        background: '#e5e7eb',
-                        color: '#0f172a',
-                        padding: '0.5rem 1rem',
-                        border: 'none',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Back
-                    </button>
-                    <button
-                      type="button"
-                      className="admin-btn"
-                      onClick={() => void createOrg()}
-                      disabled={savingCreate}
-                      style={{
-                        background: '#1e5cc7',
-                        color: '#fff',
-                        padding: '0.5rem 1rem',
-                        border: 'none',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {savingCreate ? 'Creating…' : 'Create Organization'}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Modal */}
-      {editOpen && (
-        <div
-          className="modal-bg open admin-modal-wrap"
-          onClick={() => setEditOpen(false)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 50,
-          }}
-        >
-          <div className="modal-shell" onClick={e => e.stopPropagation()}>
-            <div
-              className="modal-hd modal-hd--blue"
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '1rem',
-                background: '#1e5cc7',
-                color: '#fff',
-                borderRadius: '8px 8px 0 0',
-              }}
-            >
-              <span className="modal-title">Edit Organization</span>
-              <button
-                className="modal-close"
-                onClick={() => setEditOpen(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#fff',
-                  fontSize: '1.5rem',
-                  cursor: 'pointer',
-                }}
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="modal-body">
-              {editLoading && <LoadingState variant="inline" />}
-
-              {!editLoading && (
-                <div className="admin-form">
-                  <label>
-                    Name
-                    <input value={editName} onChange={e => setEditName(e.target.value)} required />
-                  </label>
-                  <label>
-                    Slug
-                    <input value={editSlug} onChange={e => setEditSlug(e.target.value)} placeholder="optional" />
-                  </label>
-                  <label>
-                    Status
-                    <select value={editStatus} onChange={e => setEditStatus(e.target.value)}>
-                      <option value="active">active</option>
-                      <option value="suspended">suspended</option>
-                    </select>
-                  </label>
-
-                  <p style={{ marginTop: '1.5rem', marginBottom: '1rem', fontWeight: 600 }}>
-                    Apps for this organization:
-                  </p>
-
-                  <div className="admin-internal-tabs" style={{ marginBottom: '1.5rem' }}>
-                    {apps.map(a => (
-                      <button
-                        key={a.id}
-                        type="button"
-                        className={editAppTab === a.slug ? 'active' : ''}
-                        onClick={() => setEditAppTab(a.slug)}
-                        style={{
-                          padding: '0.5rem 1rem',
-                          border: 'none',
-                          borderRadius: '8px',
-                          background: editAppTab === a.slug ? '#1e5cc7' : '#e5e7eb',
-                          color: editAppTab === a.slug ? '#fff' : '#0f172a',
-                          cursor: 'pointer',
-                          fontSize: '0.9rem',
-                          fontWeight: 600,
-                          marginRight: '0.5rem',
-                        }}
-                      >
-                        {a.name}
-                        {editSelectedApps[a.slug] ? ' ✓' : ''}
-                      </button>
-                    ))}
-                  </div>
-
-                  {editSelectedApps[editAppTab] && (
-                    <div style={{ marginBottom: '1.5rem' }}>
-                      <p style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '0.75rem' }}>
-                        Menus for {editAppTab}{' '}
-                        <SectionChip>{(editEnabledByApp[editAppTab] || []).length}</SectionChip>
+                  {appTab && (
+                    <div>
+                      <p style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.75rem', color: '#6b7280' }}>
+                        Menus for {apps.find(a => a.slug === appTab)?.name}{' '}
+                        <span style={{ fontWeight: 700, color: '#0f172a' }}>
+                          ({(enabledByApp[appTab] || []).length} / {(menusByApp[appTab] || []).length})
+                        </span>
                       </p>
-                      <div className="admin-menu-grid">
-                        {(editMenusByApp[editAppTab] || []).map(m => (
-                          <label key={m.id} className="admin-menu-item">
+                      <div style={{ display: 'grid', gap: '0.5rem', maxHeight: '300px', overflowY: 'auto' }}>
+                        {(menusByApp[appTab] || []).map(m => (
+                          <label
+                            key={m.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              gap: '0.75rem',
+                              padding: '0.75rem',
+                              border: '1px solid #e5e7eb',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              background: '#f9fafb',
+                            }}
+                          >
                             <input
                               type="checkbox"
-                              checked={(editEnabledByApp[editAppTab] || []).includes(m.id)}
-                              onChange={() => toggleEditMenu(editAppTab, m.id)}
+                              checked={(enabledByApp[appTab] || []).includes(m.id)}
+                              onChange={() => toggleMenu(appTab, m.id)}
+                              style={{ width: '1rem', height: '1rem', cursor: 'pointer', marginTop: '0.1rem', flexShrink: 0 }}
                             />
-                            <span>
-                              {m.label} <span className="admin-meta">({m.sectionLabel})</span>
-                            </span>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.9rem' }}>{m.label}</div>
+                              <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                                {m.sectionLabel} • {m.path}
+                              </div>
+                            </div>
                           </label>
                         ))}
                       </div>
                     </div>
                   )}
-
-                  <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-                    <button
-                      type="button"
-                      className="admin-btn-danger"
-                      onClick={() => setConfirmDeleteOpen(true)}
-                      disabled={deleting || savingEdit}
-                      style={{
-                        marginRight: 'auto',
-                        padding: '0.5rem 1rem',
-                        border: 'none',
-                        borderRadius: '8px',
-                        background: '#b91c1c',
-                        color: '#fff',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Delete
-                    </button>
-                    <button
-                      type="button"
-                      className="admin-btn"
-                      onClick={() => setEditOpen(false)}
-                      disabled={savingEdit}
-                      style={{
-                        background: '#e5e7eb',
-                        color: '#0f172a',
-                        padding: '0.5rem 1rem',
-                        border: 'none',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      className="admin-btn"
-                      onClick={() => void saveEdit()}
-                      disabled={savingEdit}
-                      style={{
-                        background: '#1e5cc7',
-                        color: '#fff',
-                        padding: '0.5rem 1rem',
-                        border: 'none',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {savingEdit ? 'Saving…' : 'Save'}
-                    </button>
-                  </div>
                 </div>
               )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <ConfirmDialog
-        open={confirmDeleteOpen}
-        title="Delete organization?"
-        description="This will remove the organization and all its menu assignments. This cannot be undone."
-        confirmText="Delete"
-        tone="danger"
-        busy={deleting}
-        onCancel={() => setConfirmDeleteOpen(false)}
-        onConfirm={() => void deleteOrg()}
-      />
+            </form>
+          </ModalShell>
+        )}
+      </div>
     </>
   )
 }
