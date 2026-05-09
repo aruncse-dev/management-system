@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { and, eq } from 'drizzle-orm'
-import { getDb, orgMembers, organizations } from '@fintracker-vault/db'
+import { eq } from 'drizzle-orm'
+import { getDb, organizations, users } from '@fintracker-vault/db'
 import { requirePlatformAdmin } from '../../../../../../lib/adminGuard'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -22,8 +22,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === 'DELETE') {
     await db
-      .delete(orgMembers)
-      .where(and(eq(orgMembers.orgId, orgId), eq(orgMembers.userEmail, userEmail)))
+      .update(users)
+      .set({ orgId: null, role: 'member' })
+      .where(eq(users.email, userEmail))
     return res.status(200).json({ ok: true })
   }
 
@@ -34,9 +35,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!role) return res.status(400).json({ ok: false, error: 'role must be org_admin or member' })
 
     await db
-      .update(orgMembers)
+      .update(users)
       .set({ role })
-      .where(and(eq(orgMembers.orgId, orgId), eq(orgMembers.userEmail, userEmail)))
+      .where(eq(users.email, userEmail))
 
     return res.status(200).json({ ok: true })
   }

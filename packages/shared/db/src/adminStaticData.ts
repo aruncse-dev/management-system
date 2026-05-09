@@ -1,10 +1,12 @@
 /**
  * Static admin configuration — apps and menus.
  * These are NOT stored in the database but referenced by organization configurations.
- * Format: apps are static list, menus are organized by app and section.
+ * Single source of truth: @fintracker-vault/config/appMenus
  */
 
-export const STATIC_APPS = ['fintracker', 'vault', 'staff'] as const
+import { APP_SLUGS, APP_MENUS } from '@fintracker-vault/config'
+
+export const STATIC_APPS = APP_SLUGS
 export type AppSlug = typeof STATIC_APPS[number]
 
 export const APP_CONFIG: Record<AppSlug, { name: string; description: string; icon: string }> = {
@@ -25,27 +27,17 @@ export const APP_CONFIG: Record<AppSlug, { name: string; description: string; ic
   },
 }
 
-/** Menu catalog by app and section. Structure: { [app]: { [section]: [menuIds] } } */
-export const STATIC_MENUS: Record<AppSlug, Record<string, string[]>> = {
-  fintracker: {
-    'Overview': ['dashboard'],
-    'Monthly': ['budget', 'transactions', 'credits', 'accounts'],
-    'Save & Borrow': ['savings', 'lending', 'loans'],
-    'Invest': ['gold', 'investments', 'stocks', 'mutualfunds'],
-    'Life': ['subscriptions', 'bommi'],
-    'System': ['settings', 'components'],
-  },
-  vault: {
-    'Vault': ['vault', 'vaultapps'],
-    'Family': ['persons', 'documents'],
-    'Wellness': ['health', 'habits'],
-    'Coverage': ['insurance'],
-    'System': ['vaultsettings'],
-  },
-  staff: {
-    'Menu': ['staff-attendance', 'staff', 'staff-settings'],
-  },
-}
+/** Menu catalog by app and section. Converts from { app: { section: [items] } } to { app: { section: [menuIds] } } format. */
+export const STATIC_MENUS: Record<AppSlug, Record<string, string[]>> = (() => {
+  const result: Partial<Record<AppSlug, Record<string, string[]>>> = {}
+  for (const [app, sections] of Object.entries(APP_MENUS) as [AppSlug, Record<string, { slug: string; label: string }[]>][]) {
+    result[app] = {}
+    for (const [section, items] of Object.entries(sections)) {
+      result[app]![section] = items.map(item => item.slug)
+    }
+  }
+  return result as Record<AppSlug, Record<string, string[]>>
+})()
 
 /** Flat list of all available menus across all apps (for reference). */
 export const ALL_MENUS = Object.values(STATIC_MENUS).flatMap(appMenus =>

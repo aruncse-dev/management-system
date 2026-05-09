@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import { useCallback, useEffect, useState } from 'react'
 import { ChevronLeft } from 'lucide-react'
 import { LoadingState } from '@fintracker-vault/ui'
+import { APP_SLUGS } from '@fintracker-vault/config'
 
 type OrgRow = {
   id: string
@@ -25,6 +26,20 @@ type MenuRow = {
   enabled?: boolean
 }
 
+// Build static app list
+function buildAppList(): AppRow[] {
+  const staticAppNames: Record<string, string> = {
+    fintracker: 'FinTracker',
+    vault: 'Vault',
+    staff: 'Staff',
+  }
+  return APP_SLUGS.map(slug => ({
+    id: slug,
+    slug,
+    name: staticAppNames[slug] || slug,
+  }))
+}
+
 export default function AdminOrgDetailPage() {
   const router = useRouter()
   const { id } = router.query as { id?: string }
@@ -42,16 +57,11 @@ export default function AdminOrgDetailPage() {
     setLoading(true)
     setError('')
     try {
-      const [orgRes, appsRes] = await Promise.all([
-        fetch(`/api/admin/orgs/${encodeURIComponent(id)}`, { credentials: 'same-origin' }),
-        fetch('/api/admin/apps', { credentials: 'same-origin' }),
-      ])
+      const orgRes = await fetch(`/api/admin/orgs/${encodeURIComponent(id)}`, { credentials: 'same-origin' })
       const orgJson = await orgRes.json()
-      const appsJson = await appsRes.json()
       if (!orgJson.ok) throw new Error(orgJson.error || 'Failed to load organization')
-      if (!appsJson.ok) throw new Error(appsJson.error || 'Failed to load apps')
 
-      const appRows = (appsJson.data || []) as AppRow[]
+      const appRows = buildAppList()
       setOrg(orgJson.data)
       setApps(appRows)
 

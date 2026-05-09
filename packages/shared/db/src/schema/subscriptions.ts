@@ -1,9 +1,8 @@
 import { boolean, date, numeric, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
-import { users } from './users'
 
 export const subscriptions = pgTable('subscriptions', {
   id: text('id').primaryKey(),
-  userEmail: text('user_email').notNull().references(() => users.email),
+  userEmail: text('user_email').notNull(),
   name: text('name').notNull(),
   category: text('category'),
   amount: numeric('amount', { precision: 10, scale: 2 }).notNull(),

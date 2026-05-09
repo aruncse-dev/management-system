@@ -1,9 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { eq } from 'drizzle-orm'
-import { getDb, orgMembers, organizations, users } from '@fintracker-vault/db'
+import { getDb, organizations, users } from '@fintracker-vault/db'
 import { requirePlatformAdmin } from '../../../../../lib/adminGuard'
 import { ensureUserRow } from '../../../../../lib/dbAuth'
-import { randomUUID } from 'crypto'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const actor = await requirePlatformAdmin(req, res)
@@ -20,17 +19,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === 'GET') {
     const rows = await db
       .select({
-        id: orgMembers.id,
-        orgId: orgMembers.orgId,
-        userEmail: orgMembers.userEmail,
-        role: orgMembers.role,
-        status: orgMembers.status,
-        createdAt: orgMembers.createdAt,
+        email: users.email,
         displayName: users.displayName,
+        role: users.role,
       })
-      .from(orgMembers)
-      .leftJoin(users, eq(orgMembers.userEmail, users.email))
-      .where(eq(orgMembers.orgId, orgId))
+      .from(users)
+      .where(eq(users.orgId, orgId))
 
     return res.status(200).json({ ok: true, data: rows })
   }
@@ -55,13 +49,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await ensureUserRow(email, displayName)
 
     try {
-      await db.insert(orgMembers).values({
-        id: randomUUID(),
-        orgId,
-        userEmail: email,
-        role,
-        status: 'active',
-      })
+      await db
+        .update(users)
+        .set({ orgId, role })
+        .where(eq(users.email, email))
     } catch (e) {
       const msg = e instanceof Error ? e.message : ''
       if (msg.includes('unique') || msg.includes('duplicate')) {

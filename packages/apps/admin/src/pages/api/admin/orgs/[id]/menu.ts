@@ -37,7 +37,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!Array.isArray(raw) || !raw.every(x => typeof x === 'string')) {
       return res.status(400).json({ ok: false, error: 'enabledMenuIds must be a string array' })
     }
-    await setOrgEnabledMenuIds(id, new Set(raw as string[]), appSlug)
+    await setOrgEnabledMenuIds(id, raw as string[], appSlug)
     const data = await getOrgMenuEditorState(id, appSlug)
     return res.status(200).json({ ok: true, data })
   }

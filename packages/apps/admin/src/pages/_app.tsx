@@ -6,7 +6,7 @@ import {
   SimpleAppNav,
   type SimpleAppNavSection,
 } from '@fintracker-vault/ui'
-import { AppWindow, FolderTree, LayoutGrid, Layers, Users } from 'lucide-react'
+import { LayoutGrid, Users } from 'lucide-react'
 import { getClientAuthEnv } from '../clientAuthEnv'
 import '@fintracker-vault/ui/styles'
 import '@fintracker-vault/ui/styles/admin'
@@ -22,9 +22,6 @@ export default function App({ Component, pageProps }: AppProps) {
     {
       heading: 'Admin',
       items: [
-        { path: '/admin/apps', label: 'Apps', icon: <AppWindow size={18} /> },
-        { path: '/admin/sections', label: 'Sections', icon: <Layers size={18} /> },
-        { path: '/admin/menus', label: 'Menus', icon: <FolderTree size={18} /> },
         { path: '/admin/orgs', label: 'Organizations', icon: <LayoutGrid size={18} /> },
         { path: '/admin/users', label: 'Users', icon: <Users size={18} /> },
       ],

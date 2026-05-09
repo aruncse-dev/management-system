@@ -450,7 +450,6 @@ body,
 
 .admin-card-item {
   border: 1px solid var(--admin-border, #e2e8f0);
-  border-left: 5px solid var(--navy, #1e5cc7);
   border-radius: 14px;
   padding: 0.8rem 0.9rem;
   background: var(--admin-card, #fff);

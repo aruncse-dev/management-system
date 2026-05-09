@@ -1,11 +1,10 @@
 import { boolean, jsonb, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
-import { organizations } from './orgs'
 
 /** User profile with org membership and authentication. */
 export const users = pgTable('users', {
   email: text('email').primaryKey(),
   displayName: text('display_name'),
-  orgId: text('org_id').references(() => organizations.id, { onDelete: 'set null' }),
+  orgId: text('org_id'),
   /** User role: `member` (within org), `org_admin` (manages org), `admin` (platform admin). */
   role: text('role').default('member').notNull(),
   status: text('status').default('active').notNull(),
