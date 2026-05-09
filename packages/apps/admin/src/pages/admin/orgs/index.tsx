@@ -322,7 +322,6 @@ export default function AdminOrgsPage() {
             title="Organizations"
             icon={<LayoutGrid size={16} />}
             rightChip={<SectionChip>{rows.length}</SectionChip>}
-            right={loading ? <LoadingState variant="inline" /> : null}
           >
             <div>
               {rows.length > 5 && (
@@ -430,66 +429,78 @@ export default function AdminOrgsPage() {
               {mode === 'configure' && (
                 <div>
                   <p className="admin-hint">Select apps for this organization.</p>
-                  <div className="admin-menu-grid">
+                  <div className="admin-internal-tabs">
                     {apps.map(a => (
-                      <label key={a.id} className="admin-menu-item">
-                        <input
-                          type="checkbox"
-                          checked={selectedApps[a.slug] || false}
-                          onChange={() => toggleApp(a.slug)}
-                        />
-                        <span>{a.name}</span>
-                      </label>
+                      <button
+                        key={a.id}
+                        type="button"
+                        className={selectedApps[a.slug] ? 'active' : ''}
+                        onClick={() => toggleApp(a.slug)}
+                      >
+                        {a.name}
+                      </button>
                     ))}
                   </div>
+                  <Spacer size={12} />
                 </div>
               )}
 
-              {mode === 'configure' && (
+              {mode === 'configure' && selectedApps[appTab] && appTab && (
                 <div>
-                  <p className="admin-hint">Choose menus per app.</p>
-
-                  <div className="admin-internal-tabs" role="tablist" aria-label="Selected app tabs">
+                  <p className="admin-hint">
+                    Menus for <strong>{apps.find(a => a.slug === appTab)?.name}</strong>
+                  </p>
+                  <div style={{ marginBottom: '0.75rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                     {apps
                       .filter(a => selectedApps[a.slug])
                       .map(a => (
                         <button
                           key={a.id}
                           type="button"
-                          role="tab"
-                          aria-selected={appTab === a.slug}
                           onClick={() => setAppTab(a.slug)}
-                          className={appTab === a.slug ? 'active' : ''}
+                          style={{
+                            padding: '0.5rem 1rem',
+                            borderRadius: '8px',
+                            border: 'none',
+                            background: appTab === a.slug ? '#1e5cc7' : '#e5e7eb',
+                            color: appTab === a.slug ? '#fff' : '#0f172a',
+                            cursor: 'pointer',
+                            fontSize: '0.9rem',
+                            fontWeight: appTab === a.slug ? 600 : 500,
+                          }}
                         >
                           {a.name}
                         </button>
                       ))}
                   </div>
 
-                  {appTab && (
-                    <div>
-                      <p className="admin-hint">
-                        Menus for {apps.find(a => a.slug === appTab)?.name}{' '}
-                        <strong>
-                          ({(enabledByApp[appTab] || []).length} / {(menusByApp[appTab] || []).length})
-                        </strong>
-                      </p>
-                      <div className="admin-menu-grid">
-                        {(menusByApp[appTab] || menuCatalogByApp[appTab] || []).map(m => (
-                          <label key={m.id} className="admin-menu-item">
-                            <input
-                              type="checkbox"
-                              checked={(enabledByApp[appTab] || []).includes(m.id)}
-                              onChange={() => toggleMenu(appTab, m.id)}
-                            />
-                            <span>
-                              {m.label} <span className="admin-meta">({m.sectionLabel})</span>
-                            </span>
-                          </label>
-                        ))}
-                      </div>
+                  <div>
+                    <p className="admin-hint">
+                      <span>
+                        {(enabledByApp[appTab] || []).length} / {(menusByApp[appTab] || menuCatalogByApp[appTab] || []).length} enabled
+                      </span>
+                    </p>
+                    <div className="admin-menu-grid">
+                      {(menusByApp[appTab] || menuCatalogByApp[appTab] || []).map(m => (
+                        <label key={m.id} className="admin-menu-item">
+                          <input
+                            type="checkbox"
+                            checked={(enabledByApp[appTab] || []).includes(m.id)}
+                            onChange={() => toggleMenu(appTab, m.id)}
+                          />
+                          <span>
+                            {m.label} <span className="admin-meta">({m.sectionLabel})</span>
+                          </span>
+                        </label>
+                      ))}
                     </div>
-                  )}
+                  </div>
+                </div>
+              )}
+
+              {mode === 'configure' && !appTab && (
+                <div style={{ padding: '1rem', textAlign: 'center', color: '#6b7280' }}>
+                  <p>Select an app above to configure its menus.</p>
                 </div>
               )}
               </form>
