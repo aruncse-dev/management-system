@@ -1,29 +1,25 @@
 import type { AppProps } from 'next/app'
 import Head from 'next/head'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
 import { AppAuthGate, Nav, type ModuleId, type NavDynamicMenuSection } from '@fintracker-vault/ui'
 import { getAppArea } from '../appPaths'
 import { StoreProvider } from '../store'
 import { getClientAuthEnv } from '../clientAuthEnv'
 import { OrgSwitcher } from '../components/OrgSwitcher'
+import {
+  MENU_CACHE_UPDATED_EVENT,
+  readMenuCache,
+  writeMenuCache,
+  type CachedProfileMenuRow,
+} from '../lib/profileMenuCache'
 import '../ui-kit/ui-kit.css'
 import '../styles/globals.css'
 
-type ProfileMenuRow = {
-  id: string
-  slug: string
-  label: string
-  icon: string | null
-  path: string
-  sectionSlug: string
-  sectionLabel: string
-  sortOrder: number
-}
-
-function groupNavMenu(menu: ProfileMenuRow[] | undefined | null): NavDynamicMenuSection[] | null {
-  if (!menu?.length) return null
-  const map = new Map<string, ProfileMenuRow[]>()
+/** Empty array ⇒ drawer shows only Settings, UI Kit, Logout (no org menu items). */
+function groupNavMenu(menu: CachedProfileMenuRow[] | undefined | null): NavDynamicMenuSection[] {
+  if (!menu?.length) return []
+  const map = new Map<string, CachedProfileMenuRow[]>()
   for (const m of menu) {
     const arr = map.get(m.sectionLabel) ?? []
     arr.push(m)
@@ -59,7 +55,22 @@ const PAGE_TITLES: Record<ModuleId, string> = {
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter()
   const [lendingSheet, setLendingSheet] = useState('Lending')
-  const [dynamicMenu, setDynamicMenu] = useState<NavDynamicMenuSection[] | null>(null)
+  const [dynamicMenu, setDynamicMenu] = useState<NavDynamicMenuSection[]>([])
+
+  useLayoutEffect(() => {
+    const c = readMenuCache()
+    if (c?.menu?.length) setDynamicMenu(groupNavMenu(c.menu))
+  }, [])
+
+  useEffect(() => {
+    const onMenuCacheUpdated = () => {
+      const c = readMenuCache()
+      setDynamicMenu(groupNavMenu(c?.menu ?? []))
+    }
+    window.addEventListener(MENU_CACHE_UPDATED_EVENT, onMenuCacheUpdated)
+    return () => window.removeEventListener(MENU_CACHE_UPDATED_EVENT, onMenuCacheUpdated)
+  }, [])
+
   const { googleClientId: gid } = getClientAuthEnv()
   const googleClientId = gid
 
@@ -133,9 +144,11 @@ export default function App({ Component, pageProps }: AppProps) {
         const r = await fetch('/api/profile', { credentials: 'same-origin' })
         const j = await r.json()
         if (cancelled || !j.ok) return
-        setDynamicMenu(groupNavMenu(j.data?.menu))
+        const menu = (j.data?.menu ?? []) as CachedProfileMenuRow[]
+        writeMenuCache(j.data?.activeOrgId ?? null, menu)
+        setDynamicMenu(groupNavMenu(menu))
       } catch {
-        if (!cancelled) setDynamicMenu(null)
+        if (!cancelled) setDynamicMenu([])
       }
     })()
     return () => {

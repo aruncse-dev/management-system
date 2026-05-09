@@ -9,7 +9,7 @@ This file is a concise, generic guide for anyone working in this repository.
 - `.cursor/rules/google-oauth-env.mdc` — allowed Google OAuth env keys
 - `.cursor/rules/git-pr-only-main.mdc` — PR-only workflow for `main`
 - `docs/gas-recovery.md` — legacy Google Apps Script (removed from tree; recover from tag/zip only if needed)
-- `docs/neon-schema-migrations.md` — ordered SQL migrations for Neon (`schema_migrations`)
+- `docs/neon-schema-migrations.md` — Neon schema via Drizzle (`drizzle:push`)
 
 ## Repo Overview
 

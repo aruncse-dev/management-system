@@ -76,7 +76,6 @@ export default function AdminOrgsPage() {
   const [mode, setMode] = useState<'add' | 'edit' | 'configure' | null>(null)
   const [editingId, setEditingId] = useState('')
   const [form, setForm] = useState({ name: '' })
-  const [selectedApps, setSelectedApps] = useState<Record<string, boolean>>({})
   const [appTab, setAppTab] = useState('')
   const [menusByApp, setMenusByApp] = useState<Record<string, MenuRow[]>>({})
   const [enabledByApp, setEnabledByApp] = useState<Record<string, string[]>>({})
@@ -131,7 +130,6 @@ export default function AdminOrgsPage() {
     setMode('add')
     setEditingId('')
     setForm({ name: '' })
-    setSelectedApps({})
     setMenusByApp({})
     setEnabledByApp({})
     setAppTab(apps[0]?.slug || '')
@@ -150,7 +148,6 @@ export default function AdminOrgsPage() {
   async function startConfigure(orgId: string) {
     setMode('configure')
     setEditingId(orgId)
-    setSelectedApps({})
     setMenusByApp({})
     setEnabledByApp({})
     setAppTab(apps[0]?.slug || '')
@@ -166,7 +163,6 @@ export default function AdminOrgsPage() {
         if (!menuJson.ok) throw new Error(menuJson.error || `Failed to load ${app.slug} menus`)
         const menuRows = (menuJson.data || []) as MenuRow[]
         const enabledIds = menuRows.filter(m => m.enabled).map(m => m.id)
-        setSelectedApps(prev => ({ ...prev, [app.slug]: enabledIds.length > 0 }))
         setMenusByApp(prev => ({ ...prev, [app.slug]: menuRows }))
         setEnabledByApp(prev => ({
           ...prev,
@@ -192,14 +188,9 @@ export default function AdminOrgsPage() {
     setMode(null)
     setEditingId('')
     setForm({ name: '' })
-    setSelectedApps({})
     setMenusByApp({})
     setEnabledByApp({})
     setDeleteConfirm(false)
-  }
-
-  function toggleApp(appSlug: string) {
-    setSelectedApps(prev => ({ ...prev, [appSlug]: !prev[appSlug] }))
   }
 
   function toggleMenu(appSlug: string, menuId: string) {
@@ -247,7 +238,7 @@ export default function AdminOrgsPage() {
         if (!j.ok) throw new Error(j.error || 'Save failed')
       } else if (mode === 'configure') {
         for (const app of apps) {
-          const enabledMenuIds = selectedApps[app.slug] ? enabledByApp[app.slug] || [] : []
+          const enabledMenuIds = enabledByApp[app.slug] ?? []
           const menuRes = await fetch(`/api/admin/orgs/${encodeURIComponent(editingId)}/menu`, {
             method: 'PUT',
             credentials: 'same-origin',
@@ -394,7 +385,11 @@ export default function AdminOrgsPage() {
 
       {mode && (
         <div className="modal-bg open" onClick={closeForm}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
+          <div
+            className={`admin-modal-wrap${mode === 'configure' ? ' admin-modal-wrap--config' : ''}`}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="modal modal-shell">
             <div
               className="modal-hd modal-hd--blue"
             >
@@ -433,28 +428,31 @@ export default function AdminOrgsPage() {
                       Select Apps & Menus
                     </h3>
                     <div className="admin-internal-tabs">
-                      {apps.map(a => (
-                        <button
-                          key={a.id}
-                          type="button"
-                          className={selectedApps[a.slug] ? 'active' : ''}
-                          onClick={() => {
-                            toggleApp(a.slug)
-                            setAppTab(a.slug)
-                          }}
-                        >
-                          {a.name}
-                          {selectedApps[a.slug] && (
-                            <span style={{ marginLeft: '0.5rem', opacity: 0.9, fontSize: '0.8rem' }}>
-                              ({(enabledByApp[a.slug] || []).length}/{(menusByApp[a.slug] || menuCatalogByApp[a.slug] || []).length})
-                            </span>
-                          )}
-                        </button>
-                      ))}
+                      {apps.map(a => {
+                        const total = (menusByApp[a.slug] || menuCatalogByApp[a.slug] || []).length
+                        const enabled = (enabledByApp[a.slug] || []).length
+                        const isEnabled = enabled > 0
+                        return (
+                          <button
+                            key={a.id}
+                            type="button"
+                            className={isEnabled ? 'active' : ''}
+                            onClick={() => setAppTab(a.slug)}
+                            aria-pressed={appTab === a.slug}
+                          >
+                            {a.name}
+                            {total > 0 && (
+                              <span style={{ marginLeft: '0.5rem', opacity: 0.9, fontSize: '0.8rem' }}>
+                                ({enabled}/{total})
+                              </span>
+                            )}
+                          </button>
+                        )
+                      })}
                     </div>
                   </div>
 
-                  {appTab && selectedApps[appTab] && (menusByApp[appTab] || menuCatalogByApp[appTab] || []).length > 0 && (
+                  {appTab && (menusByApp[appTab] || menuCatalogByApp[appTab] || []).length > 0 && (
                     <div>
                       <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.9rem', color: '#6b7280' }}>
                         Menus for <strong>{apps.find(a => a.slug === appTab)?.name}</strong>
@@ -504,6 +502,7 @@ export default function AdminOrgsPage() {
               >
                 {mode === 'add' ? 'Create' : 'Save'}
               </button>
+            </div>
             </div>
           </div>
         </div>

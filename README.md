@@ -36,7 +36,7 @@ All apps share UI/components via a pnpm monorepo. Frontend + API deploy to **Ver
    export DATABASE_URL="postgresql://..."
    pnpm --filter @fintracker-vault/db run drizzle:push
    ```
-   For versioned SQL migrations (e.g. menu catalog / apps), see [docs/neon-schema-migrations.md](./docs/neon-schema-migrations.md).
+   Schema is defined in `packages/shared/db/src/schema` and applied with `drizzle:push` (see [docs/neon-schema-migrations.md](./docs/neon-schema-migrations.md)).
 
 4. **Run FinTracker**
    ```bash

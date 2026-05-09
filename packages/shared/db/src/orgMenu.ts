@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm'
 import { getDb } from './neon'
-import { STATIC_MENUS, STATIC_APPS, AppSlug, getMenusForApps } from './adminStaticData'
+import { STATIC_MENUS, STATIC_APPS, AppSlug } from './adminStaticData'
+import { resolveMenuCatalogRow } from './menuCatalogResolve'
 import { organizations } from './schema/orgs'
 
 /**
@@ -71,12 +72,13 @@ export async function getEnabledOrgMenu(orgId: string, appSlug: string): Promise
   for (const [sectionLabel, menuIds] of Object.entries(appMenus)) {
     for (const menuId of menuIds) {
       if (enabledMenuIds.has(menuId)) {
+        const row = resolveMenuCatalogRow(appSlug, menuId)
         result.push({
           id: menuId,
           slug: menuId,
-          label: menuId.charAt(0).toUpperCase() + menuId.slice(1),
-          icon: null,
-          path: `/${menuId}`,
+          label: row?.label ?? menuId.charAt(0).toUpperCase() + menuId.slice(1),
+          icon: row?.icon ?? null,
+          path: row?.path ?? `/${menuId}`,
           sectionSlug: sectionLabel.toLowerCase().replace(/\s+/g, '-'),
           sectionLabel,
           sortOrder: sortOrder++,
@@ -130,14 +132,15 @@ export async function getOrgMenuEditorState(
 
     for (const [sectionLabel, menuIds] of Object.entries(appMenus)) {
       for (const menuId of menuIds) {
+        const row = resolveMenuCatalogRow(app, menuId)
         result.push({
           id: menuId,
           slug: menuId,
           sectionSlug: sectionLabel.toLowerCase().replace(/\s+/g, '-'),
           sectionLabel,
-          label: menuId.charAt(0).toUpperCase() + menuId.slice(1),
-          icon: null,
-          path: `/${menuId}`,
+          label: row?.label ?? menuId.charAt(0).toUpperCase() + menuId.slice(1),
+          icon: row?.icon ?? null,
+          path: row?.path ?? `/${menuId}`,
           sortOrder: sortOrder++,
           enabled: enabledMenuIds.has(menuId),
         })

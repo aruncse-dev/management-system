@@ -1,10 +1,9 @@
-# Neon schema migrations (SQL)
+# Neon schema
 
-Apply in order against `DATABASE_URL` (see comments at top of each file for the exact `psql` command).
+There are **no** checked-in SQL migration files under `packages/shared/db/migrations/`. Sync the database from the Drizzle schema with `DATABASE_URL` set:
 
-| File | Version | Summary |
-|------|---------|---------|
-| [`packages/shared/db/migrations/0001_menu_catalog_org_assignments.sql`](../packages/shared/db/migrations/0001_menu_catalog_org_assignments.sql) | `001` | `menu_catalog`, `org_menu_assignments`, slim `users` |
-| [`packages/shared/db/migrations/0002_apps_sections_menu_restructure.sql`](../packages/shared/db/migrations/0002_apps_sections_menu_restructure.sql) | `002` | `apps`, `menu_sections`, `menu_apps`, `menu_catalog` columns (`slug`, `icon`, `path`, `section_id`) |
+```bash
+pnpm --filter @fintracker-vault/db run drizzle:push
+```
 
-Applied versions are recorded in `schema_migrations`.
+Older databases may still have a `schema_migrations` table from historical manual SQL; it is not required for new setups.

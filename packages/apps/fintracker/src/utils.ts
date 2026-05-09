@@ -1,4 +1,4 @@
-import { ACCOUNTS, CC_MODES, OTHER_CR, ALL_CR, MNS, CATEGORIES, INCOME_CATS } from './config'
+import { ACCOUNTS, CC_MODES, OTHER_CR, ALL_CR, MNS, CATEGORIES, INCOME_CATS, BUDGET_GLOBAL_MONTH_KEY } from './config'
 import type { Budget, BudgetEntry, OpeningBal, Transaction } from './types'
 
 export function INR(n: number) {
@@ -42,6 +42,13 @@ export function mergeCategoriesWithBudgetNames(staticList: readonly string[], bu
   return out
 }
 
+/** API / DB month key: `YYYY-MM` (e.g. May 2026 → `2026-05`). */
+export function monthYearApiKey(month: string, year: string): string {
+  const i = MNS.indexOf(month as (typeof MNS)[number])
+  if (i < 0) throw new Error('Invalid month')
+  return `${year}-${String(i + 1).padStart(2, '0')}`
+}
+
 export function expenseCategoriesWithBudget(budget: Budget): string[] {
   return mergeCategoriesWithBudgetNames(CATEGORIES, budget)
 }
@@ -62,6 +69,10 @@ export function coerceBudget(raw: unknown): Budget {
           id: String(o.id ?? ''),
           name,
           amount: Number(o.amount) || 0,
+          monthYear:
+            typeof o.monthYear === 'string' && o.monthYear.trim()
+              ? o.monthYear.trim()
+              : BUDGET_GLOBAL_MONTH_KEY,
         }
       })
       .filter((e): e is BudgetEntry => e != null)
@@ -71,6 +82,7 @@ export function coerceBudget(raw: unknown): Budget {
       id: `legacy:${name}`,
       name,
       amount: Number(amount) || 0,
+      monthYear: BUDGET_GLOBAL_MONTH_KEY,
     }))
   }
   return []

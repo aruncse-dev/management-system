@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { ChevronLeft, ChevronRight, X as XIcon } from 'lucide-react'
 import { useRouter } from 'next/router'
 import { useStore } from '../store'
@@ -10,7 +10,8 @@ import Budget from './budget'
 import Credits from './credits'
 import Accounts from './accounts'
 import { MNS } from '../config'
-import { expenseCategoriesWithBudget, incomeCategoriesWithBudget } from '../utils'
+import { expenseCategoriesWithBudget, incomeCategoriesWithBudget, monthYearApiKey } from '../utils'
+import { BUDGET_GLOBAL_MONTH_KEY } from '../config'
 
 type TabId = 'dash' | 'txns' | 'bud' | 'cc' | 'acct'
 
@@ -29,11 +30,14 @@ export default function Monthly() {
   const [tab, setTab] = useState<TabId>('dash')
   const [modalOpen, setModalOpen] = useState(false)
   const [editRow, setEditRow] = useState<typeof state.rows[0] | null>(null)
-  const [status, setStatus] = useState('')
+  const [snackbar, setSnackbar] = useState<{ msg: string; variant: 'success' | 'error' | 'info' } | null>(null)
+  const snackbarTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [budgetAddOpen, setBudgetAddOpen] = useState(false)
   const [budgetName, setBudgetName] = useState('')
   const [budgetVal, setBudgetVal] = useState('')
   const [budgetSaving, setBudgetSaving] = useState(false)
+  /** `global` = `__global__` row; `month` = override for current nav month only */
+  const [budgetAddScope, setBudgetAddScope] = useState<'global' | 'month'>('global')
 
   const goTab = useCallback(
     (id: TabId) => {
@@ -59,8 +63,23 @@ export default function Monthly() {
   }, [router.isReady, router.pathname, router.query.tab, router])
 
   const showStatus = useCallback((msg: string) => {
-    setStatus(msg)
-    setTimeout(() => setStatus(''), 3000)
+    if (snackbarTimerRef.current) clearTimeout(snackbarTimerRef.current)
+    const variant: 'success' | 'error' | 'info' = msg.includes('✓')
+      ? 'success'
+      : msg.includes('⚠')
+        ? 'error'
+        : 'info'
+    setSnackbar({ msg, variant })
+    snackbarTimerRef.current = setTimeout(() => {
+      setSnackbar(null)
+      snackbarTimerRef.current = null
+    }, 3200)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (snackbarTimerRef.current) clearTimeout(snackbarTimerRef.current)
+    }
   }, [])
 
   const loadMonth = useCallback(async (month: string, year: string, forceRefresh = false) => {
@@ -114,26 +133,29 @@ export default function Monthly() {
     }
     setBudgetSaving(true)
     try {
-      const entry = await api.addBudgetEntry(name, val)
+      const monthYear =
+        budgetAddScope === 'month' ? monthYearApiKey(state.month, state.year) : BUDGET_GLOBAL_MONTH_KEY
+      await api.addBudgetEntry(name, val, monthYear)
       api.invalidateCache({ action: 'getBudget' })
       api.invalidateCache({ action: 'init' })
-      dispatch({ type: 'SET_BUDGET', payload: [...state.budget, entry] })
+      const init = await api.init(state.month, state.year)
+      dispatch({ type: 'SET_BUDGET', payload: init.budget })
       showStatus('✓ Budget saved')
       setBudgetAddOpen(false)
       setBudgetName('')
       setBudgetVal('')
+      setBudgetAddScope('global')
     } catch (e) {
       showStatus('⚠ ' + (e instanceof Error ? e.message : 'Save failed'))
     } finally {
       setBudgetSaving(false)
     }
-  }, [budgetName, budgetVal, dispatch, showStatus, state.budget])
+  }, [budgetAddScope, budgetName, budgetVal, dispatch, showStatus, state.month, state.year])
 
   return (
     <div className="monthly-wrap">
       {/* Month nav sub-header */}
       <nav className="nav-sub">
-        {status && <span className="nav-status show">{status}</span>}
         <div className="nav-month" style={{ flex: 1, justifyContent: 'center' }}>
           <button className="nav-arrow" onClick={() => changeMonth(-1)}><ChevronLeft size={16} /></button>
           <div className="nav-ml">
@@ -191,6 +213,17 @@ export default function Monthly() {
                 <div style={{fontSize:12,fontWeight:600,color:'var(--muted)',marginBottom:5,textTransform:'uppercase',letterSpacing:.4}}>Budget Amount (₹)</div>
                 <input className="form-inp" type="number" placeholder="0" value={budgetVal} onChange={e => setBudgetVal(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addBudget() }} />
               </div>
+              <div>
+                <div style={{fontSize:12,fontWeight:600,color:'var(--muted)',marginBottom:8,textTransform:'uppercase',letterSpacing:.4}}>Applies to</div>
+                <select
+                  className="form-inp"
+                  value={budgetAddScope}
+                  onChange={e => setBudgetAddScope(e.target.value === 'month' ? 'month' : 'global')}
+                >
+                  <option value="global">All months (default template)</option>
+                  <option value="month">{state.month} {state.year} only</option>
+                </select>
+              </div>
             </div>
             <div className="modal-foot">
               <div className="modal-foot-l" />
@@ -218,6 +251,12 @@ export default function Monthly() {
           }}
           showStatus={showStatus}
         />
+      )}
+
+      {snackbar && (
+        <div className="fintracker-snackbar" role="status" aria-live="polite" data-variant={snackbar.variant}>
+          {snackbar.msg}
+        </div>
       )}
     </div>
   )

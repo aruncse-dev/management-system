@@ -21,6 +21,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       : ''
     if (!email) return res.status(400).json({ ok: false, error: 'Email is required' })
 
+    const orgId =
+      typeof (body as { orgId?: unknown }).orgId === 'string'
+        ? (body as { orgId: string }).orgId.trim()
+        : ''
+    if (!orgId) return res.status(400).json({ ok: false, error: 'Organization is required' })
+
     const displayName =
       typeof (body as { displayName?: unknown }).displayName === 'string'
         ? (body as { displayName: string }).displayName
@@ -31,14 +37,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .values({
         email,
         displayName,
-        role: typeof (body as { role?: unknown }).role === 'string' ? (body as { role: string }).role : 'user',
+        orgId,
         status: 'active',
       })
       .onConflictDoUpdate({
         target: users.email,
         set: {
           displayName,
-          role: typeof (body as { role?: unknown }).role === 'string' ? (body as { role: string }).role : 'user',
+          orgId,
           updatedAt: new Date(),
         },
       })

@@ -3,6 +3,9 @@ export const CC_MODES = ['ICICI', 'HDFC']
 export const OTHER_CR = ['Bommi', 'Ramya', 'Others']
 export const ALL_CR = [...CC_MODES, ...OTHER_CR]
 export const MNS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/** `budget.month_year` value for defaults shared across months (month-specific rows override per `YYYY-MM`). */
+export const BUDGET_GLOBAL_MONTH_KEY = '__global__' as const
 export const TXN_PAGE = 40
 
 export const CATEGORIES = [

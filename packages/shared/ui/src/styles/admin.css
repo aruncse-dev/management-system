@@ -496,19 +496,43 @@ body,
   height: 1rem;
 }
 
+/* Full-bleed horizontal overlay (no side gutters); vertical + safe-area only */
+.modal-bg.open {
+  padding: max(20px, env(safe-area-inset-top, 0px)) 0
+    max(20px, env(safe-area-inset-bottom, 0px));
+}
+
 .modal-bg .admin-modal-wrap {
-  height: 80vh;
-  max-height: 80vh;
+  width: 100%;
+  max-width: min(720px, 100%);
+  height: auto;
+  max-height: min(86vh, 820px);
   display: flex;
   flex-direction: column;
+  margin-inline: env(safe-area-inset-left, 0px) env(safe-area-inset-right, 0px);
+  overflow-y: auto;
+}
+
+/* Apps & menus configure: fixed tall sheet with scroll inside body */
+.modal-bg .admin-modal-wrap.admin-modal-wrap--config {
+  height: 80vh;
+  max-height: 80vh;
+  overflow: hidden;
 }
 
 .admin-modal-wrap .modal-shell {
-  width: min(560px, 100%);
+  width: 100%;
   display: flex;
   flex-direction: column;
+  height: auto;
+  max-height: none;
+  min-height: 0;
+}
+
+.admin-modal-wrap.admin-modal-wrap--config .modal-shell {
   height: 100%;
   max-height: 100%;
+  overflow: hidden;
 }
 
 .admin-modal-wrap .modal-hd {
@@ -516,16 +540,34 @@ body,
 }
 
 .admin-modal-wrap .modal-body {
-  padding: 14px 16px 16px;
-  overflow-y: auto;
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow-y: visible;
+}
+
+.admin-modal-wrap.admin-modal-wrap--config .modal-body {
   flex: 1;
   min-height: 0;
+  overflow-y: auto;
 }
 
 .admin-modal-wrap .modal-foot {
-  padding: 12px 16px 14px;
   flex-shrink: 0;
-  border-top: 1px solid var(--admin-border, #e5e7eb);
+  background: var(--admin-card, #fff);
+  border-top: 1px solid var(--admin-border, #e2e8f0);
+}
+
+/* Ghost secondary actions; keep solid fills for primary / danger only */
+.admin-modal-wrap .modal-foot .btn-cancel,
+.admin-modal-wrap .modal-foot .btn:not(.btn-green):not(.btn-red) {
+  background: transparent;
+  color: var(--navy, #1e5cc7);
+  border: 1px solid var(--admin-border, #cbd5e1);
+}
+
+.admin-modal-wrap .modal-foot .btn-green {
+  border-color: transparent;
 }
 
 /* Ensure savings-style row accent border is clearly visible in admin lists. */
@@ -535,6 +577,11 @@ body,
 }
 
 @media (max-width: 640px) {
+  .modal-bg.open {
+    padding: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
   .admin-members li {
     flex-direction: column;
     align-items: stretch;

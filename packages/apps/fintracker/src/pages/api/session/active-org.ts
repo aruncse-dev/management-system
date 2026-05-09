@@ -1,8 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getIronSession } from 'iron-session'
-import { and, eq } from 'drizzle-orm'
 import type { FtSessionData } from '@fintracker-vault/auth'
-import { getDb, orgMembers } from '@fintracker-vault/db'
+import { listOrgsForUserEmail } from '@fintracker-vault/db'
 import { getSessionOptions } from '../../../lib/session'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -24,20 +23,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ ok: false, error: 'Missing orgId' })
   }
 
-  const db = getDb()
-  const [row] = await db
-    .select({ id: orgMembers.id })
-    .from(orgMembers)
-    .where(
-      and(
-        eq(orgMembers.orgId, orgId),
-        eq(orgMembers.userEmail, session.email.toLowerCase()),
-        eq(orgMembers.status, 'active'),
-      ),
-    )
-    .limit(1)
-
-  if (!row) {
+  const orgs = await listOrgsForUserEmail(session.email.toLowerCase())
+  if (!orgs.some((o) => o.id === orgId)) {
     return res.status(403).json({ ok: false, error: 'Not a member of this organization' })
   }
 

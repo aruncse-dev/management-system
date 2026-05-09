@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { clearMenuCache } from '../lib/profileMenuCache'
 
 type Org = { id: string; name: string }
 
@@ -37,6 +38,7 @@ export function OrgSwitcher() {
       const j = await r.json()
       if (j.ok) {
         setActiveId(orgId)
+        clearMenuCache()
         window.location.reload()
       }
     } finally {

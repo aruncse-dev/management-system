@@ -85,16 +85,19 @@ export interface InitData {
   openingBal: OpeningBal;
 }
 
-let _initInflight: Promise<InitData> | null = null;
+const _initInflightByKey = new Map<string, Promise<InitData>>();
 
-/** One shared in-flight `init` so budget/months hydrate app-wide without duplicate requests. */
-export function loadInitDataDeduped(): Promise<InitData> {
-  if (!_initInflight) {
-    _initInflight = get<InitData>('init').finally(() => {
-      _initInflight = null;
+/** Loads `init` for the calendar month (budget merges global + month-specific overrides). */
+export function loadInitDataDeduped(month: string, year: string): Promise<InitData> {
+  const key = `${month}\t${year}`;
+  let p = _initInflightByKey.get(key);
+  if (!p) {
+    p = get<InitData>('init', { month, year }).finally(() => {
+      _initInflightByKey.delete(key);
     });
+    _initInflightByKey.set(key, p);
   }
-  return _initInflight;
+  return p;
 }
 
 export interface RawLendingRow {
@@ -193,6 +196,13 @@ export interface GoldSettings {
   assetsSheetId?: string;
 }
 
+export interface ProfileData {
+  email: string;
+  displayName: string | null;
+  activeOrgId: string | null;
+  orgs: { id: string; name: string }[];
+}
+
 export interface VaultSettings {
   vaultSpreadsheetId?: string;
 }
@@ -279,14 +289,34 @@ export interface RawHolding {
 export const api = {
   invalidateCache,
   clearPersistentCache,
-  init:          ()                              => get<InitData>('init'),
+  init:          (month: string, year: string)   => get<InitData>('init', { month, year }),
   getData:       (month: string, year: string)  => get<Transaction[]>('getData', { month, year }),
   addRow:        (p: Record<string, unknown>)   => post<string>({ action: 'addRow', ...p }),
   updateRow:     (p: Record<string, unknown>)   => post<boolean>({ action: 'updateRow', ...p }),
   deleteRow:     (month: string, year: string, id: string) => post<boolean>({ action: 'deleteRow', month, year, id }),
-  saveBudget:        (budgets: Budget)              => post<boolean>({ action: 'saveBudget', budgets }),
-  addBudgetEntry:    (name: string, amt: number)   => post<BudgetEntry>({ action: 'addBudgetEntry', name, amt }),
-  updateBudgetEntry: (id: string, name: string, amt: number) => post<boolean>({ action: 'updateBudgetEntry', id, name, amt }),
+  saveBudget:        (budgets: Budget, opts?: { monthYear?: string; month?: string; year?: string }) =>
+    post<boolean>({
+      action: 'saveBudget',
+      budgets,
+      ...(opts?.monthYear !== undefined ? { monthYear: opts.monthYear } : {}),
+      ...(opts?.month !== undefined ? { month: opts.month } : {}),
+      ...(opts?.year !== undefined ? { year: opts.year } : {}),
+    }),
+  addBudgetEntry:    (name: string, amt: number, monthYear?: string) =>
+    post<BudgetEntry>({
+      action: 'addBudgetEntry',
+      name,
+      amt,
+      ...(monthYear !== undefined ? { monthYear } : {}),
+    }),
+  updateBudgetEntry: (id: string, name: string, amt: number, monthYear?: string) =>
+    post<boolean>({
+      action: 'updateBudgetEntry',
+      id,
+      name,
+      amt,
+      ...(monthYear !== undefined ? { monthYear } : {}),
+    }),
   deleteBudgetEntry: (id: string)                  => post<boolean>({ action: 'deleteBudgetEntry', id }),
   saveOpeningBal:(data: OpeningBal)             => post<boolean>({ action: 'saveOpeningBal', data }),
   getLending:    (sheetName?: string)          => get<RawLendingRow[]>('getEntries', { module: 'lending', ...(sheetName && sheetName !== 'Lending' && { sheetName }) }),
@@ -324,6 +354,19 @@ export const api = {
   getCashLoanHistory:    ()                           => get<RawCashLoanHistoryRow[]>('getHistory', { module: 'loans', type: 'cash' }),
   addCashLoanHistory:    (p: Record<string, unknown>) => post<string>({ module: 'loans', action: 'addHistory', type: 'cash', ...p }),
   deleteCashLoanHistory: (id: string)                 => post<boolean>({ module: 'loans', action: 'deleteHistory', type: 'cash', id }),
+  getProfile: async () => {
+    const res = await fetch(`${new URL('/api/profile', window.location.origin)}`, {
+      credentials: 'same-origin',
+      cache: 'no-store',
+    });
+    const text = await res.text();
+    const json = JSON.parse(text) as ApiResponse<ProfileData>;
+    if (!json.ok) {
+      const err = new Error((json as { error?: string }).error || 'Profile request failed');
+      throw err;
+    }
+    return json.data;
+  },
   getSettings:   ()                            => get<GoldSettings>('get', { module: 'settings' }),
   saveSettings:  (p: Record<string, unknown>) => post<boolean>({ module: 'settings', action: 'save', ...p }),
   getVaultSettings: ()                      => get<VaultSettings>('get', { module: 'vault' }),

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   CalendarDays,
   Gem,
@@ -47,6 +47,18 @@ export type NavDynamicMenuSection = {
   items: NavDynamicMenuItem[]
 }
 
+/** Shown in drawer footer; omit from org-driven sections to avoid duplicates. */
+function isFooterOnlyMenuItem(m: NavDynamicMenuItem): boolean {
+  if (m.id === 'settings' || m.id === 'components') return true
+  const p = m.path.trim()
+  return (
+    p === '/settings' ||
+    p.startsWith('/settings?') ||
+    p === '/components' ||
+    p.startsWith('/components?')
+  )
+}
+
 function pathDrawerActive(currentAsPath: string, itemPath: string) {
   const c = currentAsPath.trim()
   const t = itemPath.trim()
@@ -72,7 +84,7 @@ interface Props {
   onLogout?: () => void
   area?: AppNavArea
   appName?: string
-  /** When non-empty, drawer uses DB-driven sections instead of built-in FinTracker groups. */
+  /** Org-driven sections (may be empty ⇒ only Settings, UI Kit, Logout). */
   dynamicMenu?: NavDynamicMenuSection[] | null
   /** Path for active state when using `dynamicMenu` (e.g. `router.asPath`). */
   activeAsPath?: string
@@ -155,7 +167,17 @@ export default function Nav({
   const iconSrc = getAppAssetUrl(area, getAppIconAsset(area))
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
-  const useDynamic = Boolean(dynamicMenu?.length && onNavigatePath)
+  /** Path-based org menu: always use this layout when `onNavigatePath` is set (empty sections ⇒ minimal drawer). */
+  const useOrgPathMenu = Boolean(onNavigatePath)
+  const dynamicMenuForDrawer = useMemo(() => {
+    const src = dynamicMenu ?? []
+    return src
+      .map((sec) => ({
+        ...sec,
+        items: sec.items.filter((m) => !isFooterOnlyMenuItem(m)),
+      }))
+      .filter((sec) => sec.items.length > 0)
+  }, [dynamicMenu])
 
   function dynamicSection(titleLabel: string, items: NavDynamicMenuItem[]) {
     return (
@@ -255,10 +277,32 @@ export default function Nav({
           </button>
         </div>
 
-        {useDynamic ? (
+        {useOrgPathMenu ? (
           <>
-            {dynamicMenu!.map(sec => dynamicSection(sec.sectionLabel, sec.items))}
+            {dynamicMenuForDrawer.map(sec => dynamicSection(sec.sectionLabel, sec.items))}
             <div style={{ paddingTop: 12, paddingBottom: 8 }}>
+              <button
+                type="button"
+                className={`nav-drawer-item${module === 'settings' ? ' active' : ''}`}
+                onClick={() => {
+                  onModule('settings')
+                  setDrawerOpen(false)
+                }}
+              >
+                <Settings size={18} />
+                <span>Settings</span>
+              </button>
+              <button
+                type="button"
+                className={`nav-drawer-item${module === 'components' ? ' active' : ''}`}
+                onClick={() => {
+                  onModule('components')
+                  setDrawerOpen(false)
+                }}
+              >
+                <LayoutGrid size={18} />
+                <span>UI Kit</span>
+              </button>
               {onLogout && (
                 <button type="button" className="nav-drawer-item" onClick={() => setLogoutConfirmOpen(true)}>
                   <LogOut size={18} />

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, type ReactNode } from 'react';
-import { Loader2, Link2, Unlink2, SlidersHorizontal, Database, RotateCcw } from 'lucide-react';
-import { api } from '../api';
+import { Loader2, Link2, Unlink2, SlidersHorizontal, RotateCcw, User, Building2 } from 'lucide-react';
+import { api, type ProfileData } from '../api';
 import { LoadingState, SectionBlock, SectionChip, SectionTitle, Spacer, UiCard } from '../ui';
 import { SettingsSectionCard, type SettingField } from '../ui'
 
@@ -20,17 +20,6 @@ const SETTINGS_SECTIONS: SettingsSection[] = [
     icon: <SlidersHorizontal size={16} />,
     fields: [{ key: 'goldRate', label: 'Gold Rate (₹/gram)', type: 'number' }],
   },
-  {
-    key: 'storage',
-    title: 'Sheet IDs',
-    description: '',
-    icon: <Database size={16} />,
-    fields: [
-      { key: 'expensesSheetId', label: 'Expenses', type: 'text' },
-      { key: 'assetsSheetId', label: 'Assets', type: 'text' },
-      { key: 'loansSpreadsheetId', label: 'Loans', type: 'text' },
-    ],
-  },
 ];
 
 export default function Settings() {
@@ -47,19 +36,22 @@ export default function Settings() {
     hasRefreshToken?: boolean;
     expired?: boolean;
   }>({ hasToken: false });
-  const [sheetStatus, setSheetStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
   const [upstoxStatusState, setUpstoxStatusState] = useState<'checking' | 'connected' | 'missing' | 'expired'>('checking');
   const [upstoxBusy, setUpstoxBusy] = useState(false);
   const [resetBusy, setResetBusy] = useState(false);
+  const [profile, setProfile] = useState<ProfileData | null>(null);
 
   const validateLiveStatus = useCallback(async (forceRefresh = false) => {
     setLoading(true);
     setError('');
-    setSheetStatus('checking');
     setUpstoxStatusState('checking');
     try {
       if (forceRefresh) api.invalidateCache({ action: 'get', params: { module: 'settings' } });
-      const [settingsResult, tokenResult] = await Promise.allSettled([api.getSettings(), api.getTokenStatus()]);
+      const [settingsResult, tokenResult, profileResult] = await Promise.allSettled([
+        api.getSettings(),
+        api.getTokenStatus(),
+        api.getProfile(),
+      ]);
       const loaded: Record<string, string> = {};
       if (settingsResult.status === 'fulfilled') {
         SETTINGS_SECTIONS.forEach(section => {
@@ -67,10 +59,13 @@ export default function Settings() {
             loaded[String(field.key)] = String(settingsResult.value[field.key as keyof typeof settingsResult.value] || '');
           });
         });
-        setSettings(loaded);
-        setSheetStatus('connected');
+        loaded.usdToInr = settingsResult.value.usdToInr !== undefined ? String(settingsResult.value.usdToInr) : '';
+      }
+      setSettings(loaded);
+      if (profileResult.status === 'fulfilled') {
+        setProfile(profileResult.value);
       } else {
-        setSheetStatus('disconnected');
+        setProfile(null);
       }
       if (tokenResult.status === 'fulfilled') {
         setUpstoxStatus(tokenResult.value);
@@ -82,7 +77,6 @@ export default function Settings() {
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load settings');
-      setSheetStatus('disconnected');
       setUpstoxStatusState('missing');
     } finally {
       setLoading(false);
@@ -165,18 +159,39 @@ export default function Settings() {
         />
         <div className="settings-status-grid">
           <StatusBox
-            title="Google Sheets"
-            icon={<Database size={14} />}
-            tone={sheetStatus === 'checking' ? 'amber' : sheetStatus === 'connected' ? 'green' : 'red'}
-            status={sheetStatus === 'checking' ? 'Checking…' : sheetStatus === 'connected' ? 'Connected' : 'Disconnected'}
-          />
-          <StatusBox
             title="Upstox"
             icon={<Link2 size={14} />}
             tone={upstoxStatusState === 'checking' ? 'amber' : upstoxStatusState === 'connected' ? 'green' : 'red'}
             status={upstoxStatusState === 'checking' ? 'Checking…' : upstoxStatusState === 'connected' ? 'Connected' : 'Missing'}
           />
         </div>
+
+        {!loading && profile && (
+          <SectionBlock title="Account" icon={<User size={16} />}>
+            <div style={{ display: 'grid', gap: 10 }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', marginBottom: 4 }}>Name</div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>
+                  {(profile.displayName && profile.displayName.trim()) || profile.email}
+                </div>
+                {profile.displayName?.trim() ? (
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>{profile.email}</div>
+                ) : null}
+              </div>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Building2 size={14} aria-hidden />
+                  Organization
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>
+                  {profile.activeOrgId
+                    ? profile.orgs.find(o => o.id === profile.activeOrgId)?.name ?? 'Unknown org'
+                    : '—'}
+                </div>
+              </div>
+            </div>
+          </SectionBlock>
+        )}
         {error && <div className="settings-alert">⚠ {error}</div>}
         {loading && <LoadingState variant="section" />}
 

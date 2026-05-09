@@ -9,16 +9,13 @@ export const APP_LABELS: Record<AppSlug, string> = {
 
 // Fintracker menus — sections and their menu items
 export const FINTRACKER_MENUS: Record<string, { slug: string; label: string }[]> = {
-  Tracking: [{ slug: 'budget', label: 'Monthly Expenses' }],
+  Tracking: [{ slug: 'dashboard', label: 'Monthly Expenses' }],
   Assets: [
     { slug: 'savings', label: 'Savings' },
     { slug: 'gold', label: 'Gold' },
     { slug: 'bommi', label: 'Bommi' },
   ],
-  Investments: [
-    { slug: 'stocks', label: 'Stocks' },
-    { slug: 'mutualfunds', label: 'Mutual Funds' },
-  ],
+  Investments: [{ slug: 'investments', label: 'Stocks & Mutual Funds' }],
   Credit: [
     { slug: 'lending', label: 'Lending' },
     { slug: 'vijaya-amma', label: 'Vijaya Amma' },

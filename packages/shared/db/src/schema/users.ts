@@ -19,35 +19,3 @@ export const users = pgTable('users', {
 
 export type User = typeof users.$inferSelect
 export type NewUser = typeof users.$inferInsert
-
-export const ALL_MODULE_IDS = [
-  'dashboard',
-  'budget',
-  'transactions',
-  'credits',
-  'accounts',
-  'savings',
-  'lending',
-  'gold',
-  'loans',
-  'subscriptions',
-  'stocks',
-  'mutualfunds',
-  'investments',
-  'vault',
-  'insurance',
-  'persons',
-  'health',
-  'habits',
-  'documents',
-  'staff',
-] as const
-
-export type ModuleId = typeof ALL_MODULE_IDS[number]
-
-export type MenuEntry = {
-  id: ModuleId
-  label: string
-  order: number
-  enabled: boolean
-}

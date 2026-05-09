@@ -30,6 +30,8 @@ export interface BudgetEntry {
   id: string
   name: string
   amount: number
+  /** `__global__` or `YYYY-MM` — month-specific lines override global for that month in the UI. */
+  monthYear: string
 }
 
 export type Budget = BudgetEntry[]

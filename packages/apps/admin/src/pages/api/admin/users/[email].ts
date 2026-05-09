@@ -29,7 +29,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           typeof (body as { displayName?: unknown }).displayName === 'string'
             ? (body as { displayName: string }).displayName
             : undefined,
-        role: typeof (body as { role?: unknown }).role === 'string' ? (body as { role: string }).role : undefined,
+        orgId:
+          typeof (body as { orgId?: unknown }).orgId === 'string'
+            ? (body as { orgId: string }).orgId
+            : undefined,
         status:
           typeof (body as { status?: unknown }).status === 'string'
             ? (body as { status: string }).status

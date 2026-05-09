@@ -26,7 +26,7 @@ export default function AdminUsersPage() {
 
   const [mode, setMode] = useState<'add' | 'edit' | null>(null)
   const [editingEmail, setEditingEmail] = useState('')
-  const [form, setForm] = useState({ email: '', displayName: '', role: 'member' })
+  const [form, setForm] = useState({ email: '', displayName: '', orgId: '' })
   const [saving, setSaving] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
 
@@ -54,6 +54,12 @@ export default function AdminUsersPage() {
     void load()
   }, [load])
 
+  const orgNameById = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const o of orgs) map[o.id] = o.name
+    return map
+  }, [orgs])
+
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase()
     if (!term) return rows
@@ -61,14 +67,14 @@ export default function AdminUsersPage() {
       u =>
         u.email.toLowerCase().includes(term) ||
         (u.displayName || '').toLowerCase().includes(term) ||
-        (u.role || '').toLowerCase().includes(term),
+        (u.orgId ? orgNameById[u.orgId] || '' : '').toLowerCase().includes(term),
     )
-  }, [rows, q])
+  }, [rows, q, orgNameById])
 
   function startAdd() {
     setMode('add')
     setEditingEmail('')
-    setForm({ email: '', displayName: '', role: 'member' })
+    setForm({ email: '', displayName: '', orgId: '' })
     setDeleteConfirm(false)
   }
 
@@ -77,14 +83,14 @@ export default function AdminUsersPage() {
     if (!user) return
     setMode('edit')
     setEditingEmail(email)
-    setForm({ email: user.email, displayName: user.displayName || '', role: user.role })
+    setForm({ email: user.email, displayName: user.displayName || '', orgId: user.orgId || '' })
     setDeleteConfirm(false)
   }
 
   function closeForm() {
     setMode(null)
     setEditingEmail('')
-    setForm({ email: '', displayName: '', role: 'member' })
+    setForm({ email: '', displayName: '', orgId: '' })
     setDeleteConfirm(false)
   }
 
@@ -92,6 +98,10 @@ export default function AdminUsersPage() {
     e.preventDefault()
     if (!form.email.trim()) {
       setError('Email is required')
+      return
+    }
+    if (!form.orgId) {
+      setError('Organization is required')
       return
     }
 
@@ -105,7 +115,7 @@ export default function AdminUsersPage() {
         body: JSON.stringify({
           email: form.email.trim().toLowerCase(),
           displayName: form.displayName.trim() || form.email.split('@')[0],
-          role: form.role,
+          orgId: form.orgId,
         }),
       })
       const j = await r.json()
@@ -206,7 +216,7 @@ export default function AdminUsersPage() {
                       <div className="admin-card-item__body">
                         <p className="admin-card-item__title">{u.displayName || u.email}</p>
                         <p className="admin-card-item__meta">
-                          {u.email} • {u.role} • {u.orgId ? orgs.find(o => o.id === u.orgId)?.name || 'Unknown org' : 'No org'}
+                          {u.email} • {u.orgId ? orgNameById[u.orgId] || 'Unknown org' : 'Unassigned'}
                         </p>
                       </div>
                     </div>
@@ -222,7 +232,8 @@ export default function AdminUsersPage() {
 
       {mode && (
         <div className="modal-bg open" onClick={closeForm}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
+          <div className="admin-modal-wrap" onClick={e => e.stopPropagation()}>
+            <div className="modal modal-shell">
             <div className="modal-hd modal-hd--blue">
               <span className="modal-title">
                 {mode === 'add' ? 'Add User' : 'Edit User'}
@@ -265,14 +276,21 @@ export default function AdminUsersPage() {
                   />
                 </FormField>
 
-                <FormField label="Role">
+                <FormField label="Organization">
                   <select
-                    value={form.role}
-                    onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
+                    className="form-sel"
+                    value={form.orgId}
+                    onChange={e => setForm(f => ({ ...f, orgId: e.target.value }))}
+                    required
                   >
-                    <option value="member">Member</option>
-                    <option value="org_admin">Organization Admin</option>
-                    <option value="admin">Platform Admin</option>
+                    <option value="" disabled>
+                      Select organization…
+                    </option>
+                    {orgs.map(o => (
+                      <option key={o.id} value={o.id}>
+                        {o.name}
+                      </option>
+                    ))}
                   </select>
                 </FormField>
               </form>
@@ -300,6 +318,7 @@ export default function AdminUsersPage() {
               >
                 {mode === 'add' ? 'Create' : 'Save'}
               </button>
+            </div>
             </div>
           </div>
         </div>

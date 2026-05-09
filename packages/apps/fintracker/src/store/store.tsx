@@ -71,7 +71,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initial);
 
   useEffect(() => {
-    void loadInitDataDeduped()
+    void loadInitDataDeduped(state.month, state.year)
       .then((init) => {
         dispatch({ type: 'SET_MONTHS', payload: init.months });
         dispatch({ type: 'SET_BUDGET', payload: init.budget });
@@ -80,7 +80,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       .catch(() => {
         /* auth / network — pages may show their own errors */
       });
-  }, []);
+  }, [state.month, state.year]);
 
   return <Ctx.Provider value={{ state, dispatch }}>{children}</Ctx.Provider>;
 }
