@@ -427,80 +427,87 @@ export default function AdminOrgsPage() {
               )}
 
               {mode === 'configure' && (
-                <div>
-                  <p className="admin-hint">Select apps for this organization.</p>
-                  <div className="admin-internal-tabs">
-                    {apps.map(a => (
-                      <button
-                        key={a.id}
-                        type="button"
-                        className={selectedApps[a.slug] ? 'active' : ''}
-                        onClick={() => toggleApp(a.slug)}
-                      >
-                        {a.name}
-                      </button>
-                    ))}
-                  </div>
-                  <Spacer size={12} />
-                </div>
-              )}
-
-              {mode === 'configure' && selectedApps[appTab] && appTab && (
-                <div>
-                  <p className="admin-hint">
-                    Menus for <strong>{apps.find(a => a.slug === appTab)?.name}</strong>
-                  </p>
-                  <div style={{ marginBottom: '0.75rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    {apps
-                      .filter(a => selectedApps[a.slug])
-                      .map(a => (
+                <div style={{ display: 'grid', gap: '1.5rem' }}>
+                  <div>
+                    <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '0.95rem', fontWeight: 700, color: '#0f172a' }}>
+                      Select Apps
+                    </h3>
+                    <div className="admin-internal-tabs">
+                      {apps.map(a => (
                         <button
                           key={a.id}
                           type="button"
-                          onClick={() => setAppTab(a.slug)}
-                          style={{
-                            padding: '0.5rem 1rem',
-                            borderRadius: '8px',
-                            border: 'none',
-                            background: appTab === a.slug ? '#1e5cc7' : '#e5e7eb',
-                            color: appTab === a.slug ? '#fff' : '#0f172a',
-                            cursor: 'pointer',
-                            fontSize: '0.9rem',
-                            fontWeight: appTab === a.slug ? 600 : 500,
+                          className={selectedApps[a.slug] ? 'active' : ''}
+                          onClick={() => {
+                            toggleApp(a.slug)
+                            if (!selectedApps[a.slug]) {
+                              setAppTab(a.slug)
+                            }
                           }}
                         >
                           {a.name}
                         </button>
                       ))}
-                  </div>
-
-                  <div>
-                    <p className="admin-hint">
-                      <span>
-                        {(enabledByApp[appTab] || []).length} / {(menusByApp[appTab] || menuCatalogByApp[appTab] || []).length} enabled
-                      </span>
-                    </p>
-                    <div className="admin-menu-grid">
-                      {(menusByApp[appTab] || menuCatalogByApp[appTab] || []).map(m => (
-                        <label key={m.id} className="admin-menu-item">
-                          <input
-                            type="checkbox"
-                            checked={(enabledByApp[appTab] || []).includes(m.id)}
-                            onChange={() => toggleMenu(appTab, m.id)}
-                          />
-                          <span>
-                            {m.label} <span className="admin-meta">({m.sectionLabel})</span>
-                          </span>
-                        </label>
-                      ))}
                     </div>
                   </div>
-                </div>
-              )}
 
-              {mode === 'configure' && !appTab && (
-                <div style={{ padding: '1rem', textAlign: 'center', color: '#6b7280' }}>
-                  <p>Select an app above to configure its menus.</p>
+                  {appTab && selectedApps[appTab] && (
+                    <div>
+                      <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '0.95rem', fontWeight: 700, color: '#0f172a' }}>
+                        Configure Menus
+                      </h3>
+                      <div style={{ marginBottom: '0.75rem' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+                          {apps
+                            .filter(a => selectedApps[a.slug])
+                            .map(a => (
+                              <button
+                                key={a.id}
+                                type="button"
+                                onClick={() => setAppTab(a.slug)}
+                                style={{
+                                  padding: '0.5rem 1rem',
+                                  borderRadius: '8px',
+                                  border: 'none',
+                                  background: appTab === a.slug ? '#1e5cc7' : '#e5e7eb',
+                                  color: appTab === a.slug ? '#fff' : '#0f172a',
+                                  cursor: 'pointer',
+                                  fontSize: '0.85rem',
+                                  fontWeight: appTab === a.slug ? 600 : 500,
+                                }}
+                              >
+                                {a.name}
+                              </button>
+                            ))}
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+                          <span className="admin-meta">
+                            {(enabledByApp[appTab] || []).length} of {(menusByApp[appTab] || menuCatalogByApp[appTab] || []).length} enabled
+                          </span>
+                        </div>
+                      </div>
+                      <div className="admin-menu-grid">
+                        {(menusByApp[appTab] || menuCatalogByApp[appTab] || []).map(m => (
+                          <label key={m.id} className="admin-menu-item">
+                            <input
+                              type="checkbox"
+                              checked={(enabledByApp[appTab] || []).includes(m.id)}
+                              onChange={() => toggleMenu(appTab, m.id)}
+                            />
+                            <span>
+                              {m.label} <span className="admin-meta">({m.sectionLabel})</span>
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {!appTab && Object.keys(selectedApps).some(k => selectedApps[k]) && (
+                    <div style={{ padding: '1rem', textAlign: 'center', color: '#6b7280', fontSize: '0.9rem' }}>
+                      <p>Select an app above to configure its menus.</p>
+                    </div>
+                  )}
                 </div>
               )}
               </form>
