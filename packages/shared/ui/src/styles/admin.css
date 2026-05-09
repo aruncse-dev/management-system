@@ -496,10 +496,11 @@ body,
   height: 1rem;
 }
 
-.admin-modal-wrap {
+.modal-bg .admin-modal-wrap {
+  height: 80vh;
+  max-height: 80vh;
   display: flex;
   flex-direction: column;
-  height: 80vh;
 }
 
 .admin-modal-wrap .modal-shell {
@@ -507,6 +508,11 @@ body,
   display: flex;
   flex-direction: column;
   height: 100%;
+  max-height: 100%;
+}
+
+.admin-modal-wrap .modal-hd {
+  flex-shrink: 0;
 }
 
 .admin-modal-wrap .modal-body {
