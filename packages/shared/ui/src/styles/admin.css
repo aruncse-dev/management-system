@@ -496,16 +496,29 @@ body,
   height: 1rem;
 }
 
+.admin-modal-wrap {
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
 .admin-modal-wrap .modal-shell {
   width: min(560px, 100%);
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh;
 }
 
 .admin-modal-wrap .modal-body {
   padding: 14px 16px 16px;
+  overflow-y: auto;
+  flex: 1;
 }
 
 .admin-modal-wrap .modal-foot {
   padding: 12px 16px 14px;
+  flex-shrink: 0;
+  border-top: 1px solid var(--admin-border, #e5e7eb);
 }
 
 /* Ensure savings-style row accent border is clearly visible in admin lists. */
