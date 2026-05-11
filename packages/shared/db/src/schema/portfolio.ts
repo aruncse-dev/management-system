@@ -2,7 +2,7 @@ import { numeric, pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core'
 
 export const stocks = pgTable('stocks', {
   id: serial('id').primaryKey(),
-  userEmail: text('user_email').notNull(),
+  orgId: text('org_id'),
   symbol: text('symbol').notNull(),
   company: text('company'),
   isin: text('isin'),
@@ -16,7 +16,7 @@ export const stocks = pgTable('stocks', {
 
 export const mutualFunds = pgTable('mutual_funds', {
   id: serial('id').primaryKey(),
-  userEmail: text('user_email').notNull(),
+  orgId: text('org_id'),
   fundName: text('fund_name').notNull(),
   folioNo: text('folio_no'),
   units: numeric('units', { precision: 14, scale: 4 }),

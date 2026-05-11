@@ -2,7 +2,7 @@ import { boolean, date, numeric, pgTable, text, timestamp } from 'drizzle-orm/pg
 
 export const vaultApps = pgTable('vault_apps', {
   id: text('id').primaryKey(),
-  userEmail: text('user_email').notNull(),
+  orgId: text('org_id'),
   appName: text('app_name').notNull(),
   category: text('category'),
   logo: text('logo'),
@@ -16,7 +16,7 @@ export const vaultApps = pgTable('vault_apps', {
 
 export const bankingRecords = pgTable('banking_records', {
   id: text('id').primaryKey(),
-  userEmail: text('user_email').notNull(),
+  orgId: text('org_id'),
   holderName: text('holder_name'),
   bankName: text('bank_name').notNull(),
   accountNo: text('account_no'),
@@ -33,7 +33,7 @@ export const bankingRecords = pgTable('banking_records', {
 
 export const persons = pgTable('persons', {
   uuid: text('uuid').primaryKey(),
-  userEmail: text('user_email').notNull(),
+  orgId: text('org_id'),
   name: text('name').notNull(),
   relation: text('relation'),
   dob: date('dob'),
@@ -45,7 +45,7 @@ export const persons = pgTable('persons', {
 
 export const insurance = pgTable('insurance', {
   id: text('id').primaryKey(),
-  userEmail: text('user_email').notNull(),
+  orgId: text('org_id'),
   policyType: text('policy_type'),
   planName: text('plan_name').notNull(),
   insurer: text('insurer'),

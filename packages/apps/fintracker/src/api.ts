@@ -203,6 +203,64 @@ export interface ProfileData {
   orgs: { id: string; name: string }[];
 }
 
+export type AccountUsedFor = 'savings' | 'monthly' | 'both';
+
+export interface AccountRow {
+  id: string;
+  userEmail: string;
+  orgId: string | null;
+  name: string;
+  description: string | null;
+  usedFor: string;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+export type CreditSourceCategory = 'credit_card' | 'informal';
+
+export interface CreditSourceRow {
+  id: string;
+  userEmail: string;
+  orgId: string | null;
+  name: string;
+  description: string | null;
+  category: string;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+export type AccountPayload = {
+  id?: string;
+  name: string;
+  description?: string | null;
+  usedFor: AccountUsedFor;
+  isActive?: boolean;
+  sortOrder?: number;
+};
+
+export type CreditSourcePayload = {
+  id?: string;
+  name: string;
+  description?: string | null;
+  category: CreditSourceCategory;
+  isActive?: boolean;
+  sortOrder?: number;
+};
+
+async function restJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const url = new URL(path, window.location.origin).toString();
+  const res = await fetch(url, { credentials: 'same-origin', cache: 'no-store', ...init });
+  const text = await res.text();
+  if (text.trim().startsWith('<')) {
+    throw new Error('Unexpected HTML from API');
+  }
+  const json = JSON.parse(text) as ApiResponse<T>;
+  if (!json.ok) {
+    throw new Error(json.error);
+  }
+  return json.data;
+}
+
 export interface VaultSettings {
   vaultSpreadsheetId?: string;
 }
@@ -367,6 +425,50 @@ export const api = {
     }
     return json.data;
   },
+
+  getAccountsList: () => restJson<AccountRow[]>('/api/accounts-list'),
+
+  saveAccount: async (data: AccountPayload) => {
+    const { id, ...rest } = data;
+    if (id) {
+      await restJson<{ id: string }>('/api/accounts-list', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, ...rest }),
+      });
+    } else {
+      await restJson<{ id: string }>('/api/accounts-list', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(rest),
+      });
+    }
+  },
+
+  deleteAccount: (id: string) =>
+    restJson<boolean>(`/api/accounts-list?id=${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+  getCreditSources: () => restJson<CreditSourceRow[]>('/api/credit-sources'),
+
+  saveCreditSource: async (data: CreditSourcePayload) => {
+    const { id, ...rest } = data;
+    if (id) {
+      await restJson<{ id: string }>('/api/credit-sources', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, ...rest }),
+      });
+    } else {
+      await restJson<{ id: string }>('/api/credit-sources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(rest),
+      });
+    }
+  },
+
+  deleteCreditSource: (id: string) =>
+    restJson<boolean>(`/api/credit-sources?id=${encodeURIComponent(id)}`, { method: 'DELETE' }),
   getSettings:   ()                            => get<GoldSettings>('get', { module: 'settings' }),
   saveSettings:  (p: Record<string, unknown>) => post<boolean>({ module: 'settings', action: 'save', ...p }),
   getVaultSettings: ()                      => get<VaultSettings>('get', { module: 'vault' }),

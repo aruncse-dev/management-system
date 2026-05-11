@@ -38,3 +38,7 @@ Thumbs.db
 .claude
 *.xlsx
 gas/.deployment-id
+
+# Local DB dumps (pg_dump / Neon exports — can include \\restrict secrets; not source of truth)
+/neon-schema.sql
+**/neon-schema.sql

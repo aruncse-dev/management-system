@@ -1,4 +1,4 @@
-import { ACCOUNTS, CC_MODES, OTHER_CR, ALL_CR, MNS, CATEGORIES, INCOME_CATS, BUDGET_GLOBAL_MONTH_KEY } from './config'
+import { MNS, CATEGORIES, INCOME_CATS, BUDGET_GLOBAL_MONTH_KEY } from './config'
 import type { Budget, BudgetEntry, OpeningBal, Transaction } from './types'
 
 export function INR(n: number) {
@@ -15,7 +15,7 @@ export function isoDate(s: string) {
   if (!s) return ''
   const m = s.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2})$/)
   if (!m) return ''
-  const mo = MNS.indexOf(m[2])
+  const mo = (MNS as readonly string[]).indexOf(m[2])
   if (mo < 0) return ''
   return `20${m[3]}-${String(mo + 1).padStart(2, '0')}-${m[1].padStart(2, '0')}`
 }
@@ -23,7 +23,7 @@ export function isoDate(s: string) {
 export function dateKey(s: string) {
   const m = s.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2})$/)
   if (!m) return 0
-  const mo = MNS.indexOf(m[2])
+  const mo = (MNS as readonly string[]).indexOf(m[2])
   return parseInt('20' + m[3]) * 10000 + (mo + 1) * 100 + parseInt(m[1])
 }
 
@@ -100,12 +100,12 @@ export function sumType(rows: Transaction[], type: string) {
   return rows.filter(r => r.t === type).reduce((s, r) => s + r.a, 0)
 }
 
-export function sumCC(rows: Transaction[]) {
-  return rows.filter(r => CC_MODES.includes(r.m)).reduce((s, r) => s + r.a, 0)
+export function sumCC(rows: Transaction[], creditCardModeNames: readonly string[]) {
+  return rows.filter(r => creditCardModeNames.includes(r.m)).reduce((s, r) => s + r.a, 0)
 }
 
-export function sumOtherCr(rows: Transaction[]) {
-  return rows.filter(r => OTHER_CR.includes(r.m)).reduce((s, r) => s + r.a, 0)
+export function sumOtherCr(rows: Transaction[], informalCreditModeNames: readonly string[]) {
+  return rows.filter(r => informalCreditModeNames.includes(r.m)).reduce((s, r) => s + r.a, 0)
 }
 
 export function budgetSummary(budget: Budget, cm: Record<string, number>) {
@@ -119,25 +119,36 @@ export function budgetSummary(budget: Budget, cm: Record<string, number>) {
   return { totalBudget, totalSpent, ovCount, totalOver, totalPct, tCol }
 }
 
-export function acctFlows(rows: Transaction[], openingBal: OpeningBal) {
-  const accountByLower = Object.fromEntries(ACCOUNTS.map(acc => [acc.toLowerCase(), acc])) as Record<string, string>
+export function acctFlows(
+  rows: Transaction[],
+  openingBal: OpeningBal,
+  monthlyAccountNames: readonly string[],
+) {
+  const accountByLower = Object.fromEntries(monthlyAccountNames.map(acc => [acc.toLowerCase(), acc])) as Record<
+    string,
+    string
+  >
   function normalizeAccount(name: string) {
     return accountByLower[String(name || '').trim().toLowerCase()] || ''
   }
   function transferTarget(notes: string) {
     const raw = String(notes || '').trim()
     if (!raw) return ''
-    // Current format: "→Wallet · note", legacy: "-> Wallet", fallback: "... to Wallet"
     const direct = raw.match(/^(?:→|->)\s*([^·|,]+?)(?:\s*[·|,].*)?$/)
     if (direct?.[1]) return normalizeAccount(direct[1])
-    const any = raw.match(/\bto\s+(cash|hdfc bank|wallet)\b/i)
-    if (any?.[1]) return normalizeAccount(any[1])
+    const esc = monthlyAccountNames.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
+    if (esc.length) {
+      const re = new RegExp(`\\bto\\s+(${esc})\\b`, 'i')
+      const m = raw.match(re)
+      if (m?.[1]) return normalizeAccount(m[1])
+    }
     return ''
   }
 
   const result: Record<string, { inflow: number; outflow: number; current: number }> = {}
-  ACCOUNTS.forEach(acc => {
-    let inflow = 0, outflow = 0
+  for (const acc of monthlyAccountNames) {
+    let inflow = 0,
+      outflow = 0
     rows.forEach(r => {
       if (r.m === acc) {
         if (r.t === 'Income') inflow += r.a
@@ -148,7 +159,7 @@ export function acctFlows(rows: Transaction[], openingBal: OpeningBal) {
     })
     const opening = openingBal[acc] || 0
     result[acc] = { inflow, outflow, current: opening + inflow - outflow }
-  })
+  }
   return result
 }
 

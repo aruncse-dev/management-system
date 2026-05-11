@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
 import type { Transaction, TransactionForm } from '@fintracker-vault/types'
-import { ACCOUNTS, CC_MODES, OTHER_CR, CATEGORIES, INCOME_CATS } from '@fintracker-vault/config'
+import { CATEGORIES, INCOME_CATS } from '@fintracker-vault/config'
 
-const ALL_MODES = [...ACCOUNTS, ...CC_MODES, ...OTHER_CR]
 const ALL_CATS = [...CATEGORIES, ...INCOME_CATS]
 
 export type TransactionModalApi = {
@@ -20,6 +19,10 @@ interface Props {
   onSaved: () => void
   showStatus: (msg: string) => void
   api: TransactionModalApi
+  /** Accounts + credit sources allowed as transaction `mode` (payment source). */
+  paymentModeOptions: readonly string[]
+  /** Accounts allowed as transfer targets (cash accounts only). */
+  transferTargetOptions: readonly string[]
   /** Expense categories (e.g. `CATEGORIES` ∪ budget names). Defaults to `CATEGORIES` from config. */
   expenseCategoryOptions?: readonly string[]
   /** Income categories (e.g. `ALL_CATS` ∪ budget names). Defaults to merged config lists. */
@@ -66,19 +69,23 @@ export default function TransactionModal({
   onSaved,
   showStatus,
   api,
+  paymentModeOptions,
+  transferTargetOptions,
   expenseCategoryOptions,
   incomeCategoryOptions,
 }: Props) {
   const isEdit = !!row
+  const defaultMode = paymentModeOptions[0] ?? 'Cash'
+  const defaultTo = transferTargetOptions[0] ?? paymentModeOptions[0] ?? 'Cash'
   const [form, setForm] = useState<TransactionForm>({
     date: row ? isoFromGas(row.date) : todayISO(),
     desc: row?.desc || '',
     a: row ? String(row.a) : '',
     c: row?.c || 'Groceries',
     t: row?.t || 'Expense',
-    m: row?.m || 'Cash',
+    m: row?.m || defaultMode,
     notes: row?.notes || '',
-    toAcct: row?.notes?.match(/^→(.+?)( ·|$)/)?.[1] || ACCOUNTS[0],
+    toAcct: row?.notes?.match(/^→(.+?)( ·|$)/)?.[1] || defaultTo,
   })
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -206,8 +213,13 @@ export default function TransactionModal({
           <div className="form-row">
             <label className="form-lbl">Mode / Account</label>
             <select className="form-sel" value={form.m} onChange={e => set('m', e.target.value)}>
-              {ALL_MODES.map(m => (
-                <option key={m}>{m}</option>
+              {form.m && !paymentModeOptions.includes(form.m) ? (
+                <option value={form.m}>{form.m} (legacy)</option>
+              ) : null}
+              {paymentModeOptions.map(m => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
               ))}
             </select>
           </div>
@@ -215,8 +227,13 @@ export default function TransactionModal({
             <div className="form-row">
               <label className="form-lbl">Transfer To</label>
               <select className="form-sel" value={form.toAcct} onChange={e => set('toAcct', e.target.value)}>
-                {ACCOUNTS.map(a => (
-                  <option key={a}>{a}</option>
+                {form.toAcct && !transferTargetOptions.includes(form.toAcct) ? (
+                  <option value={form.toAcct}>{form.toAcct} (legacy)</option>
+                ) : null}
+                {transferTargetOptions.map(a => (
+                  <option key={a} value={a}>
+                    {a}
+                  </option>
                 ))}
               </select>
             </div>

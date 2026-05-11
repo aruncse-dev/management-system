@@ -2,7 +2,7 @@ import { boolean, date, numeric, pgTable, text, timestamp } from 'drizzle-orm/pg
 
 export const subscriptions = pgTable('subscriptions', {
   id: text('id').primaryKey(),
-  userEmail: text('user_email').notNull(),
+  orgId: text('org_id'),
   name: text('name').notNull(),
   category: text('category'),
   amount: numeric('amount', { precision: 10, scale: 2 }).notNull(),

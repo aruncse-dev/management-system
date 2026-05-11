@@ -1,8 +1,8 @@
-import { date, numeric, pgTable, text } from 'drizzle-orm/pg-core'
+import { boolean, date, integer, numeric, pgTable, text } from 'drizzle-orm/pg-core'
 
 export const transactions = pgTable('transactions', {
   id: text('id').primaryKey(),
-  userEmail: text('user_email').notNull(),
+  orgId: text('org_id'),
   date: date('date').notNull(),
   description: text('description').notNull(),
   amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
@@ -16,7 +16,6 @@ export const transactions = pgTable('transactions', {
 /** `month_year`: `__global__` = default template; `YYYY-MM` overrides global for that month only (same category). */
 export const budget = pgTable('budget', {
   id: text('id').primaryKey(),
-  userEmail: text('user_email').notNull(),
   orgId: text('org_id'),
   monthYear: text('month_year').notNull(),
   category: text('category').notNull(),
@@ -25,8 +24,23 @@ export const budget = pgTable('budget', {
 
 export const accounts = pgTable('accounts', {
   id: text('id').primaryKey(),
-  userEmail: text('user_email').notNull(),
+  orgId: text('org_id'),
   name: text('name').notNull(),
-  balance: numeric('balance', { precision: 12, scale: 2 }).default('0'),
-  type: text('type'),
+  description: text('description'),
+  /** `savings` | `monthly` | `both` — which surfaces list this account */
+  usedFor: text('used_for').notNull().default('both'),
+  isActive: boolean('is_active').default(true),
+  sortOrder: integer('sort_order').default(0),
+})
+
+/** User-configurable credit card / informal credit labels (transaction `mode`). */
+export const creditSources = pgTable('credit_sources', {
+  id: text('id').primaryKey(),
+  orgId: text('org_id'),
+  name: text('name').notNull(),
+  description: text('description'),
+  /** `credit_card` | `informal` */
+  category: text('category').notNull(),
+  isActive: boolean('is_active').default(true),
+  sortOrder: integer('sort_order').default(0),
 })

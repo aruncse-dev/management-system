@@ -9,9 +9,9 @@ import Transactions from './transactions'
 import Budget from './budget'
 import Credits from './credits'
 import Accounts from './accounts'
-import { MNS } from '../config'
+import { MNS, BUDGET_GLOBAL_MONTH_KEY } from '../config'
 import { expenseCategoriesWithBudget, incomeCategoriesWithBudget, monthYearApiKey } from '../utils'
-import { BUDGET_GLOBAL_MONTH_KEY } from '../config'
+import { useFintrackerModes } from '../context/FintrackerModesContext'
 
 type TabId = 'dash' | 'txns' | 'bud' | 'cc' | 'acct'
 
@@ -27,6 +27,7 @@ const TAB_Q: Record<TabId, string> = { dash: 'dash', txns: 'txns', bud: 'bud', c
 export default function Monthly() {
   const router = useRouter()
   const { state, dispatch } = useStore()
+  const { paymentModeOptions, transferTargetOptions } = useFintrackerModes()
   const [tab, setTab] = useState<TabId>('dash')
   const [modalOpen, setModalOpen] = useState(false)
   const [editRow, setEditRow] = useState<typeof state.rows[0] | null>(null)
@@ -238,9 +239,12 @@ export default function Monthly() {
 
       {modalOpen && (
         <TransactionModal
+          key={`${editRow?.id ?? 'new'}-${paymentModeOptions.join('|')}`}
           row={editRow}
           month={state.month} year={state.year}
           api={api}
+          paymentModeOptions={paymentModeOptions}
+          transferTargetOptions={transferTargetOptions}
           expenseCategoryOptions={expenseCategoryOptions}
           incomeCategoryOptions={incomeCategoryOptions}
           onClose={() => setModalOpen(false)}

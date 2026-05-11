@@ -7,6 +7,7 @@ import { getAppArea } from '../appPaths'
 import { StoreProvider } from '../store'
 import { getClientAuthEnv } from '../clientAuthEnv'
 import { OrgSwitcher } from '../components/OrgSwitcher'
+import { FintrackerModesProvider } from '../context/FintrackerModesContext'
 import {
   MENU_CACHE_UPDATED_EVENT,
   readMenuCache,
@@ -172,6 +173,7 @@ export default function App({ Component, pageProps }: AppProps) {
       <AppAuthGate appKind="fintracker" googleClientId={googleClientId}>
         {({ onLogout }) => (
           <StoreProvider>
+            <FintrackerModesProvider>
             <div className="with-app-shell">
               {moduleFromPath && (
                 <>
@@ -193,6 +195,7 @@ export default function App({ Component, pageProps }: AppProps) {
               )}
               <Component {...pageProps} />
             </div>
+            </FintrackerModesProvider>
           </StoreProvider>
         )}
       </AppAuthGate>

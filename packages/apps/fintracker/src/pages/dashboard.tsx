@@ -1,27 +1,34 @@
+import { useMemo } from 'react'
 import { TrendingUp, CalendarDays, Banknote, CreditCard, Package, AlertTriangle, Wallet, ArrowDownRight, ArrowUpRight } from 'lucide-react'
 import { useStore } from '../store'
 import { sumType, sumCC, sumOtherCr, catMap, budgetSummary, acctFlows, INR } from '../utils'
-import { ACCOUNTS, ALL_CR } from '../config'
+import { useFintrackerModes } from '../context/FintrackerModesContext'
 import { RightLegendDonut } from '../ui'
 import { BalanceRow, KpiCard, LoadingState, SectionBlock, UiCard } from '../ui'
 
 export default function Dashboard() {
   const { state } = useStore()
   const { rows, budget, openingBal } = state
+  const { monthlyAccountNames, creditCardNames, informalCreditNames, loading: modesLoading } = useFintrackerModes()
 
-  if (state.loading) return <div className="pg"><LoadingState /></div>
+  const allCreditModes = useMemo(
+    () => [...creditCardNames, ...informalCreditNames],
+    [creditCardNames, informalCreditNames],
+  )
+
+  if (state.loading || modesLoading) return <div className="pg"><LoadingState /></div>
 
   const inc = sumType(rows, 'Income')
   const exp = sumType(rows, 'Expense') + sumType(rows, 'Savings')
-  const cc  = sumCC(rows)
-  const ocr = sumOtherCr(rows)
-  const flows = acctFlows(rows, openingBal)
-  const totalSavings = ACCOUNTS.reduce((s,a) => s + (flows[a]?.current||0), 0)
+  const cc = sumCC(rows, creditCardNames)
+  const ocr = sumOtherCr(rows, informalCreditNames)
+  const flows = acctFlows(rows, openingBal, monthlyAccountNames)
+  const totalSavings = monthlyAccountNames.reduce((s, a) => s + (flows[a]?.current || 0), 0)
   const surplus = inc - exp
-  const totalOutstanding = rows.filter(r => (ALL_CR as readonly string[]).includes(r.m)).reduce((s,r) => s + r.a, 0)
+  const totalOutstanding = rows.filter(r => allCreditModes.includes(r.m)).reduce((s, r) => s + r.a, 0)
   const cm = catMap(rows, budget)
   const { totalBudget, totalSpent, ovCount, totalOver, totalPct, tCol } = budgetSummary(budget, cm)
-  const accountSnapshot = ACCOUNTS.map(acc => {
+  const accountSnapshot = monthlyAccountNames.map(acc => {
     const { current } = flows[acc] || { current: 0 }
     return { acc, current }
   })
@@ -71,7 +78,9 @@ export default function Dashboard() {
             label={acc}
             value={`${current < 0 ? '−' : ''}${INR(Math.abs(current))}`}
             tone={current >= 0 ? 'green' : 'red'}
-            icon={acc === 'Cash' ? <Wallet size={14} /> : acc === 'Wallet' ? <CreditCard size={14} /> : <Banknote size={14} />}
+            icon={
+              /cash/i.test(acc) ? <Wallet size={14} /> : /wallet|card/i.test(acc) ? <CreditCard size={14} /> : <Banknote size={14} />
+            }
           />
         ))}
         </div>

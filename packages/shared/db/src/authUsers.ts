@@ -1,6 +1,6 @@
-import { and, asc, eq, isNotNull } from 'drizzle-orm'
+import { and, asc, eq } from 'drizzle-orm'
 import { getDb } from './neon'
-import { organizations } from './schema/orgs'
+import { organizations, orgMembers } from './schema/orgs'
 import { users } from './schema/users'
 
 export async function getUserFromDb(email: string) {
@@ -47,14 +47,12 @@ export async function listOrgsForUserEmail(email: string): Promise<{ id: string;
   const db = getDb()
   return db
     .select({ id: organizations.id, name: organizations.name })
-    .from(users)
-    .innerJoin(organizations, eq(users.orgId, organizations.id))
+    .from(orgMembers)
+    .innerJoin(organizations, eq(orgMembers.orgId, organizations.id))
     .where(
       and(
-        eq(users.email, email.toLowerCase()),
-        eq(users.status, 'active'),
+        eq(orgMembers.userEmail, email.toLowerCase()),
         eq(organizations.status, 'active'),
-        isNotNull(users.orgId),
       ),
     )
     .orderBy(asc(organizations.name))

@@ -3,8 +3,9 @@ import { Check, Plus, Repeat2, Search, BarChart3, Bell, IndianRupee } from 'luci
 import { api, type RawSubscriptionRow, type RawVaultAppRow, type GoldSettings } from '../api'
 import { CatIcon, FormField, LoadingState, ModalActions, ModalShell, SearchField, SectionBlock, SectionChip, Spacer, KpiCard, KpiGrid } from '../ui'
 import { INR, mergeCategoriesWithBudgetNames } from '../utils'
-import { CATEGORIES, ALL_MODES } from '../constants'
+import { CATEGORIES } from '../constants'
 import { useStore } from '../store'
+import { useFintrackerModes } from '../context/FintrackerModesContext'
 
 type SubscriptionFormState = {
   name: string
@@ -159,6 +160,7 @@ function normalizeRow(row: RawSubscriptionRow): SubscriptionEntry {
 
 export default function SubscriptionsPage() {
   const { state: appState } = useStore()
+  const { paymentModeOptions } = useFintrackerModes()
   const subscriptionCategories = useMemo(
     () => mergeCategoriesWithBudgetNames(CATEGORIES, appState.budget),
     [appState.budget],
@@ -638,7 +640,12 @@ export default function SubscriptionsPage() {
             <FormField label="Payment Method">
               <select className="form-inp" value={form.payment_method} onChange={e => setForm(f => ({ ...f, payment_method: e.target.value }))}>
                 <option value="">Select</option>
-                {ALL_MODES.map(m => <option key={m} value={m}>{m}</option>)}
+                {form.payment_method && !paymentModeOptions.includes(form.payment_method) ? (
+                  <option value={form.payment_method}>{form.payment_method} (legacy)</option>
+                ) : null}
+                {paymentModeOptions.map(m => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
               </select>
             </FormField>
             <FormField label="Linked App">

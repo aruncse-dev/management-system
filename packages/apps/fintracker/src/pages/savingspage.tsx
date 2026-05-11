@@ -11,12 +11,11 @@ type SavingsTab = 'dashboard' | 'transactions'
 
 export interface SavingsPageConfig {
   sheetName: string
-  accounts: readonly string[]
+  /** When set (e.g. Bommi sheet), skips DB account list and uses these names only. */
+  accounts?: readonly string[]
   title: string
   addButtonTitle?: string
 }
-
-const DEFAULT_ACCOUNTS = ['Amma IB', 'Ramya IB', 'Arun IB', 'Amma SBI', 'Cash'] as const
 
 interface SavingsEntry {
   id: string
@@ -129,11 +128,18 @@ function typeTone(type: SavingsType) {
 
 export default function SavingsPage({
   sheetName = 'Savings',
-  accounts = DEFAULT_ACCOUNTS,
+  accounts: accountsProp,
   title = 'Savings',
   addButtonTitle,
 }: SavingsPageConfig) {
   const { state: appState } = useStore()
+  const [apiAccounts, setApiAccounts] = useState<string[]>([])
+  const [accountsLoading, setAccountsLoading] = useState(!accountsProp)
+
+  const accounts = useMemo(
+    () => (accountsProp ? [...accountsProp] : apiAccounts),
+    [accountsProp, apiAccounts],
+  )
   const savingsExpenseCategories = useMemo(
     () => mergeCategoriesWithBudgetNames(CATEGORIES, appState.budget),
     [appState.budget],
@@ -146,12 +152,45 @@ export default function SavingsPage({
   const [search, setSearch] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [editEntry, setEditEntry] = useState<SavingsEntry | null>(null)
-  const [form, setForm] = useState<SavingsFormState>(makeEmptyForm(accounts))
+  const [form, setForm] = useState<SavingsFormState>(() => makeEmptyForm(accountsProp ?? []))
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [delConfirm, setDelConfirm] = useState(false)
 
+  useEffect(() => {
+    if (accountsProp) return
+    let cancelled = false
+    ;(async () => {
+      setAccountsLoading(true)
+      try {
+        const list = await api.getAccountsList()
+        if (cancelled) return
+        const names = list
+          .filter(a => a.isActive !== false && (a.usedFor === 'savings' || a.usedFor === 'both'))
+          .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name))
+          .map(a => a.name)
+        setApiAccounts(names)
+      } catch {
+        if (!cancelled) setApiAccounts([])
+      } finally {
+        if (!cancelled) setAccountsLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [accountsProp])
+
+  useEffect(() => {
+    if (accounts.length === 0) return
+    setForm(f => {
+      if (f.account && accounts.includes(f.account)) return f
+      return makeEmptyForm(accounts)
+    })
+  }, [accounts])
+
   const loadData = useCallback(async () => {
+    if (accounts.length === 0) return
     setLoading(true)
     setError('')
     try {
@@ -282,6 +321,22 @@ export default function SavingsPage({
     } finally {
       setDeleting(false)
     }
+  }
+
+  if (!accountsProp && (accountsLoading || accounts.length === 0)) {
+    return (
+      <div className="ui-kit-page-shell savings-page">
+        <div className="pg savings-page">
+          {accountsLoading ? (
+            <LoadingState variant="section" />
+          ) : (
+            <p style={{ color: 'var(--muted)', padding: 16, fontSize: 14 }}>
+              No savings accounts configured. Add accounts in Settings → Accounts with &quot;Used for&quot; including Savings.
+            </p>
+          )}
+        </div>
+      </div>
+    )
   }
 
   return (

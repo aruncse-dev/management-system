@@ -39,9 +39,15 @@ async function resolveBudgetScope(email: string, sessionOrgId: string | undefine
   return { mode: 'org', orgId: oid }
 }
 
-function budgetRowsBaseWhere(scope: BudgetScope, email: string) {
+function budgetRowsBaseWhere(scope: BudgetScope) {
   if (scope.mode === 'org') return eq(budget.orgId, scope.orgId)
-  return and(eq(budget.userEmail, email), isNull(budget.orgId))
+  return isNull(budget.orgId)
+}
+
+/** WHERE clause for org-scoped data filtering (no user_email, only org_id). */
+function whereOrgFilter(table: any, scope: BudgetScope) {
+  if (scope.mode === 'org') return eq(table.orgId, scope.orgId)
+  return isNull(table.orgId)
 }
 
 function normalizeBudgetMonthYearKey(raw: string): string | null {
@@ -90,10 +96,9 @@ function resolvePostedBudgetMonthYearOrDefault(
 async function loadMergedBudgetForMonth(
   db: ReturnType<typeof getDb>,
   scope: BudgetScope,
-  email: string,
   monthKey: string,
 ): Promise<{ id: string; name: string; amount: number; monthYear: string }[]> {
-  const base = budgetRowsBaseWhere(scope, email)
+  const base = budgetRowsBaseWhere(scope)
   if (monthKey === BUDGET_SCOPE_KEY) {
     const rows = await db.select().from(budget).where(and(base, eq(budget.monthYear, BUDGET_SCOPE_KEY)))
     return rows.map((r) => ({
@@ -196,16 +201,16 @@ async function mergeUserSettings(
     .where(eq(users.email, email))
 }
 
-async function computeMonths(db: ReturnType<typeof getDb>, email: string, scope: BudgetScope) {
+async function computeMonths(db: ReturnType<typeof getDb>, scope: BudgetScope) {
   const txMonths = await db
     .select({ k: transactions.monthYear })
     .from(transactions)
-    .where(eq(transactions.userEmail, email))
+    .where(budgetRowsBaseWhere(scope))
     .groupBy(transactions.monthYear)
   const bMonths = await db
     .select({ k: budget.monthYear })
     .from(budget)
-    .where(budgetRowsBaseWhere(scope, email))
+    .where(budgetRowsBaseWhere(scope))
     .groupBy(budget.monthYear)
 
   const keySet = new Set<string>()
@@ -265,6 +270,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
     return fail(res, 401, 'Unauthorized', traceId)
   }
   const em = emailRaw.toLowerCase()
+  const orgId = typeof session.activeOrgId === 'string' && session.activeOrgId.trim() ? session.activeOrgId : null
   const budgetScope = await resolveBudgetScope(em, session.activeOrgId)
 
   try {
@@ -304,7 +310,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
       }
 
       if (mod === 'lending' && action === 'getEntries') {
-        const rows = await db.select().from(lending).where(eq(lending.userEmail, em)).orderBy(desc(lending.date))
+        const rows = await db.select().from(lending).where(whereOrgFilter(lending, budgetScope)).orderBy(desc(lending.date))
         return ok(
           res,
           rows.map((r) => ({
@@ -319,7 +325,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
       }
 
       if (mod === 'savings' && action === 'getEntries') {
-        const rows = await db.select().from(savings).where(eq(savings.userEmail, em)).orderBy(desc(savings.date))
+        const rows = await db.select().from(savings).where(whereOrgFilter(savings, budgetScope)).orderBy(desc(savings.date))
         return ok(
           res,
           rows.map((r) => ({
@@ -336,7 +342,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
       }
 
       if (mod === 'gold' && action === 'getEntries') {
-        const rows = await db.select().from(goldItems).where(eq(goldItems.userEmail, em))
+        const rows = await db.select().from(goldItems).where(whereOrgFilter(goldItems, budgetScope))
         return ok(
           res,
           rows.map((r) => {
@@ -354,7 +360,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
       }
 
       if (mod === 'gold' && action === 'getHistory') {
-        const rows = await db.select().from(goldHistory).where(eq(goldHistory.userEmail, em)).orderBy(desc(goldHistory.date))
+        const rows = await db.select().from(goldHistory).where(whereOrgFilter(goldHistory, budgetScope)).orderBy(desc(goldHistory.date))
         return ok(
           res,
           rows.map((r) => ({
@@ -371,7 +377,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
       if (mod === 'loans') {
         const typ = typeof req.query.type === 'string' ? req.query.type : ''
         if (action === 'getEntries' && typ === 'jewel') {
-          const rows = await db.select().from(jewelLoans).where(eq(jewelLoans.userEmail, em))
+          const rows = await db.select().from(jewelLoans).where(whereOrgFilter(jewelLoans, budgetScope))
           return ok(
             res,
             rows.map((r) => ({
@@ -388,7 +394,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
           )
         }
         if (action === 'getEntries' && typ === 'cash') {
-          const rows = await db.select().from(cashLoans).where(eq(cashLoans.userEmail, em))
+          const rows = await db.select().from(cashLoans).where(whereOrgFilter(cashLoans, budgetScope))
           return ok(
             res,
             rows.map((r) => ({
@@ -401,7 +407,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
           )
         }
         if (action === 'getEntries') {
-          const rows = await db.select().from(emiLoans).where(eq(emiLoans.userEmail, em))
+          const rows = await db.select().from(emiLoans).where(whereOrgFilter(emiLoans, budgetScope))
           return ok(
             res,
             rows.map((r) => ({
@@ -422,7 +428,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
           const rows = await db
             .select()
             .from(jewelLoanRepayments)
-            .where(eq(jewelLoanRepayments.userEmail, em))
+            .where(whereOrgFilter(jewelLoanRepayments, budgetScope))
             .orderBy(desc(jewelLoanRepayments.date))
           return ok(
             res,
@@ -439,7 +445,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
           const rows = await db
             .select()
             .from(cashLoanRepayments)
-            .where(eq(cashLoanRepayments.userEmail, em))
+            .where(whereOrgFilter(cashLoanRepayments, budgetScope))
             .orderBy(desc(cashLoanRepayments.date))
           return ok(
             res,
@@ -455,7 +461,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
       }
 
       if (mod === 'vault' && action === 'getEntries') {
-        const rows = await db.select().from(bankingRecords).where(eq(bankingRecords.userEmail, em))
+        const rows = await db.select().from(bankingRecords).where(whereOrgFilter(bankingRecords, budgetScope))
         return ok(
           res,
           rows.map((r) => ({
@@ -482,7 +488,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         const [r] = await db
           .select()
           .from(bankingRecords)
-          .where(and(eq(bankingRecords.userEmail, em), eq(bankingRecords.id, id)))
+          .where(and(whereOrgFilter(bankingRecords, budgetScope), eq(bankingRecords.id, id)))
           .limit(1)
         if (!r) return fail(res, 404, 'Not found', traceId)
         return ok(res, {
@@ -503,7 +509,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
       }
 
       if (mod === 'vault' && action === 'getApps') {
-        const rows = await db.select().from(vaultApps).where(eq(vaultApps.userEmail, em)).orderBy(desc(vaultApps.updatedAt))
+        const rows = await db.select().from(vaultApps).where(whereOrgFilter(vaultApps, budgetScope)).orderBy(desc(vaultApps.updatedAt))
         return ok(
           res,
           rows.map((r) => ({
@@ -527,7 +533,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         const [r] = await db
           .select()
           .from(vaultApps)
-          .where(and(eq(vaultApps.userEmail, em), eq(vaultApps.id, app_uuid)))
+          .where(and(whereOrgFilter(vaultApps, budgetScope), eq(vaultApps.id, app_uuid)))
           .limit(1)
         if (!r) return fail(res, 404, 'Not found', traceId)
         return ok(res, {
@@ -545,7 +551,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
       }
 
       if (mod === 'insurance' && action === 'getEntries') {
-        const rows = await db.select().from(insurance).where(eq(insurance.userEmail, em)).orderBy(desc(insurance.updatedAt))
+        const rows = await db.select().from(insurance).where(whereOrgFilter(insurance, budgetScope)).orderBy(desc(insurance.updatedAt))
         return ok(
           res,
           rows.map((r) => ({
@@ -575,7 +581,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         const rows = await db
           .select()
           .from(subscriptions)
-          .where(eq(subscriptions.userEmail, em))
+          .where(whereOrgFilter(subscriptions, budgetScope))
           .orderBy(desc(subscriptions.updatedAt))
         return ok(
           res,
@@ -599,7 +605,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
       }
 
       if (mod === 'stocks' && action === 'getHoldings') {
-        const rows = await db.select().from(stocks).where(eq(stocks.userEmail, em))
+        const rows = await db.select().from(stocks).where(whereOrgFilter(stocks, budgetScope))
         return ok(
           res,
           rows.map((r) => ({
@@ -617,7 +623,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
       }
 
       if (mod === 'mutualfunds' && action === 'getHoldings') {
-        const rows = await db.select().from(mutualFunds).where(eq(mutualFunds.userEmail, em))
+        const rows = await db.select().from(mutualFunds).where(whereOrgFilter(mutualFunds, budgetScope))
         return ok(
           res,
           rows.map((r) => {
@@ -644,7 +650,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
 
       if (action === 'init') {
         const u = await loadUserSettingsRow(db, em)
-        const months = await computeMonths(db, em, budgetScope)
+        const months = await computeMonths(db, budgetScope)
         const mq = typeof req.query.month === 'string' ? req.query.month : ''
         const yq = typeof req.query.year === 'string' ? req.query.year : ''
         let budgetMonthKey: string
@@ -659,7 +665,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
           const c = currentMonthYear()
           budgetMonthKey = monthYearKey(c.month, c.year)
         }
-        const bud = await loadMergedBudgetForMonth(db, budgetScope, em, budgetMonthKey)
+        const bud = await loadMergedBudgetForMonth(db, budgetScope, budgetMonthKey)
         return ok(
           res,
           {
@@ -679,7 +685,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         const rows = await db
           .select()
           .from(transactions)
-          .where(and(eq(transactions.userEmail, em), eq(transactions.monthYear, my)))
+          .where(and(whereOrgFilter(transactions, budgetScope), eq(transactions.monthYear, my)))
           .orderBy(desc(transactions.date))
         return ok(res, rows.map(rowFromDb), traceId)
       }
@@ -733,7 +739,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
           const dateStr = typeof body.date === 'string' ? body.date : new Date().toISOString().slice(0, 10)
           await db.insert(lending).values({
             id,
-            userEmail: em,
+            orgId: orgId,
             date: dateStr,
             name: String(body.name ?? ''),
             amount: String(num(body.amount as string | number)),
@@ -754,13 +760,13 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
               type: typeof body.type === 'string' ? body.type : undefined,
               description: typeof body.description === 'string' ? body.description : undefined,
             })
-            .where(and(eq(lending.userEmail, em), eq(lending.id, id)))
+            .where(and(whereOrgFilter(lending, budgetScope), eq(lending.id, id)))
           return ok(res, true, traceId)
         }
         if (action === 'deleteEntry') {
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
-          await db.delete(lending).where(and(eq(lending.userEmail, em), eq(lending.id, id)))
+          await db.delete(lending).where(and(whereOrgFilter(lending, budgetScope), eq(lending.id, id)))
           return ok(res, true, traceId)
         }
       }
@@ -771,7 +777,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
           const dateStr = typeof body.date === 'string' ? body.date : new Date().toISOString().slice(0, 10)
           await db.insert(savings).values({
             id,
-            userEmail: em,
+            orgId: orgId,
             date: dateStr,
             account: String(body.account ?? ''),
             amount: String(num(body.amount as string | number)),
@@ -801,13 +807,13 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
               toAccount: typeof body.toAccount === 'string' ? body.toAccount : undefined,
               category: typeof body.category === 'string' ? body.category : undefined,
             })
-            .where(and(eq(savings.userEmail, em), eq(savings.id, id)))
+            .where(and(whereOrgFilter(savings, budgetScope), eq(savings.id, id)))
           return ok(res, true, traceId)
         }
         if (action === 'deleteEntry') {
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
-          await db.delete(savings).where(and(eq(savings.userEmail, em), eq(savings.id, id)))
+          await db.delete(savings).where(and(whereOrgFilter(savings, budgetScope), eq(savings.id, id)))
           return ok(res, true, traceId)
         }
       }
@@ -818,7 +824,6 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
           const wg = num(body.weight_g as string | number)
           await db.insert(goldItems).values({
             id,
-            userEmail: em,
             name: String(body.name ?? ''),
             weightG: String(wg),
             person: typeof body.person === 'string' ? body.person : null,
@@ -837,13 +842,13 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
               person: typeof body.person === 'string' ? body.person : undefined,
               location: typeof body.location === 'string' ? body.location : undefined,
             })
-            .where(and(eq(goldItems.userEmail, em), eq(goldItems.id, id)))
+            .where(and(whereOrgFilter(goldItems, budgetScope), eq(goldItems.id, id)))
           return ok(res, true, traceId)
         }
         if (action === 'deleteEntry') {
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
-          await db.delete(goldItems).where(and(eq(goldItems.userEmail, em), eq(goldItems.id, id)))
+          await db.delete(goldItems).where(and(whereOrgFilter(goldItems, budgetScope), eq(goldItems.id, id)))
           return ok(res, true, traceId)
         }
         if (action === 'addHistory') {
@@ -851,7 +856,6 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
           const dateStr = typeof body.date === 'string' ? body.date : new Date().toISOString().slice(0, 10)
           await db.insert(goldHistory).values({
             id,
-            userEmail: em,
             date: dateStr,
             type: String(body.type ?? 'IN'),
             name: String(body.name ?? ''),
@@ -872,13 +876,13 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
               weightG: body.weight_g !== undefined ? String(num(body.weight_g as string | number)) : undefined,
               note: typeof body.note === 'string' ? body.note : undefined,
             })
-            .where(and(eq(goldHistory.userEmail, em), eq(goldHistory.id, id)))
+            .where(and(whereOrgFilter(goldHistory, budgetScope), eq(goldHistory.id, id)))
           return ok(res, { success: true }, traceId)
         }
         if (action === 'deleteHistory') {
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
-          await db.delete(goldHistory).where(and(eq(goldHistory.userEmail, em), eq(goldHistory.id, id)))
+          await db.delete(goldHistory).where(and(whereOrgFilter(goldHistory, budgetScope), eq(goldHistory.id, id)))
           return ok(res, { success: true }, traceId)
         }
       }
@@ -888,8 +892,8 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         if (action === 'addEntry' && typ === 'jewel') {
           const id = crypto.randomUUID()
           await db.insert(jewelLoans).values({
+            orgId: orgId,
             id,
-            userEmail: em,
             name: String(body.name ?? ''),
             bank: typeof body.bank === 'string' ? body.bank : null,
             principal: String(num(body.principal as string | number)),
@@ -916,20 +920,20 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
               paidAmount: body.paid_amount !== undefined ? String(num(body.paid_amount as string | number)) : undefined,
               status: typeof body.status === 'string' ? body.status : undefined,
             })
-            .where(and(eq(jewelLoans.userEmail, em), eq(jewelLoans.id, id)))
+            .where(and(whereOrgFilter(jewelLoans, budgetScope), eq(jewelLoans.id, id)))
           return ok(res, true, traceId)
         }
         if (action === 'deleteEntry' && typ === 'jewel') {
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
-          await db.delete(jewelLoans).where(and(eq(jewelLoans.userEmail, em), eq(jewelLoans.id, id)))
+          await db.delete(jewelLoans).where(and(whereOrgFilter(jewelLoans, budgetScope), eq(jewelLoans.id, id)))
           return ok(res, true, traceId)
         }
         if (action === 'addEntry' && typ === 'cash') {
           const id = crypto.randomUUID()
           await db.insert(cashLoans).values({
+            orgId: orgId,
             id,
-            userEmail: em,
             personName: String(body.person_name ?? ''),
             amountReceived: String(num(body.amount_received as string | number)),
             startDate: String(body.start_date ?? new Date().toISOString().slice(0, 10)),
@@ -948,20 +952,20 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
               startDate: typeof body.start_date === 'string' ? body.start_date : undefined,
               paidAmount: body.paid_amount !== undefined ? String(num(body.paid_amount as string | number)) : undefined,
             })
-            .where(and(eq(cashLoans.userEmail, em), eq(cashLoans.id, id)))
+            .where(and(whereOrgFilter(cashLoans, budgetScope), eq(cashLoans.id, id)))
           return ok(res, true, traceId)
         }
         if (action === 'deleteEntry' && typ === 'cash') {
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
-          await db.delete(cashLoans).where(and(eq(cashLoans.userEmail, em), eq(cashLoans.id, id)))
+          await db.delete(cashLoans).where(and(whereOrgFilter(cashLoans, budgetScope), eq(cashLoans.id, id)))
           return ok(res, true, traceId)
         }
         if (action === 'addEntry' && !typ) {
           const id = crypto.randomUUID()
           await db.insert(emiLoans).values({
+            orgId: orgId,
             id,
-            userEmail: em,
             name: String(body.name ?? ''),
             bank: typeof body.bank === 'string' ? body.bank : null,
             principal: String(num(body.principal as string | number)),
@@ -991,20 +995,20 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
               paidEmis: body.paid_emis !== undefined ? parseInt(String(body.paid_emis), 10) : undefined,
               status: typeof body.status === 'string' ? body.status : undefined,
             })
-            .where(and(eq(emiLoans.userEmail, em), eq(emiLoans.id, id)))
+            .where(and(whereOrgFilter(emiLoans, budgetScope), eq(emiLoans.id, id)))
           return ok(res, true, traceId)
         }
         if (action === 'deleteEntry' && !typ) {
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
-          await db.delete(emiLoans).where(and(eq(emiLoans.userEmail, em), eq(emiLoans.id, id)))
+          await db.delete(emiLoans).where(and(whereOrgFilter(emiLoans, budgetScope), eq(emiLoans.id, id)))
           return ok(res, true, traceId)
         }
         if (action === 'addHistory' && typ === 'jewel') {
           const id = crypto.randomUUID()
           await db.insert(jewelLoanRepayments).values({
+            orgId: orgId,
             id,
-            userEmail: em,
             loanId: String(body.loan_id ?? ''),
             date: String(body.date ?? new Date().toISOString().slice(0, 10)),
             amount: String(num(body.amount as string | number)),
@@ -1023,20 +1027,20 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
               amount: body.amount !== undefined ? String(num(body.amount as string | number)) : undefined,
               note: typeof body.note === 'string' ? body.note : undefined,
             })
-            .where(and(eq(jewelLoanRepayments.userEmail, em), eq(jewelLoanRepayments.id, id)))
+            .where(and(whereOrgFilter(jewelLoanRepayments, budgetScope), eq(jewelLoanRepayments.id, id)))
           return ok(res, true, traceId)
         }
         if (action === 'deleteHistory' && typ === 'jewel') {
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
-          await db.delete(jewelLoanRepayments).where(and(eq(jewelLoanRepayments.userEmail, em), eq(jewelLoanRepayments.id, id)))
+          await db.delete(jewelLoanRepayments).where(and(whereOrgFilter(jewelLoanRepayments, budgetScope), eq(jewelLoanRepayments.id, id)))
           return ok(res, true, traceId)
         }
         if (action === 'addHistory' && typ === 'cash') {
           const id = crypto.randomUUID()
           await db.insert(cashLoanRepayments).values({
+            orgId: orgId,
             id,
-            userEmail: em,
             loanId: String(body.loan_id ?? ''),
             date: String(body.date ?? new Date().toISOString().slice(0, 10)),
             amount: String(num(body.amount as string | number)),
@@ -1047,7 +1051,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         if (action === 'deleteHistory' && typ === 'cash') {
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
-          await db.delete(cashLoanRepayments).where(and(eq(cashLoanRepayments.userEmail, em), eq(cashLoanRepayments.id, id)))
+          await db.delete(cashLoanRepayments).where(and(whereOrgFilter(cashLoanRepayments, budgetScope), eq(cashLoanRepayments.id, id)))
           return ok(res, true, traceId)
         }
       }
@@ -1056,8 +1060,8 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         if (action === 'addEntry') {
           const id = crypto.randomUUID()
           await db.insert(bankingRecords).values({
+            orgId: orgId,
             id,
-            userEmail: em,
             holderName: typeof body.account_holder_name === 'string' ? body.account_holder_name : null,
             bankName: String(body.bank_name ?? ''),
             accountNo: typeof body.account_no === 'string' ? body.account_no : null,
@@ -1091,20 +1095,20 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
               appUuid: typeof body.app_uuid === 'string' ? body.app_uuid : undefined,
               updatedAt: new Date(),
             })
-            .where(and(eq(bankingRecords.userEmail, em), eq(bankingRecords.id, id)))
+            .where(and(whereOrgFilter(bankingRecords, budgetScope), eq(bankingRecords.id, id)))
           return ok(res, true, traceId)
         }
         if (action === 'deleteEntry') {
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
-          await db.delete(bankingRecords).where(and(eq(bankingRecords.userEmail, em), eq(bankingRecords.id, id)))
+          await db.delete(bankingRecords).where(and(whereOrgFilter(bankingRecords, budgetScope), eq(bankingRecords.id, id)))
           return ok(res, true, traceId)
         }
         if (action === 'addApp') {
           const id = crypto.randomUUID()
           await db.insert(vaultApps).values({
+            orgId: orgId,
             id,
-            userEmail: em,
             appName: String(body.app_name ?? ''),
             category: typeof body.category === 'string' ? body.category : null,
             logo: typeof body.logo === 'string' ? body.logo : null,
@@ -1133,13 +1137,13 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
               notes: typeof body.notes === 'string' ? body.notes : undefined,
               updatedAt: new Date(),
             })
-            .where(and(eq(vaultApps.userEmail, em), eq(vaultApps.id, app_uuid)))
+            .where(and(whereOrgFilter(vaultApps, budgetScope), eq(vaultApps.id, app_uuid)))
           return ok(res, true, traceId)
         }
         if (action === 'deleteApp') {
           const app_uuid = typeof body.app_uuid === 'string' ? body.app_uuid : ''
           if (!app_uuid) return fail(res, 400, 'Missing app_uuid', traceId)
-          await db.delete(vaultApps).where(and(eq(vaultApps.userEmail, em), eq(vaultApps.id, app_uuid)))
+          await db.delete(vaultApps).where(and(whereOrgFilter(vaultApps, budgetScope), eq(vaultApps.id, app_uuid)))
           return ok(res, true, traceId)
         }
       }
@@ -1148,8 +1152,8 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         if (action === 'addEntry') {
           const id = crypto.randomUUID()
           await db.insert(insurance).values({
+            orgId: orgId,
             id,
-            userEmail: em,
             policyType: typeof body.policy_type === 'string' ? body.policy_type : null,
             planName: String(body.plan_name ?? ''),
             insurer: typeof body.insurer === 'string' ? body.insurer : null,
@@ -1201,13 +1205,13 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
               notes: typeof body.notes === 'string' ? body.notes : undefined,
               updatedAt: new Date(),
             })
-            .where(and(eq(insurance.userEmail, em), eq(insurance.id, id)))
+            .where(and(whereOrgFilter(insurance, budgetScope), eq(insurance.id, id)))
           return ok(res, true, traceId)
         }
         if (action === 'deleteEntry') {
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
-          await db.delete(insurance).where(and(eq(insurance.userEmail, em), eq(insurance.id, id)))
+          await db.delete(insurance).where(and(whereOrgFilter(insurance, budgetScope), eq(insurance.id, id)))
           return ok(res, true, traceId)
         }
       }
@@ -1216,8 +1220,8 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         if (action === 'addEntry') {
           const id = crypto.randomUUID()
           await db.insert(subscriptions).values({
+            orgId: orgId,
             id,
-            userEmail: em,
             name: String(body.name ?? ''),
             category: typeof body.category === 'string' ? body.category : null,
             amount: String(num(body.amount as string | number)),
@@ -1253,13 +1257,13 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
               notes: typeof body.notes === 'string' ? body.notes : undefined,
               updatedAt: new Date(),
             })
-            .where(and(eq(subscriptions.userEmail, em), eq(subscriptions.id, id)))
+            .where(and(whereOrgFilter(subscriptions, budgetScope), eq(subscriptions.id, id)))
           return ok(res, true, traceId)
         }
         if (action === 'deleteEntry') {
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
-          await db.delete(subscriptions).where(and(eq(subscriptions.userEmail, em), eq(subscriptions.id, id)))
+          await db.delete(subscriptions).where(and(whereOrgFilter(subscriptions, budgetScope), eq(subscriptions.id, id)))
           return ok(res, true, traceId)
         }
       }
@@ -1281,12 +1285,11 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         if (!Array.isArray(budgets)) return fail(res, 400, 'Invalid budgets', traceId)
         const mk = resolvePostedBudgetMonthYear(body)
         if (!mk.ok) return fail(res, 400, mk.error, traceId)
-        await db.delete(budget).where(and(budgetRowsBaseWhere(budgetScope, em), eq(budget.monthYear, mk.key)))
+        await db.delete(budget).where(and(budgetRowsBaseWhere(budgetScope), eq(budget.monthYear, mk.key)))
         for (const e of budgets) {
           if (!e?.name?.trim()) continue
           await db.insert(budget).values({
             id: e.id && typeof e.id === 'string' ? e.id : crypto.randomUUID(),
-            userEmail: em,
             orgId: budgetScope.mode === 'org' ? budgetScope.orgId : null,
             monthYear: mk.key,
             category: e.name.trim(),
@@ -1302,7 +1305,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         if (!name) return fail(res, 400, 'Invalid budget entry', traceId)
         const mk = resolvePostedBudgetMonthYear(body)
         if (!mk.ok) return fail(res, 400, mk.error, traceId)
-        const base = budgetRowsBaseWhere(budgetScope, em)
+        const base = budgetRowsBaseWhere(budgetScope)
         const [existing] = await db
           .select()
           .from(budget)
@@ -1318,7 +1321,6 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         const id = crypto.randomUUID()
         await db.insert(budget).values({
           id,
-          userEmail: em,
           orgId: budgetScope.mode === 'org' ? budgetScope.orgId : null,
           monthYear: mk.key,
           category: name,
@@ -1332,7 +1334,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         const name = typeof body.name === 'string' ? body.name.trim() : ''
         const amt = num(body.amt as string | number)
         if (!id || !name) return fail(res, 400, 'Invalid budget entry', traceId)
-        const base = budgetRowsBaseWhere(budgetScope, em)
+        const base = budgetRowsBaseWhere(budgetScope)
         const [existingRow] = await db.select().from(budget).where(and(eq(budget.id, id), base)).limit(1)
         if (!existingRow) return fail(res, 404, 'Budget entry not found', traceId)
         const mk = resolvePostedBudgetMonthYearOrDefault(body, existingRow.monthYear)
@@ -1352,7 +1354,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
       if (action === 'deleteBudgetEntry') {
         const id = typeof body.id === 'string' ? body.id : ''
         if (!id) return fail(res, 400, 'Missing id', traceId)
-        await db.delete(budget).where(and(eq(budget.id, id), budgetRowsBaseWhere(budgetScope, em)))
+        await db.delete(budget).where(and(eq(budget.id, id), budgetRowsBaseWhere(budgetScope)))
         return ok(res, true, traceId)
       }
 
@@ -1367,7 +1369,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         if (!iso) return fail(res, 400, 'Invalid date', traceId)
         await db.insert(transactions).values({
           id,
-          userEmail: em,
+          orgId: orgId,
           date: iso,
           description: String(body.desc ?? ''),
           amount: String(num(body.a as string | number)),
@@ -1401,14 +1403,14 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
             notes: typeof body.notes === 'string' ? body.notes : '',
             monthYear: my,
           })
-          .where(and(eq(transactions.userEmail, em), eq(transactions.id, id)))
+          .where(and(whereOrgFilter(transactions, budgetScope), eq(transactions.id, id)))
         return ok(res, true, traceId)
       }
 
       if (action === 'deleteRow') {
         const id = typeof body.id === 'string' ? body.id : ''
         if (!id) return fail(res, 400, 'Missing id', traceId)
-        await db.delete(transactions).where(and(eq(transactions.userEmail, em), eq(transactions.id, id)))
+        await db.delete(transactions).where(and(whereOrgFilter(transactions, budgetScope), eq(transactions.id, id)))
         return ok(res, true, traceId)
       }
 
@@ -1427,7 +1429,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
       if (action === 'resetBudget') {
         await db
           .delete(budget)
-          .where(and(budgetRowsBaseWhere(budgetScope, em), eq(budget.monthYear, BUDGET_SCOPE_KEY)))
+          .where(and(budgetRowsBaseWhere(budgetScope), eq(budget.monthYear, BUDGET_SCOPE_KEY)))
         return ok(res, [], traceId)
       }
 
