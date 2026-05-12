@@ -29,6 +29,7 @@ import {
   users,
   vaultApps,
 } from '@fintracker-vault/db'
+import { normalizeLendingSheetSlug } from './lendingSheetSlug'
 
 const BUDGET_SCOPE_KEY = '__global__'
 
@@ -380,7 +381,18 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
       }
 
       if (mod === 'lending' && action === 'getEntries') {
-        const rows = await db.select().from(lending).where(whereOrgFilter(lending, budgetScope)).orderBy(desc(lending.date))
+        const sheetRaw =
+          typeof req.query.sheetName === 'string'
+            ? req.query.sheetName
+            : typeof req.query.sheet === 'string'
+              ? req.query.sheet
+              : undefined
+        const book = normalizeLendingSheetSlug(sheetRaw)
+        const rows = await db
+          .select()
+          .from(lending)
+          .where(and(whereOrgFilter(lending, budgetScope), eq(lending.sheetSlug, book)))
+          .orderBy(desc(lending.date))
         return ok(
           res,
           rows.map((r) => ({
@@ -840,12 +852,14 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
       }
 
       if (mod === 'lending') {
+        const book = normalizeLendingSheetSlug(body.sheetName ?? body.sheet)
         if (action === 'addEntry') {
           const id = crypto.randomUUID()
           const dateStr = typeof body.date === 'string' ? body.date : new Date().toISOString().slice(0, 10)
           await db.insert(lending).values({
             id,
             orgId: scopeOrgId,
+            sheetSlug: book,
             date: dateStr,
             name: String(body.name ?? ''),
             amount: String(num(body.amount as string | number)),
@@ -866,13 +880,15 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
               type: typeof body.type === 'string' ? body.type : undefined,
               description: typeof body.description === 'string' ? body.description : undefined,
             })
-            .where(and(whereOrgFilter(lending, budgetScope), eq(lending.id, id)))
+            .where(and(whereOrgFilter(lending, budgetScope), eq(lending.id, id), eq(lending.sheetSlug, book)))
           return ok(res, true, traceId)
         }
         if (action === 'deleteEntry') {
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
-          await db.delete(lending).where(and(whereOrgFilter(lending, budgetScope), eq(lending.id, id)))
+          await db
+            .delete(lending)
+            .where(and(whereOrgFilter(lending, budgetScope), eq(lending.id, id), eq(lending.sheetSlug, book)))
           return ok(res, true, traceId)
         }
       }

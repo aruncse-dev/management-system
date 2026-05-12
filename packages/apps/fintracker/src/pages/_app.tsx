@@ -14,6 +14,11 @@ import {
   writeMenuCache,
   type CachedProfileMenuRow,
 } from '../lib/profileMenuCache'
+import {
+  LENDING_SHEET_SLUG_DEFAULT,
+  lendingBookLabel,
+  normalizeLendingSheetSlug,
+} from '../lib/lendingSheetSlug'
 import '../ui-kit/ui-kit.css'
 import '../styles/globals.css'
 
@@ -54,7 +59,7 @@ const PAGE_TITLES: Record<ModuleId, string> = {
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter()
-  const [lendingSheet, setLendingSheet] = useState('Lending')
+  const [lendingSheet, setLendingSheet] = useState<string>(LENDING_SHEET_SLUG_DEFAULT)
   const [dynamicMenu, setDynamicMenu] = useState<NavDynamicMenuSection[]>([])
 
   useLayoutEffect(() => {
@@ -111,7 +116,9 @@ export default function App({ Component, pageProps }: AppProps) {
         credits: '/monthly?tab=cc',
         accounts: '/monthly?tab=acct',
         lending:
-          sheet && sheet !== 'Lending' ? `/lending?sheet=${encodeURIComponent(sheet)}` : '/lending',
+          sheet && sheet !== LENDING_SHEET_SLUG_DEFAULT
+            ? `/lending?sheet=${encodeURIComponent(sheet)}`
+            : '/lending',
         savings: '/savings',
         subscriptions: '/subscriptions',
         gold: '/gold',
@@ -131,8 +138,8 @@ export default function App({ Component, pageProps }: AppProps) {
     if (!router.isReady || router.pathname !== '/lending') return
     const q = router.query.sheet
     const s = typeof q === 'string' ? q : Array.isArray(q) ? q[0] : undefined
-    if (s) setLendingSheet(s)
-    else setLendingSheet('Lending')
+    if (s) setLendingSheet(normalizeLendingSheetSlug(s))
+    else setLendingSheet(LENDING_SHEET_SLUG_DEFAULT)
   }, [router.isReady, router.pathname, router.query.sheet])
 
   useEffect(() => {
@@ -157,7 +164,7 @@ export default function App({ Component, pageProps }: AppProps) {
   const pageTitle = useMemo(() => {
     if (!moduleFromPath) return 'FinTracker'
     if (moduleFromPath !== 'lending') return PAGE_TITLES[moduleFromPath]
-    return lendingSheet && lendingSheet !== 'Lending' ? lendingSheet : PAGE_TITLES.lending
+    return lendingSheet !== LENDING_SHEET_SLUG_DEFAULT ? lendingBookLabel(lendingSheet) : PAGE_TITLES.lending
   }, [moduleFromPath, lendingSheet])
 
   return (

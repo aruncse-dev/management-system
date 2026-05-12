@@ -1,6 +1,7 @@
 import { Budget, BudgetEntry, MonthRef, OpeningBal, Transaction } from './types';
 import type { FintrackerPrefs } from './expenseCycle';
 import { API_URL } from './constants';
+import { normalizeLendingSheetSlug } from './lib/lendingSheetSlug';
 
 type ApiResponse<T> = { ok: true; data: T; traceId?: string; debug?: Record<string, unknown> } | { ok: false; error: string; traceId?: string };
 
@@ -388,10 +389,10 @@ export const api = {
     }),
   deleteBudgetEntry: (id: string)                  => post<boolean>({ action: 'deleteBudgetEntry', id }),
   saveOpeningBal:(data: OpeningBal)             => post<boolean>({ action: 'saveOpeningBal', data }),
-  getLending:    (sheetName?: string)          => get<RawLendingRow[]>('getEntries', { module: 'lending', ...(sheetName && sheetName !== 'Lending' && { sheetName }) }),
-  addLending:    (p: Record<string, unknown>, sheetName?: string)  => post<string>({ module: 'lending', action: 'addEntry', ...(sheetName && sheetName !== 'Lending' && { sheetName }), ...p }),
-  updateLending: (p: Record<string, unknown>, sheetName?: string)  => post<boolean>({ module: 'lending', action: 'updateEntry', ...(sheetName && sheetName !== 'Lending' && { sheetName }), ...p }),
-  deleteLending: (id: string, sheetName?: string)                  => post<boolean>({ module: 'lending', action: 'deleteEntry', id, ...(sheetName && sheetName !== 'Lending' && { sheetName }) }),
+  getLending:    (sheetSlug?: string)          => get<RawLendingRow[]>('getEntries', { module: 'lending', sheetName: normalizeLendingSheetSlug(sheetSlug) }),
+  addLending:    (p: Record<string, unknown>, sheetSlug?: string)  => post<string>({ module: 'lending', action: 'addEntry', sheetName: normalizeLendingSheetSlug(sheetSlug), ...p }),
+  updateLending: (p: Record<string, unknown>, sheetSlug?: string)  => post<boolean>({ module: 'lending', action: 'updateEntry', sheetName: normalizeLendingSheetSlug(sheetSlug), ...p }),
+  deleteLending: (id: string, sheetSlug?: string)                  => post<boolean>({ module: 'lending', action: 'deleteEntry', id, sheetName: normalizeLendingSheetSlug(sheetSlug) }),
   getSavings:    (sheetName?: string)          => get<RawSavingsRow[]>('getEntries', { module: 'savings', ...(sheetName && sheetName !== 'Savings' ? { sheetName } : {}) }),
   addSavings:    (p: Record<string, unknown>, sheetName?: string)  => post<string>({ module: 'savings', action: 'addEntry', ...(sheetName && sheetName !== 'Savings' ? { sheetName } : {}), ...p }),
   updateSavings: (p: Record<string, unknown>, sheetName?: string)  => post<boolean>({ module: 'savings', action: 'updateEntry', ...(sheetName && sheetName !== 'Savings' ? { sheetName } : {}), ...p }),

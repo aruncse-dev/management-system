@@ -51,7 +51,7 @@ export const MENU_CATALOG_SEED: MenuCatalogSeedRow[] = [
     slug: 'lending-vijaya',
     label: 'Vijaya Amma',
     icon: 'User',
-    path: '/lending?sheet=Vijaya%20Amma',
+    path: '/lending?sheet=vijaya-amma',
     sectionId: 'credit',
     sortOrder: 1,
     appSlugs: ['fintracker'],
