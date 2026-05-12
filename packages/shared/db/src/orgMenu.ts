@@ -37,7 +37,8 @@ export async function setOrgEnabledMenuIds(
   if (!org) throw new Error(`Organization not found: ${orgId}`)
 
   const enabledMenus = (org.enabledMenus as Record<string, string[]>) ?? {}
-  enabledMenus[appSlug] = enabledMenuIds
+  const validIds = enabledMenuIds.filter(id => resolveMenuCatalogRow(appSlug, id) !== null)
+  enabledMenus[appSlug] = validIds
 
   await db
     .update(organizations)
@@ -73,12 +74,13 @@ export async function getEnabledOrgMenu(orgId: string, appSlug: string): Promise
     for (const menuId of menuIds) {
       if (enabledMenuIds.has(menuId)) {
         const row = resolveMenuCatalogRow(appSlug, menuId)
+        if (!row) continue
         result.push({
           id: menuId,
           slug: menuId,
-          label: row?.label ?? menuId.charAt(0).toUpperCase() + menuId.slice(1),
-          icon: row?.icon ?? null,
-          path: row?.path ?? `/${menuId}`,
+          label: row.label,
+          icon: row.icon,
+          path: row.path,
           sectionSlug: sectionLabel.toLowerCase().replace(/\s+/g, '-'),
           sectionLabel,
           sortOrder: sortOrder++,
@@ -133,14 +135,15 @@ export async function getOrgMenuEditorState(
     for (const [sectionLabel, menuIds] of Object.entries(appMenus)) {
       for (const menuId of menuIds) {
         const row = resolveMenuCatalogRow(app, menuId)
+        if (!row) continue
         result.push({
           id: menuId,
           slug: menuId,
           sectionSlug: sectionLabel.toLowerCase().replace(/\s+/g, '-'),
           sectionLabel,
-          label: row?.label ?? menuId.charAt(0).toUpperCase() + menuId.slice(1),
-          icon: row?.icon ?? null,
-          path: row?.path ?? `/${menuId}`,
+          label: row.label,
+          icon: row.icon,
+          path: row.path,
           sortOrder: sortOrder++,
           enabled: enabledMenuIds.has(menuId),
         })

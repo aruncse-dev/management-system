@@ -37,7 +37,7 @@ All apps share UI/components via a pnpm monorepo. Frontend + API deploy to **Ver
    export DATABASE_URL="postgresql://..."
    pnpm --filter @fintracker-vault/db run drizzle:push
    ```
-   Schema is defined in `packages/shared/db/src/schema` and applied with `drizzle:push`. After changing schema files, run `pnpm --filter @fintracker-vault/db run export-schema` (updates **`packages/shared/db/migrations/schema.sql`** — full CREATE DDL). For existing DBs that lag behind, use root **`migration.sql`** (ALTER-only) or `drizzle:push`. See [docs/neon-schema-migrations.md](./docs/neon-schema-migrations.md).
+   Schema is defined in `packages/shared/db/src/schema` and applied with `drizzle:push`. After changing schema files, run `pnpm --filter @fintracker-vault/db run export-schema` (updates **`packages/shared/db/migrations/schema.sql`** — full CREATE DDL). For existing DBs that lag behind, use `drizzle:push`. See [docs/neon-schema-migrations.md](./docs/neon-schema-migrations.md).
 
 4. **Run FinTracker**
    ```bash

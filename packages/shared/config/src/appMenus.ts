@@ -13,7 +13,6 @@ export const FINTRACKER_MENUS: Record<string, { slug: string; label: string }[]>
   Assets: [
     { slug: 'savings', label: 'Savings' },
     { slug: 'gold', label: 'Gold' },
-    { slug: 'bommi', label: 'Bommi' },
   ],
   Investments: [{ slug: 'investments', label: 'Stocks & Mutual Funds' }],
   Credit: [

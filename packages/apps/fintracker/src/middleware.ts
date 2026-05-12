@@ -9,7 +9,6 @@ const LOWERCASE_ROUTES = new Set([
   '/accounts',
   '/lending',
   '/savings',
-  '/bommi',
   '/gold',
   '/investments',
   '/loans',

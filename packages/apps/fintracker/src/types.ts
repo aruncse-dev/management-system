@@ -50,7 +50,7 @@ export interface AppState {
   budget: Budget
   openingBal: OpeningBal
   months: MonthRef[]
-  /** From `users.settings.fintracker` via init. */
+  /** From org or user settings `.fintracker` via init. */
   fintracker: FintrackerPrefs
   loading: boolean
   txnPage: number

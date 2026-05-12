@@ -43,7 +43,6 @@ const PAGE_TITLES: Record<ModuleId, string> = {
   lending: 'Lending',
   savings: 'Savings',
   subscriptions: 'Subscriptions',
-  bommi: 'Bommi',
   gold: 'Gold',
   investments: 'Investments',
   stocks: 'Stocks',
@@ -91,7 +90,6 @@ export default function App({ Component, pageProps }: AppProps) {
     if (p === '/lending') return 'lending'
     if (p === '/savings' || p === '/savingspage') return 'savings'
     if (p === '/subscriptions') return 'subscriptions'
-    if (p === '/bommi') return 'bommi'
     if (p === '/gold') return 'gold'
     if (p === '/investments') return 'investments'
     if (p === '/stocks') return 'stocks'
@@ -116,7 +114,6 @@ export default function App({ Component, pageProps }: AppProps) {
           sheet && sheet !== 'Lending' ? `/lending?sheet=${encodeURIComponent(sheet)}` : '/lending',
         savings: '/savings',
         subscriptions: '/subscriptions',
-        bommi: '/bommi',
         gold: '/gold',
         investments: '/investments',
         stocks: '/stocks',

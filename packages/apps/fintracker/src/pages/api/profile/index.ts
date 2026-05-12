@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { getIronSession } from 'iron-session'
 import { eq } from 'drizzle-orm'
 import type { FtSessionData } from '@fintracker-vault/auth'
-import { getDb, getEnabledOrgMenu, users } from '@fintracker-vault/db'
+import { getDb, getEnabledOrgMenu, organizations, users } from '@fintracker-vault/db'
 import { applyDefaultOrgToSession, listOrgsForUserEmail } from '../../../lib/dbAuth'
 import { getSessionOptions } from '../../../lib/session'
 
@@ -31,6 +31,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       menu = await getEnabledOrgMenu(session.activeOrgId, 'fintracker')
     }
 
+    let settingsPayload: unknown = user.settings
+    const activeOid = session.activeOrgId?.trim() ?? ''
+    if (activeOid && orgs.some((o) => o.id === activeOid)) {
+      const [org] = await db
+        .select({ settings: organizations.settings })
+        .from(organizations)
+        .where(eq(organizations.id, activeOid))
+        .limit(1)
+      const s = org?.settings
+      settingsPayload = s && typeof s === 'object' ? s : {}
+    }
+
     return res.status(200).json({
       ok: true,
       data: {
@@ -38,7 +50,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         displayName: user.displayName,
         role: user.role,
         status: user.status,
-        settings: user.settings,
+        settings: settingsPayload,
         useDb: user.useDb,
         orgs,
         activeOrgId: session.activeOrgId ?? null,
@@ -54,14 +66,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       : undefined
     const settings = (body as { settings?: unknown }).settings
 
-    await db
-      .update(users)
-      .set({
-        displayName,
-        settings: settings === undefined ? undefined : settings,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.email, email))
+    const orgsForPatch = await listOrgsForUserEmail(email)
+    const activeOid = session.activeOrgId?.trim() ?? ''
+    const orgSettingsTarget =
+      activeOid && orgsForPatch.some((o) => o.id === activeOid) ? activeOid : null
+
+    if (settings !== undefined && orgSettingsTarget) {
+      await db
+        .update(organizations)
+        .set({ settings, updatedAt: new Date() })
+        .where(eq(organizations.id, orgSettingsTarget))
+    }
+
+    if (displayName !== undefined || (settings !== undefined && !orgSettingsTarget)) {
+      await db
+        .update(users)
+        .set({
+          ...(displayName !== undefined ? { displayName } : {}),
+          ...(settings !== undefined && !orgSettingsTarget ? { settings } : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(users.email, email))
+    }
 
     return res.status(200).json({ ok: true })
   }
