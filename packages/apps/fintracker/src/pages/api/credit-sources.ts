@@ -33,9 +33,8 @@ async function ensureDefaultCreditSources(db: ReturnType<typeof getDb>, orgId: s
   const defaults = [
     { name: 'ICICI', sourceType: 'credit_card' as const, sortOrder: 0 },
     { name: 'HDFC', sourceType: 'credit_card' as const, sortOrder: 1 },
-    { name: 'Bommi', sourceType: 'informal' as const, sortOrder: 2 },
-    { name: 'Ramya', sourceType: 'informal' as const, sortOrder: 3 },
-    { name: 'Others', sourceType: 'informal' as const, sortOrder: 4 },
+    { name: 'Ramya', sourceType: 'informal' as const, sortOrder: 2 },
+    { name: 'Others', sourceType: 'informal' as const, sortOrder: 3 },
   ]
   for (const row of defaults) {
     await db.insert(paymentSources).values({

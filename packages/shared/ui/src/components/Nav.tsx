@@ -24,7 +24,6 @@ export type ModuleId =
   | 'lending'
   | 'savings'
   | 'subscriptions'
-  | 'bommi'
   | 'gold'
   | 'investments'
   | 'stocks'
@@ -134,7 +133,6 @@ const TRACKING: NavItem[] = [
 const ASSETS: NavItem[] = [
   { id: 'savings', icon: <PiggyBank size={18} />, label: 'Savings' },
   { id: 'gold', icon: <Gem size={18} />, label: 'Gold' },
-  { id: 'bommi', icon: <PiggyBank size={18} />, label: 'Bommi' },
 ]
 
 const INVESTMENTS: NavItem[] = [

@@ -1,7 +1,7 @@
 --
 -- Full PostgreSQL DDL for an empty database (matches Drizzle TS in src/schema/).
 -- GENERATED — edit TypeScript only, then: pnpm --filter @fintracker-vault/db run export-schema
--- For existing DBs: pnpm --filter @fintracker-vault/db run drizzle:push OR run root migration.sql (ALTERs only).
+-- For existing DBs: pnpm --filter @fintracker-vault/db run drizzle:push.
 --
 CREATE TABLE "users" (
 	"email" text PRIMARY KEY NOT NULL,
@@ -32,6 +32,7 @@ CREATE TABLE "organizations" (
 	"notes" text,
 	"enabled_apps" jsonb DEFAULT '[]',
 	"enabled_menus" jsonb DEFAULT '{}',
+	"settings" jsonb DEFAULT '{}',
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL,
 	CONSTRAINT "organizations_slug_unique" UNIQUE("slug")
@@ -116,8 +117,16 @@ CREATE TABLE "gold_items" (
 	"org_id" text,
 	"name" text NOT NULL,
 	"weight_g" numeric(10, 3) NOT NULL,
-	"person" text,
-	"location" text
+	"person_id" text,
+	"location_id" text
+);
+
+CREATE TABLE "gold_resources" (
+	"id" text PRIMARY KEY NOT NULL,
+	"org_id" text,
+	"type" text NOT NULL,
+	"name" text NOT NULL,
+	"skip" boolean DEFAULT false NOT NULL
 );
 
 CREATE TABLE "cash_loan_repayments" (

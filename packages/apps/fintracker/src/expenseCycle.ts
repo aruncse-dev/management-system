@@ -1,6 +1,6 @@
 import { MNS } from './config'
 
-/** Stored under `users.settings.fintracker` (single JSON object). */
+/** Stored under `organizations.settings.fintracker` when an org is active; otherwise `users.settings.fintracker`. */
 export type ExpenseCycleMode = 'regular' | 'custom'
 
 export interface FintrackerPrefs {

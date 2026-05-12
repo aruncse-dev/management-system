@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { desc } from 'drizzle-orm'
-import { assignDefaultOrgMenus, getDb, organizations } from '@fintracker-vault/db'
+import { desc, inArray, sql } from 'drizzle-orm'
+import { assignDefaultOrgMenus, getDb, orgMembers, organizations } from '@fintracker-vault/db'
 import { requirePlatformAdmin } from '../../../../lib/adminGuard'
 import { randomUUID } from 'crypto'
 
@@ -20,8 +20,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const db = getDb()
 
   if (req.method === 'GET') {
-    const rows = await db.select().from(organizations).orderBy(desc(organizations.createdAt))
-    return res.status(200).json({ ok: true, data: rows })
+    const orgRows = await db.select().from(organizations).orderBy(desc(organizations.createdAt))
+    const orgIds = orgRows.map(o => o.id)
+    const countByOrg = new Map<string, number>()
+    if (orgIds.length > 0) {
+      const counts = await db
+        .select({
+          orgId: orgMembers.orgId,
+          c: sql<number>`cast(count(*) as int)`.as('c'),
+        })
+        .from(orgMembers)
+        .where(inArray(orgMembers.orgId, orgIds))
+        .groupBy(orgMembers.orgId)
+      for (const row of counts) countByOrg.set(row.orgId, row.c)
+    }
+    const data = orgRows.map(o => ({
+      ...o,
+      memberCount: countByOrg.get(o.id) ?? 0,
+    }))
+    return res.status(200).json({ ok: true, data })
   }
 
   if (req.method === 'POST') {

@@ -10,6 +10,7 @@ type OrgRow = {
   slug: string | null
   status: string
   createdAt: string
+  memberCount: number
 }
 
 type AppRow = {
@@ -118,12 +119,7 @@ export default function AdminOrgsPage() {
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase()
     if (!term) return rows
-    return rows.filter(
-      o =>
-        o.name.toLowerCase().includes(term) ||
-        (o.slug || '').toLowerCase().includes(term) ||
-        (o.status || '').toLowerCase().includes(term),
-    )
+    return rows.filter(o => o.name.toLowerCase().includes(term))
   }, [rows, q])
 
   function startAdd() {
@@ -358,7 +354,9 @@ export default function AdminOrgsPage() {
                     >
                       <div className="admin-card-item__body">
                         <p className="admin-card-item__title">{o.name}</p>
-                        <p className="admin-card-item__meta">{o.slug ? `Slug: ${o.slug}` : 'No slug'} • {o.status}</p>
+                        <p className="admin-card-item__meta">
+                          {o.memberCount === 1 ? '1 member' : `${o.memberCount} members`}
+                        </p>
                       </div>
                       <button
                         type="button"

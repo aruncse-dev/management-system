@@ -17,8 +17,18 @@ import {
   Coins,
   Plug,
   IndianRupee,
+  Gem,
+  MapPin,
 } from 'lucide-react';
-import { api, type AccountRow, type AccountUsedFor, type CreditSourceCategory, type CreditSourceRow, type ProfileData } from '../api';
+import {
+  api,
+  type AccountRow,
+  type AccountUsedFor,
+  type CreditSourceCategory,
+  type CreditSourceRow,
+  type GoldResource,
+  type ProfileData,
+} from '../api';
 import { THEME_COLORS } from '../config';
 import { LoadingState, SectionBlock, SectionChip, FormField, Spacer, SettingsSectionCard, TransactionCard, type SettingField } from '../ui';
 import { useFintrackerModes } from '../context/FintrackerModesContext';
@@ -26,7 +36,9 @@ import { MENU_CACHE_UPDATED_EVENT, readMenuCache } from '../lib/profileMenuCache
 import type { FintrackerPrefs } from '../expenseCycle';
 import { DEFAULT_FINTRACKER_PREFS, cycleDateRange, cycleSubtitle } from '../expenseCycle';
 
-type SettingsNavTab = 'general' | 'accounts' | 'credits';
+type SettingsNavTab = 'general' | 'accounts' | 'gold';
+
+/** New gold resource rows use server-generated UUIDs. */
 
 function readMenuHasPath(path: string): boolean {
   const target = path.replace(/\/+$/, '') || path;
@@ -55,13 +67,24 @@ function accountNameIcon(name: string) {
 export default function Settings() {
   const router = useRouter();
   const rawTab = typeof router.query.tab === 'string' ? router.query.tab : '';
-  const settingsTab: SettingsNavTab = rawTab === 'accounts' || rawTab === 'credits' ? rawTab : 'general';
+  const settingsTab: SettingsNavTab =
+    rawTab === 'accounts' || rawTab === 'credits'
+      ? 'accounts'
+      : rawTab === 'gold'
+        ? 'gold'
+        : 'general';
   const setSettingsTab = (t: SettingsNavTab) => {
     void router.replace({ pathname: '/settings', query: t === 'general' ? {} : { tab: t } }, undefined, { shallow: true });
   };
 
-  const [accountModalOpen, setAccountModalOpen] = useState(false);
-  const [creditModalOpen, setCreditModalOpen] = useState(false);
+  useEffect(() => {
+    if (router.isReady && rawTab === 'credits') {
+      void router.replace({ pathname: '/settings', query: { tab: 'accounts' } }, undefined, { shallow: true });
+    }
+  }, [router, rawTab, router.isReady]);
+
+  const [moneyModalOpen, setMoneyModalOpen] = useState(false);
+  const [moneyModalKind, setMoneyModalKind] = useState<'account' | 'credit'>('account');
   const [acctDelConfirm, setAcctDelConfirm] = useState(false);
   const [crDelConfirm, setCrDelConfirm] = useState(false);
 
@@ -100,6 +123,17 @@ export default function Settings() {
   const [crDesc, setCrDesc] = useState('');
   const [crCat, setCrCat] = useState<CreditSourceCategory>('credit_card');
   const [crBusy, setCrBusy] = useState(false);
+
+  const [goldResources, setGoldResources] = useState<GoldResource[]>([]);
+  const [goldResLoading, setGoldResLoading] = useState(false);
+
+  const [grModalOpen, setGrModalOpen] = useState(false);
+  const [grEditingId, setGrEditingId] = useState<string | undefined>();
+  const [grType, setGrType] = useState<'person' | 'location'>('person');
+  const [grName, setGrName] = useState('');
+  const [grSkip, setGrSkip] = useState(false);
+  const [grBusy, setGrBusy] = useState(false);
+  const [grDelConfirm, setGrDelConfirm] = useState(false);
 
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [editingKey, setEditingKey] = useState<string | null>(null);
@@ -179,10 +213,11 @@ export default function Settings() {
   }, [validateLiveStatus]);
 
   useEffect(() => {
-    setAccountModalOpen(false);
-    setCreditModalOpen(false);
+    setMoneyModalOpen(false);
+    setGrModalOpen(false);
     setAcctDelConfirm(false);
     setCrDelConfirm(false);
+    setGrDelConfirm(false);
   }, [settingsTab]);
 
   async function saveField(key: string, value: string) {
@@ -253,33 +288,73 @@ export default function Settings() {
     setAcctUsed('both');
   }
 
+  function resetCrForm() {
+    setCrId(undefined);
+    setCrName('');
+    setCrDesc('');
+    setCrCat('credit_card');
+  }
+
+  function closeMoneyModal() {
+    setMoneyModalOpen(false);
+    resetAcctForm();
+    resetCrForm();
+    setAcctDelConfirm(false);
+    setCrDelConfirm(false);
+  }
+
   function startEditAccount(a: AccountRow) {
+    resetCrForm();
+    setMoneyModalKind('account');
     setAcctDelConfirm(false);
     setAcctId(a.id);
     setAcctName(a.name);
     setAcctDesc(a.description ?? '');
     setAcctUsed((a.usedFor as AccountUsedFor) || 'both');
+    setMoneyModalOpen(true);
   }
 
-  async function submitAccount(e: FormEvent) {
+  async function submitMoney(e: FormEvent) {
     e.preventDefault();
-    setAcctBusy(true);
-    setError('');
-    try {
-      await api.saveAccount({
-        id: acctId,
-        name: acctName.trim(),
-        description: acctDesc.trim() || null,
-        usedFor: acctUsed,
-      });
-      resetAcctForm();
-      setAccountModalOpen(false);
-      setAcctDelConfirm(false);
-      await refreshModes();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Save failed');
-    } finally {
-      setAcctBusy(false);
+    const isAccount = Boolean(acctId) || (!crId && moneyModalKind === 'account');
+    if (isAccount) {
+      setAcctBusy(true);
+      setError('');
+      try {
+        await api.saveAccount({
+          id: acctId,
+          name: acctName.trim(),
+          description: acctDesc.trim() || null,
+          usedFor: acctUsed,
+        });
+        resetAcctForm();
+        closeMoneyModal();
+        setAcctDelConfirm(false);
+        await refreshModes();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Save failed');
+      } finally {
+        setAcctBusy(false);
+      }
+    } else {
+      setCrBusy(true);
+      setError('');
+      try {
+        await api.saveCreditSource({
+          id: crId,
+          name: crName.trim(),
+          description: crDesc.trim() || null,
+          category: crCat,
+        });
+        resetCrForm();
+        closeMoneyModal();
+        setCrDelConfirm(false);
+        await refreshModes();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Save failed');
+      } finally {
+        setCrBusy(false);
+      }
     }
   }
 
@@ -293,7 +368,7 @@ export default function Settings() {
     try {
       await api.deleteAccount(acctId);
       resetAcctForm();
-      setAccountModalOpen(false);
+      closeMoneyModal();
       setAcctDelConfirm(false);
       await refreshModes();
     } catch (err) {
@@ -301,47 +376,15 @@ export default function Settings() {
     }
   }
 
-  function closeAccountModal() {
-    setAccountModalOpen(false);
-    resetAcctForm();
-    setAcctDelConfirm(false);
-  }
-
-  function resetCrForm() {
-    setCrId(undefined);
-    setCrName('');
-    setCrDesc('');
-    setCrCat('credit_card');
-  }
-
   function startEditCredit(c: CreditSourceRow) {
+    resetAcctForm();
+    setMoneyModalKind('credit');
     setCrDelConfirm(false);
     setCrId(c.id);
     setCrName(c.name);
     setCrDesc(c.description ?? '');
     setCrCat((c.category as CreditSourceCategory) || 'credit_card');
-  }
-
-  async function submitCredit(e: FormEvent) {
-    e.preventDefault();
-    setCrBusy(true);
-    setError('');
-    try {
-      await api.saveCreditSource({
-        id: crId,
-        name: crName.trim(),
-        description: crDesc.trim() || null,
-        category: crCat,
-      });
-      resetCrForm();
-      setCreditModalOpen(false);
-      setCrDelConfirm(false);
-      await refreshModes();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Save failed');
-    } finally {
-      setCrBusy(false);
-    }
+    setMoneyModalOpen(true);
   }
 
   async function deleteCreditFromModal() {
@@ -354,7 +397,7 @@ export default function Settings() {
     try {
       await api.deleteCreditSource(crId);
       resetCrForm();
-      setCreditModalOpen(false);
+      closeMoneyModal();
       setCrDelConfirm(false);
       await refreshModes();
     } catch (err) {
@@ -362,11 +405,109 @@ export default function Settings() {
     }
   }
 
-  function closeCreditModal() {
-    setCreditModalOpen(false);
+  const loadGoldResources = useCallback(
+    async (force = false) => {
+      if (!hasGoldMenu) return;
+      setGoldResLoading(true);
+      setError('');
+      try {
+        if (force) api.invalidateCache({ action: 'getResources', params: { module: 'gold' } });
+        const rows = await api.getGoldResources();
+        setGoldResources(rows);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Failed to load gold setup');
+      } finally {
+        setGoldResLoading(false);
+      }
+    },
+    [hasGoldMenu],
+  );
+
+  useEffect(() => {
+    if (settingsTab === 'gold' && hasGoldMenu) void loadGoldResources();
+  }, [settingsTab, hasGoldMenu, loadGoldResources]);
+
+  function openAddAccount() {
+    setMoneyModalKind('account');
+    resetAcctForm();
     resetCrForm();
-    setCrDelConfirm(false);
+    setAcctDelConfirm(false);
+    setMoneyModalOpen(true);
   }
+
+  function openAddCredit(category: CreditSourceCategory) {
+    setMoneyModalKind('credit');
+    resetAcctForm();
+    resetCrForm();
+    setCrCat(category);
+    setCrDelConfirm(false);
+    setMoneyModalOpen(true);
+  }
+
+  function openAddGoldResource(type: 'person' | 'location') {
+    setGrEditingId(undefined);
+    setGrType(type);
+    setGrName('');
+    setGrSkip(false);
+    setGrDelConfirm(false);
+    setGrModalOpen(true);
+  }
+
+  function startEditGoldResource(r: GoldResource) {
+    setGrEditingId(r.id);
+    setGrType(r.type);
+    setGrName(r.name);
+    setGrSkip(r.skip);
+    setGrDelConfirm(false);
+    setGrModalOpen(true);
+  }
+
+  function closeGrModal() {
+    setGrModalOpen(false);
+    setGrEditingId(undefined);
+    setGrName('');
+    setGrSkip(false);
+    setGrDelConfirm(false);
+  }
+
+  async function submitGoldResource(e: FormEvent) {
+    e.preventDefault();
+    if (!grName.trim()) return;
+    setGrBusy(true);
+    setError('');
+    try {
+      const skip = grType === 'location' ? grSkip : false;
+      if (grEditingId) {
+        await api.updateGoldResource({ id: grEditingId, type: grType, name: grName.trim(), skip });
+      } else {
+        await api.addGoldResource({ type: grType, name: grName.trim(), skip });
+      }
+      closeGrModal();
+      await loadGoldResources(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Save failed');
+    } finally {
+      setGrBusy(false);
+    }
+  }
+
+  async function deleteGoldResourceFromModal() {
+    if (!grEditingId) return;
+    if (!grDelConfirm) {
+      setGrDelConfirm(true);
+      return;
+    }
+    setError('');
+    try {
+      await api.deleteGoldResource(grEditingId);
+      closeGrModal();
+      await loadGoldResources(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Delete failed');
+    }
+  }
+
+  const showAccountFields = Boolean(acctId) || (!crId && moneyModalKind === 'account');
 
   return (
     <div className="ui-kit-page-shell savings-page">
@@ -387,14 +528,16 @@ export default function Settings() {
           <span className="bottom-nav-icon"><Wallet size={19} /></span>
           <span>Accounts</span>
         </button>
-        <button
-          type="button"
-          className={`bottom-nav-item${settingsTab === 'credits' ? ' active' : ''}`}
-          onClick={() => setSettingsTab('credits')}
-        >
-          <span className="bottom-nav-icon"><CreditCard size={19} /></span>
-          <span>Credits</span>
-        </button>
+        {hasGoldMenu ? (
+          <button
+            type="button"
+            className={`bottom-nav-item${settingsTab === 'gold' ? ' active' : ''}`}
+            onClick={() => setSettingsTab('gold')}
+          >
+            <span className="bottom-nav-icon"><Gem size={19} /></span>
+            <span>Gold</span>
+          </button>
+        ) : null}
       </nav>
 
       <div className="pg savings-page">
@@ -592,23 +735,6 @@ export default function Settings() {
               </SectionBlock>
             ) : null}
 
-            {!loading && hasGoldMenu ? (
-              <SectionBlock title="Gold" icon={<Coins size={14} aria-hidden />}>
-                <div className="txn-cards">
-                  <SettingsSectionCard
-                    field={GOLD_RATE_FIELD}
-                    value={settings[GOLD_RATE_FIELD.key] || ''}
-                    editing={editingKey === GOLD_RATE_FIELD.key}
-                    saving={saving}
-                    editValue={editValue}
-                    onStartEdit={() => startEdit(String(GOLD_RATE_FIELD.key))}
-                    onChange={setEditValue}
-                    onSave={value => saveField(String(GOLD_RATE_FIELD.key), value)}
-                  />
-                </div>
-              </SectionBlock>
-            ) : null}
-
             {!loading && hasSubscriptionsMenu ? (
               <SectionBlock title="Rates" icon={<IndianRupee size={14} aria-hidden />}>
                 <div className="txn-cards">
@@ -628,51 +754,40 @@ export default function Settings() {
         )}
 
         {settingsTab === 'accounts' && (
-          <SectionBlock title="Accounts" icon={<Wallet size={14} />} right={<SectionChip>{dbAccounts.length}</SectionChip>}>
-            {modesLoading ? (
-              <LoadingState variant="section" />
-            ) : dbAccounts.length === 0 ? (
-              <p style={{ color: 'var(--muted)', padding: '0.25rem 0', fontSize: 14 }}>No accounts yet. Tap + to add one.</p>
-            ) : (
-              <div className="txn-cards">
-                {dbAccounts.map(a => (
-                  <TransactionCard
-                    key={a.id}
-                    compact
-                    title={a.name}
-                    tone="navy"
-                    icon={accountNameIcon(a.name)}
-                    onClick={() => {
-                      startEditAccount(a);
-                      setAccountModalOpen(true);
-                    }}
-                  />
-                ))}
-              </div>
-            )}
-          </SectionBlock>
-        )}
-
-        {settingsTab === 'credits' && (
           <>
-            <SectionBlock title="Credit cards" icon={<CreditCard size={14} />} right={<SectionChip>{dbCredits.filter(c => c.category === 'credit_card').length}</SectionChip>}>
+            <SectionBlock
+              title="Payment accounts"
+              icon={<Wallet size={14} />}
+              right={
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  <SectionChip>{dbAccounts.length}</SectionChip>
+                  <button
+                    type="button"
+                    className="ui-kit-btn ui-kit-btn--soft ui-kit-btn-inline"
+                    onClick={openAddAccount}
+                    aria-label="Add payment account"
+                  >
+                    <Plus size={16} strokeWidth={2.5} />
+                  </button>
+                </span>
+              }
+            >
               {modesLoading ? (
                 <LoadingState variant="section" />
-              ) : dbCredits.filter(c => c.category === 'credit_card').length === 0 ? (
-                <p style={{ color: 'var(--muted)', padding: '0.25rem 0', fontSize: 14 }}>No cards yet. Tap + to add.</p>
+              ) : dbAccounts.length === 0 ? (
+                <p style={{ color: 'var(--muted)', padding: '0.25rem 0', fontSize: 14 }}>
+                  No accounts yet. Use + above to add one.
+                </p>
               ) : (
                 <div className="txn-cards">
-                  {dbCredits.filter(c => c.category === 'credit_card').map(c => (
+                  {dbAccounts.map((a) => (
                     <TransactionCard
-                      key={c.id}
+                      key={a.id}
                       compact
-                      title={c.name}
-                      tone="red"
-                      icon={<CreditCard size={14} />}
-                      onClick={() => {
-                        startEditCredit(c);
-                        setCreditModalOpen(true);
-                      }}
+                      title={a.name}
+                      tone="navy"
+                      icon={accountNameIcon(a.name)}
+                      onClick={() => startEditAccount(a)}
                     />
                   ))}
                 </div>
@@ -681,26 +796,191 @@ export default function Settings() {
 
             <Spacer size={6} />
 
-            <SectionBlock title="Other credits" icon={<Users size={14} />} right={<SectionChip>{dbCredits.filter(c => c.category === 'informal').length}</SectionChip>}>
+            <SectionBlock
+              title="Credit cards"
+              icon={<CreditCard size={14} />}
+              right={
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  <SectionChip>{dbCredits.filter((c) => c.category === 'credit_card').length}</SectionChip>
+                  <button
+                    type="button"
+                    className="ui-kit-btn ui-kit-btn--soft ui-kit-btn-inline"
+                    onClick={() => openAddCredit('credit_card')}
+                    aria-label="Add credit card"
+                  >
+                    <Plus size={16} strokeWidth={2.5} />
+                  </button>
+                </span>
+              }
+            >
               {modesLoading ? (
                 <LoadingState variant="section" />
-              ) : dbCredits.filter(c => c.category === 'informal').length === 0 ? (
-                <p style={{ color: 'var(--muted)', padding: '0.25rem 0', fontSize: 14 }}>No informal credits yet. Tap + to add.</p>
+              ) : dbCredits.filter((c) => c.category === 'credit_card').length === 0 ? (
+                <p style={{ color: 'var(--muted)', padding: '0.25rem 0', fontSize: 14 }}>
+                  No cards yet. Use + above to add.
+                </p>
               ) : (
                 <div className="txn-cards">
-                  {dbCredits.filter(c => c.category === 'informal').map(c => (
-                    <TransactionCard
-                      key={c.id}
-                      compact
-                      title={c.name}
-                      tone="amber"
-                      icon={<Users size={14} />}
-                      onClick={() => {
-                        startEditCredit(c);
-                        setCreditModalOpen(true);
-                      }}
-                    />
-                  ))}
+                  {dbCredits
+                    .filter((c) => c.category === 'credit_card')
+                    .map((c) => (
+                      <TransactionCard
+                        key={c.id}
+                        compact
+                        title={c.name}
+                        tone="red"
+                        icon={<CreditCard size={14} />}
+                        onClick={() => startEditCredit(c)}
+                      />
+                    ))}
+                </div>
+              )}
+            </SectionBlock>
+
+            <Spacer size={6} />
+
+            <SectionBlock
+              title="Other credits"
+              icon={<Users size={14} />}
+              right={
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  <SectionChip>{dbCredits.filter((c) => c.category === 'informal').length}</SectionChip>
+                  <button
+                    type="button"
+                    className="ui-kit-btn ui-kit-btn--soft ui-kit-btn-inline"
+                    onClick={() => openAddCredit('informal')}
+                    aria-label="Add informal credit"
+                  >
+                    <Plus size={16} strokeWidth={2.5} />
+                  </button>
+                </span>
+              }
+            >
+              {modesLoading ? (
+                <LoadingState variant="section" />
+              ) : dbCredits.filter((c) => c.category === 'informal').length === 0 ? (
+                <p style={{ color: 'var(--muted)', padding: '0.25rem 0', fontSize: 14 }}>
+                  No informal credits yet. Use + above to add.
+                </p>
+              ) : (
+                <div className="txn-cards">
+                  {dbCredits
+                    .filter((c) => c.category === 'informal')
+                    .map((c) => (
+                      <TransactionCard
+                        key={c.id}
+                        compact
+                        title={c.name}
+                        tone="amber"
+                        icon={<Users size={14} />}
+                        onClick={() => startEditCredit(c)}
+                      />
+                    ))}
+                </div>
+              )}
+            </SectionBlock>
+          </>
+        )}
+
+        {settingsTab === 'gold' && hasGoldMenu && (
+          <>
+            <SectionBlock title="Gold rate" icon={<Coins size={14} aria-hidden />}>
+              <div className="txn-cards">
+                {loading ? (
+                  <LoadingState variant="section" />
+                ) : (
+                  <SettingsSectionCard
+                    field={GOLD_RATE_FIELD}
+                    value={settings[GOLD_RATE_FIELD.key] || ''}
+                    editing={editingKey === GOLD_RATE_FIELD.key}
+                    saving={saving}
+                    editValue={editValue}
+                    onStartEdit={() => startEdit(String(GOLD_RATE_FIELD.key))}
+                    onChange={setEditValue}
+                    onSave={(value) => saveField(String(GOLD_RATE_FIELD.key), value)}
+                  />
+                )}
+              </div>
+            </SectionBlock>
+
+            <Spacer size={6} />
+
+            <SectionBlock
+              title="People"
+              icon={<User size={14} />}
+              right={
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  <SectionChip>{goldResources.filter((r) => r.type === 'person').length}</SectionChip>
+                  <button
+                    type="button"
+                    className="ui-kit-btn ui-kit-btn--soft ui-kit-btn-inline"
+                    onClick={() => openAddGoldResource('person')}
+                    aria-label="Add person"
+                  >
+                    <Plus size={16} strokeWidth={2.5} />
+                  </button>
+                </span>
+              }
+            >
+              {goldResLoading ? (
+                <LoadingState variant="section" />
+              ) : goldResources.filter((r) => r.type === 'person').length === 0 ? (
+                <p style={{ color: 'var(--muted)', padding: '0.25rem 0', fontSize: 14 }}>No people yet.</p>
+              ) : (
+                <div className="txn-cards">
+                  {goldResources
+                    .filter((r) => r.type === 'person')
+                    .map((r) => (
+                      <TransactionCard
+                        key={r.id}
+                        compact
+                        title={r.name}
+                        tone="navy"
+                        icon={<User size={14} />}
+                        onClick={() => startEditGoldResource(r)}
+                      />
+                    ))}
+                </div>
+              )}
+            </SectionBlock>
+
+            <Spacer size={6} />
+
+            <SectionBlock
+              title="Locations"
+              icon={<MapPin size={14} />}
+              right={
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  <SectionChip>{goldResources.filter((r) => r.type === 'location').length}</SectionChip>
+                  <button
+                    type="button"
+                    className="ui-kit-btn ui-kit-btn--soft ui-kit-btn-inline"
+                    onClick={() => openAddGoldResource('location')}
+                    aria-label="Add location"
+                  >
+                    <Plus size={16} strokeWidth={2.5} />
+                  </button>
+                </span>
+              }
+            >
+              {goldResLoading ? (
+                <LoadingState variant="section" />
+              ) : goldResources.filter((r) => r.type === 'location').length === 0 ? (
+                <p style={{ color: 'var(--muted)', padding: '0.25rem 0', fontSize: 14 }}>No locations yet.</p>
+              ) : (
+                <div className="txn-cards">
+                  {goldResources
+                    .filter((r) => r.type === 'location')
+                    .map((r) => (
+                      <TransactionCard
+                        key={r.id}
+                        compact
+                        title={r.skip ? `${r.name} · excluded from estimate` : r.name}
+                        tone={r.skip ? 'red' : 'navy'}
+                        icon={<MapPin size={14} />}
+                        onClick={() => startEditGoldResource(r)}
+                      />
+                    ))}
                 </div>
               )}
             </SectionBlock>
@@ -714,95 +994,94 @@ export default function Settings() {
         ) : null}
       </div>
 
-      {settingsTab === 'accounts' && !modesLoading && (
-        <button
-          type="button"
-          onClick={() => {
-            resetAcctForm();
-            setAcctDelConfirm(false);
-            setAccountModalOpen(true);
-          }}
-          style={{
-            position: 'fixed',
-            bottom: 24,
-            right: 20,
-            width: 52,
-            height: 52,
-            borderRadius: '50%',
-            background: 'var(--navy-dark)',
-            color: '#fff',
-            border: 'none',
-            boxShadow: '0 4px 16px rgba(0,0,0,.2)',
-            cursor: 'pointer',
-            zIndex: 100,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-          title="Add account"
-          aria-label="Add account"
-        >
-          <Plus size={22} strokeWidth={2.5} />
-        </button>
-      )}
-
-      {settingsTab === 'credits' && !modesLoading && (
-        <button
-          type="button"
-          onClick={() => {
-            resetCrForm();
-            setCrDelConfirm(false);
-            setCreditModalOpen(true);
-          }}
-          style={{
-            position: 'fixed',
-            bottom: 24,
-            right: 20,
-            width: 52,
-            height: 52,
-            borderRadius: '50%',
-            background: 'var(--navy-dark)',
-            color: '#fff',
-            border: 'none',
-            boxShadow: '0 4px 16px rgba(0,0,0,.2)',
-            cursor: 'pointer',
-            zIndex: 100,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-          title="Add credit source"
-          aria-label="Add credit source"
-        >
-          <Plus size={22} strokeWidth={2.5} />
-        </button>
-      )}
-
-      {accountModalOpen && (
-        <div className="modal-bg open" onClick={closeAccountModal}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
+      {moneyModalOpen && (
+        <div className="modal-bg open" onClick={closeMoneyModal}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-hd modal-hd--blue">
-              <span className="modal-title">{acctId ? 'Edit account' : 'Add account'}</span>
-              <button type="button" className="modal-close" onClick={closeAccountModal}>
+              <span className="modal-title">
+                {acctId
+                  ? 'Edit payment account'
+                  : crId
+                    ? 'Edit credit source'
+                    : moneyModalKind === 'account'
+                      ? 'Add payment account'
+                      : 'Add credit source'}
+              </span>
+              <button type="button" className="modal-close" onClick={closeMoneyModal}>
                 ×
               </button>
             </div>
-            <form onSubmit={submitAccount}>
+            <form onSubmit={submitMoney}>
               <div className="modal-body">
                 <div className="ui-stack">
-                  <FormField label="Name">
-                    <input className="form-inp" value={acctName} onChange={e => setAcctName(e.target.value)} required />
-                  </FormField>
-                  <FormField label="Description">
-                    <input className="form-inp" value={acctDesc} onChange={e => setAcctDesc(e.target.value)} />
-                  </FormField>
-                  <FormField label="Used for">
-                    <select className="form-sel" value={acctUsed} onChange={e => setAcctUsed(e.target.value as AccountUsedFor)}>
-                      <option value="savings">Savings</option>
-                      <option value="monthly">Monthly expenses</option>
-                      <option value="both">Both</option>
-                    </select>
-                  </FormField>
+                  {!acctId && !crId ? (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
+                      <button
+                        type="button"
+                        className={`ui-kit-btn ui-kit-btn-inline${moneyModalKind === 'account' ? ' ui-kit-btn--solid' : ' ui-kit-btn--soft'}`}
+                        onClick={() => setMoneyModalKind('account')}
+                      >
+                        Payment account
+                      </button>
+                      <button
+                        type="button"
+                        className={`ui-kit-btn ui-kit-btn-inline${moneyModalKind === 'credit' ? ' ui-kit-btn--solid' : ' ui-kit-btn--soft'}`}
+                        onClick={() => setMoneyModalKind('credit')}
+                      >
+                        Credit source
+                      </button>
+                    </div>
+                  ) : null}
+                  {showAccountFields ? (
+                    <>
+                      <FormField label="Name">
+                        <input
+                          className="form-inp"
+                          value={acctName}
+                          onChange={(e) => setAcctName(e.target.value)}
+                          required
+                        />
+                      </FormField>
+                      <FormField label="Description">
+                        <input className="form-inp" value={acctDesc} onChange={(e) => setAcctDesc(e.target.value)} />
+                      </FormField>
+                      <FormField label="Used for">
+                        <select
+                          className="form-sel"
+                          value={acctUsed}
+                          onChange={(e) => setAcctUsed(e.target.value as AccountUsedFor)}
+                        >
+                          <option value="savings">Savings</option>
+                          <option value="monthly">Monthly expenses</option>
+                          <option value="both">Both</option>
+                        </select>
+                      </FormField>
+                    </>
+                  ) : (
+                    <>
+                      <FormField label="Name">
+                        <input
+                          className="form-inp"
+                          value={crName}
+                          onChange={(e) => setCrName(e.target.value)}
+                          required
+                        />
+                      </FormField>
+                      <FormField label="Description">
+                        <input className="form-inp" value={crDesc} onChange={(e) => setCrDesc(e.target.value)} />
+                      </FormField>
+                      <FormField label="Category">
+                        <select
+                          className="form-sel"
+                          value={crCat}
+                          onChange={(e) => setCrCat(e.target.value as CreditSourceCategory)}
+                        >
+                          <option value="credit_card">Credit card</option>
+                          <option value="informal">Other / informal</option>
+                        </select>
+                      </FormField>
+                    </>
+                  )}
                 </div>
               </div>
               <div className="modal-foot">
@@ -810,50 +1089,7 @@ export default function Settings() {
                   <button type="button" className="btn btn-sm btn-red" onClick={() => void deleteAccountFromModal()}>
                     {acctDelConfirm ? 'Confirm delete?' : 'Delete'}
                   </button>
-                ) : (
-                  <span />
-                )}
-                <div className="modal-foot-l" />
-                <button type="button" className="btn btn-sm btn-cancel" onClick={closeAccountModal} disabled={acctBusy}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-sm btn-green" disabled={acctBusy}>
-                  {acctBusy ? 'Saving…' : acctId ? 'Save' : 'Add'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {creditModalOpen && (
-        <div className="modal-bg open" onClick={closeCreditModal}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-hd modal-hd--blue">
-              <span className="modal-title">{crId ? 'Edit credit source' : 'Add credit source'}</span>
-              <button type="button" className="modal-close" onClick={closeCreditModal}>
-                ×
-              </button>
-            </div>
-            <form onSubmit={submitCredit}>
-              <div className="modal-body">
-                <div className="ui-stack">
-                  <FormField label="Name">
-                    <input className="form-inp" value={crName} onChange={e => setCrName(e.target.value)} required />
-                  </FormField>
-                  <FormField label="Description">
-                    <input className="form-inp" value={crDesc} onChange={e => setCrDesc(e.target.value)} />
-                  </FormField>
-                  <FormField label="Category">
-                    <select className="form-sel" value={crCat} onChange={e => setCrCat(e.target.value as CreditSourceCategory)}>
-                      <option value="credit_card">Credit card</option>
-                      <option value="informal">Other / informal</option>
-                    </select>
-                  </FormField>
-                </div>
-              </div>
-              <div className="modal-foot">
-                {crId ? (
+                ) : crId ? (
                   <button type="button" className="btn btn-sm btn-red" onClick={() => void deleteCreditFromModal()}>
                     {crDelConfirm ? 'Confirm delete?' : 'Delete'}
                   </button>
@@ -861,11 +1097,86 @@ export default function Settings() {
                   <span />
                 )}
                 <div className="modal-foot-l" />
-                <button type="button" className="btn btn-sm btn-cancel" onClick={closeCreditModal} disabled={crBusy}>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-cancel"
+                  onClick={closeMoneyModal}
+                  disabled={acctBusy || crBusy}
+                >
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-sm btn-green" disabled={crBusy}>
-                  {crBusy ? 'Saving…' : crId ? 'Save' : 'Add'}
+                <button type="submit" className="btn btn-sm btn-green" disabled={acctBusy || crBusy}>
+                  {acctBusy || crBusy
+                    ? 'Saving…'
+                    : showAccountFields
+                      ? acctId
+                        ? 'Save'
+                        : 'Add'
+                      : crId
+                        ? 'Save'
+                        : 'Add'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {grModalOpen && (
+        <div className="modal-bg open" onClick={closeGrModal}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-hd modal-hd--blue">
+              <span className="modal-title">
+                {grEditingId ? `Edit ${grType === 'person' ? 'person' : 'location'}` : `Add ${grType === 'person' ? 'person' : 'location'}`}
+              </span>
+              <button type="button" className="modal-close" onClick={closeGrModal}>
+                ×
+              </button>
+            </div>
+            <form onSubmit={submitGoldResource}>
+              <div className="modal-body">
+                <div className="ui-stack">
+                  {!grEditingId ? (
+                    <FormField label="Type">
+                      <select
+                        className="form-sel"
+                        value={grType}
+                        onChange={(e) => {
+                          const v = e.target.value === 'location' ? 'location' : 'person';
+                          setGrType(v);
+                          if (v === 'person') setGrSkip(false);
+                        }}
+                      >
+                        <option value="person">Person</option>
+                        <option value="location">Location</option>
+                      </select>
+                    </FormField>
+                  ) : null}
+                  <FormField label="Name">
+                    <input className="form-inp" value={grName} onChange={(e) => setGrName(e.target.value)} required />
+                  </FormField>
+                  {grType === 'location' ? (
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>
+                      <input type="checkbox" checked={grSkip} onChange={(e) => setGrSkip(e.target.checked)} />
+                      Exclude from estimated gold value (e.g. bank-held)
+                    </label>
+                  ) : null}
+                </div>
+              </div>
+              <div className="modal-foot">
+                {grEditingId ? (
+                  <button type="button" className="btn btn-sm btn-red" onClick={() => void deleteGoldResourceFromModal()}>
+                    {grDelConfirm ? 'Confirm delete?' : 'Delete'}
+                  </button>
+                ) : (
+                  <span />
+                )}
+                <div className="modal-foot-l" />
+                <button type="button" className="btn btn-sm btn-cancel" onClick={closeGrModal} disabled={grBusy}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-sm btn-green" disabled={grBusy}>
+                  {grBusy ? 'Saving…' : grEditingId ? 'Save' : 'Add'}
                 </button>
               </div>
             </form>

@@ -126,9 +126,16 @@ export interface RawGoldRow {
   id: string;
   name: string;
   weight_g: number | string;
-  pavan: number | string;
-  person: string;
-  location: string;
+  person_id: string | null;
+  location_id: string | null;
+}
+
+export interface GoldResource {
+  id: string;
+  type: 'person' | 'location';
+  name: string;
+  skip: boolean;
+  org_id?: string;
 }
 
 export interface RawGoldHistoryRow {
@@ -196,7 +203,7 @@ export interface GoldSettings {
   emiSheetName?: string;
   expensesSheetId?: string;
   assetsSheetId?: string;
-  /** Parsed from `users.settings.fintracker`. */
+  /** Parsed from org/user settings `.fintracker`. */
   fintracker?: FintrackerPrefs;
   /** Same object as JSON string (for copy / backup). */
   fintrackerJson?: string;
@@ -393,6 +400,10 @@ export const api = {
   addGold:       (p: Record<string, unknown>)  => post<string>({ module: 'gold', action: 'addEntry', ...p }),
   updateGold:    (p: Record<string, unknown>)  => post<boolean>({ module: 'gold', action: 'updateEntry', ...p }),
   deleteGold:    (id: string)                  => post<boolean>({ module: 'gold', action: 'deleteEntry', id }),
+  getGoldResources:  (type?: string)           => get<GoldResource[]>('getResources', { module: 'gold', ...(type && { type }) }),
+  addGoldResource:   (p: Record<string, unknown>) => post<string>({ module: 'gold', action: 'addResource', ...p }),
+  updateGoldResource:(p: Record<string, unknown>) => post<boolean>({ module: 'gold', action: 'updateResource', ...p }),
+  deleteGoldResource:(id: string)              => post<boolean>({ module: 'gold', action: 'deleteResource', id }),
   getGoldHistory:    ()                           => get<RawGoldHistoryRow[]>('getHistory', { module: 'gold' }),
   addGoldHistory:    (p: Record<string, unknown>) => post<string>({ module: 'gold', action: 'addHistory', ...p }),
   updateGoldHistory: (p: Record<string, unknown>) => post<{ success: boolean }>({ module: 'gold', action: 'updateHistory', ...p }),

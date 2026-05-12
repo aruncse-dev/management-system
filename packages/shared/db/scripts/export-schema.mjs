@@ -1,6 +1,5 @@
 /**
  * Regenerates packages/shared/db/migrations/schema.sql from Drizzle TS (full CREATE DDL for an empty DB).
- * Does not touch migration.sql — that file holds manual ALTERs for existing databases.
  *
  * Run after any change under src/schema/:
  *   pnpm --filter @fintracker-vault/db run export-schema
@@ -32,7 +31,7 @@ const header = [
   '--',
   '-- Full PostgreSQL DDL for an empty database (matches Drizzle TS in src/schema/).',
   '-- GENERATED — edit TypeScript only, then: pnpm --filter @fintracker-vault/db run export-schema',
-  '-- For existing DBs: pnpm --filter @fintracker-vault/db run drizzle:push OR run root migration.sql (ALTERs only).',
+  '-- For existing DBs: pnpm --filter @fintracker-vault/db run drizzle:push.',
   '--',
   '',
 ].join('\n')

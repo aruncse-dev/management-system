@@ -11,6 +11,8 @@ export const organizations = pgTable('organizations', {
   enabledApps: jsonb('enabled_apps').default('[]'),
   /** Map of app slug to enabled menu IDs: {"fintracker": ["dashboard", "budget"], "vault": [...]} */
   enabledMenus: jsonb('enabled_menus').default('{}'),
+  /** FinTracker/Vault-style module prefs (gold rate, sheets, fintracker cycle, openingBal, upstox, etc.) — scoped to the org. */
+  settings: jsonb('settings').default('{}'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 })

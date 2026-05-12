@@ -72,7 +72,7 @@ export function dbApiErrorMessage(e: unknown): string {
 
   // Column errors contain `... of relation "tablename" does not exist` — classify before relation.
   if (code === '42703' || looksLikeUndefinedColumn(msg)) {
-    return `${base} Your database is behind the app schema (missing column). With the same DATABASE_URL: pnpm --filter @fintracker-vault/db run drizzle:push — or psql -f migration.sql (repo root, ALTERs) / compare packages/shared/db/migrations/schema.sql.`
+    return `${base} Your database is behind the app schema (missing column). With the same DATABASE_URL: pnpm --filter @fintracker-vault/db run drizzle:push — compare packages/shared/db/migrations/schema.sql if needed.`
   }
   if (code === '42P01' || looksLikeUndefinedRelation(msg)) {
     return `${base} If a table is missing, sync with the same DATABASE_URL: pnpm --filter @fintracker-vault/db run drizzle:push (full DDL reference: packages/shared/db/migrations/schema.sql).`

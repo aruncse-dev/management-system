@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { Plus, Loader2, Pencil, LayoutDashboard, List, Clock, BarChart3, Shield, Gem, Package, Users, Home, Building2, Lock, ArrowDownRight, ArrowUpRight } from 'lucide-react';
-import { api, RawGoldRow, RawGoldHistoryRow } from '../api';
+import { api, RawGoldRow, RawGoldHistoryRow, GoldResource } from '../api';
 import { INR } from '../utils';
 import { THEME_COLORS } from '../config';
 import { RightLegendDonut } from '../ui'
@@ -17,8 +17,12 @@ interface GoldItem {
   name: string;
   weight_g: number;
   pavan: number;
+  person_id: string | null;
+  location_id: string | null;
   person: string;
   location: string;
+  /** True when the linked location resource has `skip` (e.g. Bank) — excluded from estimated personal value. */
+  locationSkip: boolean;
 }
 
 interface GoldHistoryItem {
@@ -34,8 +38,8 @@ interface GoldFormState {
   name: string;
   weight_g: string;
   pavan: string;
-  person: string;
-  location: string;
+  person_id: string;
+  location_id: string;
 }
 
 interface GoldHistoryFormState {
@@ -46,27 +50,35 @@ interface GoldHistoryFormState {
   note: string;
 }
 
-const PEOPLE = ['Ramya', 'Arun', 'Nithran', 'Dhuruvan', 'Amma'];
-const LOCATIONS = ['Home', 'Bank', 'Locker'];
 const PAVAN_CONVERSION = 1 / 8; // 1 pavan = 8 grams
-const PERSON_COLORS: Record<string, string> = Object.fromEntries(
-  PEOPLE.map((person, index) => [person, THEME_COLORS[index]])
-) as Record<string, string>;
-const LOCATION_COLORS: Record<string, string> = Object.fromEntries(
-  LOCATIONS.map((location, index) => [location, THEME_COLORS[PEOPLE.length + index]])
-) as Record<string, string>;
+
+function resourceMap(resources: GoldResource[]): Map<string, GoldResource> {
+  return new Map(resources.map((r) => [r.id, r]))
+}
+
+function resourceName(map: Map<string, GoldResource>, id: string | null): string {
+  if (!id) return ''
+  return map.get(id)?.name?.trim() ?? ''
+}
+
+function locationSkipped(map: Map<string, GoldResource>, id: string | null): boolean {
+  if (!id) return false
+  return map.get(id)?.skip === true
+}
+
 const LOCATION_ICONS: Record<string, React.ReactNode> = {
   Home: <Home size={12} />,
   Bank: <Building2 size={12} />,
   Locker: <Lock size={12} />,
 };
-function emptyForm(): GoldFormState {
+
+function createEmptyGoldForm(person_id = '', location_id = ''): GoldFormState {
   return {
     name: '',
     weight_g: '',
     pavan: '',
-    person: 'Ramya',
-    location: 'Home',
+    person_id,
+    location_id,
   };
 }
 
@@ -80,18 +92,24 @@ function emptyHistoryForm(): GoldHistoryFormState {
   };
 }
 
-function parseRow(raw: RawGoldRow): GoldItem | null {
-  const weight_g = parseFloat(String(raw.weight_g));
-  const pavan = parseFloat(String(raw.pavan));
-  if (isNaN(weight_g) || isNaN(pavan)) return null;
+function parseRow(raw: RawGoldRow, map: Map<string, GoldResource>): GoldItem | null {
+  const weight_g = parseFloat(String(raw.weight_g))
+  if (isNaN(weight_g)) return null
+  const person_id = raw.person_id && String(raw.person_id).trim() ? String(raw.person_id).trim() : null
+  const location_id = raw.location_id && String(raw.location_id).trim() ? String(raw.location_id).trim() : null
+  const person = resourceName(map, person_id)
+  const location = resourceName(map, location_id)
   return {
     id: raw.id,
     name: String(raw.name ?? '').trim(),
     weight_g,
-    pavan,
-    person: String(raw.person ?? '').trim(),
-    location: String(raw.location ?? '').trim(),
-  };
+    pavan: weight_g * PAVAN_CONVERSION,
+    person_id,
+    location_id,
+    person,
+    location,
+    locationSkip: locationSkipped(map, location_id),
+  }
 }
 
 function normalizeDate(dateStr: string): string {
@@ -257,6 +275,7 @@ export default function Gold() {
   // Data
   const [items, setItems] = useState<GoldItem[]>([]);
   const [history, setHistory] = useState<GoldHistoryItem[]>([]);
+  const [resources, setResources] = useState<GoldResource[]>([]);
   const [goldRate, setGoldRate] = useState(7500);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -268,7 +287,7 @@ export default function Gold() {
   // Items modal
   const [itemsModalOpen, setItemsModalOpen] = useState(false);
   const [editItem, setEditItem] = useState<GoldItem | null>(null);
-  const [form, setForm] = useState<GoldFormState>(emptyForm());
+  const [form, setForm] = useState<GoldFormState>(createEmptyGoldForm());
   const [savingItem, setSavingItem] = useState(false);
   const [deletingItem, setDeletingItem] = useState(false);
   const [deleteItemConfirm, setDeleteItemConfirm] = useState(false);
@@ -281,18 +300,39 @@ export default function Gold() {
   const [deletingHistory, setDeletingHistory] = useState(false);
   const [deleteHistoryConfirm, setDeleteHistoryConfirm] = useState(false);
 
+  const personResources = useMemo(() => resources.filter((r) => r.type === 'person'), [resources]);
+  const locationResources = useMemo(() => resources.filter((r) => r.type === 'location'), [resources]);
+
+  const PERSON_COLORS = useMemo(
+    () =>
+      Object.fromEntries(
+        personResources.map((r, index) => [r.name, THEME_COLORS[index % THEME_COLORS.length]]),
+      ) as Record<string, string>,
+    [personResources],
+  );
+
+  const LOCATION_COLORS = useMemo(
+    () =>
+      Object.fromEntries(
+        locationResources.map((r, index) => [
+          r.name,
+          THEME_COLORS[(personResources.length + index) % THEME_COLORS.length],
+        ]),
+      ) as Record<string, string>,
+    [locationResources, personResources.length],
+  );
+
   // Derivations
   const totalItems = items.length;
   const totalPeople = useMemo(() => new Set(items.map(item => item.person).filter(Boolean)).size, [items]);
   const totalGrams = useMemo(() => items.reduce((s, i) => s + i.weight_g, 0), [items]);
   const totalPavan = useMemo(() => items.reduce((s, i) => s + i.pavan, 0), [items]);
 
-  // Estimated value only for Home & Locker (excludes Bank)
-  const personalGrams = useMemo(() =>
-    items
-      .filter(i => i.location === 'Home' || i.location === 'Locker')
-      .reduce((s, i) => s + i.weight_g, 0)
-  , [items]);
+  // Estimated value excludes locations marked `skip` on the resource (e.g. Bank).
+  const personalGrams = useMemo(
+    () => items.filter((i) => !i.locationSkip).reduce((s, i) => s + i.weight_g, 0),
+    [items],
+  );
   const estimatedValue = useMemo(() => personalGrams * goldRate, [personalGrams, goldRate]);
 
   const groupedByPerson = useMemo(() => {
@@ -313,17 +353,29 @@ export default function Gold() {
     return groups;
   }, [items]);
 
-  const personBreakdown = useMemo(() => PEOPLE.map((person) => ({
-    label: person,
-    value: groupedByPerson[person]?.reduce((s, item) => s + item.weight_g, 0) ?? 0,
-    color: PERSON_COLORS[person],
-  })).sort((a, b) => b.value - a.value || a.label.localeCompare(b.label)), [groupedByPerson]);
+  const personBreakdown = useMemo(
+    () =>
+      personResources
+        .map((person) => ({
+          label: person.name,
+          value: groupedByPerson[person.name]?.reduce((s, item) => s + item.weight_g, 0) ?? 0,
+          color: PERSON_COLORS[person.name] ?? THEME_COLORS[0],
+        }))
+        .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label)),
+    [groupedByPerson, personResources, PERSON_COLORS],
+  );
 
-  const locationBreakdown = useMemo(() => LOCATIONS.map((location) => ({
-    label: location,
-    value: groupedByLocation[location]?.reduce((s, item) => s + item.weight_g, 0) ?? 0,
-    color: LOCATION_COLORS[location],
-  })).sort((a, b) => b.value - a.value || a.label.localeCompare(b.label)), [groupedByLocation]);
+  const locationBreakdown = useMemo(
+    () =>
+      locationResources
+        .map((location) => ({
+          label: location.name,
+          value: groupedByLocation[location.name]?.reduce((s, item) => s + item.weight_g, 0) ?? 0,
+          color: LOCATION_COLORS[location.name] ?? THEME_COLORS[0],
+        }))
+        .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label)),
+    [groupedByLocation, locationResources, LOCATION_COLORS],
+  );
 
   const personTotal = useMemo(() => personBreakdown.reduce((s, item) => s + item.value, 0), [personBreakdown]);
   const locationTotal = useMemo(() => locationBreakdown.reduce((s, item) => s + item.value, 0), [locationBreakdown]);
@@ -358,14 +410,18 @@ export default function Gold() {
       if (forceRefresh) {
         api.invalidateCache({ action: 'getEntries', params: { module: 'gold' } });
         api.invalidateCache({ action: 'getHistory', params: { module: 'gold' } });
+        api.invalidateCache({ action: 'getResources', params: { module: 'gold' } });
         api.invalidateCache({ action: 'get', params: { module: 'settings' } });
       }
-      const [rows, settings, historyRows] = await Promise.all([
+      const [rows, resRows, settings, historyRows] = await Promise.all([
         api.getGold(),
+        api.getGoldResources(),
         api.getSettings(),
         api.getGoldHistory(),
       ]);
-      setItems(rows.map(parseRow).filter((i): i is GoldItem => i !== null));
+      setResources(resRows);
+      const map = resourceMap(resRows)
+      setItems(rows.map((r) => parseRow(r, map)).filter((i): i is GoldItem => i !== null));
       setGoldRate(settings.goldRate);
       setHistory(historyRows.map(parseHistoryRow).filter((h): h is GoldHistoryItem => h !== null));
     } catch (e) {
@@ -385,9 +441,9 @@ export default function Gold() {
     setForm({
       name: i.name,
       weight_g: String(i.weight_g),
-      pavan: String(i.pavan),
-      person: i.person,
-      location: i.location,
+      pavan: String(i.pavan.toFixed(2)),
+      person_id: i.person_id ?? '',
+      location_id: i.location_id ?? '',
     });
     setItemsModalOpen(true);
     setDeleteItemConfirm(false);
@@ -395,7 +451,10 @@ export default function Gold() {
 
   function openAddItem() {
     setEditItem(null);
-    setForm(emptyForm());
+    const firstPerson = personResources[0]?.id ?? '';
+    const firstLoc =
+      locationResources.find((l) => !l.skip)?.id ?? locationResources[0]?.id ?? '';
+    setForm(createEmptyGoldForm(firstPerson, firstLoc));
     setSavingItem(false);
     setDeletingItem(false);
     setDeleteItemConfirm(false);
@@ -405,7 +464,7 @@ export default function Gold() {
   function closeItemModal() {
     setItemsModalOpen(false);
     setEditItem(null);
-    setForm(emptyForm());
+    setForm(createEmptyGoldForm());
     setSavingItem(false);
     setDeletingItem(false);
     setDeleteItemConfirm(false);
@@ -431,9 +490,8 @@ export default function Gold() {
     const payload = {
       name: form.name.trim(),
       weight_g: parseFloat(form.weight_g),
-      pavan: parseFloat(form.pavan),
-      person: form.person,
-      location: form.location,
+      person_id: form.person_id.trim() || undefined,
+      location_id: form.location_id.trim() || undefined,
     };
     try {
       if (editItem) {
@@ -621,9 +679,11 @@ export default function Gold() {
                 />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 8 }}>
-                {LOCATIONS.map(l => (groupedByLocation[l] ? (
-                  <LocationCard key={l} location={l} items={groupedByLocation[l]} />
-                ) : null))}
+                {locationResources.map((r) =>
+                  groupedByLocation[r.name] ? (
+                    <LocationCard key={r.id} location={r.name} items={groupedByLocation[r.name]} />
+                  ) : null,
+                )}
               </div>
             </SectionBlock>
 
@@ -641,9 +701,11 @@ export default function Gold() {
                 />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 8 }}>
-                {PEOPLE.map(p => (groupedByPerson[p] ? (
-                  <PersonCard key={p} person={p} items={groupedByPerson[p]} />
-                ) : null))}
+                {personResources.map((r) =>
+                  groupedByPerson[r.name] ? (
+                    <PersonCard key={r.id} person={r.name} items={groupedByPerson[r.name]} />
+                  ) : null,
+                )}
               </div>
             </SectionBlock>
           </>
@@ -819,13 +881,30 @@ export default function Gold() {
                   <input className="form-inp" type="number" min="0" step="0.001" placeholder="0.000" value={form.pavan} disabled />
                 </FormField>
                 <FormField label="Person">
-                  <select className="form-sel" value={form.person} onChange={e => setField('person', e.target.value)}>
-                    {PEOPLE.map(p => <option key={p} value={p}>{p}</option>)}
+                  <select
+                    className="form-sel"
+                    value={form.person_id}
+                    onChange={(e) => setField('person_id', e.target.value)}
+                  >
+                    {personResources.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
                   </select>
                 </FormField>
                 <FormField label="Location">
-                  <select className="form-sel" value={form.location} onChange={e => setField('location', e.target.value)}>
-                    {LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
+                  <select
+                    className="form-sel"
+                    value={form.location_id}
+                    onChange={(e) => setField('location_id', e.target.value)}
+                  >
+                    {locationResources.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.name}
+                        {l.skip ? ' (excluded from value)' : ''}
+                      </option>
+                    ))}
                   </select>
                 </FormField>
               </div>

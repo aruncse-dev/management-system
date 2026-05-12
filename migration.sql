@@ -1,4 +1,0 @@
--- Idempotent ALTER / one-off data fixes for existing Neon databases.
--- Apply manually when needed: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migration.sql
--- Prefer `pnpm --filter @fintracker-vault/db run drizzle:push` for schema sync from TypeScript.
--- See docs/neon-schema-migrations.md. Append new statements below as required.
