@@ -25,7 +25,7 @@ export default function App({ Component, pageProps }: AppProps) {
       items: [
         { path: '/admin/orgs', label: 'Organizations', icon: <LayoutGrid size={18} /> },
         { path: '/admin/users', label: 'Admin users', icon: <UserCog size={18} /> },
-        { path: '/admin/members', label: 'Members', icon: <Users size={18} /> },
+        { path: '/admin/members', label: 'Org members', icon: <Users size={18} /> },
       ],
     },
   ]

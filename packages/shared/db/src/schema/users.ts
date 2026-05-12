@@ -4,7 +4,7 @@ import { boolean, jsonb, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
 export const users = pgTable('users', {
   email: text('email').primaryKey(),
   displayName: text('display_name'),
-  /** User role: `member` (within org), `org_admin` (manages org), `admin` (platform admin). */
+  /** Platform role: `admin` = Admin app only; `member` = default. Org-scoped roles live on `org_members.role`, not here. */
   role: text('role').default('member').notNull(),
   status: text('status').default('active').notNull(),
   /** Auth token — track for session management (e.g., OAuth token, session ID). */

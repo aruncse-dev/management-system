@@ -3,6 +3,7 @@ import { desc, eq } from 'drizzle-orm'
 import { getDb, users } from '@fintracker-vault/db'
 import { requirePlatformAdmin } from '../../../../lib/adminGuard'
 
+/** `users.role = admin` — platform administrators (Admin app only). Not org membership. */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const actor = await requirePlatformAdmin(req, res)
   if (!actor) return
@@ -10,7 +11,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const db = getDb()
 
   if (req.method === 'GET') {
-    const rows = await db.select().from(users).orderBy(desc(users.createdAt))
+    const rows = await db
+      .select()
+      .from(users)
+      .where(eq(users.role, 'admin'))
+      .orderBy(desc(users.createdAt))
     return res.status(200).json({ ok: true, data: rows })
   }
 
@@ -34,13 +39,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const [existing] = await db.select().from(users).where(eq(users.email, email)).limit(1)
     if (existing) {
-      return res.status(409).json({ ok: false, error: 'A user with this email already exists' })
+      if (existing.role === 'admin') {
+        return res.status(409).json({ ok: false, error: 'This email already has platform admin access' })
+      }
+      await db
+        .update(users)
+        .set({
+          role: 'admin',
+          displayName: displayName || existing.displayName || email.split('@')[0],
+          status,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.email, email))
+      return res.status(200).json({ ok: true })
     }
 
     await db.insert(users).values({
       email,
       displayName,
-      role: 'member',
+      role: 'admin',
       status,
       useDb: false,
     })
