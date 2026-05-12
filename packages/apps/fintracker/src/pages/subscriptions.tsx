@@ -513,7 +513,7 @@ export default function SubscriptionsPage() {
                   <button
                     key={row.id}
                     type="button"
-                    className="ui-kit-holding-card ui-kit-holding-card--btn ui-kit-holding-card--accent-navy"
+                    className="ui-kit-holding-card ui-kit-holding-card--btn"
                     onClick={() => startEdit(row)}
                     style={{ textAlign: 'left' }}
                   >

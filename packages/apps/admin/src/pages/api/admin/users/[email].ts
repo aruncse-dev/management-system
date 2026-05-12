@@ -32,7 +32,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     if (typeof (body as { role?: unknown }).role === 'string') {
       const r = (body as { role: string }).role
-      if (['member', 'org_admin', 'admin'].includes(r)) updates.role = r
+      // Org-scoped roles belong on `org_members`; `users.role` here is platform-only (`admin` | `member`).
+      if (r === 'org_admin') {
+        return res.status(400).json({
+          ok: false,
+          error: 'Org roles are managed under Org members, not Admin users.',
+        })
+      }
+      if (r === 'admin' || r === 'member') updates.role = r
     }
     if (typeof (body as { useDb?: unknown }).useDb === 'boolean') {
       updates.useDb = (body as { useDb: boolean }).useDb
@@ -60,9 +67,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === 'DELETE') {
     if (actor.kind === 'google' && targetEmail === actor.email.toLowerCase()) {
-      return res.status(400).json({ ok: false, error: 'Admin cannot delete own account' })
+      return res.status(400).json({ ok: false, error: 'You cannot revoke your own platform admin access' })
     }
-    await db.delete(users).where(eq(users.email, targetEmail))
+    const [target] = await db.select().from(users).where(eq(users.email, targetEmail)).limit(1)
+    if (!target) return res.status(404).json({ ok: false, error: 'User not found' })
+    if (target.role !== 'admin') {
+      return res.status(400).json({ ok: false, error: 'Only platform administrators can be removed from this list' })
+    }
+    await db
+      .update(users)
+      .set({ role: 'member', updatedAt: new Date() })
+      .where(eq(users.email, targetEmail))
     return res.status(200).json({ ok: true })
   }
 

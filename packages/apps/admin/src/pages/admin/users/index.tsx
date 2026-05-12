@@ -150,11 +150,11 @@ export default function AdminUsersPage() {
         credentials: 'same-origin',
       })
       const j = await r.json()
-      if (!j.ok) throw new Error(j.error || 'Delete failed')
+      if (!j.ok) throw new Error(j.error || 'Revoke failed')
       await load()
       closeForm()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Delete failed')
+      setError(e instanceof Error ? e.message : 'Revoke failed')
     } finally {
       setSaving(false)
     }
@@ -169,11 +169,7 @@ export default function AdminUsersPage() {
         <div>
           {error ? <p className="admin-error">⚠ {error}</p> : null}
 
-          <SectionBlock
-            title="Admin users"
-            icon={<UserCog size={16} />}
-            rightChip={<SectionChip>{rows.length}</SectionChip>}
-          >
+          <SectionBlock title="Admin users" icon={<UserCog size={16} />} rightChip={<SectionChip>{rows.length}</SectionChip>}>
             <div>
               {rows.length > 0 && (
                 <>
@@ -192,7 +188,7 @@ export default function AdminUsersPage() {
 
               {!loading && rows.length === 0 && (
                 <div style={{ textAlign: 'center', color: '#6b7280', padding: '2rem 0' }}>
-                  <p>No users yet. Create one with the button below.</p>
+                  <p>No admin users yet. Add one with the button below.</p>
                 </div>
               )}
 
@@ -284,7 +280,7 @@ export default function AdminUsersPage() {
               <div className="modal-foot">
                 {mode === 'edit' ? (
                   <button type="button" className="btn btn-sm btn-red" onClick={confirmDelete} disabled={saving}>
-                    {saving ? 'Deleting…' : deleteConfirm ? 'Tap again to confirm' : 'Delete user'}
+                    {saving ? 'Saving…' : deleteConfirm ? 'Tap again to confirm' : 'Revoke admin access'}
                   </button>
                 ) : null}
                 <div className="modal-foot-l" />

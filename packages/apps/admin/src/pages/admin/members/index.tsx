@@ -3,12 +3,16 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { Users, Search, X as XIcon } from 'lucide-react'
 import { FabButton, FormField, LoadingState, SearchField, SectionChip, SectionBlock, Spacer } from '@fintracker-vault/ui'
 
+type OrgMemberRole = 'member' | 'org_admin'
+
 type MemberRow = {
   id: string
   orgId: string
   orgName: string
   userEmail: string
   displayName: string | null
+  /** Stored as `member` or `admin` in `org_members.role`. */
+  role: string | null
   createdAt: string
 }
 
@@ -24,7 +28,12 @@ export default function AdminMembersPage() {
 
   const [mode, setMode] = useState<'add' | 'detail' | null>(null)
   const [editingId, setEditingId] = useState('')
-  const [form, setForm] = useState({ orgId: '', userEmail: '', displayName: '' })
+  const [form, setForm] = useState<{ orgId: string; userEmail: string; displayName: string; orgRole: OrgMemberRole }>({
+    orgId: '',
+    userEmail: '',
+    displayName: '',
+    orgRole: 'member',
+  })
   const [saving, setSaving] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
 
@@ -68,7 +77,7 @@ export default function AdminMembersPage() {
   function startAdd() {
     setMode('add')
     setEditingId('')
-    setForm({ orgId: orgFilter || orgs[0]?.id || '', userEmail: '', displayName: '' })
+    setForm({ orgId: orgFilter || orgs[0]?.id || '', userEmail: '', displayName: '', orgRole: 'member' })
     setDeleteConfirm(false)
   }
 
@@ -79,6 +88,7 @@ export default function AdminMembersPage() {
       orgId: row.orgId,
       userEmail: row.userEmail,
       displayName: row.displayName || '',
+      orgRole: row.role === 'admin' ? 'org_admin' : 'member',
     })
     setDeleteConfirm(false)
   }
@@ -86,7 +96,7 @@ export default function AdminMembersPage() {
   function closeForm() {
     setMode(null)
     setEditingId('')
-    setForm({ orgId: '', userEmail: '', displayName: '' })
+    setForm({ orgId: '', userEmail: '', displayName: '', orgRole: 'member' })
     setDeleteConfirm(false)
   }
 
@@ -112,6 +122,34 @@ export default function AdminMembersPage() {
           orgId: form.orgId,
           userEmail: form.userEmail.trim().toLowerCase(),
           displayName: form.displayName.trim() || undefined,
+        }),
+      })
+      const j = await r.json()
+      if (!j.ok) throw new Error(j.error || 'Save failed')
+      await load()
+      closeForm()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Save failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function submitEdit(e?: FormEvent) {
+    e?.preventDefault()
+    if (!editingId) return
+
+    setSaving(true)
+    setError('')
+    try {
+      const r = await fetch('/api/admin/org-members', {
+        method: 'PATCH',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingId,
+          displayName: form.displayName.trim(),
+          role: form.orgRole,
         }),
       })
       const j = await r.json()
@@ -158,13 +196,13 @@ export default function AdminMembersPage() {
   return (
     <>
       <Head>
-        <title>Members · Admin</title>
+        <title>Org members · Admin</title>
       </Head>
       <div className="admin-page" style={{ paddingTop: 0 }}>
         <div>
           {error ? <p className="admin-error">⚠ {error}</p> : null}
 
-          <SectionBlock title="Members" icon={<Users size={16} />} rightChip={<SectionChip>{rows.length}</SectionChip>}>
+          <SectionBlock title="Org members" icon={<Users size={16} />} rightChip={<SectionChip>{rows.length}</SectionChip>}>
             <div>
               <div className="admin-header" style={{ marginBottom: '0.75rem' }}>
                 <div style={{ flex: '1 1 14rem', maxWidth: 'min(100%, 22rem)', minWidth: 0 }}>
@@ -203,7 +241,7 @@ export default function AdminMembersPage() {
 
               {!loading && rows.length === 0 && (
                 <div style={{ textAlign: 'center', color: '#6b7280', padding: '2rem 0' }}>
-                  <p>No members yet. Add one with the button below.</p>
+                  <p>No org members yet. Add one with the button below.</p>
                 </div>
               )}
 
@@ -215,6 +253,7 @@ export default function AdminMembersPage() {
                 <div className="ui-stack">
                   {filtered.map(r => {
                     const name = r.displayName?.trim() || ''
+                    const title = name || r.userEmail
                     return (
                       <div
                         key={r.id}
@@ -230,11 +269,15 @@ export default function AdminMembersPage() {
                         }}
                       >
                         <div className="admin-card-item__body">
-                          <p className="admin-card-item__title">{r.orgName}</p>
+                          <p className={`admin-card-item__title${name ? '' : ' admin-muted'}`}>{title}</p>
                           <p className="admin-card-item__meta">
-                            <span className={name ? undefined : 'admin-muted'}>{name || 'No name'}</span>
-                            <span className="admin-muted"> · </span>
-                            <span>{r.userEmail}</span>
+                            <span>{r.orgName}</span>
+                            {name ? (
+                              <>
+                                <span className="admin-muted"> · </span>
+                                <span>{r.userEmail}</span>
+                              </>
+                            ) : null}
                           </p>
                         </div>
                       </div>
@@ -247,14 +290,14 @@ export default function AdminMembersPage() {
         </div>
       </div>
 
-      <FabButton label="Add member" onClick={startAdd} />
+      <FabButton label="Add org member" onClick={startAdd} />
 
       {mode === 'add' && (
         <div className="modal-bg open" onClick={closeForm}>
           <div className="admin-modal-wrap" onClick={e => e.stopPropagation()}>
             <div className="modal modal-shell">
               <div className="modal-hd modal-hd--blue">
-                <span className="modal-title">Add member</span>
+                <span className="modal-title">Add org member</span>
                 <button type="button" className="modal-close" onClick={closeForm} aria-label="Close">
                   <XIcon size={18} />
                 </button>
@@ -317,23 +360,40 @@ export default function AdminMembersPage() {
           <div className="admin-modal-wrap" onClick={e => e.stopPropagation()}>
             <div className="modal modal-shell">
               <div className="modal-hd modal-hd--blue">
-                <span className="modal-title">Member details</span>
+                <span className="modal-title">Org member</span>
                 <button type="button" className="modal-close" onClick={closeForm} aria-label="Close">
                   <XIcon size={18} />
                 </button>
               </div>
               <div className="modal-body">
-                <div className="admin-form">
+                <form id="admin-member-edit" onSubmit={submitEdit} className="admin-form">
                   <FormField label="Organization">
                     <input type="text" readOnly value={orgNameDetail} />
                   </FormField>
                   <FormField label="Name">
-                    <input type="text" readOnly value={form.displayName.trim() || 'No name'} />
+                    <input
+                      type="text"
+                      value={form.displayName}
+                      onChange={e => setForm(f => ({ ...f, displayName: e.target.value }))}
+                      placeholder="Display name"
+                      autoComplete="name"
+                    />
                   </FormField>
                   <FormField label="Email">
                     <input type="text" readOnly value={form.userEmail} />
                   </FormField>
-                </div>
+                  <FormField label="Role in organization">
+                    <select
+                      className="form-sel"
+                      value={form.orgRole}
+                      onChange={e => setForm(f => ({ ...f, orgRole: e.target.value as OrgMemberRole }))}
+                      aria-label="Role in organization"
+                    >
+                      <option value="member">Member</option>
+                      <option value="org_admin">Org admin</option>
+                    </select>
+                  </FormField>
+                </form>
               </div>
               <div className="modal-foot">
                 <button type="button" className="btn btn-sm btn-red" onClick={confirmDelete} disabled={saving}>
@@ -341,7 +401,10 @@ export default function AdminMembersPage() {
                 </button>
                 <div className="modal-foot-l" />
                 <button type="button" className="btn btn-sm btn-cancel" onClick={closeForm} disabled={saving}>
-                  Close
+                  Cancel
+                </button>
+                <button type="submit" form="admin-member-edit" className="btn btn-sm btn-green" disabled={saving}>
+                  {saving ? 'Saving…' : 'Save'}
                 </button>
               </div>
             </div>
