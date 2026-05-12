@@ -1,12 +1,9 @@
-import { useEffect } from 'react'
-import { useRouter } from 'next/router'
+import type { GetServerSideProps } from 'next'
+
+export const getServerSideProps: GetServerSideProps = async () => ({
+  redirect: { destination: '/admin/orgs', permanent: false },
+})
 
 export default function HomeRedirect() {
-  const router = useRouter()
-
-  useEffect(() => {
-    void router.replace('/admin')
-  }, [router])
-
   return null
 }

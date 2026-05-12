@@ -11,8 +11,8 @@ export default function AdminLoginPage() {
   const [error, setError] = useState('')
 
   const goNext = useCallback(() => {
-    const next = typeof router.query.next === 'string' ? router.query.next : '/admin'
-    void router.replace(next.startsWith('/') ? next : '/admin')
+    const next = typeof router.query.next === 'string' ? router.query.next : '/admin/orgs'
+    void router.replace(next.startsWith('/') ? next : '/admin/orgs')
   }, [router])
 
   const handleGoogle = async (resp: CredentialResponse) => {

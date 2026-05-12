@@ -48,7 +48,7 @@ export default function App({ Component, pageProps }: AppProps) {
                 iconSrc="/favicon.svg"
                 iconAlt="Admin"
                 barTitle="Admin"
-                currentPath={router.pathname || '/admin'}
+                currentPath={router.pathname || '/admin/orgs'}
                 onNavigate={(path: string) => void router.push(path)}
                 sections={sections}
                 onLogout={async () => {
