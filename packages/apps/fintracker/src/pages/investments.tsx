@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { BarChart3, LayoutDashboard, PieChart, RefreshCw, Shield, TrendingUp, Wallet } from 'lucide-react';
 import { api, type RawHolding } from '../api';
-import { KpiCard, KpiGrid, LoadingState, SectionBlock, Spacer, UiCard } from '../ui';
+import { KpiCard, KpiGrid, LoadingState, SectionBlock, Spacer } from '../ui';
 import Stocks, { clearStocksCache } from './stocks';
 import MutualFunds, { clearMutualFundsCache } from './mutualfunds';
 
@@ -13,12 +13,20 @@ type HoldingsGroup = {
 };
 
 type DashboardCache = {
+  /** Bumps when dashboard load semantics change (ignore stale in-memory cache). */
+  version: number;
   hasToken: boolean;
   data: HoldingsGroup;
   lastSynced: string | null;
 };
 
+const DASHBOARD_CACHE_VERSION = 2;
+
 let INVESTMENTS_CACHE: DashboardCache | null = null;
+
+function isValidInvestmentsCache(c: DashboardCache | null): c is DashboardCache {
+  return c !== null && c.version === DASHBOARD_CACHE_VERSION;
+}
 
 function formatRupees(value: number) {
   const sign = value >= 0 ? '' : '-';
@@ -64,17 +72,19 @@ function MetricsSection({
 }
 
 function DashboardView() {
-  const [loading, setLoading] = useState(() => INVESTMENTS_CACHE === null);
+  const [loading, setLoading] = useState(() => !isValidInvestmentsCache(INVESTMENTS_CACHE));
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState('');
-  const [hasToken, setHasToken] = useState(() => INVESTMENTS_CACHE?.hasToken ?? false);
-  const [data, setData] = useState<HoldingsGroup>(() => INVESTMENTS_CACHE?.data ?? { stocks: [], mutualFunds: [] });
+  const [hasToken, setHasToken] = useState(() => (isValidInvestmentsCache(INVESTMENTS_CACHE) ? INVESTMENTS_CACHE.hasToken : false));
+  const [data, setData] = useState<HoldingsGroup>(() =>
+    isValidInvestmentsCache(INVESTMENTS_CACHE) ? INVESTMENTS_CACHE.data : { stocks: [], mutualFunds: [] },
+  );
 
   const loadDashboard = async (forceRefresh = false) => {
     try {
       setLoading(true);
       setError('');
-      if (!forceRefresh && INVESTMENTS_CACHE) {
+      if (!forceRefresh && isValidInvestmentsCache(INVESTMENTS_CACHE)) {
         setHasToken(INVESTMENTS_CACHE.hasToken);
         setData(INVESTMENTS_CACHE.data);
         setLoading(false);
@@ -88,27 +98,27 @@ function DashboardView() {
         api.invalidateCache({ action: 'getHoldings', params: { module: 'mutualfunds' } });
         INVESTMENTS_CACHE = null;
       }
-      const status = await api.getTokenStatus();
-      setHasToken(status.hasToken);
-      if (!status.hasToken) {
-        const next = { stocks: [], mutualFunds: [] };
-        setData(next);
-        INVESTMENTS_CACHE = { hasToken: false, data: next, lastSynced: null };
-        return;
-      }
-      const [stocks, mutualFunds] = await Promise.all([
+      const [status, stocks, mutualFunds] = await Promise.all([
+        api.getTokenStatus(),
         api.getStocks(),
         api.getMutualFunds(),
       ]);
+      const connected = Boolean(
+        (status.hasToken || status.hasAccessToken || status.hasExtendedToken) && !status.expired,
+      );
+      setHasToken(connected);
       const next = { stocks: stocks as RawHolding[], mutualFunds: mutualFunds as RawHolding[] };
       setData(next);
       INVESTMENTS_CACHE = {
-        hasToken: true,
+        version: DASHBOARD_CACHE_VERSION,
+        hasToken: connected,
         data: next,
         lastSynced: (() => {
-          const stamps = [next.stocks[0]?.synced, next.mutualFunds[0]?.synced].filter(Boolean) as string[];
+          const stamps = [...next.stocks, ...next.mutualFunds]
+            .map((h) => h.synced)
+            .filter(Boolean) as string[];
           if (stamps.length === 0) return null;
-          const sorted = stamps.sort();
+          const sorted = [...stamps].sort();
           return sorted[sorted.length - 1] ?? null;
         })(),
       };
@@ -189,30 +199,11 @@ function DashboardView() {
 
       {loading ? (
         <LoadingState />
-      ) : hasToken ? (
-        <>
-          <div>
-            <MetricsSection title="Stocks" holdings={data.stocks} icon={<TrendingUp size={14} />} />
-            <MetricsSection title="Mutual Funds" holdings={data.mutualFunds} icon={<PieChart size={14} />} />
-          </div>
-        </>
       ) : (
-        <UiCard>
-          <div style={{
-            padding: '1.5rem',
-            background: '#EFF6FF',
-            border: '1px solid #BFDBFE',
-            borderRadius: '0.375rem',
-            textAlign: 'center'
-          }}>
-            <p style={{ marginBottom: '0.75rem', color: 'var(--text)', fontSize: '0.875rem' }}>
-              No portfolio data available yet.
-            </p>
-            <p style={{ marginBottom: 0, color: 'var(--muted)', fontSize: '0.75rem' }}>
-              Connect Upstox in Settings to load your portfolio.
-            </p>
-          </div>
-        </UiCard>
+        <div>
+          <MetricsSection title="Stocks" holdings={data.stocks} icon={<TrendingUp size={14} />} />
+          <MetricsSection title="Mutual Funds" holdings={data.mutualFunds} icon={<PieChart size={14} />} />
+        </div>
       )}
     </div>
   );
