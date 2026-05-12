@@ -895,14 +895,10 @@ export default function Loans() {
 
                         <div className="ui-kit-holding-card-grid">
                           <div className="ui-kit-holding-stat">
-                            <span>Interest Rate</span>
-                            <strong>{`${loan.rate}%`}</strong>
-                          </div>
-                          <div className="ui-kit-holding-stat ui-kit-holding-stat--center">
                             <span>Monthly EMI</span>
                             <strong>{INR(loan.emi_amount)}</strong>
                           </div>
-                          <div className="ui-kit-holding-stat ui-kit-holding-stat--right">
+                          <div className="ui-kit-holding-stat ui-kit-holding-stat--right" style={{ gridColumn: 'span 2' }}>
                             <span>Tenure Left</span>
                             <strong>{`${remainingMonths} months`}</strong>
                           </div>
@@ -1028,16 +1024,16 @@ export default function Loans() {
 
                         <div className="ui-kit-holding-card-grid">
                           <div className="ui-kit-holding-stat">
-                            <span>Interest Rate</span>
-                            <strong>{`${jewelLoan.rate}%`}</strong>
-                          </div>
-                          <div className="ui-kit-holding-stat ui-kit-holding-stat--center">
                             <span>Total Payable</span>
                             <strong>{INR(totalPayable)}</strong>
                           </div>
+                          <div className="ui-kit-holding-stat ui-kit-holding-stat--center">
+                            <span>Start Date</span>
+                            <strong>{fmtDate(jewelLoan.startDate)}</strong>
+                          </div>
                           <div className="ui-kit-holding-stat ui-kit-holding-stat--right">
-                            <span>Start → End</span>
-                            <strong>{`${fmtDate(jewelLoan.startDate)} → ${fmtDate(jewelLoan.endDate)}`}</strong>
+                            <span>End Date</span>
+                            <strong>{fmtDate(jewelLoan.endDate)}</strong>
                           </div>
                         </div>
 
