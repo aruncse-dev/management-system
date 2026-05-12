@@ -9,7 +9,7 @@ type LoansTab = 'dashboard' | 'emi' | 'jewel' | 'cash' | 'history'
 
 type CombinedLoan =
   | { kind: 'EMI'; id: string; name: string; bank: string; principal: number; rate: number; tenure_months: number; emi_amount: number; paid_emis: number; interest: number; paid: number; outstanding: number; startDate: string; endDate: string; status: string }
-  | { kind: 'Jewel'; id: string; name: string; bank: string; principal: number; interest: number; paid: number; outstanding: number; startDate: string; endDate: string; status: string }
+  | { kind: 'Jewel'; id: string; name: string; bank: string; principal: number; rate: number; interest: number; paid: number; outstanding: number; startDate: string; endDate: string; status: string }
   | { kind: 'Cash'; id: string; name: string; bank?: string; principal: number; paid: number; outstanding: number; startDate: string; status: string }
 
 type CombinedHistoryRow = {
@@ -60,9 +60,11 @@ interface PaymentFormState {
   note: string
 }
 
-function parseNumber(value: number | string) {
-  const n = parseFloat(String(value))
-  return isNaN(n) ? 0 : n
+function parseNumber(value: number | string | null | undefined) {
+  if (value == null) return 0
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0
+  const n = parseFloat(String(value).trim())
+  return Number.isNaN(n) ? 0 : n
 }
 
 function parseDate(dateStr: string): Date {
@@ -225,6 +227,7 @@ function buildJewelLoans(rows: RawJewelLoanRow[]): CombinedLoan[] {
       name: String(raw.name ?? '').trim(),
       bank: String(raw.bank ?? '').trim(),
       principal,
+      rate,
       interest,
       paid,
       outstanding: totalPayable - paid,
@@ -479,7 +482,7 @@ export default function Loans() {
       name: loan.name,
       bank: loan.bank,
       principal: String(loan.principal),
-      rate: '0',
+      rate: String(loan.rate),
       start_date: formatDateForInput(loan.startDate),
       end_date: formatDateForInput(loan.endDate),
       paid_amount: String(loan.paid),
@@ -1025,16 +1028,16 @@ export default function Loans() {
 
                         <div className="ui-kit-holding-card-grid">
                           <div className="ui-kit-holding-stat">
+                            <span>Interest Rate</span>
+                            <strong>{`${jewelLoan.rate}%`}</strong>
+                          </div>
+                          <div className="ui-kit-holding-stat ui-kit-holding-stat--center">
                             <span>Total Payable</span>
                             <strong>{INR(totalPayable)}</strong>
                           </div>
-                          <div className="ui-kit-holding-stat ui-kit-holding-stat--center">
-                            <span>Start Date</span>
-                            <strong>{fmtDate(jewelLoan.startDate)}</strong>
-                          </div>
                           <div className="ui-kit-holding-stat ui-kit-holding-stat--right">
-                            <span>End Date</span>
-                            <strong>{fmtDate(jewelLoan.endDate)}</strong>
+                            <span>Start → End</span>
+                            <strong>{`${fmtDate(jewelLoan.startDate)} → ${fmtDate(jewelLoan.endDate)}`}</strong>
                           </div>
                         </div>
 
