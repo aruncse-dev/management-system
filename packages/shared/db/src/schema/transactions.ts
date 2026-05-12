@@ -7,10 +7,13 @@ export const transactions = pgTable('transactions', {
   description: text('description').notNull(),
   amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
   category: text('category'),
+  categoryId: text('category_id'),
   type: text('type').notNull(),
   mode: text('mode'),
+  paymentSourceId: text('payment_source_id'),
   /** Transfer destination account/credit label (`mode` is the source). Legacy rows may leave this null and encode `→…` in `notes`. */
   transferTo: text('transfer_to'),
+  transferToId: text('transfer_to_id'),
   notes: text('notes'),
   monthYear: text('month_year').notNull(),
 })
@@ -24,25 +27,16 @@ export const budget = pgTable('budget', {
   amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
 })
 
-export const accounts = pgTable('accounts', {
+/** Unified table: accounts, credit cards, and informal credits. */
+export const paymentSources = pgTable('payment_sources', {
   id: text('id').primaryKey(),
   orgId: text('org_id'),
   name: text('name').notNull(),
   description: text('description'),
-  /** `savings` | `monthly` | `both` — which surfaces list this account */
+  /** `account` | `credit_card` | `informal` */
+  sourceType: text('source_type').notNull(),
+  /** `savings` | `monthly` | `both` — which surfaces list this (primarily for accounts) */
   usedFor: text('used_for').notNull().default('both'),
-  isActive: boolean('is_active').default(true),
-  sortOrder: integer('sort_order').default(0),
-})
-
-/** User-configurable credit card / informal credit labels (transaction `mode`). */
-export const creditSources = pgTable('credit_sources', {
-  id: text('id').primaryKey(),
-  orgId: text('org_id'),
-  name: text('name').notNull(),
-  description: text('description'),
-  /** `credit_card` | `informal` */
-  category: text('category').notNull(),
   isActive: boolean('is_active').default(true),
   sortOrder: integer('sort_order').default(0),
 })

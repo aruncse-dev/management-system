@@ -1,22 +1,47 @@
-import { useState, useEffect, useCallback, type FormEvent, type ReactNode } from 'react';
+import { useState, useEffect, useCallback, type FormEvent } from 'react';
 import { useRouter } from 'next/router';
-import { Loader2, Link2, Unlink2, SlidersHorizontal, User, Wallet, CreditCard, Plus, Users, Banknote, Landmark, PiggyBank, CalendarRange } from 'lucide-react';
+import {
+  Loader2,
+  Link2,
+  Unlink2,
+  SlidersHorizontal,
+  User,
+  Wallet,
+  CreditCard,
+  Plus,
+  Users,
+  Banknote,
+  Landmark,
+  PiggyBank,
+  CalendarRange,
+  Coins,
+  Plug,
+  IndianRupee,
+} from 'lucide-react';
 import { api, type AccountRow, type AccountUsedFor, type CreditSourceCategory, type CreditSourceRow, type ProfileData } from '../api';
 import { THEME_COLORS } from '../config';
-import { LoadingState, SectionBlock, SectionChip, FormField, Spacer, SettingsSectionCard, TransactionCard, UiCard, type SettingField } from '../ui';
+import { LoadingState, SectionBlock, SectionChip, FormField, Spacer, SettingsSectionCard, TransactionCard, type SettingField } from '../ui';
 import { useFintrackerModes } from '../context/FintrackerModesContext';
+import { MENU_CACHE_UPDATED_EVENT, readMenuCache } from '../lib/profileMenuCache';
 import type { FintrackerPrefs } from '../expenseCycle';
 import { DEFAULT_FINTRACKER_PREFS, cycleDateRange, cycleSubtitle } from '../expenseCycle';
 
 type SettingsNavTab = 'general' | 'accounts' | 'credits';
 
-interface SettingsSection {
-  key: string;
-  title: string;
-  description: string;
-  icon: ReactNode;
-  fields: SettingField[];
+function readMenuHasPath(path: string): boolean {
+  const target = path.replace(/\/+$/, '') || path;
+  const menu = readMenuCache()?.menu ?? [];
+  return menu.some(m => {
+    const p = (m.path ?? '').trim().replace(/\/+$/, '');
+    return p === target;
+  });
 }
+
+const GOLD_RATE_FIELD: SettingField = { key: 'goldRate', label: 'Gold Rate (₹/gram)', type: 'number' };
+
+/** Same shell as `TransactionCard` lists on Accounts / Credits (holding row + txn border). */
+const GENERAL_SETTINGS_PANEL =
+  'ui-kit-holding-card ui-kit-holding-card--accent-navy txn-entry-card' as const
 
 /** Account row icon from name (case-insensitive); credits use fixed icons. */
 function accountNameIcon(name: string) {
@@ -26,16 +51,6 @@ function accountNameIcon(name: string) {
   if (s.includes('wallet')) return <Wallet size={14} aria-hidden />
   return <PiggyBank size={14} aria-hidden />
 }
-
-const SETTINGS_SECTIONS: SettingsSection[] = [
-  {
-    key: 'core',
-    title: 'Core Settings',
-    description: '',
-    icon: <SlidersHorizontal size={14} />,
-    fields: [{ key: 'goldRate', label: 'Gold Rate (₹/gram)', type: 'number' }],
-  },
-];
 
 export default function Settings() {
   const router = useRouter();
@@ -50,7 +65,29 @@ export default function Settings() {
   const [acctDelConfirm, setAcctDelConfirm] = useState(false);
   const [crDelConfirm, setCrDelConfirm] = useState(false);
 
-  const { accounts: dbAccounts, creditSources: dbCredits, refresh: refreshModes, loading: modesLoading } = useFintrackerModes();
+  const {
+    accounts: dbAccounts,
+    creditSources: dbCredits,
+    refresh: refreshModes,
+    loading: modesLoading,
+    monthlyAccountNames,
+    savingsAccountNames,
+  } = useFintrackerModes();
+
+  const [hasInvestmentsMenu, setHasInvestmentsMenu] = useState(() => readMenuHasPath('/investments'));
+  const [hasGoldMenu, setHasGoldMenu] = useState(() => readMenuHasPath('/gold'));
+  const [hasSubscriptionsMenu, setHasSubscriptionsMenu] = useState(() => readMenuHasPath('/subscriptions'));
+
+  useEffect(() => {
+    const syncMenuFlags = () => {
+      setHasInvestmentsMenu(readMenuHasPath('/investments'));
+      setHasGoldMenu(readMenuHasPath('/gold'));
+      setHasSubscriptionsMenu(readMenuHasPath('/subscriptions'));
+    };
+    syncMenuFlags();
+    window.addEventListener(MENU_CACHE_UPDATED_EVENT, syncMenuFlags);
+    return () => window.removeEventListener(MENU_CACHE_UPDATED_EVENT, syncMenuFlags);
+  }, []);
 
   const [acctId, setAcctId] = useState<string | undefined>();
   const [acctName, setAcctName] = useState('');
@@ -83,8 +120,8 @@ export default function Settings() {
   const [fintrackerDraft, setFintrackerDraft] = useState<FintrackerPrefs>(() => ({
     expenseCycle: { ...DEFAULT_FINTRACKER_PREFS.expenseCycle },
   }));
-  const [fintrackerJson, setFintrackerJson] = useState('');
   const [fintrackerSaving, setFintrackerSaving] = useState(false);
+  const [upstoxUiOpen, setUpstoxUiOpen] = useState(true);
 
   const validateLiveStatus = useCallback(async (forceRefresh = false) => {
     setLoading(true);
@@ -99,11 +136,9 @@ export default function Settings() {
       ]);
       const loaded: Record<string, string> = {};
       if (settingsResult.status === 'fulfilled') {
-        SETTINGS_SECTIONS.forEach(section => {
-          section.fields.forEach(field => {
-            loaded[String(field.key)] = String(settingsResult.value[field.key as keyof typeof settingsResult.value] || '');
-          });
-        });
+        loaded[String(GOLD_RATE_FIELD.key)] = String(
+          settingsResult.value[GOLD_RATE_FIELD.key as keyof typeof settingsResult.value] || '',
+        );
         loaded.usdToInr = settingsResult.value.usdToInr !== undefined ? String(settingsResult.value.usdToInr) : '';
         const ft = settingsResult.value.fintracker;
         if (ft && typeof ft === 'object' && ft.expenseCycle) {
@@ -116,11 +151,6 @@ export default function Settings() {
         } else {
           setFintrackerDraft({ expenseCycle: { ...DEFAULT_FINTRACKER_PREFS.expenseCycle } });
         }
-        setFintrackerJson(
-          typeof settingsResult.value.fintrackerJson === 'string'
-            ? settingsResult.value.fintrackerJson
-            : JSON.stringify(ft ?? DEFAULT_FINTRACKER_PREFS),
-        );
       }
       setSettings(loaded);
       if (profileResult.status === 'fulfilled') {
@@ -186,7 +216,7 @@ export default function Settings() {
 
   function startEdit(key: string) {
     setEditingKey(key);
-    setEditValue(settings[key] || '');
+    setEditValue(settings[key] ?? '');
   }
 
   async function connectUpstox() {
@@ -371,24 +401,33 @@ export default function Settings() {
         {settingsTab === 'general' && (
           <>
             {profile ? (
-              <div className="txn-cards">
-                <TransactionCard
-                  asStatic
-                  tone="navy"
-                  icon={<User size={14} aria-hidden />}
-                  title={(profile.displayName && profile.displayName.trim()) || profile.email}
-                  amount={profile.displayName?.trim() ? profile.email : '\u00a0'}
-                  amountLabel="Email"
-                  type={
-                    profile.activeOrgId
-                      ? profile.orgs.find((o) => o.id === profile.activeOrgId)?.name ?? 'Unknown org'
-                      : '—'
-                  }
-                  typeLabel="Organization"
-                  date={profile.orgs.length ? `${profile.orgs.length} linked` : '—'}
-                  dateLabel="Orgs"
-                />
-              </div>
+              <SectionBlock title="Profile" icon={<User size={14} aria-hidden />}>
+                <div className="txn-cards">
+                  <div
+                    className={`${GENERAL_SETTINGS_PANEL} txn-entry-card--compact`}
+                    role="group"
+                  >
+                    <div className="settings-profile-card-body">
+                      <div className="settings-profile-card-top">
+                        <div className="settings-profile-name">
+                          {(profile.displayName && profile.displayName.trim()) || profile.email}
+                        </div>
+                        {profile.displayName?.trim() ? (
+                          <div className="settings-profile-email">{profile.email}</div>
+                        ) : null}
+                      </div>
+                      <div className="settings-profile-org-row">
+                        <span className="settings-profile-meta-label">Organization</span>
+                        <span className="settings-profile-meta-value settings-profile-meta-value--end">
+                          {profile.activeOrgId
+                            ? profile.orgs.find((o) => o.id === profile.activeOrgId)?.name ?? 'Unknown org'
+                            : '—'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </SectionBlock>
             ) : null}
 
             {loading && (
@@ -398,156 +437,193 @@ export default function Settings() {
               </>
             )}
 
-            {!loading && (
-              <SectionBlock title="Expense period" icon={<CalendarRange size={14} />}>
-                <div className="ui-stack" style={{ gap: 12 }}>
-                  <FormField label="Cycle">
-                    <select
-                      className="form-inp"
-                      value={fintrackerDraft.expenseCycle.mode}
-                      onChange={(e) =>
-                        setFintrackerDraft((prev) => ({
-                          ...prev,
-                          expenseCycle: {
-                            ...prev.expenseCycle,
-                            mode: e.target.value === 'custom' ? 'custom' : 'regular',
-                          },
-                        }))
-                      }
-                    >
-                      <option value="regular">Regular (calendar month)</option>
-                      <option value="custom">Custom (prev month anchor → this month anchor − 1)</option>
-                    </select>
-                  </FormField>
-                  {fintrackerDraft.expenseCycle.mode === 'custom' ? (
-                    <FormField label="Anchor day (cycle starts this day of previous month)">
-                      <input
-                        className="form-inp"
-                        type="number"
-                        min={2}
-                        max={31}
-                        value={fintrackerDraft.expenseCycle.anchorDay}
+            {!loading &&
+            !modesLoading &&
+            monthlyAccountNames.length > 0 &&
+            savingsAccountNames.length > 0 ? (
+              <SectionBlock title="Billing cycle" icon={<CalendarRange size={14} aria-hidden />}>
+                <div className="txn-cards">
+                  <div className={GENERAL_SETTINGS_PANEL} role="group">
+                    <div className="ui-stack settings-general-card-stack">
+                    <p className="settings-billing-hint">
+                      <strong style={{ color: 'var(--text)' }}>Regular</strong> — 1st through last day of each calendar month.{' '}
+                      <strong style={{ color: 'var(--text)' }}>Custom</strong> — from your anchor day last month through the day before the same anchor this month.
+                    </p>
+                    <FormField label="Cycle">
+                      <select
+                        className="form-inp settings-general-fullwidth-control"
+                        value={fintrackerDraft.expenseCycle.mode}
                         onChange={(e) =>
                           setFintrackerDraft((prev) => ({
                             ...prev,
                             expenseCycle: {
                               ...prev.expenseCycle,
-                              anchorDay: Math.min(
-                                31,
-                                Math.max(2, parseInt(e.target.value || '19', 10) || 19),
-                              ),
+                              mode: e.target.value === 'custom' ? 'custom' : 'regular',
                             },
                           }))
                         }
-                      />
+                      >
+                        <option value="regular">Calendar month</option>
+                        <option value="custom">Custom (anchored month)</option>
+                      </select>
                     </FormField>
-                  ) : null}
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                    Example (May 2026):{' '}
-                    <strong style={{ color: 'var(--text)' }}>{cycleSubtitle('May', '2026', fintrackerDraft)}</strong>
-                    {' · '}
-                    {(() => {
-                      try {
-                        const r = cycleDateRange('May', '2026', fintrackerDraft)
-                        return `${r.start} → ${r.end}`
-                      } catch {
-                        return ''
-                      }
-                    })()}
-                  </div>
-                  <details style={{ fontSize: 12, color: 'var(--muted)' }}>
-                    <summary style={{ cursor: 'pointer', marginBottom: 6 }}>
-                      Stored JSON (<code>settings.fintracker</code>)
-                    </summary>
-                    <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 11, margin: 0 }}>{fintrackerJson}</pre>
-                  </details>
-                  <button
-                    type="button"
-                    className="ui-kit-btn ui-kit-btn--solid ui-kit-btn-inline settings-action-btn"
-                    onClick={() => void saveFintrackerPrefs()}
-                    disabled={fintrackerSaving}
-                  >
-                    {fintrackerSaving ? <Loader2 size={14} className="spin-icon" /> : null}
-                    Save expense period
-                  </button>
-                </div>
-              </SectionBlock>
-            )}
-
-            <Spacer size={6} />
-
-            <SectionBlock
-              title="Upstox"
-              icon={<Link2 size={14} />}
-              right={
-                <SectionChip>
-                  {upstoxStatusState === 'checking' ? '…' : upstoxStatusState === 'connected' ? 'Live' : 'Off'}
-                </SectionChip>
-              }
-            >
-              <div className="settings-status-grid">
-                <StatusBox
-                  title="Upstox"
-                  icon={<Link2 size={14} />}
-                  tone={upstoxStatusState === 'checking' ? 'amber' : upstoxStatusState === 'connected' ? 'green' : 'red'}
-                  status={upstoxStatusState === 'checking' ? 'Checking…' : upstoxStatusState === 'connected' ? 'Connected' : 'Missing'}
-                />
-              </div>
-            </SectionBlock>
-
-            <Spacer size={6} />
-
-            {!loading && SETTINGS_SECTIONS.map((section, idx) => (
-              <div key={section.key}>
-                {idx === 0 ? <Spacer size={6} /> : null}
-                <SectionBlock title={section.title} icon={section.icon}>
-                  <div className="ui-stack">
-                    {section.fields.map(field => (
-                      <SettingsSectionCard
-                        key={field.key}
-                        field={field}
-                        value={settings[field.key] || ''}
-                        editing={editingKey === field.key}
-                        saving={saving}
-                        editValue={editValue}
-                        onStartEdit={() => startEdit(String(field.key))}
-                        onChange={setEditValue}
-                        onSave={value => saveField(String(field.key), value)}
-                      />
-                    ))}
-                    {section.key === 'core' && (
-                      <div style={{ borderTop: '1px solid var(--muted-border)', paddingTop: 12 }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', marginBottom: 6 }}>USD → INR Rate</div>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>
-                          ₹{settings.usdToInr ? Number(settings.usdToInr).toFixed(2) : '—'}
-                        </div>
-                        <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>Live rate (when connected to settings API)</div>
-                      </div>
-                    )}
-                  </div>
-                </SectionBlock>
-              </div>
-            ))}
-
-            {!loading && (
-              <>
-                <Spacer size={6} />
-                <SectionBlock title="Integrations" icon={<Link2 size={14} />}>
-                  <div className="ui-stack">
-                    <div className="settings-actions" style={{ flexWrap: 'wrap' }}>
-                      <button className="ui-kit-btn ui-kit-btn--soft ui-kit-btn-inline settings-action-btn" onClick={connectUpstox} disabled={upstoxBusy}>
-                        <Link2 size={14} />
-                        {upstoxStatus.hasToken ? 'Re-login' : 'Connect'} Upstox
-                      </button>
-                      <button className="ui-kit-btn ui-kit-btn--soft ui-kit-btn-inline settings-action-btn" onClick={clearUpstox} disabled={upstoxBusy || !upstoxStatus.hasToken}>
-                        <Unlink2 size={14} />
-                        Logout Upstox
-                      </button>
+                    {fintrackerDraft.expenseCycle.mode === 'custom' ? (
+                      <FormField label="Anchor day">
+                        <input
+                          className="form-inp"
+                          type="number"
+                          min={2}
+                          max={31}
+                          title="Day of month (2–31). The period starts on this day last month and ends the day before this day in the current month."
+                          aria-label="Anchor day of month, 2 through 31"
+                          value={fintrackerDraft.expenseCycle.anchorDay}
+                          onChange={(e) =>
+                            setFintrackerDraft((prev) => ({
+                              ...prev,
+                              expenseCycle: {
+                                ...prev.expenseCycle,
+                                anchorDay: Math.min(
+                                  31,
+                                  Math.max(2, parseInt(e.target.value || '19', 10) || 19),
+                                ),
+                              },
+                            }))
+                          }
+                        />
+                      </FormField>
+                    ) : null}
+                    <p className="settings-billing-example">
+                      Example — May 2026:{' '}
+                      <strong>{cycleSubtitle('May', '2026', fintrackerDraft)}</strong>
+                      {' · '}
+                      {(() => {
+                        try {
+                          const r = cycleDateRange('May', '2026', fintrackerDraft)
+                          return `${r.start} → ${r.end}`
+                        } catch {
+                          return ''
+                        }
+                      })()}
+                    </p>
+                    <button
+                      type="button"
+                      className="ui-kit-btn ui-kit-btn--solid ui-kit-btn-inline settings-action-btn settings-general-save-btn"
+                      onClick={() => void saveFintrackerPrefs()}
+                      disabled={fintrackerSaving}
+                    >
+                      {fintrackerSaving ? <Loader2 size={14} className="spin-icon" /> : null}
+                      Save
+                    </button>
                     </div>
                   </div>
-                </SectionBlock>
-              </>
-            )}
+                </div>
+              </SectionBlock>
+            ) : null}
+
+            {hasInvestmentsMenu ? (
+              <SectionBlock title="Integrations" icon={<Plug size={14} aria-hidden />}>
+                <div className="txn-cards">
+                  <div className={GENERAL_SETTINGS_PANEL} role="group">
+                    <div className="settings-upstox-toggle-row">
+                      <span className="settings-upstox-toggle-label">Upstox</span>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={upstoxUiOpen}
+                        className={`settings-switch${upstoxUiOpen ? ' settings-switch--on' : ''}`}
+                        onClick={() => setUpstoxUiOpen((v) => !v)}
+                        aria-label={upstoxUiOpen ? 'Hide Upstox connection controls' : 'Show Upstox connection controls'}
+                      />
+                    </div>
+                    {upstoxUiOpen ? (
+                      <div className="ui-stack settings-general-card-stack settings-upstox-body">
+                      <div className="settings-upstox-status-row">
+                        <span className="settings-upstox-status-label">Status</span>
+                        <SectionChip>
+                          {upstoxStatusState === 'checking' ? '…' : upstoxStatusState === 'connected' ? 'Connected' : 'Not connected'}
+                        </SectionChip>
+                      </div>
+                      {(upstoxStatus.hasAccessToken !== undefined ||
+                        upstoxStatus.hasRefreshToken !== undefined ||
+                        upstoxStatus.expired !== undefined) && (
+                        <div className="settings-upstox-token-lines">
+                          {upstoxStatus.hasAccessToken !== undefined ? (
+                            <div>Access token: {upstoxStatus.hasAccessToken ? 'yes' : 'no'}</div>
+                          ) : null}
+                          {upstoxStatus.hasExtendedToken !== undefined ? (
+                            <div>Extended token: {upstoxStatus.hasExtendedToken ? 'yes' : 'no'}</div>
+                          ) : null}
+                          {upstoxStatus.hasRefreshToken !== undefined ? (
+                            <div>Refresh token: {upstoxStatus.hasRefreshToken ? 'yes' : 'no'}</div>
+                          ) : null}
+                          {upstoxStatus.expired !== undefined ? (
+                            <div>Expired: {upstoxStatus.expired ? 'yes' : 'no'}</div>
+                          ) : null}
+                        </div>
+                      )}
+                      <div className="settings-actions settings-general-upstox-actions">
+                        <button
+                          type="button"
+                          className="ui-kit-btn ui-kit-btn--solid ui-kit-btn-inline settings-action-btn"
+                          onClick={() => void connectUpstox()}
+                          disabled={upstoxBusy}
+                        >
+                          <Link2 size={14} />
+                          {upstoxStatus.hasToken ? 'Re-login' : 'Connect'}
+                        </button>
+                        <button
+                          type="button"
+                          className="ui-kit-btn ui-kit-btn--soft ui-kit-btn-inline settings-action-btn"
+                          onClick={() => void clearUpstox()}
+                          disabled={upstoxBusy || !upstoxStatus.hasToken}
+                        >
+                          <Unlink2 size={14} />
+                          Logout
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="settings-upstox-collapsed-hint">
+                      Turn on to connect or manage your Upstox session.
+                    </p>
+                  )}
+                  </div>
+                </div>
+              </SectionBlock>
+            ) : null}
+
+            {!loading && hasGoldMenu ? (
+              <SectionBlock title="Gold" icon={<Coins size={14} aria-hidden />}>
+                <div className="txn-cards">
+                  <SettingsSectionCard
+                    field={GOLD_RATE_FIELD}
+                    value={settings[GOLD_RATE_FIELD.key] || ''}
+                    editing={editingKey === GOLD_RATE_FIELD.key}
+                    saving={saving}
+                    editValue={editValue}
+                    onStartEdit={() => startEdit(String(GOLD_RATE_FIELD.key))}
+                    onChange={setEditValue}
+                    onSave={value => saveField(String(GOLD_RATE_FIELD.key), value)}
+                  />
+                </div>
+              </SectionBlock>
+            ) : null}
+
+            {!loading && hasSubscriptionsMenu ? (
+              <SectionBlock title="Rates" icon={<IndianRupee size={14} aria-hidden />}>
+                <div className="txn-cards">
+                  <div className={GENERAL_SETTINGS_PANEL} role="group">
+                    <div className="settings-rates-usd-block">
+                      <div className="settings-profile-meta-label">USD → INR</div>
+                      <div className="settings-gold-usd-value">
+                        ₹{settings.usdToInr ? Number(settings.usdToInr).toFixed(2) : '—'}
+                      </div>
+                      <div className="settings-gold-usd-note">From settings API when available</div>
+                    </div>
+                  </div>
+                </div>
+              </SectionBlock>
+            ) : null}
           </>
         )}
 
@@ -798,30 +874,4 @@ export default function Settings() {
       )}
     </div>
   );
-}
-
-function StatusBox({
-  title,
-  icon,
-  tone,
-  status,
-}: {
-  title: string
-  icon: ReactNode
-  tone: 'green' | 'red' | 'amber'
-  status: string
-}) {
-  return (
-    <UiCard
-      title={
-        <span className="settings-status-title">
-          <span className="settings-status-icon">{icon}</span>
-          <span>{title}</span>
-        </span>
-      }
-      right={<span className={`settings-chip ${tone === 'green' ? 'ok' : tone === 'amber' ? 'warn' : 'neutral'}`}>{status}</span>}
-    >
-      <div />
-    </UiCard>
-  )
 }

@@ -81,7 +81,7 @@ export function SettingsSectionCard<T = Record<string, unknown>>({
           type="button"
           onClick={editing ? () => onSave(editValue) : onStartEdit}
           disabled={saving}
-          className="ui-kit-btn ui-kit-btn--soft settings-icon-btn"
+          className={`ui-kit-btn ui-kit-btn-inline settings-icon-btn${editing ? ' ui-kit-btn--solid' : ' ui-kit-btn--soft'}`}
           aria-label={editing ? 'Save' : 'Edit'}
           title={editing ? 'Save' : 'Edit'}
         >

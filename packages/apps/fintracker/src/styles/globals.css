@@ -1433,11 +1433,224 @@ tr:last-child td { border-bottom: none; }
   flex-shrink: 0;
 }
 .settings-status-details { color: var(--muted); font-size: 12px; line-height: 1.5; }
+
+/* Settings → General: profile + grouped cards */
+.savings-page .ui-kit-section-block .ui-kit-section-body {
+  min-width: 0;
+}
+.settings-general-card-stack {
+  gap: 10px;
+}
+.settings-profile-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.settings-profile-meta-row {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.settings-profile-meta-label {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.settings-profile-meta-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.35;
+  word-break: break-word;
+}
+.settings-billing-hint {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.45;
+  margin: 0;
+}
+.settings-billing-example {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.4;
+}
+.settings-billing-advanced {
+  font-size: 12px;
+  color: var(--muted);
+}
+.settings-billing-advanced summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 0;
+}
+.settings-billing-json {
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: 11px;
+  margin: 8px 0 0;
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+.settings-general-fullwidth-control {
+  width: 100%;
+  min-width: 0;
+}
+.settings-general-save-btn {
+  width: 100%;
+  justify-content: center;
+  margin-top: 2px;
+}
+.settings-general-upstox-actions {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.settings-upstox-details summary,
+.settings-gold-details summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  list-style-position: outside;
+}
+.settings-upstox-token-lines {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.settings-gold-usd-block {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.settings-gold-usd-value {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text);
+  margin-top: 4px;
+}
+.settings-gold-usd-note {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
 .settings-action-btn { padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; display: inline-flex; align-items: center; gap: 8px; font-family: inherit; font-size: 12px; font-weight: 700; }
 .settings-action-btn:disabled { opacity: .55; cursor: not-allowed; }
-.settings-section-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-.settings-section-head .section-title { font-size: 14px; }
-.settings-section-icon { width: 28px; height: 28px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; background: var(--navy-lt); color: var(--navy); flex-shrink: 0; }
+.settings-profile-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.settings-profile-card-top {
+  min-width: 0;
+}
+.settings-profile-name {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1.25;
+  word-break: break-word;
+}
+.settings-profile-email {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  line-height: 1.35;
+  word-break: break-all;
+}
+.settings-profile-org-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.settings-profile-meta-value--end {
+  text-align: right;
+  flex-shrink: 0;
+  max-width: 60%;
+}
+.settings-upstox-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.settings-upstox-toggle-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+.settings-upstox-body {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.settings-upstox-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.settings-upstox-status-label {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.settings-upstox-collapsed-hint {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+.settings-switch {
+  position: relative;
+  width: 44px;
+  height: 26px;
+  border-radius: 13px;
+  border: none;
+  padding: 0;
+  background: var(--border);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+.settings-switch--on {
+  background: var(--navy);
+}
+.settings-switch::after {
+  content: '';
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.15s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+.settings-switch--on::after {
+  transform: translateX(18px);
+}
+.settings-switch:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: 2px;
+}
+.settings-rates-usd-block {
+  padding-top: 0;
+}
 .settings-card-title-row {
   display: inline-flex;
   align-items: center;

@@ -43,16 +43,6 @@ CREATE TABLE "schema_migrations" (
 	"applied_at" timestamp DEFAULT now() NOT NULL
 );
 
-CREATE TABLE "accounts" (
-	"id" text PRIMARY KEY NOT NULL,
-	"org_id" text,
-	"name" text NOT NULL,
-	"description" text,
-	"used_for" text DEFAULT 'both' NOT NULL,
-	"is_active" boolean DEFAULT true,
-	"sort_order" integer DEFAULT 0
-);
-
 CREATE TABLE "budget" (
 	"id" text PRIMARY KEY NOT NULL,
 	"org_id" text,
@@ -61,12 +51,13 @@ CREATE TABLE "budget" (
 	"amount" numeric(12, 2) NOT NULL
 );
 
-CREATE TABLE "credit_sources" (
+CREATE TABLE "payment_sources" (
 	"id" text PRIMARY KEY NOT NULL,
 	"org_id" text,
 	"name" text NOT NULL,
 	"description" text,
-	"category" text NOT NULL,
+	"source_type" text NOT NULL,
+	"used_for" text DEFAULT 'both' NOT NULL,
 	"is_active" boolean DEFAULT true,
 	"sort_order" integer DEFAULT 0
 );
@@ -78,8 +69,12 @@ CREATE TABLE "transactions" (
 	"description" text NOT NULL,
 	"amount" numeric(12, 2) NOT NULL,
 	"category" text,
+	"category_id" text,
 	"type" text NOT NULL,
 	"mode" text,
+	"payment_source_id" text,
+	"transfer_to" text,
+	"transfer_to_id" text,
 	"notes" text,
 	"month_year" text NOT NULL
 );
