@@ -19,37 +19,6 @@ function fail(res: NextApiResponse, status: number, error: string) {
 
 const CATEGORY = new Set(['credit_card', 'informal'])
 
-async function ensureDefaultCreditSources(db: ReturnType<typeof getDb>, orgId: string | null) {
-  const existing = await db
-    .select({ id: paymentSources.id })
-    .from(paymentSources)
-    .where(and(
-      orgId ? eq(paymentSources.orgId, orgId) : isNull(paymentSources.orgId),
-      inArray(paymentSources.sourceType, ['credit_card', 'informal'])
-    ))
-    .limit(1)
-  if (existing.length > 0) return
-
-  const defaults = [
-    { name: 'ICICI', sourceType: 'credit_card' as const, sortOrder: 0 },
-    { name: 'HDFC', sourceType: 'credit_card' as const, sortOrder: 1 },
-    { name: 'Ramya', sourceType: 'informal' as const, sortOrder: 2 },
-    { name: 'Others', sourceType: 'informal' as const, sortOrder: 3 },
-  ]
-  for (const row of defaults) {
-    await db.insert(paymentSources).values({
-      id: crypto.randomUUID(),
-      orgId,
-      name: row.name,
-      description: null,
-      sourceType: row.sourceType,
-      usedFor: 'both',
-      isActive: true,
-      sortOrder: row.sortOrder,
-    })
-  }
-}
-
 function serialize(row: typeof paymentSources.$inferSelect) {
   return {
     id: row.id,
@@ -66,12 +35,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
   const session = await getIronSession<FtSessionData>(req, res, getSessionOptions())
   if (!session.email) return fail(res, 401, 'Unauthorized')
-  const email = session.email.toLowerCase()
   const orgId = typeof session.activeOrgId === 'string' && session.activeOrgId.trim() ? session.activeOrgId : null
   const db = getDb()
 
   if (req.method === 'GET') {
-    await ensureDefaultCreditSources(db, orgId)
     const rows = await db
       .select()
       .from(paymentSources)
