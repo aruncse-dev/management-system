@@ -1,12 +1,9 @@
-import Head from 'next/head'
+import type { GetServerSideProps } from 'next'
 
-export default function AdminHomePage() {
-  return (
-    <>
-      <Head>
-        <title>Admin · FinTracker</title>
-      </Head>
-      <div className="admin-page" />
-    </>
-  )
+export const getServerSideProps: GetServerSideProps = async () => ({
+  redirect: { destination: '/admin/orgs', permanent: false },
+})
+
+export default function AdminHomeRedirect() {
+  return null
 }
