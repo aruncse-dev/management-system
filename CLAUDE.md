@@ -40,9 +40,7 @@ Minimum per-app envs:
 - `VITE_ALLOWED_EMAILS`
 - `DATABASE_URL`
 
-Fintracker admin workflows also use:
-
-- `ADMIN_EMAILS`
+Platform admin console access is **`users.role = 'admin'`** (active) in Neon, not an env var.
 
 ## Working Agreement for Docs
 

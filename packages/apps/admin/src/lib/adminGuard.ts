@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getIronSession } from 'iron-session'
 import type { FtSessionData } from '@fintracker-vault/auth'
-import { getUserFromDb, isAdminEmail } from './dbAuth'
+import { getUserFromDb } from './dbAuth'
 import { getSessionOptions } from './session'
 
 export type PlatformAdminActor = { kind: 'google'; email: string }
@@ -17,12 +17,8 @@ export async function requirePlatformAdmin(
   }
 
   const email = session.email.toLowerCase()
-  if (isAdminEmail(email)) {
-    return { kind: 'google', email: session.email }
-  }
-
   const user = await getUserFromDb(email)
-  if (!user || user.role !== 'admin') {
+  if (!user || user.role !== 'admin' || user.status !== 'active') {
     res.status(403).json({ ok: false, error: 'Forbidden' })
     return null
   }

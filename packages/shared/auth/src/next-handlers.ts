@@ -143,24 +143,24 @@ export async function handleLogoutPost(
   return res.status(200).json({ ok: true })
 }
 
+type VerifyPinHooks = {
+  finalizeSession?: (session: FtSessionData) => Promise<void>
+  /** When `PIN_SESSION_EMAIL` is unset and the session has no email yet (e.g. return first platform admin from DB). */
+  resolvePinBootstrapEmail?: () => Promise<string | undefined>
+}
+
 /**
  * PIN-only bootstrap when there is no Google session yet: which email to bind to the new session.
  *
  * - If `PIN_SESSION_EMAIL` is set, that value wins.
- * - Otherwise the first entry in `ADMIN_EMAILS` is used (single-admin / household setups).
+ * - Otherwise `hooks.resolvePinBootstrapEmail` (e.g. first `users.role = admin` row).
  */
-function resolvePinSessionEmail(): string | undefined {
+async function resolvePinSessionEmail(
+  hooks?: VerifyPinHooks,
+): Promise<string | undefined> {
   const explicit = (process.env.PIN_SESSION_EMAIL || '').trim().toLowerCase()
   if (explicit) return explicit
-  const admins = (process.env.ADMIN_EMAILS || '')
-    .split(',')
-    .map(e => e.trim().toLowerCase())
-    .filter(Boolean)
-  return admins[0] || undefined
-}
-
-type VerifyPinHooks = {
-  finalizeSession?: (session: FtSessionData) => Promise<void>
+  return (await hooks?.resolvePinBootstrapEmail?.()) || undefined
 }
 
 export async function handleVerifyPinPost(
@@ -205,12 +205,12 @@ export async function handleVerifyPinPost(
     return res.status(200).json({ ok: true })
   }
 
-  const email = resolvePinSessionEmail()
+  const email = await resolvePinSessionEmail(hooks)
   if (!email) {
     return res.status(401).json({
       ok: false,
       error:
-        'No active session. Sign in with Google once, or set PIN_SESSION_EMAIL (or ADMIN_EMAILS) so PIN can restore your session.',
+        'No active session. Sign in with Google once, set PIN_SESSION_EMAIL, or ensure an active platform admin exists in the database.',
     })
   }
 

@@ -13,12 +13,16 @@ export async function getUserFromDb(email: string) {
   return user ?? null
 }
 
-export function isAdminEmail(email: string): boolean {
-  const adminEmails = (process.env.ADMIN_EMAILS || '')
-    .split(',')
-    .map(e => e.trim().toLowerCase())
-    .filter(Boolean)
-  return adminEmails.includes(email.toLowerCase())
+/** First active platform admin (`users.role = admin`), for PIN-only session bootstrap when `PIN_SESSION_EMAIL` is unset. */
+export async function getFirstPlatformAdminEmail(): Promise<string | undefined> {
+  const db = getDb()
+  const [row] = await db
+    .select({ email: users.email })
+    .from(users)
+    .where(and(eq(users.role, 'admin'), eq(users.status, 'active')))
+    .orderBy(asc(users.email))
+    .limit(1)
+  return row?.email
 }
 
 export async function upsertUser(email: string, displayName?: string) {
@@ -29,7 +33,7 @@ export async function upsertUser(email: string, displayName?: string) {
     .values({
       email: normalizedEmail,
       displayName: displayName ?? normalizedEmail.split('@')[0] ?? normalizedEmail,
-      role: isAdminEmail(normalizedEmail) ? 'admin' : 'member',
+      role: 'member',
       status: 'active',
       useDb: false,
     })
@@ -74,11 +78,7 @@ export async function verifyProvisionedGoogleUser(
   { allowed: true } | { allowed: false; error: string; statusCode: number }
 > {
   const normalized = email.toLowerCase()
-  let user = await getUserFromDb(normalized)
-  if (!user && isAdminEmail(normalized)) {
-    await upsertUser(normalized, displayName)
-    user = await getUserFromDb(normalized)
-  }
+  const user = await getUserFromDb(normalized)
   if (!user) {
     return {
       allowed: false,
