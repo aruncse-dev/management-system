@@ -2,6 +2,7 @@ import { useState, useEffect, useLayoutEffect, useCallback, useMemo, memo } from
 import { useRouter } from 'next/router'
 import { Search, LayoutDashboard, Handshake, ArrowDownLeft, BarChart3, Shield, User, ArrowUpRight, Plus } from 'lucide-react'
 import { api, RawLendingRow } from '../api'
+import { LENDING_SHEET_SLUG_VIJAYA, normalizeLendingSheetSlug } from '../lib/lendingSheetSlug'
 import { INR } from '../utils'
 import { FormField, HoldingCard, KpiCard, KpiGrid, LoadingState, SearchField, SectionBlock, SectionChip } from '../ui'
 
@@ -9,7 +10,8 @@ type LendType = 'LEND' | 'RECEIVED'
 type LendTab = 'dashboard' | 'lended' | 'received'
 
 interface LendingProps {
-  sheetName: string
+  /** @deprecated Prefer URL `?sheet=`; kept for tests */
+  sheetSlug?: string
   onTabChange?: (tab: 'dashboard' | 'lended' | 'received') => void
 }
 
@@ -153,12 +155,12 @@ const EntryCard = memo(function EntryCard({
   )
 })
 
-export default function Lending({ sheetName: sheetNameProp, onTabChange }: LendingProps) {
+export default function Lending({ sheetSlug: sheetSlugProp, onTabChange }: LendingProps) {
   const router = useRouter()
   const sheetQ = router.isReady ? router.query.sheet : undefined
   const sheetFromQuery =
     typeof sheetQ === 'string' ? sheetQ : Array.isArray(sheetQ) ? sheetQ[0] : undefined
-  const safeSheetName = String(sheetFromQuery ?? sheetNameProp ?? 'Lending').trim() || 'Lending'
+  const safeSheetSlug = normalizeLendingSheetSlug(sheetFromQuery ?? sheetSlugProp)
   const [entries, setEntries] = useState<LendingEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -176,14 +178,14 @@ export default function Lending({ sheetName: sheetNameProp, onTabChange }: Lendi
     setLoading(true)
     setError('')
     try {
-      const rows = await api.getLending(safeSheetName)
+      const rows = await api.getLending(safeSheetSlug)
       setEntries(rows.map(parseRow).filter((e): e is LendingEntry => e !== null))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load')
     } finally {
       setLoading(false)
     }
-  }, [safeSheetName])
+  }, [safeSheetSlug])
 
   useLayoutEffect(() => {
     setEntries([])
@@ -197,7 +199,7 @@ export default function Lending({ sheetName: sheetNameProp, onTabChange }: Lendi
     setPersonModalOpen(false)
     setPersonModalName(null)
     setActiveTab('dashboard')
-  }, [safeSheetName])
+  }, [safeSheetSlug])
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -250,9 +252,9 @@ export default function Lending({ sheetName: sheetNameProp, onTabChange }: Lendi
     const apiType = form.type === 'RECEIVED' ? 'REPAY' : form.type
     const p = { date: form.date, name: form.name.trim(), amount: parseFloat(form.amount), type: apiType, description: form.description.trim() }
     try {
-      if (editEntry) await api.updateLending({ ...p, id: editEntry.id }, safeSheetName)
-      else await api.addLending(p, safeSheetName)
-      api.invalidateCache({ action: 'getEntries', params: { module: 'lending', ...(safeSheetName && safeSheetName !== 'Lending' ? { sheetName: safeSheetName } : {}) } })
+      if (editEntry) await api.updateLending({ ...p, id: editEntry.id }, safeSheetSlug)
+      else await api.addLending(p, safeSheetSlug)
+      api.invalidateCache({ action: 'getEntries', params: { module: 'lending', sheetName: safeSheetSlug } })
       setModalOpen(false)
       await loadData()
     } catch (e) {
@@ -268,9 +270,9 @@ export default function Lending({ sheetName: sheetNameProp, onTabChange }: Lendi
     setSaving(true)
     const deletingId = editEntry.id
     try {
-      await api.deleteLending(deletingId, safeSheetName)
+      await api.deleteLending(deletingId, safeSheetSlug)
       setEntries(prev => prev.filter(entry => entry.id !== deletingId))
-      api.invalidateCache({ action: 'getEntries', params: { module: 'lending', ...(safeSheetName && safeSheetName !== 'Lending' ? { sheetName: safeSheetName } : {}) } })
+      api.invalidateCache({ action: 'getEntries', params: { module: 'lending', sheetName: safeSheetSlug } })
       setModalOpen(false)
       await loadData()
     } catch (e) {
@@ -317,7 +319,9 @@ export default function Lending({ sheetName: sheetNameProp, onTabChange }: Lendi
   }, [entries, personModalName])
 
   const shouldUseDescriptionAsTitle = (entry: LendingEntry) =>
-    !entry.name.trim() || entry.name.trim().toLowerCase() === 'vijaya amma'
+    safeSheetSlug === LENDING_SHEET_SLUG_VIJAYA ||
+    !entry.name.trim() ||
+    entry.name.trim().toLowerCase() === 'vijaya amma'
 
 
   return (

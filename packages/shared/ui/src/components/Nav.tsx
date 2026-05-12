@@ -65,7 +65,8 @@ function pathDrawerActive(currentAsPath: string, itemPath: string) {
   const [cPath, cQuery] = c.split('?')
   const [tPath, tQuery] = t.split('?')
   if (cPath !== tPath) return false
-  if (!tQuery) return true
+  // Item is path-only: active only when the browser URL has no query (e.g. /lending must not match /lending?sheet=vijaya-amma).
+  if (!tQuery) return !cQuery?.trim()
   const cParams = new URLSearchParams(cQuery || '')
   const tParams = new URLSearchParams(tQuery)
   for (const [k, v] of tParams) {
@@ -92,8 +93,8 @@ interface Props {
 }
 
 const LENDING_SUBMENU = [
-  { id: 'Lending', label: 'Lending', icon: <Wallet size={18} /> },
-  { id: 'Vijaya Amma', label: 'Vijaya Amma', icon: <User size={18} /> },
+  { id: 'lending', label: 'Lending', icon: <Wallet size={18} /> },
+  { id: 'vijaya-amma', label: 'Vijaya Amma', icon: <User size={18} /> },
 ]
 
 function getAppAssetUrl(_area: AppNavArea, asset: string): string {

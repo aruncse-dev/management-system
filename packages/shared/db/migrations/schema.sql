@@ -95,6 +95,7 @@ CREATE TABLE "savings" (
 CREATE TABLE "lending" (
 	"id" text PRIMARY KEY NOT NULL,
 	"org_id" text,
+	"sheet_slug" text DEFAULT 'lending' NOT NULL,
 	"date" date NOT NULL,
 	"name" text NOT NULL,
 	"amount" numeric(12, 2) NOT NULL,
