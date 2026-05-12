@@ -19,36 +19,6 @@ function fail(res: NextApiResponse, status: number, error: string) {
 
 const USED_FOR = new Set(['savings', 'monthly', 'both'])
 
-async function ensureDefaultAccounts(db: ReturnType<typeof getDb>, orgId: string | null) {
-  const existing = await db
-    .select({ id: paymentSources.id })
-    .from(paymentSources)
-    .where(and(
-      orgId ? eq(paymentSources.orgId, orgId) : isNull(paymentSources.orgId),
-      eq(paymentSources.sourceType, 'account')
-    ))
-    .limit(1)
-  if (existing.length > 0) return
-
-  const defaults = [
-    { name: 'Cash', usedFor: 'both' as const, sortOrder: 0 },
-    { name: 'HDFC Bank', usedFor: 'both' as const, sortOrder: 1 },
-    { name: 'Wallet', usedFor: 'both' as const, sortOrder: 2 },
-  ]
-  for (const row of defaults) {
-    await db.insert(paymentSources).values({
-      id: crypto.randomUUID(),
-      orgId,
-      name: row.name,
-      description: null,
-      sourceType: 'account',
-      usedFor: row.usedFor,
-      isActive: true,
-      sortOrder: row.sortOrder,
-    })
-  }
-}
-
 function serializeAccount(row: typeof paymentSources.$inferSelect) {
   return {
     id: row.id,
@@ -65,12 +35,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const session = await getIronSession<FtSessionData>(req, res, getSessionOptions())
     if (!session.email) return fail(res, 401, 'Unauthorized')
-    const email = session.email.toLowerCase()
     const orgId = typeof session.activeOrgId === 'string' && session.activeOrgId.trim() ? session.activeOrgId : null
     const db = getDb()
 
     if (req.method === 'GET') {
-      await ensureDefaultAccounts(db, orgId)
       const rows = await db
         .select()
         .from(paymentSources)
