@@ -29,7 +29,8 @@ All apps share UI/components via a pnpm monorepo. Frontend + API deploy to **Ver
    - **`VITE_GOOGLE_CLIENT_ID`** — OAuth Web client ID (see `.cursor/rules/google-oauth-env.mdc`)
    - **`DATABASE_URL`** — Neon Postgres URL (`postgresql://...`)
    - **`VITE_ALLOWED_EMAILS`** — comma-separated emails allowed to sign in (vault/staff still use this in `next.config`; fintracker auth is DB-aware but allowlist remains useful for other apps)
-   - **`ADMIN_EMAILS`** — your Google email → platform admin (`/admin`, orgs, users)
+
+   Platform admin (`packages/apps/admin`): set **`users.role = 'admin'`** (and `status = 'active'`) in Neon for the Google account that should manage orgs — not an env var.
 
 3. **Apply database schema** (creates tables in Neon). From repo root:
    ```bash
@@ -44,7 +45,7 @@ All apps share UI/components via a pnpm monorepo. Frontend + API deploy to **Ver
    ```
    Open [http://localhost:3000](http://localhost:3000), sign in with Google.
 
-5. **Platform admin app** (separate package, port **3003**) — copy `packages/apps/admin/.env.local.example` to `packages/apps/admin/.env.local` (same `SESSION_SECRET`, `DATABASE_URL`, Google keys, `ADMIN_EMAILS` as FinTracker). Then:
+5. **Platform admin app** (separate package, port **3003**) — copy `packages/apps/admin/.env.local.example` to `packages/apps/admin/.env.local` (same `SESSION_SECRET`, `DATABASE_URL`, and Google keys as FinTracker). Then:
    ```bash
    pnpm dev:admin
    ```
@@ -69,7 +70,6 @@ Use each app’s `.env.local.example` as a template. Set **`SESSION_SECRET`**, *
 | `VITE_GOOGLE_CLIENT_ID` / `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | Client + server | Google Sign-In (mirrored in `next.config`) |
 | `VITE_ALLOWED_EMAILS` / `ALLOWED_EMAILS` | Server (+ client mirror in vault/staff) | Sign-in allowlist where enforced |
 | `DATABASE_URL` | Server only | Neon connection string |
-| `ADMIN_EMAILS` | Server only | FinTracker platform admins |
 | `NEXT_PUBLIC_API_URL` | Client | API base path; default **`/api`** (only set if API is on another origin) |
 | `APP_PASSWORD` | Server | Optional PIN (`POST /api/auth/verify-pin`) |
 | `PIN_SESSION_EMAIL` | Server | Optional PIN-only session email |
@@ -156,8 +156,9 @@ Both apps deploy to Vercel automatically on push to `main`.
    - `VITE_GOOGLE_CLIENT_ID`
    - `DATABASE_URL`
    - `VITE_ALLOWED_EMAILS`
-   - `ADMIN_EMAILS` (fintracker admin panel)
 4. Enable corepack: Set `ENABLE_EXPERIMENTAL_COREPACK=1`
+
+   Platform admins are **`users.role = 'admin'`** in Neon, not an env variable.
 
 ---
 

@@ -1,8 +1,8 @@
 export {
   applyDefaultOrgToSession,
   ensureUserRow,
+  getFirstPlatformAdminEmail,
   getUserFromDb,
-  isAdminEmail,
   listOrgsForUserEmail,
   upsertUser,
   verifyProvisionedGoogleUser,

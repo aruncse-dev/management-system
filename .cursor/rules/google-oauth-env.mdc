@@ -36,8 +36,8 @@ Set `VITE_GOOGLE_CLIENT_ID=...` in **repo** `.env` or `.env.local`, or `web/.env
 ## Server auth and DB env
 
 - **`SESSION_SECRET`** — 32+ character random string; encrypts the HttpOnly session cookie (`ft_session_fintracker` / `ft_session_vault` / `ft_session_staff` per app). Required for login and authenticated API access.
-- **`APP_PASSWORD`** — 4-digit PIN validated only on the server (`POST /api/auth/verify-pin`). Prefer this over client-exposed `VITE_APP_PASSWORD` / `NEXT_PUBLIC_APP_PASSWORD` (removed from the client bundle). **`PIN_SESSION_EMAIL`** (optional) — if there is no Google session cookie but the PIN is correct, the server binds the session to this email; otherwise the first entry in **`ALLOWED_EMAILS`** / **`VITE_ALLOWED_EMAILS`** is used for PIN-only session bootstrap.
+- **`APP_PASSWORD`** — 4-digit PIN validated only on the server (`POST /api/auth/verify-pin`). Prefer this over client-exposed `VITE_APP_PASSWORD` / `NEXT_PUBLIC_APP_PASSWORD` (removed from the client bundle). **`PIN_SESSION_EMAIL`** (optional) — if there is no Google session cookie but the PIN is correct, the server binds the session to this email; if unset, apps use the first active **`users.role = 'admin'`** row (see `@fintracker-vault/db` / `getFirstPlatformAdminEmail`).
 - **`DATABASE_URL`** — Neon/Postgres connection string for server-side DB access.
-- **`ADMIN_EMAILS`** — comma-separated admin users for bootstrap/admin tooling.
+- **Platform admin** — not an env key: set **`users.role = 'admin'`** (and `status = 'active'`) in Neon for accounts that may use the admin console.
 
 Allowlist for Google sign-in remains **`VITE_ALLOWED_EMAILS`** / **`NEXT_PUBLIC_ALLOWED_EMAILS`** / **`ALLOWED_EMAILS`** (checked in `POST /api/auth/google`, not exposed on the client).
