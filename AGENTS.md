@@ -23,3 +23,4 @@ Do not push feature commits directly to `main`.
 - `.cursor/rules/google-oauth-env.mdc`
 - `.cursor/rules/git-pr-only-main.mdc`
 - `docs/gas-recovery.md`
+- `.cursor/skills/admin-ui-style/SKILL.md` (canonical Admin UI skill; `.claude/skills/admin-ui-style.md` points here)

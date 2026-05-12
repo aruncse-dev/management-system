@@ -5,6 +5,15 @@ export type GetFtSessionOptions = () => SessionOptions
 export type FtSessionData = {
   email?: string
   authedAt?: number
+  /** Active organization for multi-org users; set after Google sign-in / PIN and via org switcher. */
+  activeOrgId?: string
+}
+
+/** Separate iron-session cookie for `/admin` + `/api/admin/*` (platform console). */
+export type FtAdminSessionData = {
+  email?: string
+  authedAt?: number
+  method?: 'google'
 }
 
 /** Minimum length enforced by iron-session usage; keep in sync with middleware error copy. */

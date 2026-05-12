@@ -1,0 +1,30 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "moduleResolution": "bundler",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "jsx": "preserve",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@fintracker-vault/ui": ["../../shared/ui/src"],
+      "@fintracker-vault/ui/*": ["../../shared/ui/src/*"],
+      "@fintracker-vault/types": ["../../shared/types/src"],
+      "@fintracker-vault/types/*": ["../../shared/types/src/*"],
+      "@fintracker-vault/config": ["../../shared/config/src"],
+      "@fintracker-vault/config/*": ["../../shared/config/src/*"],
+      "@fintracker-vault/utils": ["../../shared/utils/src/index.ts"],
+      "@fintracker-vault/utils/*": ["../../shared/utils/src/*"],
+      "@fintracker-vault/auth": ["../../shared/auth/src/index.ts"],
+      "@fintracker-vault/auth/middleware": ["../../shared/auth/src/middleware.ts"],
+      "@fintracker-vault/db": ["../../shared/db/src/index.ts"],
+      "@fintracker-vault/db/*": ["../../shared/db/src/*"]
+    },
+    "noEmit": true,
+    "incremental": true,
+    "isolatedModules": true,
+    "plugins": [{ "name": "next" }],
+    "strictNullChecks": true
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}

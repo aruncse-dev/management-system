@@ -11,7 +11,8 @@ type GoogleAuthHooks = {
     | { allowed: true }
     | { allowed: false; error?: string; statusCode?: number }
   >
-  skipAllowlistCheck?: boolean
+  /** Called after verification, before the session cookie is written (e.g. set `activeOrgId`). */
+  prepareSession?: (args: { email: string; session: FtSessionData }) => Promise<void>
 }
 
 export async function handleGoogleAuthPost(
@@ -67,19 +68,6 @@ export async function handleGoogleAuthPost(
     return res.status(401).json({ ok: false, error: 'No email in token' })
   }
 
-  const allowedRaw =
-    process.env.VITE_ALLOWED_EMAILS ||
-    process.env.NEXT_PUBLIC_ALLOWED_EMAILS ||
-    process.env.ALLOWED_EMAILS ||
-    ''
-  const allowed = allowedRaw
-    .split(',')
-    .map(e => e.trim().toLowerCase())
-    .filter(Boolean)
-  if (!hooks?.skipAllowlistCheck && allowed.length > 0 && !allowed.includes(email)) {
-    return res.status(403).json({ ok: false, error: 'Email not allowed' })
-  }
-
   if (hooks?.onVerified) {
     const displayName =
       typeof (body as { displayName?: unknown }).displayName === 'string'
@@ -96,6 +84,9 @@ export async function handleGoogleAuthPost(
   const session = await getIronSession<FtSessionData>(req, res, sessionOptions)
   session.email = email
   session.authedAt = Date.now()
+  if (hooks?.prepareSession) {
+    await hooks.prepareSession({ email, session })
+  }
   await session.save()
 
   return res.status(200).json({ ok: true, email })
@@ -124,6 +115,7 @@ export async function handleSessionGet(
     ok: true,
     authed: Boolean(email),
     email: email || undefined,
+    activeOrgId: session.activeOrgId || undefined,
   })
 }
 
@@ -154,27 +146,28 @@ export async function handleLogoutPost(
 /**
  * PIN-only bootstrap when there is no Google session yet: which email to bind to the new session.
  *
- * - If `PIN_SESSION_EMAIL` is set, that value wins (recommended when `ALLOWED_EMAILS` lists multiple people).
- * - Otherwise, if `ALLOWED_EMAILS` / `VITE_ALLOWED_EMAILS` / `NEXT_PUBLIC_ALLOWED_EMAILS` is a comma-separated
- *   list, **only the first entry** is used. That matches the common single-user deployment but is easy to
- *   misconfigure for multi-user allowlists — set `PIN_SESSION_EMAIL` explicitly in that case.
+ * - If `PIN_SESSION_EMAIL` is set, that value wins.
+ * - Otherwise the first entry in `ADMIN_EMAILS` is used (single-admin / household setups).
  */
 function resolvePinSessionEmail(): string | undefined {
   const explicit = (process.env.PIN_SESSION_EMAIL || '').trim().toLowerCase()
   if (explicit) return explicit
-  const raw =
-    process.env.VITE_ALLOWED_EMAILS ||
-    process.env.NEXT_PUBLIC_ALLOWED_EMAILS ||
-    process.env.ALLOWED_EMAILS ||
-    ''
-  const first = raw.split(',')[0]?.trim().toLowerCase()
-  return first || undefined
+  const admins = (process.env.ADMIN_EMAILS || '')
+    .split(',')
+    .map(e => e.trim().toLowerCase())
+    .filter(Boolean)
+  return admins[0] || undefined
+}
+
+type VerifyPinHooks = {
+  finalizeSession?: (session: FtSessionData) => Promise<void>
 }
 
 export async function handleVerifyPinPost(
   req: NextApiRequest,
   res: NextApiResponse,
   getSessionOptions: GetFtSessionOptions,
+  hooks?: VerifyPinHooks,
 ) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST')
@@ -207,6 +200,7 @@ export async function handleVerifyPinPost(
 
   if (session.email) {
     session.authedAt = Date.now()
+    if (hooks?.finalizeSession) await hooks.finalizeSession(session)
     await session.save()
     return res.status(200).json({ ok: true })
   }
@@ -216,12 +210,13 @@ export async function handleVerifyPinPost(
     return res.status(401).json({
       ok: false,
       error:
-        'No active session. Sign in with Google once, or set ALLOWED_EMAILS (or PIN_SESSION_EMAIL) so PIN can restore your session.',
+        'No active session. Sign in with Google once, or set PIN_SESSION_EMAIL (or ADMIN_EMAILS) so PIN can restore your session.',
     })
   }
 
   session.email = email
   session.authedAt = Date.now()
+  if (hooks?.finalizeSession) await hooks.finalizeSession(session)
   await session.save()
 
   return res.status(200).json({ ok: true })

@@ -5,11 +5,7 @@ const { googleClientId: resolvedGoogleClientId, allowedEmails: resolvedAllowedEm
   getGoogleAuthEnv(__dirname)
 
 const clientEnv = {
-  NEXT_PUBLIC_API_URL:
-    process.env.NEXT_PUBLIC_API_URL ||
-    process.env.NEXT_PUBLIC_API_BASE_URL ||
-    process.env.VITE_API_URL ||
-    '/api',
+  NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || '/api',
   VITE_GOOGLE_CLIENT_ID: resolvedGoogleClientId,
   NEXT_PUBLIC_GOOGLE_CLIENT_ID: resolvedGoogleClientId,
   VITE_ALLOWED_EMAILS: resolvedAllowedEmails,

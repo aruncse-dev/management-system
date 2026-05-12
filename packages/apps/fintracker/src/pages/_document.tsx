@@ -30,6 +30,7 @@ export default class MyDocument extends Document<Props> {
           <meta name="color-scheme" content="light" />
           <meta name="theme-color" content="#1E5CC7" />
           <meta name="apple-mobile-web-app-capable" content="yes" />
+          <meta name="mobile-web-app-capable" content="yes" />
           <meta name="apple-mobile-web-app-status-bar-style" content="default" />
           <meta name="apple-mobile-web-app-title" content="FinTracker" />
           <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;600&display=swap" rel="stylesheet" />

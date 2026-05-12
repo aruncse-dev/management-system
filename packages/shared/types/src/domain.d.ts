@@ -7,6 +7,7 @@ export interface Transaction {
     t: 'Expense' | 'Income' | 'Transfer' | 'Savings';
     m: string;
     notes: string;
+    transferTo?: string;
     _k?: number;
 }
 export interface MonthRef {

@@ -1,15 +1,6 @@
-import { neon } from '@neondatabase/serverless'
-import { drizzle } from 'drizzle-orm/neon-http'
-import * as schema from './schema/index'
-
-export function getDb() {
-  const url = process.env.DATABASE_URL
-  if (!url) {
-    throw new Error('DATABASE_URL is not configured')
-  }
-  const sql = neon(url)
-  return drizzle(sql, { schema })
-}
-
-export { schema }
+export { getDb } from './neon'
+export * as schema from './schema/index'
 export * from './schema/index'
+export * from './authUsers'
+export * from './orgMenu'
+export * from './adminStaticData'

@@ -8,8 +8,8 @@ interface Props {
 }
 
 export default function ErrorScreen({ error, onRetry, iconSrc = '/icon-192.png' }: Props) {
-  const isGASNotDeployed = error.includes('GAS not deployed')
-  const isGASRestricted = error.includes('GAS access restricted')
+  const showApiHints =
+    error.includes('Unexpected HTML from API') || error.includes('sign-in page instead of API JSON')
 
   return (
     <div className="login-screen">
@@ -31,10 +31,10 @@ export default function ErrorScreen({ error, onRetry, iconSrc = '/icon-192.png' 
           </div>
         </div>
         <AlertCircle size={48} style={{ color: '#EF4444', marginBottom: 16 }} />
-        <h1 style={{ fontSize: 24, fontWeight: 700, color: '#FFF', marginBottom: 8 }}>Backend Configuration Error</h1>
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: '#FFF', marginBottom: 8 }}>Backend or network error</h1>
         <p style={{ fontSize: 14, color: '#A5B4FC', marginBottom: 24 }}>{error}</p>
 
-        {isGASNotDeployed && (
+        {showApiHints && (
           <div
             style={{
               background: 'rgba(239, 68, 68, 0.1)',
@@ -45,82 +45,18 @@ export default function ErrorScreen({ error, onRetry, iconSrc = '/icon-192.png' 
               textAlign: 'left',
             }}
           >
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#FFF', marginBottom: 10 }}>Fix: Deploy Google Apps Script</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#FFF', marginBottom: 10 }}>Things to check</div>
             <ol style={{ fontSize: 12, color: '#A5B4FC', margin: 0, paddingLeft: 20, lineHeight: 1.6 }}>
-              <li>Open terminal in the project root</li>
+              <li>Sign in with Google on this app (session cookie required for API routes).</li>
               <li>
-                Run:{' '}
-                <code
-                  style={{
-                    background: 'rgba(0,0,0,0.3)',
-                    padding: '2px 6px',
-                    borderRadius: 4,
-                    fontFamily: 'inherit',
-                  }}
-                >
-                  ./deploy.sh
-                </code>
-              </li>
-              <li>Follow the Google authentication prompts</li>
-              <li>
-                Copy the deployment URL into{' '}
-                <code
-                  style={{
-                    background: 'rgba(0,0,0,0.3)',
-                    padding: '2px 6px',
-                    borderRadius: 4,
-                    fontFamily: 'inherit',
-                  }}
-                >
-                  VITE_API_URL
-                </code>{' '}
-                in{' '}
-                <code
-                  style={{
-                    background: 'rgba(0,0,0,0.3)',
-                    padding: '2px 6px',
-                    borderRadius: 4,
-                    fontFamily: 'inherit',
-                  }}
-                >
-                  .env
-                </code>
-              </li>
-              <li>Refresh this page</li>
-            </ol>
-          </div>
-        )}
-
-        {isGASRestricted && (
-          <div
-            style={{
-              background: 'rgba(239, 68, 68, 0.1)',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
-              borderRadius: 10,
-              padding: 16,
-              marginBottom: 20,
-              textAlign: 'left',
-            }}
-          >
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#FFF', marginBottom: 10 }}>Fix: Update GAS Deployment Access</div>
-            <ol style={{ fontSize: 12, color: '#A5B4FC', margin: 0, paddingLeft: 20, lineHeight: 1.6 }}>
-              <li>
-                Go to{' '}
-                <a href="https://script.google.com" target="_blank" rel="noopener noreferrer" style={{ color: '#818CF8', textDecoration: 'underline' }}>
-                  script.google.com
-                </a>
-              </li>
-              <li>Select the &quot;FinTracker&quot; project</li>
-              <li>
-                Click <strong>Deploy</strong> → <strong>Manage deployments</strong>
-              </li>
-              <li>Click the edit icon (pencil) on the deployment</li>
-              <li>
-                Set <strong>&quot;Who has access&quot;</strong> to <strong>&quot;Anyone&quot;</strong>
+                <code style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: 4 }}>DATABASE_URL</code>{' '}
+                is set and schema is applied (<code style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: 4 }}>drizzle-kit push</code>).
               </li>
               <li>
-                Click <strong>Update</strong> and refresh this page
+                <code style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: 4 }}>NEXT_PUBLIC_API_URL</code>{' '}
+                matches your API (default <code style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: 4 }}>/api</code>).
               </li>
+              <li>Restart <code style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: 4 }}>pnpm dev:fintracker</code> after env changes.</li>
             </ol>
           </div>
         )}

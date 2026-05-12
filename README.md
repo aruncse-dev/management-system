@@ -4,8 +4,9 @@ Three apps in a monorepo built with **Next.js 14** and shared packages, now migr
 
 - **FinTracker** — Financial tracking: monthly expenses, gold, investments, loans, savings
 - **Vault** — Secure storage: insurance, passwords, documents
+- **Staff** — Staff attendance (port 3002)
 
-All apps share UI/components via a pnpm monorepo. Frontend runs on Vercel.
+All apps share UI/components via a pnpm monorepo. Frontend + API deploy to **Vercel**; database is **Neon Postgres**. Google Apps Script has been **removed** from this repo (see [docs/gas-recovery.md](./docs/gas-recovery.md) for legacy snapshots only).
 
 ---
 
@@ -14,29 +15,72 @@ All apps share UI/components via a pnpm monorepo. Frontend runs on Vercel.
 ### Prerequisites
 - Node.js 20+
 - pnpm 10.x
+- A [Neon](https://neon.tech) project and **connection string** (`DATABASE_URL`)
 
-### Local Development
+### FinTracker + platform admin + Neon (local)
+
+1. **Install dependencies**
+   ```bash
+   pnpm install
+   ```
+
+2. **Configure FinTracker** — copy [packages/apps/fintracker/.env.local.example](./packages/apps/fintracker/.env.local.example) to `packages/apps/fintracker/.env.local` and set at minimum:
+   - **`SESSION_SECRET`** — 32+ random characters (e.g. `openssl rand -base64 32`)
+   - **`VITE_GOOGLE_CLIENT_ID`** — OAuth Web client ID (see `.cursor/rules/google-oauth-env.mdc`)
+   - **`DATABASE_URL`** — Neon Postgres URL (`postgresql://...`)
+   - **`VITE_ALLOWED_EMAILS`** — comma-separated emails allowed to sign in (vault/staff still use this in `next.config`; fintracker auth is DB-aware but allowlist remains useful for other apps)
+   - **`ADMIN_EMAILS`** — your Google email → platform admin (`/admin`, orgs, users)
+
+3. **Apply database schema** (creates tables in Neon). From repo root:
+   ```bash
+   export DATABASE_URL="postgresql://..."
+   pnpm --filter @fintracker-vault/db run drizzle:push
+   ```
+   Schema is defined in `packages/shared/db/src/schema` and applied with `drizzle:push`. After changing schema files, run `pnpm --filter @fintracker-vault/db run export-schema` (updates **`packages/shared/db/migrations/schema.sql`** — full CREATE DDL). For existing DBs that lag behind, use root **`migration.sql`** (ALTER-only) or `drizzle:push`. See [docs/neon-schema-migrations.md](./docs/neon-schema-migrations.md).
+
+4. **Run FinTracker**
+   ```bash
+   pnpm dev:fintracker
+   ```
+   Open [http://localhost:3000](http://localhost:3000), sign in with Google.
+
+5. **Platform admin app** (separate package, port **3003**) — copy `packages/apps/admin/.env.local.example` to `packages/apps/admin/.env.local` (same `SESSION_SECRET`, `DATABASE_URL`, Google keys, `ADMIN_EMAILS` as FinTracker). Then:
+   ```bash
+   pnpm dev:admin
+   ```
+   - [http://localhost:3003/admin/orgs](http://localhost:3003/admin/orgs) — organizations, members, per-app menus
+   - [http://localhost:3003/admin/users](http://localhost:3003/admin/users) — global users
+   - Apps / menu sections / menu catalog: `/admin/apps`, `/admin/sections`, `/admin/menus`
+
+### Other apps locally
 
 ```bash
-# Install
-pnpm install
-
-# Start both apps (fintracker :3000, vault :3001)
-pnpm dev
-
-# Fresh restart (kill ports, clear caches)
-pnpm dev:fresh
+pnpm dev:vault    # http://localhost:3001
+pnpm dev:staff    # http://localhost:3002
 ```
 
-### Create `.env.local` Files
+Use each app’s `.env.local.example` as a template. Set **`SESSION_SECRET`**, **`VITE_GOOGLE_CLIENT_ID`**, **`DATABASE_URL`**, and **`VITE_ALLOWED_EMAILS`** as needed.
 
-Create app `.env.local` files (fintracker / vault / staff):
+### Env naming (trimmed)
 
-```env
-VITE_GOOGLE_CLIENT_ID=your-oauth-client-id
-DATABASE_URL=postgresql://...your-neon-connection-string...
-VITE_ALLOWED_EMAILS=your@email.com
-ADMIN_EMAILS=admin@email.com
+| Variable | Scope | Purpose |
+|----------|--------|---------|
+| `SESSION_SECRET` | Server | Iron-session cookie encryption |
+| `VITE_GOOGLE_CLIENT_ID` / `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | Client + server | Google Sign-In (mirrored in `next.config`) |
+| `VITE_ALLOWED_EMAILS` / `ALLOWED_EMAILS` | Server (+ client mirror in vault/staff) | Sign-in allowlist where enforced |
+| `DATABASE_URL` | Server only | Neon connection string |
+| `ADMIN_EMAILS` | Server only | FinTracker platform admins |
+| `NEXT_PUBLIC_API_URL` | Client | API base path; default **`/api`** (only set if API is on another origin) |
+| `APP_PASSWORD` | Server | Optional PIN (`POST /api/auth/verify-pin`) |
+| `PIN_SESSION_EMAIL` | Server | Optional PIN-only session email |
+
+Removed / obsolete: **`VITE_GAS_URL`**, **`VITE_API_TOKEN`**, **`GAS_EXEC_URL`**, **`NEXT_PUBLIC_GAS_URL`**, **`VITE_API_URL`** (for default same-origin API).
+
+### Monorepo dev shortcuts
+
+```bash
+pnpm dev              # all apps (turbo)
+pnpm dev:fresh        # kill ports, clear caches, then dev
 ```
 
 (`.env.local` files are gitignored — never committed)
@@ -48,7 +92,8 @@ ADMIN_EMAILS=admin@email.com
 ```
 Frontend (Next.js 14, Vercel)
     ├── fintracker/   (pages router, port 3000)
-    └── vault/        (pages router, port 3001)
+    ├── vault/        (pages router, port 3001)
+    └── staff/        (pages router, port 3002)
            ↓
     Shared packages (@fintracker-vault/*)
     ├── config/       (constants, env config)
@@ -93,7 +138,7 @@ pnpm type-check             # TypeScript validation
 pnpm lint                   # ESLint
 pnpm format                 # Prettier
 
-pnpm kill-ports             # Kill port 3000/3001
+pnpm kill-ports             # Kill ports 3000–3002
 pnpm clean:cache            # Clear .next + .turbo
 pnpm clean                  # Full clean (node_modules + .turbo + .next)
 ```
@@ -132,8 +177,8 @@ Both apps deploy to Vercel automatically on push to `main`.
 **Q: Is my data secure?**
 - A: Data lives in your DB and is protected by server-side session checks. See [CLAUDE.md](./CLAUDE.md) for security details.
 
-**Q: How do I restore the old GAS setup temporarily?**
-- A: Follow [docs/gas-recovery.md](./docs/gas-recovery.md) to restore from tag or archive zip.
+**Q: Where is the old Google Apps Script code?**
+- A: It is no longer in this repo. Use [docs/gas-recovery.md](./docs/gas-recovery.md) only if you need a historical copy from a git tag or zip.
 
 **Q: How do I add a new page?**
 - A: Create a file in `packages/apps/fintracker/src/pages/` (or vault). Next.js auto-routes it.
@@ -143,7 +188,7 @@ Both apps deploy to Vercel automatically on push to `main`.
 ## More Info
 
 - **Architecture & Code Guidelines:** [CLAUDE.md](./CLAUDE.md)
-- **GAS Recovery:** [docs/gas-recovery.md](./docs/gas-recovery.md)
+- **Legacy GAS notes:** [docs/gas-recovery.md](./docs/gas-recovery.md)
 
 ---
 

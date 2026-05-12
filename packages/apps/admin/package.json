@@ -1,0 +1,38 @@
+{
+  "name": "admin",
+  "version": "1.1.0",
+  "description": "Platform admin console",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "predev": "pnpm --filter @fintracker-vault/ui run build && pnpm --filter @fintracker-vault/auth run build",
+    "dev": "next dev -p 3003",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint . --ext .ts,.tsx",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fintracker-vault/auth": "workspace:*",
+    "@fintracker-vault/config": "workspace:*",
+    "@fintracker-vault/db": "workspace:*",
+    "@fintracker-vault/types": "workspace:*",
+    "@fintracker-vault/ui": "workspace:*",
+    "@fintracker-vault/utils": "workspace:*",
+    "@react-oauth/google": "^0.12.1",
+    "next": "^14.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "autoprefixer": "^10.4.0",
+    "eslint": "^8.50.0",
+    "eslint-config-next": "^14.0.0",
+    "postcss": "^8.4.0",
+    "tailwindcss": "^3.3.0",
+    "typescript": "^5.2.0"
+  }
+}

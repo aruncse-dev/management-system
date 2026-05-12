@@ -1,9 +1,8 @@
 import { boolean, date, numeric, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
-import { users } from './users'
 
 export const vaultApps = pgTable('vault_apps', {
   id: text('id').primaryKey(),
-  userEmail: text('user_email').notNull().references(() => users.email),
+  orgId: text('org_id'),
   appName: text('app_name').notNull(),
   category: text('category'),
   logo: text('logo'),
@@ -17,7 +16,7 @@ export const vaultApps = pgTable('vault_apps', {
 
 export const bankingRecords = pgTable('banking_records', {
   id: text('id').primaryKey(),
-  userEmail: text('user_email').notNull().references(() => users.email),
+  orgId: text('org_id'),
   holderName: text('holder_name'),
   bankName: text('bank_name').notNull(),
   accountNo: text('account_no'),
@@ -28,13 +27,13 @@ export const bankingRecords = pgTable('banking_records', {
   transactionPassword: text('transaction_password'),
   profilePassword: text('profile_password'),
   mpin: text('mpin'),
-  appUuid: text('app_uuid').references(() => vaultApps.id),
+  appUuid: text('app_uuid'),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 })
 
 export const persons = pgTable('persons', {
   uuid: text('uuid').primaryKey(),
-  userEmail: text('user_email').notNull().references(() => users.email),
+  orgId: text('org_id'),
   name: text('name').notNull(),
   relation: text('relation'),
   dob: date('dob'),
@@ -46,11 +45,11 @@ export const persons = pgTable('persons', {
 
 export const insurance = pgTable('insurance', {
   id: text('id').primaryKey(),
-  userEmail: text('user_email').notNull().references(() => users.email),
+  orgId: text('org_id'),
   policyType: text('policy_type'),
   planName: text('plan_name').notNull(),
   insurer: text('insurer'),
-  appId: text('app_id').references(() => vaultApps.id),
+  appId: text('app_id'),
   policyNo: text('policy_no'),
   owner: text('owner'),
   premium: numeric('premium', { precision: 12, scale: 2 }),
@@ -62,6 +61,6 @@ export const insurance = pgTable('insurance', {
   cashValue: numeric('cash_value', { precision: 14, scale: 2 }),
   nominee: text('nominee'),
   notes: text('notes'),
-  personUuid: text('person_uuid').references(() => persons.uuid),
+  personUuid: text('person_uuid'),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 })

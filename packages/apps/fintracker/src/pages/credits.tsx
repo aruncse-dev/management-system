@@ -1,14 +1,15 @@
 import { useMemo } from 'react'
 import { useStore } from '../store'
 import { INR } from '../utils'
-import { CC_MODES, OTHER_CR, ALL_CR, MNS } from '../constants'
+import { MNS } from '../config'
+import { useFintrackerModes } from '../context/FintrackerModesContext'
 import { CreditCard, Users, CircleDollarSign, Banknote, Layers3, Users2 } from 'lucide-react'
-import { KpiCard, KpiGrid, SectionBlock, SectionChip } from '../ui'
+import { KpiCard, KpiGrid, LoadingState, SectionBlock, SectionChip } from '../ui'
 
 const CC_CYCLE_DAY = 19
 
 function cycleLabel(month: string, year: string): string {
-  const mi = MNS.indexOf(month)
+  const mi = MNS.indexOf(month as (typeof MNS)[number])
   const prevMi = mi === 0 ? 11 : mi - 1
   return `${CC_CYCLE_DAY} ${MNS[prevMi]} – ${CC_CYCLE_DAY - 1} ${month} ${year}`
 }
@@ -16,19 +17,35 @@ function cycleLabel(month: string, year: string): string {
 export default function Credits() {
   const { state } = useStore()
   const { rows, month, year } = state
+  const { creditCardNames, informalCreditNames, loading: modesLoading } = useFintrackerModes()
 
-  const totals: Record<string, number> = {}
-  ;[...CC_MODES, ...OTHER_CR].forEach(m => { totals[m] = 0 })
-  rows.forEach(r => {
-    if (ALL_CR.includes(r.m)) {
-      totals[r.m] += r.a
-    }
-  })
+  const totals: Record<string, number> = useMemo(() => {
+    const t: Record<string, number> = {}
+    for (const m of [...creditCardNames, ...informalCreditNames]) t[m] = 0
+    rows.forEach(r => {
+      if (r.m in t) t[r.m] += r.a
+    })
+    return t
+  }, [rows, creditCardNames, informalCreditNames])
 
-  const ccNet = CC_MODES.reduce((s, m) => s + totals[m], 0)
-  const otherTotal = OTHER_CR.reduce((s, m) => s + totals[m], 0)
+  const ccNet = useMemo(() => creditCardNames.reduce((s, m) => s + (totals[m] || 0), 0), [creditCardNames, totals])
+  const otherTotal = useMemo(
+    () => informalCreditNames.reduce((s, m) => s + (totals[m] || 0), 0),
+    [informalCreditNames, totals],
+  )
   const overall = ccNet + otherTotal
-  const activeSources = useMemo(() => [...CC_MODES, ...OTHER_CR].filter(m => totals[m] > 0).length, [totals])
+  const activeSources = useMemo(
+    () => [...creditCardNames, ...informalCreditNames].filter(m => (totals[m] || 0) > 0).length,
+    [creditCardNames, informalCreditNames, totals],
+  )
+
+  if (modesLoading) {
+    return (
+      <div className="pg ui-kit-page-shell monthly-subpage">
+        <LoadingState variant="section" />
+      </div>
+    )
+  }
 
   return (
     <div className="pg ui-kit-page-shell monthly-subpage">
@@ -47,11 +64,11 @@ export default function Credits() {
 
       <SectionBlock title="Credit Cards" icon={<CreditCard size={14} />}>
         <div className="cc-g">
-          {CC_MODES.map(m => (
+          {creditCardNames.map(m => (
             <KpiCard
               key={m}
               label={m}
-              value={INR(totals[m])}
+              value={INR(totals[m] || 0)}
               tone="navy"
               accentTone="red"
               icon={<CreditCard size={14} />}
@@ -62,11 +79,11 @@ export default function Credits() {
 
       <SectionBlock title="Other Credits" icon={<Users size={14} />}>
         <div className="cr-g3">
-          {OTHER_CR.map(m => (
+          {informalCreditNames.map(m => (
             <KpiCard
               key={m}
               label={m}
-              value={INR(Math.max(0, totals[m]))}
+              value={INR(Math.max(0, totals[m] || 0))}
               tone="navy"
               accentTone="green"
               icon={<Users2 size={14} />}

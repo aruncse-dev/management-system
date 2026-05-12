@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Pencil, Trash2, X as XIcon, AlertTriangle, Package } from 'lucide-react'
 import { useStore } from '../store'
-import { catMap, budgetSummary, INR } from '../utils'
+import { catMap, budgetSummary, INR, monthYearApiKey } from '../utils'
+import { BUDGET_GLOBAL_MONTH_KEY } from '../config'
 import { api } from '../api'
 import { CatIcon } from '../ui'
 import { KpiCard, KpiGrid, SectionBlock, UiCard } from '../ui'
@@ -13,7 +14,7 @@ interface ModalState { mode: ModalMode; id: string; cat: string; val: string }
 
 export default function Budget({ showStatus, onCategoryClick }: Props) {
   const { state, dispatch } = useStore()
-  const { budget, rows } = state
+  const { budget, rows, month, year } = state
   const cm = catMap(rows, budget)
   const { totalBudget, totalSpent, ovCount, totalOver } = budgetSummary(budget, cm)
   const listed = budget.filter(e => e.name.trim())
@@ -21,10 +22,17 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
   const [saving, setSaving] = useState(false)
   const [catSheet, setCatSheet] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const [budgetAddScope, setBudgetAddScope] = useState<'global' | 'month'>('global')
   const remaining = totalBudget - totalSpent
-  function openEdit(id: string, cat: string, budg: number) { setModal({ mode: 'edit', id, cat, val: String(budg) }) }
+  function openEdit(id: string, cat: string, budg: number, rowMonthYear: string) {
+    setBudgetAddScope(rowMonthYear === BUDGET_GLOBAL_MONTH_KEY ? 'global' : 'month')
+    setModal({ mode: 'edit', id, cat, val: String(budg) })
+  }
   function openDelete(id: string, cat: string) { setModal({ mode: 'delete', id, cat, val: '' }) }
-  function closeModal() { setModal({ mode: null, id: '', cat: '', val: '' }) }
+  function closeModal() {
+    setBudgetAddScope('global')
+    setModal({ mode: null, id: '', cat: '', val: '' })
+  }
 
   async function confirmAdd() {
     const val = parseFloat(modal.val)
@@ -32,11 +40,15 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
     if (!name || isNaN(val) || val < 0) { showStatus('⚠ Enter name and a valid amount'); return }
     setSaving(true)
     try {
-      const entry = await api.addBudgetEntry(name, val)
+      const monthYear =
+        budgetAddScope === 'month' ? monthYearApiKey(month, year) : BUDGET_GLOBAL_MONTH_KEY
+      await api.addBudgetEntry(name, val, monthYear)
       api.invalidateCache({ action: 'getBudget' })
       api.invalidateCache({ action: 'init' })
-      dispatch({ type:'SET_BUDGET', payload: [...budget, entry] })
+      const init = await api.init(month, year)
+      dispatch({ type: 'SET_BUDGET', payload: init.budget })
       showStatus('✓ Budget saved')
+      setBudgetAddScope('global')
       closeModal()
     } catch (e) { showStatus('⚠ ' + (e instanceof Error ? e.message : 'Save failed')) }
     finally { setSaving(false) }
@@ -48,13 +60,13 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
     if (!name || isNaN(val) || val < 0) { closeModal(); return }
     setSaving(true)
     try {
-      await api.updateBudgetEntry(modal.id, name, val)
+      const monthYear =
+        budgetAddScope === 'month' ? monthYearApiKey(month, year) : BUDGET_GLOBAL_MONTH_KEY
+      await api.updateBudgetEntry(modal.id, name, val, monthYear)
       api.invalidateCache({ action: 'getBudget' })
       api.invalidateCache({ action: 'init' })
-      dispatch({
-        type:'SET_BUDGET',
-        payload: budget.map(e => e.id === modal.id ? { ...e, name, amount: val } : e),
-      })
+      const init = await api.init(month, year)
+      dispatch({ type: 'SET_BUDGET', payload: init.budget })
       showStatus('✓ Budget updated')
       closeModal()
     } catch (e) { showStatus('⚠ ' + (e instanceof Error ? e.message : 'Save failed')) }
@@ -67,7 +79,8 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
       await api.deleteBudgetEntry(modal.id)
       api.invalidateCache({ action: 'getBudget' })
       api.invalidateCache({ action: 'init' })
-      dispatch({ type:'SET_BUDGET', payload: budget.filter(e => e.id !== modal.id) })
+      const init = await api.init(month, year)
+      dispatch({ type: 'SET_BUDGET', payload: init.budget })
       showStatus('✓ Budget removed')
       closeModal()
     } catch (e) { showStatus('⚠ ' + (e instanceof Error ? e.message : 'Delete failed')) }
@@ -102,7 +115,7 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
 
       <SectionBlock title="Categories" icon={<AlertTriangle size={14} />}>
         <div className="budget-list">
-        {listed.filter(e => e.name.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>(cm[b.name]||0)-(cm[a.name]||0)).map(({ id, name: cat, amount: budg }) => {
+        {listed.filter(e => e.name.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>(cm[b.name]||0)-(cm[a.name]||0)).map(({ id, name: cat, amount: budg, monthYear: budMy }) => {
           const spent = cm[cat] || 0
           const over = spent > budg
           const rowRemaining = budg - spent
@@ -112,10 +125,18 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
           return (
             <UiCard
               key={id}
-              title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><CatIcon cat={cat} size={14} />{cat}</span>}
+              title={
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <CatIcon cat={cat} size={14} />
+                  {cat}
+                  {budMy !== BUDGET_GLOBAL_MONTH_KEY && (
+                    <span className="budget-badge near" style={{ fontSize: 10 }}>This month</span>
+                  )}
+                </span>
+              }
               right={<div className="budget-row-actions">
                 <span className={badgeClass}>{status}</span>
-                <button className="icon-btn" onClick={(e) => { e.stopPropagation(); openEdit(id, cat, budg) }} aria-label={`Edit ${cat}`} title={`Edit ${cat}`}><Pencil size={13} /></button>
+                <button className="icon-btn" onClick={(e) => { e.stopPropagation(); openEdit(id, cat, budg, budMy) }} aria-label={`Edit ${cat}`} title={`Edit ${cat}`}><Pencil size={13} /></button>
                 <button className="icon-btn" style={{color:'var(--red)'}} onClick={(e) => { e.stopPropagation(); openDelete(id, cat) }} aria-label={`Delete ${cat}`} title={`Delete ${cat}`}><Trash2 size={13} /></button>
               </div>}
             >
@@ -197,6 +218,19 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
                     onKeyDown={e => { if (e.key === 'Enter') { modal.mode === 'add' ? confirmAdd() : confirmEdit() } }}
                   />
                 </div>
+                {(modal.mode === 'add' || modal.mode === 'edit') && (
+                  <div>
+                    <div style={{fontSize:12,fontWeight:600,color:'var(--muted)',marginBottom:8,textTransform:'uppercase',letterSpacing:.4}}>Applies to</div>
+                    <select
+                      className="form-inp"
+                      value={budgetAddScope}
+                      onChange={e => setBudgetAddScope(e.target.value === 'month' ? 'month' : 'global')}
+                    >
+                      <option value="global">All months (default template)</option>
+                      <option value="month">{month} {year} only</option>
+                    </select>
+                  </div>
+                )}
               </div>
               <div className="modal-foot">
                 <div className="modal-foot-l" />

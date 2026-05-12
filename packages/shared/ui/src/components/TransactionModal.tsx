@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
 import type { Transaction, TransactionForm } from '@fintracker-vault/types'
-import { ACCOUNTS, CC_MODES, OTHER_CR, CATEGORIES, INCOME_CATS } from '@fintracker-vault/config'
+import { CATEGORIES, INCOME_CATS } from '@fintracker-vault/config'
 
-const ALL_MODES = [...ACCOUNTS, ...CC_MODES, ...OTHER_CR]
 const ALL_CATS = [...CATEGORIES, ...INCOME_CATS]
 
 export type TransactionModalApi = {
@@ -20,6 +19,10 @@ interface Props {
   onSaved: () => void
   showStatus: (msg: string) => void
   api: TransactionModalApi
+  /** Accounts + credit sources allowed as transaction `mode` (payment source). */
+  paymentModeOptions: readonly string[]
+  /** Accounts + credits allowed as transfer destination (same as payment sources for symmetry). */
+  transferTargetOptions: readonly string[]
   /** Expense categories (e.g. `CATEGORIES` ∪ budget names). Defaults to `CATEGORIES` from config. */
   expenseCategoryOptions?: readonly string[]
   /** Income categories (e.g. `ALL_CATS` ∪ budget names). Defaults to merged config lists. */
@@ -58,6 +61,53 @@ function isoFromGas(s: string) {
   return `20${m[3]}-${months[m[2]]}-${m[1].padStart(2, '0')}`
 }
 
+function buildTransactionFormFromRow(
+  row: Transaction | null,
+  paymentModeOptions: readonly string[],
+  transferTargetOptions: readonly string[],
+): TransactionForm {
+  const defaultMode = paymentModeOptions[0] ?? 'Cash'
+  const defaultTo = transferTargetOptions[0] ?? paymentModeOptions[0] ?? 'Cash'
+  if (!row) {
+    return {
+      date: todayISO(),
+      desc: '',
+      a: '',
+      c: 'Groceries',
+      t: 'Expense',
+      m: defaultMode,
+      notes: '',
+      toAcct: defaultTo,
+    }
+  }
+  let notes = row.notes || ''
+  let toAcct = defaultTo
+  if (row.t === 'Transfer') {
+    const col = (row.transferTo ?? '').trim()
+    if (col) {
+      toAcct = col
+      notes = (row.notes ?? '').trim()
+    } else {
+      const trimmed = notes.trim()
+      const m = trimmed.match(/^(?:→|->)\s*(.+?)(?:\s*·\s*([\s\S]*))?$/)
+      if (m) {
+        toAcct = m[1].trim() || defaultTo
+        notes = (m[2] || '').trim()
+      }
+    }
+  }
+  return {
+    date: isoFromGas(row.date),
+    desc: row.desc || '',
+    a: String(row.a),
+    c: row.c || 'Groceries',
+    t: row.t || 'Expense',
+    m: row.m || defaultMode,
+    notes,
+    toAcct,
+  }
+}
+
 export default function TransactionModal({
   row,
   month,
@@ -66,20 +116,17 @@ export default function TransactionModal({
   onSaved,
   showStatus,
   api,
+  paymentModeOptions,
+  transferTargetOptions,
   expenseCategoryOptions,
   incomeCategoryOptions,
 }: Props) {
   const isEdit = !!row
-  const [form, setForm] = useState<TransactionForm>({
-    date: row ? isoFromGas(row.date) : todayISO(),
-    desc: row?.desc || '',
-    a: row ? String(row.a) : '',
-    c: row?.c || 'Groceries',
-    t: row?.t || 'Expense',
-    m: row?.m || 'Cash',
-    notes: row?.notes || '',
-    toAcct: row?.notes?.match(/^→(.+?)( ·|$)/)?.[1] || ACCOUNTS[0],
-  })
+  const defaultMode = paymentModeOptions[0] ?? 'Cash'
+  const defaultTo = transferTargetOptions[0] ?? paymentModeOptions[0] ?? 'Cash'
+  const [form, setForm] = useState<TransactionForm>(() =>
+    buildTransactionFormFromRow(row, paymentModeOptions, transferTargetOptions),
+  )
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [delConfirm, setDelConfirm] = useState(false)
@@ -100,7 +147,9 @@ export default function TransactionModal({
       return
     }
     setSaving(true)
-    const notes = isTransfer ? `→${form.toAcct || ''}${form.notes ? ' · ' + form.notes : ''}` : form.notes
+    const extra = form.notes.trim()
+    const notes = isTransfer ? extra : form.notes
+    const transferTo = isTransfer ? (form.toAcct || '').trim() : ''
     const p = {
       month,
       year,
@@ -111,6 +160,7 @@ export default function TransactionModal({
       t: form.t,
       m: form.m,
       notes,
+      ...(isTransfer ? { transferTo } : {}),
     }
     try {
       if (isEdit && row) await api.updateRow({ ...p, id: row.id })
@@ -206,8 +256,13 @@ export default function TransactionModal({
           <div className="form-row">
             <label className="form-lbl">Mode / Account</label>
             <select className="form-sel" value={form.m} onChange={e => set('m', e.target.value)}>
-              {ALL_MODES.map(m => (
-                <option key={m}>{m}</option>
+              {form.m && !paymentModeOptions.includes(form.m) ? (
+                <option value={form.m}>{form.m} (legacy)</option>
+              ) : null}
+              {paymentModeOptions.map(m => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
               ))}
             </select>
           </div>
@@ -215,18 +270,23 @@ export default function TransactionModal({
             <div className="form-row">
               <label className="form-lbl">Transfer To</label>
               <select className="form-sel" value={form.toAcct} onChange={e => set('toAcct', e.target.value)}>
-                {ACCOUNTS.map(a => (
-                  <option key={a}>{a}</option>
+                {form.toAcct && !transferTargetOptions.includes(form.toAcct) ? (
+                  <option value={form.toAcct}>{form.toAcct} (legacy)</option>
+                ) : null}
+                {transferTargetOptions.map(a => (
+                  <option key={a} value={a}>
+                    {a}
+                  </option>
                 ))}
               </select>
             </div>
           )}
           <div className="form-row">
-            <label className="form-lbl">Notes</label>
+            <label className="form-lbl">{isTransfer ? 'Memo (optional)' : 'Notes'}</label>
             <input
               className="form-inp"
               type="text"
-              placeholder="Optional notes"
+              placeholder={isTransfer ? 'Shown after · in stored notes' : 'Optional notes'}
               value={form.notes}
               onChange={e => set('notes', e.target.value)}
             />

@@ -1,4 +1,6 @@
 export * from './users'
+export * from './orgs'
+export * from './schemaMigrations'
 export * from './transactions'
 export * from './savings'
 export * from './lending'

@@ -1,12 +1,15 @@
 import { boolean, jsonb, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
 
+/** User profile with authentication. Org membership is via org_members table. */
 export const users = pgTable('users', {
   email: text('email').primaryKey(),
   displayName: text('display_name'),
-  role: text('role').default('user').notNull(),
+  /** User role: `member` (within org), `org_admin` (manages org), `admin` (platform admin). */
+  role: text('role').default('member').notNull(),
   status: text('status').default('active').notNull(),
-  modules: text('modules').array().default([]).notNull(),
-  menuConfig: jsonb('menu_config'),
+  /** Auth token — track for session management (e.g., OAuth token, session ID). */
+  token: text('token'),
+  lastTokenAt: timestamp('last_token_at'),
   settings: jsonb('settings'),
   useDb: boolean('use_db').default(false).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -15,35 +18,3 @@ export const users = pgTable('users', {
 
 export type User = typeof users.$inferSelect
 export type NewUser = typeof users.$inferInsert
-
-export const ALL_MODULE_IDS = [
-  'dashboard',
-  'budget',
-  'transactions',
-  'credits',
-  'accounts',
-  'savings',
-  'lending',
-  'gold',
-  'loans',
-  'subscriptions',
-  'stocks',
-  'mutualfunds',
-  'investments',
-  'vault',
-  'insurance',
-  'persons',
-  'health',
-  'habits',
-  'documents',
-  'staff',
-] as const
-
-export type ModuleId = typeof ALL_MODULE_IDS[number]
-
-export type MenuEntry = {
-  id: ModuleId
-  label: string
-  order: number
-  enabled: boolean
-}

@@ -4,10 +4,6 @@ export const env = {
     API_BASE_URL: typeof window === 'undefined'
         ? process.env.API_URL || 'http://localhost:3001'
         : process.env.REACT_APP_API_URL || 'http://localhost:3001',
-    // GAS
-    GAS_URL: typeof window === 'undefined'
-        ? process.env.GAS_URL || ''
-        : window.GAS_URL || '',
     // Auth
     GEMINI_KEY: typeof window === 'undefined'
         ? process.env.GEMINI_KEY || ''

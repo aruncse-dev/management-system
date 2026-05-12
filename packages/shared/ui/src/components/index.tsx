@@ -674,7 +674,7 @@ export function HoldingModal({
   )
 }
 
-/** Ledger / savings entry card: holding header + Amount · Type · Date grid (matches txn-entry-card). */
+/** Ledger / savings entry card: holding header + optional Amount · Type · Date grid. */
 export function TransactionCard({
   title,
   amount,
@@ -688,11 +688,14 @@ export function TransactionCard({
   typeLabel = 'Type',
   dateLabel = 'Date',
   linkUrl,
+  compact = false,
+  asStatic = false,
 }: {
   title: ReactNode
-  amount: ReactNode
-  type: ReactNode
-  date: ReactNode
+  /** Omitted from layout when `compact` is true. */
+  amount?: ReactNode
+  type?: ReactNode
+  date?: ReactNode
   tone: Extract<UiTone, 'green' | 'red' | 'amber' | 'navy' | 'muted'>
   icon: ReactNode
   onClick?: () => void
@@ -705,11 +708,15 @@ export function TransactionCard({
   dateLabel?: string
   /** Optional URL: shows icon + “Preview” below the grid (full URL in `title`; opens in new tab; does not trigger `onClick`). */
   linkUrl?: string
+  /** Name + icon only (no stats grid). For accounts / credits lists. */
+  compact?: boolean
+  /** When true, render a non-interactive div (e.g. profile summary). */
+  asStatic?: boolean
 }) {
   const trimmedLink = linkUrl?.trim() ?? ''
   const hasLink = trimmedLink.length > 0
 
-  const btnClass = `ui-kit-holding-card ui-kit-holding-card--accent-${tone} ui-kit-holding-card--btn txn-entry-card${hasLink ? ' ui-kit-holding-card--stacked' : ''}${className ? ` ${className}` : ''}`.trim()
+  const btnClass = `ui-kit-holding-card ui-kit-holding-card--accent-${tone} ui-kit-holding-card--btn txn-entry-card${hasLink ? ' ui-kit-holding-card--stacked' : ''}${compact ? ' txn-entry-card--compact' : ''}${className ? ` ${className}` : ''}`.trim()
 
   const iconWrap = (
     <div className={`ui-kit-holding-icon ui-kit-holding-icon--bg ui-tone-${tone}`}>
@@ -719,7 +726,7 @@ export function TransactionCard({
 
   const body = (
     <>
-      <div className="ui-kit-holding-card-head">
+      <div className={`ui-kit-holding-card-head${compact ? ' ui-kit-holding-card-head--compact' : ''}`}>
         <div>
           <div className="ui-kit-holding-card-title">
             <span>{title}</span>
@@ -727,24 +734,33 @@ export function TransactionCard({
         </div>
         <div className="ui-kit-holding-card-head-right">{iconWrap}</div>
       </div>
-      <div className="ui-kit-holding-card-grid">
-        <div className="ui-kit-holding-stat">
-          <span>{amountLabel}</span>
-          <strong>{amount}</strong>
+      {!compact && (
+        <div className="ui-kit-holding-card-grid">
+          <div className="ui-kit-holding-stat">
+            <span>{amountLabel}</span>
+            <strong>{amount}</strong>
+          </div>
+          <div className="ui-kit-holding-stat ui-kit-holding-stat--center">
+            <span>{typeLabel}</span>
+            <strong>{type}</strong>
+          </div>
+          <div className="ui-kit-holding-stat ui-kit-holding-stat--right">
+            <span>{dateLabel}</span>
+            <strong>{date}</strong>
+          </div>
         </div>
-        <div className="ui-kit-holding-stat ui-kit-holding-stat--center">
-          <span>{typeLabel}</span>
-          <strong>{type}</strong>
-        </div>
-        <div className="ui-kit-holding-stat ui-kit-holding-stat--right">
-          <span>{dateLabel}</span>
-          <strong>{date}</strong>
-        </div>
-      </div>
+      )}
     </>
   )
 
   if (!hasLink) {
+    if (asStatic) {
+      return (
+        <div className={btnClass} role="group">
+          {body}
+        </div>
+      )
+    }
     return (
       <button type="button" className={btnClass} onClick={onClick}>
         {body}
@@ -754,9 +770,15 @@ export function TransactionCard({
 
   return (
     <div className="ui-kit-holding-card-with-link">
-      <button type="button" className={btnClass} onClick={onClick}>
-        {body}
-      </button>
+      {asStatic ? (
+        <div className={btnClass} role="group">
+          {body}
+        </div>
+      ) : (
+        <button type="button" className={btnClass} onClick={onClick}>
+          {body}
+        </button>
+      )}
       <a
         className="ui-kit-holding-card-linkrow ui-kit-holding-card-previewlink"
         href={trimmedLink}
@@ -780,7 +802,13 @@ export * from './FinanceUI'
 export * from './RightLegendDonut'
 export { default as BottomNav } from './BottomNav'
 export { default as ErrorScreen } from './ErrorScreen'
-export { default as Nav, type ModuleId, type AppNavArea } from './Nav'
+export {
+  default as Nav,
+  type ModuleId,
+  type AppNavArea,
+  type NavDynamicMenuItem,
+  type NavDynamicMenuSection,
+} from './Nav'
 export {
   default as SimpleAppNav,
   performGoogleAppLogout,
@@ -801,3 +829,6 @@ export {
   LOGIN_BRAND_MARK_STYLE,
   type GoogleAuthCardProps,
 } from './GoogleAuthCard'
+export { ConfirmDialog } from './ConfirmDialog'
+export { FabButton, FormCard, DataPageHeader, AdminDataListSearch } from './AdminShell'
+export { DynamicLucide } from './DynamicLucide'

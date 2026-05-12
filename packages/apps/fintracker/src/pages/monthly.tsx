@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { ChevronLeft, ChevronRight, X as XIcon } from 'lucide-react'
 import { useRouter } from 'next/router'
 import { useStore } from '../store'
@@ -9,31 +9,30 @@ import Transactions from './transactions'
 import Budget from './budget'
 import Credits from './credits'
 import Accounts from './accounts'
-import { MNS } from '../config'
-import { expenseCategoriesWithBudget, incomeCategoriesWithBudget } from '../utils'
+import { MNS, BUDGET_GLOBAL_MONTH_KEY } from '../config'
+import { expenseCategoriesWithBudget, incomeCategoriesWithBudget, monthYearApiKey } from '../utils'
+import { useFintrackerModes } from '../context/FintrackerModesContext'
+import { cycleSubtitle } from '../expenseCycle'
 
 type TabId = 'dash' | 'txns' | 'bud' | 'cc' | 'acct'
-
-const CC_CYCLE_DAY = 19
-function cycleSubtitle(month: string) {
-  const mi = MNS.indexOf(month as typeof MNS[number])
-  const prevMi = mi === 0 ? 11 : mi - 1
-  return `${CC_CYCLE_DAY} ${MNS[prevMi]} – ${CC_CYCLE_DAY - 1} ${month}`
-}
 
 const TAB_Q: Record<TabId, string> = { dash: 'dash', txns: 'txns', bud: 'bud', cc: 'cc', acct: 'acct' }
 
 export default function Monthly() {
   const router = useRouter()
   const { state, dispatch } = useStore()
+  const { paymentModeOptions, transferTargetOptions } = useFintrackerModes()
   const [tab, setTab] = useState<TabId>('dash')
   const [modalOpen, setModalOpen] = useState(false)
   const [editRow, setEditRow] = useState<typeof state.rows[0] | null>(null)
-  const [status, setStatus] = useState('')
+  const [snackbar, setSnackbar] = useState<{ msg: string; variant: 'success' | 'error' | 'info' } | null>(null)
+  const snackbarTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [budgetAddOpen, setBudgetAddOpen] = useState(false)
   const [budgetName, setBudgetName] = useState('')
   const [budgetVal, setBudgetVal] = useState('')
   const [budgetSaving, setBudgetSaving] = useState(false)
+  /** `global` = `__global__` row; `month` = override for current nav month only */
+  const [budgetAddScope, setBudgetAddScope] = useState<'global' | 'month'>('global')
 
   const goTab = useCallback(
     (id: TabId) => {
@@ -59,8 +58,23 @@ export default function Monthly() {
   }, [router.isReady, router.pathname, router.query.tab, router])
 
   const showStatus = useCallback((msg: string) => {
-    setStatus(msg)
-    setTimeout(() => setStatus(''), 3000)
+    if (snackbarTimerRef.current) clearTimeout(snackbarTimerRef.current)
+    const variant: 'success' | 'error' | 'info' = msg.includes('✓')
+      ? 'success'
+      : msg.includes('⚠')
+        ? 'error'
+        : 'info'
+    setSnackbar({ msg, variant })
+    snackbarTimerRef.current = setTimeout(() => {
+      setSnackbar(null)
+      snackbarTimerRef.current = null
+    }, 3200)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (snackbarTimerRef.current) clearTimeout(snackbarTimerRef.current)
+    }
   }, [])
 
   const loadMonth = useCallback(async (month: string, year: string, forceRefresh = false) => {
@@ -83,7 +97,7 @@ export default function Monthly() {
       showStatus('⚠ Failed to connect to backend')
       dispatch({ type: 'SET_LOADING', payload: false })
     })
-  }, []) // eslint-disable-line
+  }, [state.month, state.year, state.fintracker, loadMonth, dispatch, showStatus])
 
   const expenseCategoryOptions = useMemo(
     () => expenseCategoriesWithBudget(state.budget),
@@ -102,8 +116,7 @@ export default function Monthly() {
     if (newIdx > 11) { newIdx = 0; newYear++ }
     const newMonth = MNS[newIdx]
     dispatch({ type: 'SET_MONTH', payload: { month: newMonth, year: String(newYear) } })
-    await loadMonth(newMonth, String(newYear))
-  }, [state.month, state.year, dispatch, loadMonth])
+  }, [state.month, state.year, dispatch])
 
   const addBudget = useCallback(async () => {
     const val = parseFloat(budgetVal)
@@ -114,31 +127,34 @@ export default function Monthly() {
     }
     setBudgetSaving(true)
     try {
-      const entry = await api.addBudgetEntry(name, val)
+      const monthYear =
+        budgetAddScope === 'month' ? monthYearApiKey(state.month, state.year) : BUDGET_GLOBAL_MONTH_KEY
+      await api.addBudgetEntry(name, val, monthYear)
       api.invalidateCache({ action: 'getBudget' })
       api.invalidateCache({ action: 'init' })
-      dispatch({ type: 'SET_BUDGET', payload: [...state.budget, entry] })
+      const init = await api.init(state.month, state.year)
+      dispatch({ type: 'SET_BUDGET', payload: init.budget })
       showStatus('✓ Budget saved')
       setBudgetAddOpen(false)
       setBudgetName('')
       setBudgetVal('')
+      setBudgetAddScope('global')
     } catch (e) {
       showStatus('⚠ ' + (e instanceof Error ? e.message : 'Save failed'))
     } finally {
       setBudgetSaving(false)
     }
-  }, [budgetName, budgetVal, dispatch, showStatus, state.budget])
+  }, [budgetAddScope, budgetName, budgetVal, dispatch, showStatus, state.month, state.year])
 
   return (
     <div className="monthly-wrap">
       {/* Month nav sub-header */}
       <nav className="nav-sub">
-        {status && <span className="nav-status show">{status}</span>}
         <div className="nav-month" style={{ flex: 1, justifyContent: 'center' }}>
           <button className="nav-arrow" onClick={() => changeMonth(-1)}><ChevronLeft size={16} /></button>
           <div className="nav-ml">
             {state.month} {state.year}
-            <div style={{ fontSize: 9, opacity: .65, fontWeight: 400 }}>{cycleSubtitle(state.month)}</div>
+            <div style={{ fontSize: 9, opacity: .65, fontWeight: 400 }}>{cycleSubtitle(state.month, state.year, state.fintracker)}</div>
           </div>
           <button className="nav-arrow" onClick={() => changeMonth(1)}><ChevronRight size={16} /></button>
         </div>
@@ -191,6 +207,17 @@ export default function Monthly() {
                 <div style={{fontSize:12,fontWeight:600,color:'var(--muted)',marginBottom:5,textTransform:'uppercase',letterSpacing:.4}}>Budget Amount (₹)</div>
                 <input className="form-inp" type="number" placeholder="0" value={budgetVal} onChange={e => setBudgetVal(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addBudget() }} />
               </div>
+              <div>
+                <div style={{fontSize:12,fontWeight:600,color:'var(--muted)',marginBottom:8,textTransform:'uppercase',letterSpacing:.4}}>Applies to</div>
+                <select
+                  className="form-inp"
+                  value={budgetAddScope}
+                  onChange={e => setBudgetAddScope(e.target.value === 'month' ? 'month' : 'global')}
+                >
+                  <option value="global">All months (default template)</option>
+                  <option value="month">{state.month} {state.year} only</option>
+                </select>
+              </div>
             </div>
             <div className="modal-foot">
               <div className="modal-foot-l" />
@@ -205,9 +232,12 @@ export default function Monthly() {
 
       {modalOpen && (
         <TransactionModal
+          key={`${editRow?.id ?? 'new'}-${paymentModeOptions.join('|')}--${transferTargetOptions.join('|')}`}
           row={editRow}
           month={state.month} year={state.year}
           api={api}
+          paymentModeOptions={paymentModeOptions}
+          transferTargetOptions={transferTargetOptions}
           expenseCategoryOptions={expenseCategoryOptions}
           incomeCategoryOptions={incomeCategoryOptions}
           onClose={() => setModalOpen(false)}
@@ -218,6 +248,12 @@ export default function Monthly() {
           }}
           showStatus={showStatus}
         />
+      )}
+
+      {snackbar && (
+        <div className="fintracker-snackbar" role="status" aria-live="polite" data-variant={snackbar.variant}>
+          {snackbar.msg}
+        </div>
       )}
     </div>
   )

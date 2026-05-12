@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   CalendarDays,
   Gem,
@@ -13,6 +13,7 @@ import {
   Wallet,
 } from 'lucide-react'
 import React from 'react'
+import { DynamicLucide } from './DynamicLucide'
 
 export type ModuleId =
   | 'dashboard'
@@ -34,6 +35,46 @@ export type ModuleId =
 
 export type AppNavArea = 'finance' | 'vault'
 
+export type NavDynamicMenuItem = {
+  id: string
+  label: string
+  icon: string | null
+  path: string
+}
+
+export type NavDynamicMenuSection = {
+  sectionLabel: string
+  items: NavDynamicMenuItem[]
+}
+
+/** Shown in drawer footer; omit from org-driven sections to avoid duplicates. */
+function isFooterOnlyMenuItem(m: NavDynamicMenuItem): boolean {
+  if (m.id === 'settings' || m.id === 'components') return true
+  const p = m.path.trim()
+  return (
+    p === '/settings' ||
+    p.startsWith('/settings?') ||
+    p === '/components' ||
+    p.startsWith('/components?')
+  )
+}
+
+function pathDrawerActive(currentAsPath: string, itemPath: string) {
+  const c = currentAsPath.trim()
+  const t = itemPath.trim()
+  if (c === t) return true
+  const [cPath, cQuery] = c.split('?')
+  const [tPath, tQuery] = t.split('?')
+  if (cPath !== tPath) return false
+  if (!tQuery) return true
+  const cParams = new URLSearchParams(cQuery || '')
+  const tParams = new URLSearchParams(tQuery)
+  for (const [k, v] of tParams) {
+    if (cParams.get(k) !== v) return false
+  }
+  return true
+}
+
 interface Props {
   module: ModuleId
   onModule: (id: ModuleId, lendingSheetForUrl?: string) => void
@@ -43,6 +84,12 @@ interface Props {
   onLogout?: () => void
   area?: AppNavArea
   appName?: string
+  /** Org-driven sections (may be empty ⇒ only Settings, UI Kit, Logout). */
+  dynamicMenu?: NavDynamicMenuSection[] | null
+  /** Path for active state when using `dynamicMenu` (e.g. `router.asPath`). */
+  activeAsPath?: string
+  /** Navigate for `dynamicMenu` items. */
+  onNavigatePath?: (path: string) => void
 }
 
 const LENDING_SUBMENU = [
@@ -112,11 +159,59 @@ export default function Nav({
   onLogout,
   area = 'finance',
   appName,
+  dynamicMenu,
+  activeAsPath = '',
+  onNavigatePath,
 }: Props) {
   const name = appName ?? brandName(area)
   const iconSrc = getAppAssetUrl(area, getAppIconAsset(area))
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
+  /** Path-based org menu: always use this layout when `onNavigatePath` is set (empty sections ⇒ minimal drawer). */
+  const useOrgPathMenu = Boolean(onNavigatePath)
+  const dynamicMenuForDrawer = useMemo(() => {
+    const src = dynamicMenu ?? []
+    return src
+      .map((sec) => ({
+        ...sec,
+        items: sec.items.filter((m) => !isFooterOnlyMenuItem(m)),
+      }))
+      .filter((sec) => sec.items.length > 0)
+  }, [dynamicMenu])
+
+  function dynamicSection(titleLabel: string, items: NavDynamicMenuItem[]) {
+    return (
+      <div style={{ paddingTop: 8, paddingBottom: 6 }} key={titleLabel}>
+        <div
+          style={{
+            fontSize: 12,
+            fontWeight: 600,
+            color: 'rgba(255, 255, 255, 0.5)',
+            textTransform: 'uppercase',
+            letterSpacing: '.04em',
+            padding: '8px 14px 4px 14px',
+            marginBottom: 2,
+          }}
+        >
+          {titleLabel}
+        </div>
+        {items.map(m => (
+          <button
+            key={m.id}
+            type="button"
+            className={`nav-drawer-item${pathDrawerActive(activeAsPath, m.path) ? ' active' : ''}`}
+            onClick={() => {
+              onNavigatePath?.(m.path)
+              setDrawerOpen(false)
+            }}
+          >
+            <DynamicLucide name={m.icon} size={18} />
+            <span>{m.label}</span>
+          </button>
+        ))}
+      </div>
+    )
+  }
 
   function section(titleLabel: string, items: NavItem[]) {
     return (
@@ -182,91 +277,129 @@ export default function Nav({
           </button>
         </div>
 
-        {section('Tracking', TRACKING)}
-        {section('Assets', ASSETS)}
-        {section('Investments', INVESTMENTS)}
+        {useOrgPathMenu ? (
+          <>
+            {dynamicMenuForDrawer.map(sec => dynamicSection(sec.sectionLabel, sec.items))}
+            <div style={{ paddingTop: 12, paddingBottom: 8 }}>
+              <button
+                type="button"
+                className={`nav-drawer-item${module === 'settings' ? ' active' : ''}`}
+                onClick={() => {
+                  onModule('settings')
+                  setDrawerOpen(false)
+                }}
+              >
+                <Settings size={18} />
+                <span>Settings</span>
+              </button>
+              <button
+                type="button"
+                className={`nav-drawer-item${module === 'components' ? ' active' : ''}`}
+                onClick={() => {
+                  onModule('components')
+                  setDrawerOpen(false)
+                }}
+              >
+                <LayoutGrid size={18} />
+                <span>UI Kit</span>
+              </button>
+              {onLogout && (
+                <button type="button" className="nav-drawer-item" onClick={() => setLogoutConfirmOpen(true)}>
+                  <LogOut size={18} />
+                  <span>Logout</span>
+                </button>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            {section('Tracking', TRACKING)}
+            {section('Assets', ASSETS)}
+            {section('Investments', INVESTMENTS)}
 
-        <div style={{ paddingTop: 8, paddingBottom: 6 }}>
-          <div
-            style={{
-              fontSize: 12,
-              fontWeight: 600,
-              color: 'rgba(255, 255, 255, 0.5)',
-              textTransform: 'uppercase',
-              letterSpacing: '.04em',
-              padding: '8px 14px 4px 14px',
-              marginBottom: 2,
-            }}
-          >
-            Credit
-          </div>
-          {onLendingSheet && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-              {LENDING_SUBMENU.map(sub => (
+            <div style={{ paddingTop: 8, paddingBottom: 6 }}>
+              <div
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: 'rgba(255, 255, 255, 0.5)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '.04em',
+                  padding: '8px 14px 4px 14px',
+                  marginBottom: 2,
+                }}
+              >
+                Credit
+              </div>
+              {onLendingSheet && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                  {LENDING_SUBMENU.map(sub => (
+                    <button
+                      key={sub.id}
+                      type="button"
+                      className={`nav-drawer-item${module === 'lending' && lendingSheet === sub.id ? ' active' : ''}`}
+                      onClick={() => {
+                        onLendingSheet(sub.id)
+                        onModule('lending', sub.id)
+                        setDrawerOpen(false)
+                      }}
+                    >
+                      {sub.icon}
+                      <span>{sub.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {CREDIT_EXTRA.map(m => (
                 <button
-                  key={sub.id}
+                  key={m.id}
                   type="button"
-                  className={`nav-drawer-item${module === 'lending' && lendingSheet === sub.id ? ' active' : ''}`}
+                  className={`nav-drawer-item${navItemActive(module, m) ? ' active' : ''}`}
                   onClick={() => {
-                    onLendingSheet(sub.id)
-                    onModule('lending', sub.id)
+                    onModule(m.id)
                     setDrawerOpen(false)
                   }}
                 >
-                  {sub.icon}
-                  <span>{sub.label}</span>
+                  {m.icon}
+                  <span>{m.label}</span>
                 </button>
               ))}
             </div>
-          )}
-          {CREDIT_EXTRA.map(m => (
-            <button
-              key={m.id}
-              type="button"
-              className={`nav-drawer-item${navItemActive(module, m) ? ' active' : ''}`}
-              onClick={() => {
-                onModule(m.id)
-                setDrawerOpen(false)
-              }}
-            >
-              {m.icon}
-              <span>{m.label}</span>
-            </button>
-          ))}
-        </div>
 
-        {section('Services', SERVICES)}
+            {section('Services', SERVICES)}
 
-        <div style={{ paddingTop: 12, paddingBottom: 8 }}>
-          <button
-            type="button"
-            className={`nav-drawer-item${module === 'settings' ? ' active' : ''}`}
-            onClick={() => {
-              onModule('settings')
-              setDrawerOpen(false)
-            }}
-          >
-            <Settings size={18} />
-            <span>Settings</span>
-          </button>
-          <button
-            type="button"
-            className={`nav-drawer-item${module === 'components' ? ' active' : ''}`}
-            onClick={() => {
-              onModule('components')
-              setDrawerOpen(false)
-            }}
-          >
-            <LayoutGrid size={18} />
-            <span>UI Kit</span>
-          </button>
-          {onLogout && (
-            <button type="button" className="nav-drawer-item" onClick={() => setLogoutConfirmOpen(true)}>
-              <LogOut size={18} />
-              <span>Logout</span>
-            </button>
-          )}
-        </div>
+            <div style={{ paddingTop: 12, paddingBottom: 8 }}>
+              <button
+                type="button"
+                className={`nav-drawer-item${module === 'settings' ? ' active' : ''}`}
+                onClick={() => {
+                  onModule('settings')
+                  setDrawerOpen(false)
+                }}
+              >
+                <Settings size={18} />
+                <span>Settings</span>
+              </button>
+              <button
+                type="button"
+                className={`nav-drawer-item${module === 'components' ? ' active' : ''}`}
+                onClick={() => {
+                  onModule('components')
+                  setDrawerOpen(false)
+                }}
+              >
+                <LayoutGrid size={18} />
+                <span>UI Kit</span>
+              </button>
+              {onLogout && (
+                <button type="button" className="nav-drawer-item" onClick={() => setLogoutConfirmOpen(true)}>
+                  <LogOut size={18} />
+                  <span>Logout</span>
+                </button>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       {logoutConfirmOpen && onLogout && (

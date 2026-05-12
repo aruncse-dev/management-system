@@ -1,7 +1,7 @@
 import { Pencil, X } from 'lucide-react'
 import { useStore, usePage } from '../store'
 import { Transaction } from '../types'
-import { fd, INR } from '../utils'
+import { fd, INR, transactionTransferDestination } from '../utils'
 import { TXN_PAGE } from '../config'
 import { LoadingState, SectionBlock, SectionChip, TransactionCard } from '../ui'
 import { CatIcon } from '../ui'
@@ -75,13 +75,23 @@ export default function Transactions({ onEdit }: Props) {
       ) : (
         <div className="txn-cards">
           {rows.map(r => {
-            const isI = r.t==='Income', isS=r.t==='Savings'
+            const isI = r.t === 'Income'
+            const isS = r.t === 'Savings'
+            const isTr = r.t === 'Transfer'
             const tone = toneForTransaction(r)
+            const toDest = isTr ? transactionTransferDestination(r) : ''
+            const amountStr = isI || isS ? `+${INR(r.a)}` : isTr ? `↔ ${INR(r.a)}` : `-${INR(r.a)}`
+            const titleStr =
+              isTr && toDest
+                ? r.desc?.trim()
+                  ? `${r.desc.trim()} · ${r.m} → ${toDest}`
+                  : `${r.m} → ${toDest}`
+                : r.desc || r.c
             return (
               <TransactionCard
                 key={r.id}
-                title={r.desc || r.c}
-                amount={`${(isI || isS) ? '+' : '-'}${INR(r.a)}`}
+                title={titleStr}
+                amount={amountStr}
                 type={r.t}
                 date={fd(r.date)}
                 tone={tone}

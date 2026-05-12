@@ -1,4 +1,5 @@
 import { Budget, BudgetEntry, MonthRef, OpeningBal, Transaction } from './types';
+import type { FintrackerPrefs } from './expenseCycle';
 import { API_URL } from './constants';
 
 type ApiResponse<T> = { ok: true; data: T; traceId?: string; debug?: Record<string, unknown> } | { ok: false; error: string; traceId?: string };
@@ -15,9 +16,11 @@ async function parseResponse<T>(res: Response): Promise<T> {
   const text = await res.text();
   if (text.trim().startsWith('<')) {
     const isLoginPage = text.includes('accounts.google.com');
-    throw new Error(isLoginPage
-      ? 'GAS access restricted — go to script.google.com → Deploy → Manage deployments → set "Who has access" to Anyone'
-      : 'GAS not deployed — run ./deploy.sh');
+    throw new Error(
+      isLoginPage
+        ? 'Received a sign-in page instead of API JSON — sign in to the app and ensure /api routes are reachable.'
+        : 'Unexpected HTML from API — check NEXT_PUBLIC_API_URL, server logs, and DATABASE_URL.',
+    );
   }
   const json: ApiResponse<T> = JSON.parse(text);
   if (!json.ok) {
@@ -81,18 +84,22 @@ export interface InitData {
   months: MonthRef[];
   budget: Budget;
   openingBal: OpeningBal;
+  fintracker: FintrackerPrefs;
 }
 
-let _initInflight: Promise<InitData> | null = null;
+const _initInflightByKey = new Map<string, Promise<InitData>>();
 
-/** One shared in-flight `init` so budget/months hydrate app-wide without duplicate requests. */
-export function loadInitDataDeduped(): Promise<InitData> {
-  if (!_initInflight) {
-    _initInflight = get<InitData>('init').finally(() => {
-      _initInflight = null;
+/** Loads `init` for the calendar month (budget merges global + month-specific overrides). */
+export function loadInitDataDeduped(month: string, year: string): Promise<InitData> {
+  const key = `${month}\t${year}`;
+  let p = _initInflightByKey.get(key);
+  if (!p) {
+    p = get<InitData>('init', { month, year }).finally(() => {
+      _initInflightByKey.delete(key);
     });
+    _initInflightByKey.set(key, p);
   }
-  return _initInflight;
+  return p;
 }
 
 export interface RawLendingRow {
@@ -189,6 +196,73 @@ export interface GoldSettings {
   emiSheetName?: string;
   expensesSheetId?: string;
   assetsSheetId?: string;
+  /** Parsed from `users.settings.fintracker`. */
+  fintracker?: FintrackerPrefs;
+  /** Same object as JSON string (for copy / backup). */
+  fintrackerJson?: string;
+}
+
+export interface ProfileData {
+  email: string;
+  displayName: string | null;
+  activeOrgId: string | null;
+  orgs: { id: string; name: string }[];
+}
+
+export type AccountUsedFor = 'savings' | 'monthly' | 'both';
+
+export interface AccountRow {
+  id: string;
+  orgId: string | null;
+  name: string;
+  description: string | null;
+  usedFor: string;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+export type CreditSourceCategory = 'credit_card' | 'informal';
+
+export interface CreditSourceRow {
+  id: string;
+  orgId: string | null;
+  name: string;
+  description: string | null;
+  category: string;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+export type AccountPayload = {
+  id?: string;
+  name: string;
+  description?: string | null;
+  usedFor: AccountUsedFor;
+  isActive?: boolean;
+  sortOrder?: number;
+};
+
+export type CreditSourcePayload = {
+  id?: string;
+  name: string;
+  description?: string | null;
+  category: CreditSourceCategory;
+  isActive?: boolean;
+  sortOrder?: number;
+};
+
+async function restJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const url = new URL(path, window.location.origin).toString();
+  const res = await fetch(url, { credentials: 'same-origin', cache: 'no-store', ...init });
+  const text = await res.text();
+  if (text.trim().startsWith('<')) {
+    throw new Error('Unexpected HTML from API');
+  }
+  const json = JSON.parse(text) as ApiResponse<T>;
+  if (!json.ok) {
+    throw new Error(json.error);
+  }
+  return json.data;
 }
 
 export interface VaultSettings {
@@ -277,14 +351,34 @@ export interface RawHolding {
 export const api = {
   invalidateCache,
   clearPersistentCache,
-  init:          ()                              => get<InitData>('init'),
+  init:          (month: string, year: string)   => get<InitData>('init', { month, year }),
   getData:       (month: string, year: string)  => get<Transaction[]>('getData', { month, year }),
   addRow:        (p: Record<string, unknown>)   => post<string>({ action: 'addRow', ...p }),
   updateRow:     (p: Record<string, unknown>)   => post<boolean>({ action: 'updateRow', ...p }),
   deleteRow:     (month: string, year: string, id: string) => post<boolean>({ action: 'deleteRow', month, year, id }),
-  saveBudget:        (budgets: Budget)              => post<boolean>({ action: 'saveBudget', budgets }),
-  addBudgetEntry:    (name: string, amt: number)   => post<BudgetEntry>({ action: 'addBudgetEntry', name, amt }),
-  updateBudgetEntry: (id: string, name: string, amt: number) => post<boolean>({ action: 'updateBudgetEntry', id, name, amt }),
+  saveBudget:        (budgets: Budget, opts?: { monthYear?: string; month?: string; year?: string }) =>
+    post<boolean>({
+      action: 'saveBudget',
+      budgets,
+      ...(opts?.monthYear !== undefined ? { monthYear: opts.monthYear } : {}),
+      ...(opts?.month !== undefined ? { month: opts.month } : {}),
+      ...(opts?.year !== undefined ? { year: opts.year } : {}),
+    }),
+  addBudgetEntry:    (name: string, amt: number, monthYear?: string) =>
+    post<BudgetEntry>({
+      action: 'addBudgetEntry',
+      name,
+      amt,
+      ...(monthYear !== undefined ? { monthYear } : {}),
+    }),
+  updateBudgetEntry: (id: string, name: string, amt: number, monthYear?: string) =>
+    post<boolean>({
+      action: 'updateBudgetEntry',
+      id,
+      name,
+      amt,
+      ...(monthYear !== undefined ? { monthYear } : {}),
+    }),
   deleteBudgetEntry: (id: string)                  => post<boolean>({ action: 'deleteBudgetEntry', id }),
   saveOpeningBal:(data: OpeningBal)             => post<boolean>({ action: 'saveOpeningBal', data }),
   getLending:    (sheetName?: string)          => get<RawLendingRow[]>('getEntries', { module: 'lending', ...(sheetName && sheetName !== 'Lending' && { sheetName }) }),
@@ -322,6 +416,63 @@ export const api = {
   getCashLoanHistory:    ()                           => get<RawCashLoanHistoryRow[]>('getHistory', { module: 'loans', type: 'cash' }),
   addCashLoanHistory:    (p: Record<string, unknown>) => post<string>({ module: 'loans', action: 'addHistory', type: 'cash', ...p }),
   deleteCashLoanHistory: (id: string)                 => post<boolean>({ module: 'loans', action: 'deleteHistory', type: 'cash', id }),
+  getProfile: async () => {
+    const res = await fetch(`${new URL('/api/profile', window.location.origin)}`, {
+      credentials: 'same-origin',
+      cache: 'no-store',
+    });
+    const text = await res.text();
+    const json = JSON.parse(text) as ApiResponse<ProfileData>;
+    if (!json.ok) {
+      const err = new Error((json as { error?: string }).error || 'Profile request failed');
+      throw err;
+    }
+    return json.data;
+  },
+
+  getAccountsList: () => restJson<AccountRow[]>('/api/accounts-list'),
+
+  saveAccount: async (data: AccountPayload) => {
+    const { id, ...rest } = data;
+    if (id) {
+      await restJson<{ id: string }>('/api/accounts-list', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, ...rest }),
+      });
+    } else {
+      await restJson<{ id: string }>('/api/accounts-list', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(rest),
+      });
+    }
+  },
+
+  deleteAccount: (id: string) =>
+    restJson<boolean>(`/api/accounts-list?id=${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+  getCreditSources: () => restJson<CreditSourceRow[]>('/api/credit-sources'),
+
+  saveCreditSource: async (data: CreditSourcePayload) => {
+    const { id, ...rest } = data;
+    if (id) {
+      await restJson<{ id: string }>('/api/credit-sources', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, ...rest }),
+      });
+    } else {
+      await restJson<{ id: string }>('/api/credit-sources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(rest),
+      });
+    }
+  },
+
+  deleteCreditSource: (id: string) =>
+    restJson<boolean>(`/api/credit-sources?id=${encodeURIComponent(id)}`, { method: 'DELETE' }),
   getSettings:   ()                            => get<GoldSettings>('get', { module: 'settings' }),
   saveSettings:  (p: Record<string, unknown>) => post<boolean>({ module: 'settings', action: 'save', ...p }),
   getVaultSettings: ()                      => get<VaultSettings>('get', { module: 'vault' }),
@@ -408,6 +559,5 @@ export const api = {
   syncMutualFunds: ()                          => post<{ count: number }>({ module: 'mutualfunds', action: 'sync' }),
   configure:     (expensesSheetId: string, assetsSheetId?: string) => post<boolean>({ action: 'configure', expensesSheetId, assetsSheetId }),
   ensureMonth:   (month: string, year: string)  => post<boolean>({ action: 'ensureMonth', month, year }),
-  resetBudget:   ()                             => post<Budget>({ action: 'resetBudget' }),
   gemini:        (system: string, prompt: string, forceTool?: boolean) => post<string>({ action: 'gemini', system, prompt, forceTool }),
 };

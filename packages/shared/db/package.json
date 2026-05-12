@@ -11,7 +11,8 @@
     "build": "tsc --noEmit",
     "type-check": "tsc --noEmit",
     "drizzle:push": "drizzle-kit push",
-    "drizzle:generate": "drizzle-kit generate"
+    "drizzle:generate": "drizzle-kit generate && node ./scripts/export-schema.mjs",
+    "export-schema": "node ./scripts/export-schema.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.10.4",

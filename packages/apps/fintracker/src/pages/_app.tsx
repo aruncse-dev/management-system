@@ -1,13 +1,38 @@
 import type { AppProps } from 'next/app'
 import Head from 'next/head'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
-import { AppAuthGate, Nav, type ModuleId } from '@fintracker-vault/ui'
+import { AppAuthGate, Nav, type ModuleId, type NavDynamicMenuSection } from '@fintracker-vault/ui'
 import { getAppArea } from '../appPaths'
 import { StoreProvider } from '../store'
 import { getClientAuthEnv } from '../clientAuthEnv'
+import { OrgSwitcher } from '../components/OrgSwitcher'
+import { FintrackerModesProvider } from '../context/FintrackerModesContext'
+import {
+  MENU_CACHE_UPDATED_EVENT,
+  readMenuCache,
+  writeMenuCache,
+  type CachedProfileMenuRow,
+} from '../lib/profileMenuCache'
 import '../ui-kit/ui-kit.css'
 import '../styles/globals.css'
+
+/** Empty array ⇒ drawer shows only Settings, UI Kit, Logout (no org menu items). */
+function groupNavMenu(menu: CachedProfileMenuRow[] | undefined | null): NavDynamicMenuSection[] {
+  if (!menu?.length) return []
+  const map = new Map<string, CachedProfileMenuRow[]>()
+  for (const m of menu) {
+    const arr = map.get(m.sectionLabel) ?? []
+    arr.push(m)
+    map.set(m.sectionLabel, arr)
+  }
+  return [...map.entries()].map(([sectionLabel, items]) => ({
+    sectionLabel,
+    items: [...items]
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label))
+      .map(m => ({ id: m.id, label: m.label, icon: m.icon, path: m.path })),
+  }))
+}
 
 const PAGE_TITLES: Record<ModuleId, string> = {
   dashboard: 'Dashboard',
@@ -31,6 +56,22 @@ const PAGE_TITLES: Record<ModuleId, string> = {
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter()
   const [lendingSheet, setLendingSheet] = useState('Lending')
+  const [dynamicMenu, setDynamicMenu] = useState<NavDynamicMenuSection[]>([])
+
+  useLayoutEffect(() => {
+    const c = readMenuCache()
+    if (c?.menu?.length) setDynamicMenu(groupNavMenu(c.menu))
+  }, [])
+
+  useEffect(() => {
+    const onMenuCacheUpdated = () => {
+      const c = readMenuCache()
+      setDynamicMenu(groupNavMenu(c?.menu ?? []))
+    }
+    window.addEventListener(MENU_CACHE_UPDATED_EVENT, onMenuCacheUpdated)
+    return () => window.removeEventListener(MENU_CACHE_UPDATED_EVENT, onMenuCacheUpdated)
+  }, [])
+
   const { googleClientId: gid } = getClientAuthEnv()
   const googleClientId = gid
 
@@ -97,6 +138,25 @@ export default function App({ Component, pageProps }: AppProps) {
     else setLendingSheet('Lending')
   }, [router.isReady, router.pathname, router.query.sheet])
 
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const r = await fetch('/api/profile', { credentials: 'same-origin' })
+        const j = await r.json()
+        if (cancelled || !j.ok) return
+        const menu = (j.data?.menu ?? []) as CachedProfileMenuRow[]
+        writeMenuCache(j.data?.activeOrgId ?? null, menu)
+        setDynamicMenu(groupNavMenu(menu))
+      } catch {
+        if (!cancelled) setDynamicMenu([])
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [router.pathname])
+
   const pageTitle = useMemo(() => {
     if (!moduleFromPath) return 'FinTracker'
     if (moduleFromPath !== 'lending') return PAGE_TITLES[moduleFromPath]
@@ -111,26 +171,34 @@ export default function App({ Component, pageProps }: AppProps) {
         <meta name="theme-color" content="#1E5CC7" />
       </Head>
       <AppAuthGate appKind="fintracker" googleClientId={googleClientId}>
-      {({ onLogout }) => (
-        <StoreProvider>
-          <div className="with-app-shell">
-            {moduleFromPath && (
-              <Nav
-                module={moduleFromPath}
-                onModule={goToModule}
-                lendingSheet={lendingSheet}
-                onLendingSheet={setLendingSheet}
-                title={pageTitle}
-                appName="FinTracker"
-                area={getAppArea(router.asPath)}
-                onLogout={onLogout}
-              />
-            )}
-            <Component {...pageProps} />
-          </div>
-        </StoreProvider>
-      )}
-    </AppAuthGate>
+        {({ onLogout }) => (
+          <StoreProvider>
+            <FintrackerModesProvider>
+            <div className="with-app-shell">
+              {moduleFromPath && (
+                <>
+                  <Nav
+                    module={moduleFromPath}
+                    onModule={goToModule}
+                    lendingSheet={lendingSheet}
+                    onLendingSheet={setLendingSheet}
+                    title={pageTitle}
+                    appName="FinTracker"
+                    area={getAppArea(router.asPath)}
+                    onLogout={onLogout}
+                    dynamicMenu={dynamicMenu}
+                    activeAsPath={router.asPath}
+                    onNavigatePath={(path: string) => void router.push(path)}
+                  />
+                  <OrgSwitcher />
+                </>
+              )}
+              <Component {...pageProps} />
+            </div>
+            </FintrackerModesProvider>
+          </StoreProvider>
+        )}
+      </AppAuthGate>
     </>
   )
 }

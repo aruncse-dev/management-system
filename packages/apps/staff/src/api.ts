@@ -20,8 +20,8 @@ async function parseResponse<T>(res: Response): Promise<T> {
     const isLoginPage = text.includes('accounts.google.com')
     throw new Error(
       isLoginPage
-        ? 'GAS access restricted — set deployment to Anyone with the link'
-        : 'GAS not deployed or misconfigured',
+        ? 'Received a sign-in page instead of API JSON — sign in to the app and ensure /api routes are reachable.'
+        : 'Unexpected HTML from API — check NEXT_PUBLIC_API_URL, server logs, and DATABASE_URL.',
     )
   }
   const json: ApiResponse<T> = JSON.parse(text)

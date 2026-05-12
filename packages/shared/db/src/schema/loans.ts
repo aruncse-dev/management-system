@@ -1,9 +1,8 @@
 import { date, integer, numeric, pgTable, text } from 'drizzle-orm/pg-core'
-import { users } from './users'
 
 export const emiLoans = pgTable('emi_loans', {
   id: text('id').primaryKey(),
-  userEmail: text('user_email').notNull().references(() => users.email),
+  orgId: text('org_id'),
   name: text('name').notNull(),
   bank: text('bank'),
   principal: numeric('principal', { precision: 12, scale: 2 }).notNull(),
@@ -17,7 +16,7 @@ export const emiLoans = pgTable('emi_loans', {
 
 export const jewelLoans = pgTable('jewel_loans', {
   id: text('id').primaryKey(),
-  userEmail: text('user_email').notNull().references(() => users.email),
+  orgId: text('org_id'),
   name: text('name').notNull(),
   bank: text('bank'),
   principal: numeric('principal', { precision: 12, scale: 2 }).notNull(),
@@ -30,8 +29,8 @@ export const jewelLoans = pgTable('jewel_loans', {
 
 export const jewelLoanRepayments = pgTable('jewel_loan_repayments', {
   id: text('id').primaryKey(),
-  userEmail: text('user_email').notNull().references(() => users.email),
-  loanId: text('loan_id').notNull().references(() => jewelLoans.id),
+  orgId: text('org_id'),
+  loanId: text('loan_id').notNull(),
   date: date('date').notNull(),
   amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
   note: text('note'),
@@ -39,7 +38,7 @@ export const jewelLoanRepayments = pgTable('jewel_loan_repayments', {
 
 export const cashLoans = pgTable('cash_loans', {
   id: text('id').primaryKey(),
-  userEmail: text('user_email').notNull().references(() => users.email),
+  orgId: text('org_id'),
   personName: text('person_name').notNull(),
   amountReceived: numeric('amount_received', { precision: 12, scale: 2 }).notNull(),
   startDate: date('start_date').notNull(),
@@ -48,8 +47,8 @@ export const cashLoans = pgTable('cash_loans', {
 
 export const cashLoanRepayments = pgTable('cash_loan_repayments', {
   id: text('id').primaryKey(),
-  userEmail: text('user_email').notNull().references(() => users.email),
-  loanId: text('loan_id').notNull().references(() => cashLoans.id),
+  orgId: text('org_id'),
+  loanId: text('loan_id').notNull(),
   date: date('date').notNull(),
   amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
   note: text('note'),

@@ -4,11 +4,8 @@ const { getGoogleAuthEnv } = require('../resolve-google-env.cjs')
 const { googleClientId: resolvedGoogleClientId } = getGoogleAuthEnv(__dirname)
 
 const clientEnv = {
-  NEXT_PUBLIC_API_URL:
-    process.env.NEXT_PUBLIC_API_URL ||
-    process.env.NEXT_PUBLIC_API_BASE_URL ||
-    process.env.VITE_API_URL ||
-    '/api',
+  /** Same-origin Next.js API (`/api/*`). Override only if you split the API to another origin. */
+  NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || '/api',
   VITE_GOOGLE_CLIENT_ID: resolvedGoogleClientId,
   NEXT_PUBLIC_GOOGLE_CLIENT_ID: resolvedGoogleClientId,
 }
