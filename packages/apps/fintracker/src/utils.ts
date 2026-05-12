@@ -100,6 +100,21 @@ export function sumType(rows: Transaction[], type: string) {
   return rows.filter(r => r.t === type).reduce((s, r) => s + r.a, 0)
 }
 
+/** Destination label from legacy transfer `notes` (`→Cash`, `→HDFC Bank · memo`). */
+export function transferNotesDestination(notes: string): string {
+  const raw = String(notes || '').trim()
+  const m = raw.match(/^(?:→|->)\s*(.+?)(?:\s*·\s*[\s\S]*)?$/)
+  return (m?.[1] || '').trim()
+}
+
+/** Resolved transfer destination: `transferTo` column, else legacy `→…` in `notes`. */
+export function transactionTransferDestination(row: Pick<Transaction, 't' | 'notes' | 'transferTo'>): string {
+  if (row.t !== 'Transfer') return ''
+  const col = (row.transferTo ?? '').trim()
+  if (col) return col
+  return transferNotesDestination(row.notes ?? '')
+}
+
 export function sumCC(rows: Transaction[], creditCardModeNames: readonly string[]) {
   return rows.filter(r => creditCardModeNames.includes(r.m)).reduce((s, r) => s + r.a, 0)
 }
@@ -123,20 +138,25 @@ export function acctFlows(
   rows: Transaction[],
   openingBal: OpeningBal,
   monthlyAccountNames: readonly string[],
+  /** Include credit / informal names so transfer destinations resolve the same as in the UI. */
+  transferParticipantNames?: readonly string[],
 ) {
-  const accountByLower = Object.fromEntries(monthlyAccountNames.map(acc => [acc.toLowerCase(), acc])) as Record<
+  const nameUniverse =
+    transferParticipantNames && transferParticipantNames.length > 0
+      ? transferParticipantNames
+      : monthlyAccountNames
+  const accountByLower = Object.fromEntries(nameUniverse.map(acc => [acc.toLowerCase(), acc])) as Record<
     string,
     string
   >
   function normalizeAccount(name: string) {
     return accountByLower[String(name || '').trim().toLowerCase()] || ''
   }
-  function transferTarget(notes: string) {
-    const raw = String(notes || '').trim()
-    if (!raw) return ''
-    const direct = raw.match(/^(?:→|->)\s*([^·|,]+?)(?:\s*[·|,].*)?$/)
-    if (direct?.[1]) return normalizeAccount(direct[1])
-    const esc = monthlyAccountNames.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
+  function resolvedTransferDest(row: Transaction): string {
+    const dest = transactionTransferDestination(row)
+    if (dest) return normalizeAccount(dest)
+    const raw = String(row.notes || '').trim()
+    const esc = nameUniverse.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
     if (esc.length) {
       const re = new RegExp(`\\bto\\s+(${esc})\\b`, 'i')
       const m = raw.match(re)
@@ -155,7 +175,7 @@ export function acctFlows(
         else if (r.t === 'Expense' || r.t === 'Savings') outflow += r.a
         else if (r.t === 'Transfer') outflow += r.a
       }
-      if (r.t === 'Transfer' && transferTarget(r.notes) === acc) inflow += r.a
+      if (r.t === 'Transfer' && resolvedTransferDest(r) === acc) inflow += r.a
     })
     const opening = openingBal[acc] || 0
     result[acc] = { inflow, outflow, current: opening + inflow - outflow }

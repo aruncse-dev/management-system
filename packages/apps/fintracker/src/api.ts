@@ -1,4 +1,5 @@
 import { Budget, BudgetEntry, MonthRef, OpeningBal, Transaction } from './types';
+import type { FintrackerPrefs } from './expenseCycle';
 import { API_URL } from './constants';
 
 type ApiResponse<T> = { ok: true; data: T; traceId?: string; debug?: Record<string, unknown> } | { ok: false; error: string; traceId?: string };
@@ -83,6 +84,7 @@ export interface InitData {
   months: MonthRef[];
   budget: Budget;
   openingBal: OpeningBal;
+  fintracker: FintrackerPrefs;
 }
 
 const _initInflightByKey = new Map<string, Promise<InitData>>();
@@ -194,6 +196,10 @@ export interface GoldSettings {
   emiSheetName?: string;
   expensesSheetId?: string;
   assetsSheetId?: string;
+  /** Parsed from `users.settings.fintracker`. */
+  fintracker?: FintrackerPrefs;
+  /** Same object as JSON string (for copy / backup). */
+  fintrackerJson?: string;
 }
 
 export interface ProfileData {
@@ -207,7 +213,6 @@ export type AccountUsedFor = 'savings' | 'monthly' | 'both';
 
 export interface AccountRow {
   id: string;
-  userEmail: string;
   orgId: string | null;
   name: string;
   description: string | null;
@@ -220,7 +225,6 @@ export type CreditSourceCategory = 'credit_card' | 'informal';
 
 export interface CreditSourceRow {
   id: string;
-  userEmail: string;
   orgId: string | null;
   name: string;
   description: string | null;
@@ -555,6 +559,5 @@ export const api = {
   syncMutualFunds: ()                          => post<{ count: number }>({ module: 'mutualfunds', action: 'sync' }),
   configure:     (expensesSheetId: string, assetsSheetId?: string) => post<boolean>({ action: 'configure', expensesSheetId, assetsSheetId }),
   ensureMonth:   (month: string, year: string)  => post<boolean>({ action: 'ensureMonth', month, year }),
-  resetBudget:   ()                             => post<Budget>({ action: 'resetBudget' }),
   gemini:        (system: string, prompt: string, forceTool?: boolean) => post<string>({ action: 'gemini', system, prompt, forceTool }),
 };

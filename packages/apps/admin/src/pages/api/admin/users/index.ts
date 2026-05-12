@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { desc } from 'drizzle-orm'
+import { desc, eq } from 'drizzle-orm'
 import { getDb, users } from '@fintracker-vault/db'
 import { requirePlatformAdmin } from '../../../../lib/adminGuard'
 
@@ -16,40 +16,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === 'POST') {
     const body = typeof req.body === 'object' && req.body !== null ? req.body : {}
-    const email = typeof (body as { email?: unknown }).email === 'string'
-      ? (body as { email: string }).email.toLowerCase().trim()
-      : ''
-    if (!email) return res.status(400).json({ ok: false, error: 'Email is required' })
-
-    const orgId =
-      typeof (body as { orgId?: unknown }).orgId === 'string'
-        ? (body as { orgId: string }).orgId.trim()
+    const email =
+      typeof (body as { email?: unknown }).email === 'string'
+        ? (body as { email: string }).email.toLowerCase().trim()
         : ''
-    if (!orgId) return res.status(400).json({ ok: false, error: 'Organization is required' })
+    if (!email || !email.includes('@')) {
+      return res.status(400).json({ ok: false, error: 'Valid email is required' })
+    }
 
     const displayName =
       typeof (body as { displayName?: unknown }).displayName === 'string'
-        ? (body as { displayName: string }).displayName
+        ? (body as { displayName: string }).displayName.trim()
         : email.split('@')[0]
 
-    await db
-      .insert(users)
-      .values({
-        email,
-        displayName,
-        orgId,
-        status: 'active',
-      })
-      .onConflictDoUpdate({
-        target: users.email,
-        set: {
-          displayName,
-          orgId,
-          updatedAt: new Date(),
-        },
-      })
+    const statusRaw = typeof (body as { status?: unknown }).status === 'string' ? (body as { status: string }).status : 'active'
+    const status = ['active', 'inactive'].includes(statusRaw) ? statusRaw : 'active'
 
-    return res.status(200).json({ ok: true })
+    const [existing] = await db.select().from(users).where(eq(users.email, email)).limit(1)
+    if (existing) {
+      return res.status(409).json({ ok: false, error: 'A user with this email already exists' })
+    }
+
+    await db.insert(users).values({
+      email,
+      displayName,
+      role: 'member',
+      status,
+      useDb: false,
+    })
+
+    return res.status(201).json({ ok: true })
   }
 
   res.setHeader('Allow', 'GET, POST')

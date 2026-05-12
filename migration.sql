@@ -1,284 +1,165 @@
--- FinTracker Multi-Organization Schema Migration
--- Drop user_email, use org_id alone for data filtering
--- Apply with: psql "$DATABASE_URL" -f migration.sql
+-- Bulk import: Apr–May 2026 transactions (public.transactions).
+-- org_id: 07f73827-1172-4a97-983e-8382bf7f9ef5
+BEGIN;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS transfer_to text;
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-19'::date, 'Previous Month''s Balance ', 2200, 'Other', 'Income', 'Cash', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-19'::date, 'Previous Month ', 1200, 'Groceries', 'Income', 'HDFC Bank', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-19'::date, 'Chicken, Mutton ', 1450, 'Meat', 'Expense', 'ICICI', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-19'::date, 'Fish ', 1200, 'Meat', 'Expense', 'HDFC Bank', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-19'::date, 'Fruits ', 2400, 'Fruits', 'Expense', 'ICICI', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-19'::date, 'Energy Laddu, Choco Rolls ', 250, 'Snacks', 'Expense', 'ICICI', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-19'::date, 'Groceries A1 Mart ', 1600, 'Groceries', 'Expense', 'ICICI', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-19'::date, 'Relatives Marriage ', 1500, 'Gifts/Functions', 'Expense', 'Cash', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-19'::date, 'Vijaya Amma - Cash ', 1500, 'Vijaya Amma', 'Expense', 'Cash', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-19'::date, 'Pampers XL ', 1250, 'Kids', 'Expense', 'ICICI', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-19'::date, 'Vegetables ', 750, 'Vegetables', 'Expense', 'Cash', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-19'::date, 'Auto ', 250, 'Travel', 'Expense', 'Cash', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-19'::date, 'Banana & Others ', 600, 'Fruits', 'Expense', 'ICICI', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-20'::date, 'Ration Shop ', 500, 'Groceries', 'Expense', 'ICICI', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-20'::date, 'Sridar Mamam Rituals ', 2000, 'Gifts/Functions', 'Expense', 'Cash', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-20'::date, 'Relatives Marriage ', 3000, 'Gifts/Functions', 'Expense', 'Cash', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-21'::date, 'Jio Fiber ', 1100, 'Internet/Recharge', 'Expense', 'HDFC', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-20'::date, 'Arun & Ramya Max Life Insurance ', 3600, 'Insurance', 'Expense', 'HDFC', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-21'::date, 'Travel Cuddalore ', 3300, 'Travel', 'Expense', 'Ramya', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-21'::date, 'Dinner ', 100, 'Food/Eating Out', 'Expense', 'HDFC', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-20'::date, 'Health Insurance - In Laws ', 4200, 'Insurance', 'Expense', 'HDFC', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-22'::date, 'Microsoft Subscription ', 800, 'Others', 'Expense', 'HDFC', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-23'::date, 'Term Insurance ', 2200, 'Insurance', 'Expense', 'Ramya', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-23'::date, 'Lunch ', 250, 'Food/Eating Out', 'Expense', 'ICICI', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-23'::date, 'Aavin Milk ', 1000, 'Milk', 'Expense', 'Ramya', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-24'::date, 'Fruits ', 1000, 'Fruits', 'Expense', 'ICICI', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-24'::date, 'Kids Play Area ', 350, 'Kids', 'Expense', 'Ramya', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-24'::date, 'Dinner ', 100, 'Food/Eating Out', 'Expense', 'HDFC', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-23'::date, 'Pondicherry <-> Tiruvannamalai ', 1900, 'Travel', 'Expense', 'ICICI', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-25'::date, 'Bed Protector ', 350, 'Kids', 'Expense', 'HDFC', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-25'::date, 'Saloon ', 150, 'Body Care', 'Expense', 'ICICI', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-25'::date, 'Vijaya Amma - Shopping ', 1700, 'Vijaya Amma', 'Expense', 'Ramya', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-25'::date, 'Amma ', 500, 'Amma', 'Expense', 'Cash', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-25'::date, 'Groceries Store ', 2600, 'Groceries', 'Expense', 'ICICI', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-24'::date, 'A1 Mart - Dal, Oil & Others ', 3250, 'Groceries', 'Expense', 'HDFC', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-24'::date, 'A1 Mart - Snacks & Nuts ', 1150, 'Snacks', 'Expense', 'HDFC', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-24'::date, 'Pooja Items, Plastic Utilities ', 1050, 'Home Care', 'Expense', 'HDFC', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-25'::date, 'Hand Wash, Soap ', 200, 'Body Care', 'Expense', 'HDFC', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-25'::date, 'A1 Mart - Misc Items ', 900, 'Others', 'Expense', 'HDFC', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-20'::date, 'Bala Arm Sleeve ', 250, 'Others', 'Expense', 'HDFC', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-25'::date, 'Jaggery ', 350, 'Groceries', 'Expense', 'ICICI', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-26'::date, 'Chicken ', 350, 'Meat', 'Expense', 'ICICI', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-26'::date, 'Slipper & Shoe ', 1200, 'Body Care', 'Expense', 'HDFC Bank', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-26'::date, 'Cash Box ', 400, 'Gifts/Functions', 'Expense', 'ICICI', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-26'::date, 'Vegetables ', 200, 'Vegetables', 'Expense', 'Cash', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-26'::date, 'Prawns ', 400, 'Meat', 'Expense', 'Ramya', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-26'::date, 'Rice ', 1500, 'Groceries', 'Expense', 'Ramya', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-26'::date, 'Misc Expenses ', 400, 'Daily Expenses', 'Expense', 'Cash', 'Unknown Expenses', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-26'::date, 'Dinner ', 100, 'Food/Eating Out', 'Expense', 'HDFC', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-27'::date, 'Egg ', 200, 'Meat', 'Expense', 'Ramya', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-27'::date, 'Petrol ', 400, 'Travel', 'Expense', 'HDFC Bank', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-27'::date, 'Amma Village Visit ', 200, 'Amma', 'Expense', 'Cash', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-27'::date, 'Vijaya Amma - Cash ', 1500, 'Vijaya Amma', 'Expense', 'Cash', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-26'::date, 'Baby Avva - Medicines ', 500, 'Health & Medical', 'Expense', 'HDFC Bank', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-28'::date, 'Daily Expenses ', 300, 'Daily Expenses', 'Expense', 'Cash', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-28'::date, 'Daily Expenses ', 300, 'Daily Expenses', 'Expense', 'Cash', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-28'::date, 'Vegetables ', 600, 'Vegetables', 'Expense', 'ICICI', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-28'::date, 'Shampoo & Others ', 1200, 'Body Care', 'Expense', 'ICICI', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-28'::date, 'Lunch ', 100, 'Food/Eating Out', 'Expense', 'ICICI', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-28'::date, 'NameBoard ', 2300, 'Gifts/Functions', 'Expense', 'HDFC Bank', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-29'::date, 'Vegetables ', 100, 'Vegetables', 'Expense', 'Cash', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-29'::date, 'Descaler ', 350, 'Home Care', 'Expense', 'HDFC', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-28'::date, 'Petrol Car ', 3050, 'Travel', 'Expense', 'ICICI', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-29'::date, 'Ramya Hospital ', 2000, 'Health & Medical', 'Expense', 'Ramya', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-29'::date, 'Amma ', 500, 'Amma', 'Expense', 'Cash', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-29'::date, 'Vijaya Amma - More Super Market ', 2600, 'Vijaya Amma', 'Expense', 'ICICI', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-29'::date, 'Parithi''s Marriage ', 5000, 'Gifts/Functions', 'Expense', 'Ramya', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-30'::date, 'Aer Plug ', 250, 'Home Care', 'Expense', 'HDFC', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-30'::date, 'Ping Identity ', 307800, 'Salary', 'Income', 'HDFC Bank', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-30'::date, 'Ramya Repayment ', 3000, 'Credit Repayment', 'Expense', 'HDFC Bank', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-30'::date, 'Bommi Repayment ', 4000, 'Credit Repayment', 'Expense', 'HDFC Bank', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-30'::date, 'ICICI Repayment ', 99800, 'Credit Repayment', 'Expense', 'HDFC Bank', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-30'::date, 'Jewel Loan ', 9100, 'Jewel Loan', 'Expense', 'HDFC Bank', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-30'::date, 'HDFC Repayment ', 36200, 'Credit Repayment', 'Expense', 'HDFC Bank', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-05'::date, 'Personal & Car Loan Repayment ', 56000, 'Long Term Loan', 'Expense', 'HDFC Bank', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-30'::date, 'Daas Uncle ', 2000, 'Travel', 'Expense', 'HDFC Bank', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-30'::date, 'Ramani Amma ', 10000, 'Staff Salary', 'Expense', 'Cash', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-30'::date, 'Cake Guru - Sweets & Savouries ', 1400, 'Snacks', 'Expense', 'ICICI', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-30'::date, 'Meena Athai Grand Daughter''s Function ', 2500, 'Others', 'Expense', 'Cash', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-01'::date, 'Aavin Milk ', 4000, 'Milk', 'Expense', 'HDFC Bank', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-01'::date, 'Rent ', 5500, 'Rent', 'Expense', 'HDFC Bank', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-01'::date, 'Vijaya Amma - Rent ', 6500, 'Vijaya Amma', 'Expense', 'HDFC Bank', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-05'::date, 'SIP ', 11500, 'SIP/Savings', 'Expense', 'HDFC Bank', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-01'::date, 'Nithran Hospital ', 400, 'Health & Medical', 'Expense', 'Cash', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-01'::date, 'Chennai to TVM (Anna & Akka Pickup) ', 7500, 'Vijaya Amma', 'Expense', 'HDFC Bank', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-01'::date, 'Amma ', 200, 'Amma', 'Expense', 'Cash', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-02'::date, 'Netflix ', 200, 'Entertainment', 'Expense', 'HDFC Bank', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-02'::date, 'Google Workspace ', 300, 'Career/Learning', 'Expense', 'HDFC', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-02'::date, 'Amma ', 200, 'Amma', 'Expense', 'Cash', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-02'::date, 'Nurse Aunty ', 5000, 'Baby Avva', 'Expense', 'Cash', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-02'::date, 'Hotel Visit - Auto ', 500, 'Travel', 'Expense', 'Cash', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-03'::date, 'Store Milk ', 2700, 'Milk', 'Expense', 'Cash', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-03'::date, 'Amutha Akka - Balance Salary ', 1500, 'Staff Salary', 'Expense', 'Cash', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-03'::date, 'Lunch ', 300, 'Food/Eating Out', 'Expense', 'HDFC', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-03'::date, 'Ramya ', 200, 'Body Care', 'Expense', 'HDFC', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-03'::date, 'Bottle Cleaner ', 100, 'Home Care', 'Expense', 'HDFC', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-03'::date, 'Sticker Books ', 270, 'Kids', 'Expense', 'HDFC', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-04'::date, 'Lunch - Darling ', 2850, 'Food/Eating Out', 'Expense', 'HDFC', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-04'::date, 'Daily Expenses ', 300, 'Daily Expenses', 'Expense', 'Cash', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-05'::date, 'Dominos ', 850, 'Food/Eating Out', 'Expense', 'ICICI', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-05'::date, 'A2B Lunch ', 150, 'Food/Eating Out', 'Expense', 'Bommi', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-05'::date, 'Car Service ', 4400, 'Car', 'Expense', 'HDFC Bank', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-04'::date, 'RO Filter Change ', 600, 'Maintenance', 'Expense', 'Cash', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-04'::date, 'Recharge ', 100, 'Internet/Recharge', 'Expense', 'ICICI', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-05'::date, 'Dinner ', 250, 'Food/Eating Out', 'Expense', 'ICICI', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-05'::date, 'Egg ', 200, 'Meat', 'Expense', 'HDFC Bank', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-05'::date, 'Banana Leaf ', 100, 'Vegetables', 'Expense', 'Cash', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-05'::date, 'Rose Milk ', 100, 'Snacks', 'Expense', 'Cash', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-05'::date, 'Swimming Pool ', 1300, 'Kids', 'Expense', 'HDFC', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-05'::date, 'Teats ', 100, 'Kids', 'Expense', 'HDFC', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-06'::date, 'Auto ', 100, 'Travel', 'Expense', 'Cash', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-06'::date, 'Ramya Print Out ', 800, 'Career/Learning', 'Expense', 'Ramya', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-06'::date, 'Swaad ', 100, 'Food/Eating Out', 'Expense', 'Bommi', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-06'::date, 'Altaf Food Court ', 150, 'Food/Eating Out', 'Expense', 'ICICI', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-06'::date, 'Suja Akka ', 3000, 'Staff Salary', 'Expense', 'Cash', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-07'::date, 'Daily Expenses ', 200, 'Daily Expenses', 'Expense', 'Cash', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-07'::date, 'Auto ', 200, 'Travel', 'Expense', 'Cash', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-07'::date, 'Rice Mill ', 200, 'Groceries', 'Expense', 'Cash', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-07'::date, 'Real Estate ', 10000, 'SIP/Savings', 'Expense', 'Cash', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-07'::date, 'Exam  Registration Fees Ramya ', 1100, 'Career/Learning', 'Expense', 'Ramya', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-07'::date, 'Book Xerox ', 100, 'Others', 'Expense', 'Cash', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-08'::date, 'Daily Expenses ', 100, 'Daily Expenses', 'Expense', 'Cash', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-08'::date, 'Petrol ', 300, 'Travel', 'Expense', 'Cash', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-09'::date, 'Consultancy Fees ', 2000, 'Baby Avva', 'Expense', 'HDFC Bank', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-09'::date, 'Ambulance ', 2100, 'Baby Avva', 'Expense', 'HDFC Bank', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-09'::date, 'Care Taker Advance ', 5000, 'Baby Avva', 'Expense', 'HDFC Bank', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-09'::date, 'Cylinder 2 ', 1900, 'Cylinder', 'Expense', 'HDFC', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-09'::date, 'Cash ', 500, 'Others', 'Income', 'Cash', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-09'::date, 'Daily Expenses ', 100, 'Daily Expenses', 'Expense', 'Cash', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-07'::date, 'Police Canteen ', 2200, 'Home Care', 'Expense', 'HDFC', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-10'::date, 'Cake ', 400, 'Gifts/Functions', 'Expense', 'ICICI', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-10'::date, 'Oil, Sugar & Others ', 2700, 'Groceries', 'Expense', 'HDFC', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-10'::date, 'Liquid Items Comfort, Vim, Surf ', 1800, 'Home Care', 'Expense', 'HDFC', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-10'::date, 'Soap & Brush ', 200, 'Body Care', 'Expense', 'HDFC', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-10'::date, 'Tic Fiber ', 800, 'Internet/Recharge', 'Expense', 'HDFC', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-10'::date, 'Amutha Akka - Advance ', 1500, 'Staff Salary', 'Expense', 'HDFC Bank', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-10'::date, 'Pampers, gloves ', 1250, 'Baby Avva', 'Expense', 'Bommi', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-10'::date, 'Medicine- Nurse aunty ', 1000, 'Baby Avva', 'Expense', 'Bommi', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-11'::date, 'Amma Cash ', 200, 'Amma', 'Expense', 'Cash', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-11'::date, 'Lunch ', 250, 'Food/Eating Out', 'Expense', 'ICICI', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-11'::date, 'Amazon Cashback ', 500, 'Cashback', 'Income', 'Wallet', 'Amazon Pay cashback', '2026-05');
+-- Missed transfers (CSV rows that failed field parsing). `mode` = from, `transfer_to` = to; `notes` = optional memo only.
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, transfer_to, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-19'::date, 'Cash Transfer', 9500, 'Transfer', 'Transfer', 'Ramya', 'Cash', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, transfer_to, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-20'::date, 'Transfer', 500, 'Transfer', 'Transfer', 'Cash', 'HDFC Bank', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, transfer_to, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-27'::date, 'Cash Transfer', 5000, 'Transfer', 'Transfer', 'Ramya', 'Cash', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, transfer_to, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-28'::date, 'Transfer', 100, 'Transfer', 'Transfer', 'Bommi', 'HDFC Bank', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, transfer_to, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-04-30'::date, 'Cash Withdrawal', 35000, 'Transfer', 'Transfer', 'HDFC Bank', 'Cash', '', '2026-04');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, transfer_to, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-07'::date, 'Transfer', 3300, 'Transfer', 'Transfer', 'HDFC Bank', 'Cash', '', '2026-05');
+INSERT INTO public.transactions (id, org_id, date, description, amount, category, type, mode, transfer_to, notes, month_year) VALUES (gen_random_uuid()::text, '07f73827-1172-4a97-983e-8382bf7f9ef5', '2026-05-09'::date, 'Transfer', 100, 'Transfer', 'Transfer', 'Cash', 'HDFC Bank', '', '2026-05');
 
--- ============================================================================
--- 1. CREATE org_members JOIN TABLE (if not exists)
--- ============================================================================
-CREATE TABLE IF NOT EXISTS public.org_members (
-  id text PRIMARY KEY,
-  org_id text NOT NULL,
-  user_email text NOT NULL,
-  role text NOT NULL DEFAULT 'member',
-  created_at timestamp NOT NULL DEFAULT now(),
-  UNIQUE(org_id, user_email)
-);
+-- Correct legacy mis-import: opening cash income was stored as mode=Income, notes=Cash (Cash never received inflow in acctFlows).
+UPDATE public.transactions
+SET mode = 'Cash', notes = ''
+WHERE org_id = '07f73827-1172-4a97-983e-8382bf7f9ef5'
+  AND type = 'Income'
+  AND mode = 'Income'
+  AND trim(coalesce(notes, '')) = 'Cash'
+  AND amount::numeric = 2200
+  AND description LIKE 'Previous Month%Balance%';
 
-CREATE INDEX IF NOT EXISTS idx_org_members_org_id ON public.org_members(org_id);
-CREATE INDEX IF NOT EXISTS idx_org_members_user_email ON public.org_members(user_email);
-
--- ============================================================================
--- 2. BACKFILL org_members FROM EXISTING users.org_id
--- ============================================================================
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_name = 'users' AND column_name = 'org_id'
-  ) THEN
-    INSERT INTO public.org_members (id, org_id, user_email, role, created_at)
-    SELECT
-      gen_random_uuid()::text as id,
-      org_id,
-      email,
-      'member' as role,
-      now() as created_at
-    FROM public.users
-    WHERE org_id IS NOT NULL
-    ON CONFLICT DO NOTHING;
-  END IF;
-END $$;
-
--- ============================================================================
--- 3. DROP org_id FROM users TABLE
--- ============================================================================
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_name = 'users' AND column_name = 'org_id'
-  ) THEN
-    ALTER TABLE public.users DROP COLUMN IF EXISTS org_id CASCADE;
-  END IF;
-END $$;
-
--- ============================================================================
--- 4. REMOVE user_email, ADD org_id TO ALL DATA TABLES
--- ============================================================================
-
--- Transactions
-DO $$
-BEGIN
-  IF EXISTS (SELECT FROM pg_tables WHERE tablename = 'transactions') THEN
-    ALTER TABLE public.transactions DROP COLUMN IF EXISTS user_email CASCADE;
-    ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';
-    CREATE INDEX IF NOT EXISTS idx_transactions_org_id ON public.transactions(org_id);
-  END IF;
-END $$;
-
--- Budget
-DO $$
-BEGIN
-  IF EXISTS (SELECT FROM pg_tables WHERE tablename = 'budget') THEN
-    ALTER TABLE public.budget DROP COLUMN IF EXISTS user_email CASCADE;
-    ALTER TABLE public.budget ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';
-    CREATE INDEX IF NOT EXISTS idx_budget_org_id ON public.budget(org_id);
-  END IF;
-END $$;
-
--- Accounts
-DO $$
-BEGIN
-  IF EXISTS (SELECT FROM pg_tables WHERE tablename = 'accounts') THEN
-    ALTER TABLE public.accounts DROP COLUMN IF EXISTS user_email CASCADE;
-    ALTER TABLE public.accounts ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';
-    CREATE INDEX IF NOT EXISTS idx_accounts_org_id ON public.accounts(org_id);
-  END IF;
-END $$;
-
--- Credit Sources
-DO $$
-BEGIN
-  IF EXISTS (SELECT FROM pg_tables WHERE tablename = 'credit_sources') THEN
-    ALTER TABLE public.credit_sources DROP COLUMN IF EXISTS user_email CASCADE;
-    ALTER TABLE public.credit_sources ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';
-    CREATE INDEX IF NOT EXISTS idx_credit_sources_org_id ON public.credit_sources(org_id);
-  END IF;
-END $$;
-
--- Savings
-DO $$
-BEGIN
-  IF EXISTS (SELECT FROM pg_tables WHERE tablename = 'savings') THEN
-    ALTER TABLE public.savings DROP COLUMN IF EXISTS user_email CASCADE;
-    ALTER TABLE public.savings ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';
-    CREATE INDEX IF NOT EXISTS idx_savings_org_id ON public.savings(org_id);
-  END IF;
-END $$;
-
--- Lending
-DO $$
-BEGIN
-  IF EXISTS (SELECT FROM pg_tables WHERE tablename = 'lending') THEN
-    ALTER TABLE public.lending DROP COLUMN IF EXISTS user_email CASCADE;
-    ALTER TABLE public.lending ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';
-    CREATE INDEX IF NOT EXISTS idx_lending_org_id ON public.lending(org_id);
-  END IF;
-END $$;
-
--- Gold Items
-DO $$
-BEGIN
-  IF EXISTS (SELECT FROM pg_tables WHERE tablename = 'gold_items') THEN
-    ALTER TABLE public.gold_items DROP COLUMN IF EXISTS user_email CASCADE;
-    ALTER TABLE public.gold_items ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';
-    CREATE INDEX IF NOT EXISTS idx_gold_items_org_id ON public.gold_items(org_id);
-  END IF;
-END $$;
-
--- Gold History
-DO $$
-BEGIN
-  IF EXISTS (SELECT FROM pg_tables WHERE tablename = 'gold_history') THEN
-    ALTER TABLE public.gold_history DROP COLUMN IF EXISTS user_email CASCADE;
-    ALTER TABLE public.gold_history ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';
-    CREATE INDEX IF NOT EXISTS idx_gold_history_org_id ON public.gold_history(org_id);
-  END IF;
-END $$;
-
--- EMI Loans
-DO $$
-BEGIN
-  IF EXISTS (SELECT FROM pg_tables WHERE tablename = 'emi_loans') THEN
-    ALTER TABLE public.emi_loans DROP COLUMN IF EXISTS user_email CASCADE;
-    ALTER TABLE public.emi_loans ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';
-    CREATE INDEX IF NOT EXISTS idx_emi_loans_org_id ON public.emi_loans(org_id);
-  END IF;
-END $$;
-
--- Jewel Loans
-DO $$
-BEGIN
-  IF EXISTS (SELECT FROM pg_tables WHERE tablename = 'jewel_loans') THEN
-    ALTER TABLE public.jewel_loans DROP COLUMN IF EXISTS user_email CASCADE;
-    ALTER TABLE public.jewel_loans ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';
-    CREATE INDEX IF NOT EXISTS idx_jewel_loans_org_id ON public.jewel_loans(org_id);
-  END IF;
-END $$;
-
--- Jewel Loan Repayments
-DO $$
-BEGIN
-  IF EXISTS (SELECT FROM pg_tables WHERE tablename = 'jewel_loan_repayments') THEN
-    ALTER TABLE public.jewel_loan_repayments DROP COLUMN IF EXISTS user_email CASCADE;
-    ALTER TABLE public.jewel_loan_repayments ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';
-    CREATE INDEX IF NOT EXISTS idx_jewel_loan_repayments_org_id ON public.jewel_loan_repayments(org_id);
-  END IF;
-END $$;
-
--- Cash Loans
-DO $$
-BEGIN
-  IF EXISTS (SELECT FROM pg_tables WHERE tablename = 'cash_loans') THEN
-    ALTER TABLE public.cash_loans DROP COLUMN IF EXISTS user_email CASCADE;
-    ALTER TABLE public.cash_loans ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';
-    CREATE INDEX IF NOT EXISTS idx_cash_loans_org_id ON public.cash_loans(org_id);
-  END IF;
-END $$;
-
--- Cash Loan Repayments
-DO $$
-BEGIN
-  IF EXISTS (SELECT FROM pg_tables WHERE tablename = 'cash_loan_repayments') THEN
-    ALTER TABLE public.cash_loan_repayments DROP COLUMN IF EXISTS user_email CASCADE;
-    ALTER TABLE public.cash_loan_repayments ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';
-    CREATE INDEX IF NOT EXISTS idx_cash_loan_repayments_org_id ON public.cash_loan_repayments(org_id);
-  END IF;
-END $$;
-
--- Stocks
-DO $$
-BEGIN
-  IF EXISTS (SELECT FROM pg_tables WHERE tablename = 'stocks') THEN
-    ALTER TABLE public.stocks DROP COLUMN IF EXISTS user_email CASCADE;
-    ALTER TABLE public.stocks ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';
-    CREATE INDEX IF NOT EXISTS idx_stocks_org_id ON public.stocks(org_id);
-  END IF;
-END $$;
-
--- Mutual Funds
-DO $$
-BEGIN
-  IF EXISTS (SELECT FROM pg_tables WHERE tablename = 'mutual_funds') THEN
-    ALTER TABLE public.mutual_funds DROP COLUMN IF EXISTS user_email CASCADE;
-    ALTER TABLE public.mutual_funds ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';
-    CREATE INDEX IF NOT EXISTS idx_mutual_funds_org_id ON public.mutual_funds(org_id);
-  END IF;
-END $$;
-
--- Vault Apps
-DO $$
-BEGIN
-  IF EXISTS (SELECT FROM pg_tables WHERE tablename = 'vault_apps') THEN
-    ALTER TABLE public.vault_apps DROP COLUMN IF EXISTS user_email CASCADE;
-    ALTER TABLE public.vault_apps ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';
-    CREATE INDEX IF NOT EXISTS idx_vault_apps_org_id ON public.vault_apps(org_id);
-  END IF;
-END $$;
-
--- Banking Records
-DO $$
-BEGIN
-  IF EXISTS (SELECT FROM pg_tables WHERE tablename = 'banking_records') THEN
-    ALTER TABLE public.banking_records DROP COLUMN IF EXISTS user_email CASCADE;
-    ALTER TABLE public.banking_records ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';
-    CREATE INDEX IF NOT EXISTS idx_banking_records_org_id ON public.banking_records(org_id);
-  END IF;
-END $$;
-
--- Persons
-DO $$
-BEGIN
-  IF EXISTS (SELECT FROM pg_tables WHERE tablename = 'persons') THEN
-    ALTER TABLE public.persons DROP COLUMN IF EXISTS user_email CASCADE;
-    ALTER TABLE public.persons ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';
-    CREATE INDEX IF NOT EXISTS idx_persons_org_id ON public.persons(org_id);
-  END IF;
-END $$;
-
--- Insurance
-DO $$
-BEGIN
-  IF EXISTS (SELECT FROM pg_tables WHERE tablename = 'insurance') THEN
-    ALTER TABLE public.insurance DROP COLUMN IF EXISTS user_email CASCADE;
-    ALTER TABLE public.insurance ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';
-    CREATE INDEX IF NOT EXISTS idx_insurance_org_id ON public.insurance(org_id);
-  END IF;
-END $$;
-
--- Staff Members
-DO $$
-BEGIN
-  IF EXISTS (SELECT FROM pg_tables WHERE tablename = 'staff_members') THEN
-    ALTER TABLE public.staff_members DROP COLUMN IF EXISTS user_email CASCADE;
-    ALTER TABLE public.staff_members ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';
-    CREATE INDEX IF NOT EXISTS idx_staff_members_org_id ON public.staff_members(org_id);
-  END IF;
-END $$;
-
--- Attendance
-DO $$
-BEGIN
-  IF EXISTS (SELECT FROM pg_tables WHERE tablename = 'attendance') THEN
-    ALTER TABLE public.attendance DROP COLUMN IF EXISTS user_email CASCADE;
-    ALTER TABLE public.attendance ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';
-    CREATE INDEX IF NOT EXISTS idx_attendance_org_id ON public.attendance(org_id);
-  END IF;
-END $$;
-
--- Subscriptions
-DO $$
-BEGIN
-  IF EXISTS (SELECT FROM pg_tables WHERE tablename = 'subscriptions') THEN
-    ALTER TABLE public.subscriptions DROP COLUMN IF EXISTS user_email CASCADE;
-    ALTER TABLE public.subscriptions ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';
-    CREATE INDEX IF NOT EXISTS idx_subscriptions_org_id ON public.subscriptions(org_id);
-  END IF;
-END $$;
-
--- ============================================================================
--- VERIFY
--- ============================================================================
--- Check org_members populated: SELECT COUNT(*) FROM public.org_members;
--- Check user_email removed: SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'transactions' AND column_name = 'user_email';
--- Check org_id added: SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'transactions' AND column_name = 'org_id';
+COMMIT;

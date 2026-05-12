@@ -1,8 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getIronSession } from 'iron-session'
-import { and, asc, eq, isNull } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNull } from 'drizzle-orm'
 import type { FtSessionData } from '@fintracker-vault/auth'
-import { creditSources, getDb } from '@fintracker-vault/db'
+import { paymentSources, getDb } from '@fintracker-vault/db'
 import { dbApiErrorMessage } from '../../lib/dbApiErrorMessage'
 import { getSessionOptions } from '../../lib/session'
 
@@ -21,38 +21,42 @@ const CATEGORY = new Set(['credit_card', 'informal'])
 
 async function ensureDefaultCreditSources(db: ReturnType<typeof getDb>, orgId: string | null) {
   const existing = await db
-    .select({ id: creditSources.id })
-    .from(creditSources)
-    .where(orgId ? eq(creditSources.orgId, orgId) : isNull(creditSources.orgId))
+    .select({ id: paymentSources.id })
+    .from(paymentSources)
+    .where(and(
+      orgId ? eq(paymentSources.orgId, orgId) : isNull(paymentSources.orgId),
+      inArray(paymentSources.sourceType, ['credit_card', 'informal'])
+    ))
     .limit(1)
   if (existing.length > 0) return
 
   const defaults = [
-    { name: 'ICICI', category: 'credit_card' as const, sortOrder: 0 },
-    { name: 'HDFC', category: 'credit_card' as const, sortOrder: 1 },
-    { name: 'Bommi', category: 'informal' as const, sortOrder: 2 },
-    { name: 'Ramya', category: 'informal' as const, sortOrder: 3 },
-    { name: 'Others', category: 'informal' as const, sortOrder: 4 },
+    { name: 'ICICI', sourceType: 'credit_card' as const, sortOrder: 0 },
+    { name: 'HDFC', sourceType: 'credit_card' as const, sortOrder: 1 },
+    { name: 'Bommi', sourceType: 'informal' as const, sortOrder: 2 },
+    { name: 'Ramya', sourceType: 'informal' as const, sortOrder: 3 },
+    { name: 'Others', sourceType: 'informal' as const, sortOrder: 4 },
   ]
   for (const row of defaults) {
-    await db.insert(creditSources).values({
+    await db.insert(paymentSources).values({
       id: crypto.randomUUID(),
       orgId,
       name: row.name,
       description: null,
-      category: row.category,
+      sourceType: row.sourceType,
+      usedFor: 'both',
       isActive: true,
       sortOrder: row.sortOrder,
     })
   }
 }
 
-function serialize(row: typeof creditSources.$inferSelect) {
+function serialize(row: typeof paymentSources.$inferSelect) {
   return {
     id: row.id,
     name: row.name,
     description: row.description ?? null,
-    category: row.category,
+    category: row.sourceType,
     orgId: row.orgId ?? null,
     isActive: row.isActive ?? true,
     sortOrder: row.sortOrder ?? 0,
@@ -71,9 +75,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await ensureDefaultCreditSources(db, orgId)
     const rows = await db
       .select()
-      .from(creditSources)
-      .where(orgId ? eq(creditSources.orgId, orgId) : isNull(creditSources.orgId))
-      .orderBy(asc(creditSources.sortOrder), asc(creditSources.name))
+      .from(paymentSources)
+      .where(and(
+        orgId ? eq(paymentSources.orgId, orgId) : isNull(paymentSources.orgId),
+        inArray(paymentSources.sourceType, ['credit_card', 'informal'])
+      ))
+      .orderBy(asc(paymentSources.sortOrder), asc(paymentSources.name))
     return ok(res, rows.map(serialize))
   }
 
@@ -81,17 +88,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const body = typeof req.body === 'object' && req.body ? (req.body as Record<string, unknown>) : {}
     const name = String(body.name ?? '').trim()
     if (!name) return fail(res, 400, 'Name required')
-    const category = String(body.category ?? '')
-    if (!CATEGORY.has(category)) return fail(res, 400, 'Invalid category')
+    const sourceType = String(body.category ?? '')
+    if (!CATEGORY.has(sourceType)) return fail(res, 400, 'Invalid category')
     const description = body.description != null ? String(body.description) : null
     const sortOrder = typeof body.sortOrder === 'number' ? body.sortOrder : Number(body.sortOrder) || 0
     const id = crypto.randomUUID()
-    await db.insert(creditSources).values({
+    await db.insert(paymentSources).values({
       id,
       orgId,
       name,
       description: description || null,
-      category,
+      sourceType,
+      usedFor: 'both',
       isActive: body.isActive === false ? false : true,
       sortOrder,
     })
@@ -104,23 +112,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!id) return fail(res, 400, 'Missing id')
     const name = String(body.name ?? '').trim()
     if (!name) return fail(res, 400, 'Name required')
-    const category = String(body.category ?? '')
-    if (!CATEGORY.has(category)) return fail(res, 400, 'Invalid category')
+    const sourceType = String(body.category ?? '')
+    if (!CATEGORY.has(sourceType)) return fail(res, 400, 'Invalid category')
     const description = body.description != null ? String(body.description) : null
     const sortOrder = typeof body.sortOrder === 'number' ? body.sortOrder : Number(body.sortOrder) || 0
     await db
-      .update(creditSources)
+      .update(paymentSources)
       .set({
         name,
         description: description || null,
-        category,
+        sourceType,
         isActive: body.isActive === false ? false : true,
         sortOrder,
       })
       .where(
         and(
-          eq(creditSources.id, id),
-          orgId ? eq(creditSources.orgId, orgId) : isNull(creditSources.orgId),
+          eq(paymentSources.id, id),
+          orgId ? eq(paymentSources.orgId, orgId) : isNull(paymentSources.orgId),
+          inArray(paymentSources.sourceType, ['credit_card', 'informal'])
         ),
       )
     return ok(res, { id })
@@ -130,11 +139,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const id = typeof req.query.id === 'string' ? req.query.id : ''
     if (!id) return fail(res, 400, 'Missing id')
     await db
-      .delete(creditSources)
+      .delete(paymentSources)
       .where(
         and(
-          eq(creditSources.id, id),
-          orgId ? eq(creditSources.orgId, orgId) : isNull(creditSources.orgId),
+          eq(paymentSources.id, id),
+          orgId ? eq(paymentSources.orgId, orgId) : isNull(paymentSources.orgId),
+          inArray(paymentSources.sourceType, ['credit_card', 'informal'])
         ),
       )
     return ok(res, true)

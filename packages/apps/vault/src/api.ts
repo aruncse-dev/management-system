@@ -482,6 +482,5 @@ export const api = {
   syncMutualFunds: ()                          => post<{ count: number }>({ module: 'mutualfunds', action: 'sync' }),
   configure:     (expensesSheetId: string, assetsSheetId?: string) => post<boolean>({ action: 'configure', expensesSheetId, assetsSheetId }),
   ensureMonth:   (month: string, year: string)  => post<boolean>({ action: 'ensureMonth', month, year }),
-  resetBudget:   ()                             => post<Budget>({ action: 'resetBudget' }),
   gemini:        (system: string, prompt: string, forceTool?: boolean) => post<string>({ action: 'gemini', system, prompt, forceTool }),
 };

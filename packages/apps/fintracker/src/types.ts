@@ -1,3 +1,5 @@
+import type { FintrackerPrefs } from './expenseCycle'
+
 export interface Transaction {
   id: string
   date: string
@@ -7,6 +9,7 @@ export interface Transaction {
   t: 'Expense' | 'Income' | 'Transfer' | 'Savings'
   m: string
   notes: string
+  transferTo?: string
   _k?: number
 }
 
@@ -47,6 +50,8 @@ export interface AppState {
   budget: Budget
   openingBal: OpeningBal
   months: MonthRef[]
+  /** From `users.settings.fintracker` via init. */
+  fintracker: FintrackerPrefs
   loading: boolean
   txnPage: number
   filter: string

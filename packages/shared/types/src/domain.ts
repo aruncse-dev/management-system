@@ -6,7 +6,10 @@ export interface Transaction {
   c: string;
   t: 'Expense' | 'Income' | 'Transfer' | 'Savings';
   m: string;
+  /** Optional memo; for transfers prefer `transferTo` + short memo instead of encoding `→` in notes. */
   notes: string;
+  /** When `t === 'Transfer'`, destination side (`m` is source). Legacy rows may omit this and use `notes` `→…` only. */
+  transferTo?: string;
   _k?: number;
 }
 

@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { eq } from 'drizzle-orm'
-import { getDb, organizations, users } from '@fintracker-vault/db'
+import { and, eq } from 'drizzle-orm'
+import { getDb, organizations, orgMembers } from '@fintracker-vault/db'
 import { requirePlatformAdmin } from '../../../../../../lib/adminGuard'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -22,22 +22,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === 'DELETE') {
     await db
-      .update(users)
-      .set({ orgId: null, role: 'member' })
-      .where(eq(users.email, userEmail))
+      .delete(orgMembers)
+      .where(and(eq(orgMembers.orgId, orgId), eq(orgMembers.userEmail, userEmail)))
     return res.status(200).json({ ok: true })
   }
 
   if (req.method === 'PUT') {
     const body = typeof req.body === 'object' && req.body !== null ? req.body : {}
     const roleRaw = typeof (body as { role?: unknown }).role === 'string' ? (body as { role: string }).role : ''
-    const role = roleRaw === 'org_admin' ? 'org_admin' : roleRaw === 'member' ? 'member' : null
-    if (!role) return res.status(400).json({ ok: false, error: 'role must be org_admin or member' })
+    const roleInOrg = roleRaw === 'org_admin' ? 'admin' : roleRaw === 'member' ? 'member' : null
+    if (!roleInOrg) {
+      return res.status(400).json({ ok: false, error: 'role must be org_admin or member' })
+    }
 
-    await db
-      .update(users)
-      .set({ role })
-      .where(eq(users.email, userEmail))
+    const [updated] = await db
+      .update(orgMembers)
+      .set({ role: roleInOrg })
+      .where(and(eq(orgMembers.orgId, orgId), eq(orgMembers.userEmail, userEmail)))
+      .returning({ id: orgMembers.id })
+
+    if (!updated) {
+      return res.status(404).json({ ok: false, error: 'Member not found in this organization' })
+    }
 
     return res.status(200).json({ ok: true })
   }

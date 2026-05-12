@@ -12,11 +12,11 @@ interface Props {
 export default function Accounts({ showStatus: _showStatus }: Props) {
   const { state } = useStore()
   const { rows, openingBal } = state
-  const { monthlyAccountNames, loading: modesLoading } = useFintrackerModes()
+  const { monthlyAccountNames, paymentModeOptions, loading: modesLoading } = useFintrackerModes()
 
   const flows = useMemo(
-    () => acctFlows(rows, openingBal, monthlyAccountNames),
-    [rows, openingBal, monthlyAccountNames],
+    () => acctFlows(rows, openingBal, monthlyAccountNames, paymentModeOptions),
+    [rows, openingBal, monthlyAccountNames, paymentModeOptions],
   )
 
   const overview = useMemo(() => {

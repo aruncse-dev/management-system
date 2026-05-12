@@ -181,6 +181,12 @@ body,
   min-height: 2.5rem;
 }
 
+.admin-form input[readonly] {
+  background: #f1f5f9;
+  color: var(--admin-text, #0f172a);
+  cursor: default;
+}
+
 .admin-form button[type='submit'],
 .admin-form > button:not(.admin-btn-danger) {
   align-self: flex-start;

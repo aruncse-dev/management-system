@@ -49,8 +49,8 @@ export default function AdminLoginPage() {
       <GoogleAuthCard
         iconSrc="/favicon.svg"
         iconAlt="FinTracker"
-        title="Platform admin"
-        subtitle="Sign in with Google using an administrator account."
+        title="Admin"
+        subtitle="Sign in with Google."
         error={error}
       >
         <div className="admin-login-stack">

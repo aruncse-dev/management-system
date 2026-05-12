@@ -21,7 +21,7 @@ interface Props {
   api: TransactionModalApi
   /** Accounts + credit sources allowed as transaction `mode` (payment source). */
   paymentModeOptions: readonly string[]
-  /** Accounts allowed as transfer targets (cash accounts only). */
+  /** Accounts + credits allowed as transfer destination (same as payment sources for symmetry). */
   transferTargetOptions: readonly string[]
   /** Expense categories (e.g. `CATEGORIES` ∪ budget names). Defaults to `CATEGORIES` from config. */
   expenseCategoryOptions?: readonly string[]
@@ -61,6 +61,53 @@ function isoFromGas(s: string) {
   return `20${m[3]}-${months[m[2]]}-${m[1].padStart(2, '0')}`
 }
 
+function buildTransactionFormFromRow(
+  row: Transaction | null,
+  paymentModeOptions: readonly string[],
+  transferTargetOptions: readonly string[],
+): TransactionForm {
+  const defaultMode = paymentModeOptions[0] ?? 'Cash'
+  const defaultTo = transferTargetOptions[0] ?? paymentModeOptions[0] ?? 'Cash'
+  if (!row) {
+    return {
+      date: todayISO(),
+      desc: '',
+      a: '',
+      c: 'Groceries',
+      t: 'Expense',
+      m: defaultMode,
+      notes: '',
+      toAcct: defaultTo,
+    }
+  }
+  let notes = row.notes || ''
+  let toAcct = defaultTo
+  if (row.t === 'Transfer') {
+    const col = (row.transferTo ?? '').trim()
+    if (col) {
+      toAcct = col
+      notes = (row.notes ?? '').trim()
+    } else {
+      const trimmed = notes.trim()
+      const m = trimmed.match(/^(?:→|->)\s*(.+?)(?:\s*·\s*([\s\S]*))?$/)
+      if (m) {
+        toAcct = m[1].trim() || defaultTo
+        notes = (m[2] || '').trim()
+      }
+    }
+  }
+  return {
+    date: isoFromGas(row.date),
+    desc: row.desc || '',
+    a: String(row.a),
+    c: row.c || 'Groceries',
+    t: row.t || 'Expense',
+    m: row.m || defaultMode,
+    notes,
+    toAcct,
+  }
+}
+
 export default function TransactionModal({
   row,
   month,
@@ -77,16 +124,9 @@ export default function TransactionModal({
   const isEdit = !!row
   const defaultMode = paymentModeOptions[0] ?? 'Cash'
   const defaultTo = transferTargetOptions[0] ?? paymentModeOptions[0] ?? 'Cash'
-  const [form, setForm] = useState<TransactionForm>({
-    date: row ? isoFromGas(row.date) : todayISO(),
-    desc: row?.desc || '',
-    a: row ? String(row.a) : '',
-    c: row?.c || 'Groceries',
-    t: row?.t || 'Expense',
-    m: row?.m || defaultMode,
-    notes: row?.notes || '',
-    toAcct: row?.notes?.match(/^→(.+?)( ·|$)/)?.[1] || defaultTo,
-  })
+  const [form, setForm] = useState<TransactionForm>(() =>
+    buildTransactionFormFromRow(row, paymentModeOptions, transferTargetOptions),
+  )
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [delConfirm, setDelConfirm] = useState(false)
@@ -107,7 +147,9 @@ export default function TransactionModal({
       return
     }
     setSaving(true)
-    const notes = isTransfer ? `→${form.toAcct || ''}${form.notes ? ' · ' + form.notes : ''}` : form.notes
+    const extra = form.notes.trim()
+    const notes = isTransfer ? extra : form.notes
+    const transferTo = isTransfer ? (form.toAcct || '').trim() : ''
     const p = {
       month,
       year,
@@ -118,6 +160,7 @@ export default function TransactionModal({
       t: form.t,
       m: form.m,
       notes,
+      ...(isTransfer ? { transferTo } : {}),
     }
     try {
       if (isEdit && row) await api.updateRow({ ...p, id: row.id })
@@ -239,11 +282,11 @@ export default function TransactionModal({
             </div>
           )}
           <div className="form-row">
-            <label className="form-lbl">Notes</label>
+            <label className="form-lbl">{isTransfer ? 'Memo (optional)' : 'Notes'}</label>
             <input
               className="form-inp"
               type="text"
-              placeholder="Optional notes"
+              placeholder={isTransfer ? 'Shown after · in stored notes' : 'Optional notes'}
               value={form.notes}
               onChange={e => set('notes', e.target.value)}
             />

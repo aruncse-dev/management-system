@@ -9,6 +9,8 @@ export const transactions = pgTable('transactions', {
   category: text('category'),
   type: text('type').notNull(),
   mode: text('mode'),
+  /** Transfer destination account/credit label (`mode` is the source). Legacy rows may leave this null and encode `→…` in `notes`. */
+  transferTo: text('transfer_to'),
   notes: text('notes'),
   monthYear: text('month_year').notNull(),
 })

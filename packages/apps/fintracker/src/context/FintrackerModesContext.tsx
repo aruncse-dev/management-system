@@ -19,6 +19,7 @@ export type FintrackerModesContextValue = {
   creditCardNames: string[]
   informalCreditNames: string[]
   paymentModeOptions: string[]
+  /** Transfer “to” dropdown — same as payment modes so any account or credit can receive a transfer. */
   transferTargetOptions: string[]
 }
 
@@ -113,7 +114,7 @@ export function FintrackerModesProvider({ children }: { children: ReactNode }) {
       creditCardNames,
       informalCreditNames,
       paymentModeOptions,
-      transferTargetOptions: monthlyAccountNames,
+      transferTargetOptions: paymentModeOptions,
     }),
     [
       loading,

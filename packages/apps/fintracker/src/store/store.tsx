@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useEffect, useReducer } from 'react';
 import { AppState, Transaction, Budget, OpeningBal, MonthRef } from '../types';
 import { dateKey, currentMonthYear } from './utils';
-import { coerceBudget } from '../utils';
+import { coerceBudget, transactionTransferDestination } from '../utils';
 import { TXN_PAGE } from './constants';
 import { loadInitDataDeduped } from '../api';
+import { DEFAULT_FINTRACKER_PREFS } from '../expenseCycle';
 
 const BUDGET_LS_KEY = 'ft_fintracker_budget_v1';
 
@@ -26,13 +27,15 @@ type Action =
   | { type: 'SET_FILTER'; payload: string }
   | { type: 'SET_CAT_FILTER'; payload: string }
   | { type: 'SET_TXN_PAGE'; payload: number }
-  | { type: 'SET_SEARCH'; payload: string };
+  | { type: 'SET_SEARCH'; payload: string }
+  | { type: 'SET_FINTRACKER'; payload: AppState['fintracker'] };
 
 const { month, year } = currentMonthYear();
 
 const initial: AppState = {
   month, year, rows: [], budget: [], openingBal: {},
-  months: [], loading: true, txnPage: 1, filter: 'All', catFilter: '', search: '',
+  months: [], fintracker: { ...DEFAULT_FINTRACKER_PREFS, expenseCycle: { ...DEFAULT_FINTRACKER_PREFS.expenseCycle } },
+  loading: true, txnPage: 1, filter: 'All', catFilter: '', search: '',
 };
 
 function reducer(state: AppState, action: Action): AppState {
@@ -57,6 +60,7 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, budget };
     }
     case 'SET_OPENING_BAL': return { ...state, openingBal: action.payload };
+    case 'SET_FINTRACKER': return { ...state, fintracker: action.payload };
     case 'SET_FILTER':      return { ...state, filter: action.payload, catFilter: '', txnPage: 1 };
     case 'SET_CAT_FILTER':  return { ...state, catFilter: action.payload, filter: 'All', txnPage: 1 };
     case 'SET_TXN_PAGE':    return { ...state, txnPage: action.payload };
@@ -69,6 +73,13 @@ const Ctx = createContext<{ state: AppState; dispatch: React.Dispatch<Action> } 
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initial);
+  const [prefsTick, setPrefsTick] = React.useState(0);
+
+  React.useEffect(() => {
+    const bump = () => setPrefsTick((n) => n + 1);
+    window.addEventListener('fintracker:prefs', bump);
+    return () => window.removeEventListener('fintracker:prefs', bump);
+  }, []);
 
   useEffect(() => {
     void loadInitDataDeduped(state.month, state.year)
@@ -76,11 +87,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         dispatch({ type: 'SET_MONTHS', payload: init.months });
         dispatch({ type: 'SET_BUDGET', payload: init.budget });
         dispatch({ type: 'SET_OPENING_BAL', payload: init.openingBal });
+        dispatch({ type: 'SET_FINTRACKER', payload: init.fintracker });
       })
       .catch(() => {
         /* auth / network — pages may show their own errors */
       });
-  }, [state.month, state.year]);
+  }, [state.month, state.year, prefsTick]);
 
   return <Ctx.Provider value={{ state, dispatch }}>{children}</Ctx.Provider>;
 }
@@ -94,11 +106,24 @@ export function useStore() {
 export function usePage() {
   const { state } = useStore();
   const { rows, filter, catFilter, search } = state;
-  let all = filter === 'All' ? rows : rows.filter(r => r.m === filter || r.t === filter);
+  let all = filter === 'All' ? rows : rows.filter(r => {
+    if (r.m === filter || r.t === filter) return true
+    if (r.t === 'Transfer' && transactionTransferDestination(r) === filter) return true
+    return false
+  })
   if (catFilter) all = all.filter(r => r.c === catFilter);
   if (search) {
     const q = search.toLowerCase();
-    all = all.filter(r => r.desc.toLowerCase().includes(q) || r.c.toLowerCase().includes(q) || r.m.toLowerCase().includes(q) || r.notes.toLowerCase().includes(q));
+    all = all.filter(r => {
+      const dest = r.t === 'Transfer' ? transactionTransferDestination(r) : ''
+      return (
+        r.desc.toLowerCase().includes(q) ||
+        r.c.toLowerCase().includes(q) ||
+        r.m.toLowerCase().includes(q) ||
+        r.notes.toLowerCase().includes(q) ||
+        dest.toLowerCase().includes(q)
+      )
+    });
   }
   const total = all.length;
   const shown = Math.min(state.txnPage * TXN_PAGE, total);

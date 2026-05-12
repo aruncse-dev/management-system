@@ -22,28 +22,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === 'PUT') {
     const body = typeof req.body === 'object' && req.body !== null ? req.body : {}
-    await db
-      .update(users)
-      .set({
-        displayName:
-          typeof (body as { displayName?: unknown }).displayName === 'string'
-            ? (body as { displayName: string }).displayName
-            : undefined,
-        orgId:
-          typeof (body as { orgId?: unknown }).orgId === 'string'
-            ? (body as { orgId: string }).orgId
-            : undefined,
-        status:
-          typeof (body as { status?: unknown }).status === 'string'
-            ? (body as { status: string }).status
-            : undefined,
-        useDb:
-          typeof (body as { useDb?: unknown }).useDb === 'boolean'
-            ? (body as { useDb: boolean }).useDb
-            : undefined,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.email, targetEmail))
+    const updates: Record<string, unknown> = {}
+
+    if (typeof (body as { displayName?: unknown }).displayName === 'string') {
+      updates.displayName = (body as { displayName: string }).displayName
+    }
+    if (typeof (body as { status?: unknown }).status === 'string') {
+      updates.status = (body as { status: string }).status
+    }
+    if (typeof (body as { role?: unknown }).role === 'string') {
+      const r = (body as { role: string }).role
+      if (['member', 'org_admin', 'admin'].includes(r)) updates.role = r
+    }
+    if (typeof (body as { useDb?: unknown }).useDb === 'boolean') {
+      updates.useDb = (body as { useDb: boolean }).useDb
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ ok: false, error: 'No valid fields to update' })
+    }
+
+    const patch: {
+      displayName?: string
+      status?: string
+      role?: string
+      useDb?: boolean
+      updatedAt: Date
+    } = { updatedAt: new Date() }
+    if (updates.displayName !== undefined) patch.displayName = updates.displayName as string
+    if (updates.status !== undefined) patch.status = updates.status as string
+    if (updates.role !== undefined) patch.role = updates.role as string
+    if (updates.useDb !== undefined) patch.useDb = updates.useDb as boolean
+
+    await db.update(users).set(patch).where(eq(users.email, targetEmail))
     return res.status(200).json({ ok: true })
   }
 

@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { eq } from 'drizzle-orm'
-import { getDb, organizations, users } from '@fintracker-vault/db'
+import { and, eq } from 'drizzle-orm'
+import { getDb, organizations, orgMembers, users } from '@fintracker-vault/db'
 import { requirePlatformAdmin } from '../../../../../lib/adminGuard'
 import { ensureUserRow } from '../../../../../lib/dbAuth'
 
@@ -19,12 +19,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === 'GET') {
     const rows = await db
       .select({
-        email: users.email,
+        id: orgMembers.id,
+        email: orgMembers.userEmail,
         displayName: users.displayName,
-        role: users.role,
+        role: orgMembers.role,
       })
-      .from(users)
-      .where(eq(users.orgId, orgId))
+      .from(orgMembers)
+      .leftJoin(users, eq(orgMembers.userEmail, users.email))
+      .where(eq(orgMembers.orgId, orgId))
 
     return res.status(200).json({ ok: true, data: rows })
   }
@@ -40,7 +42,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const roleRaw = typeof (body as { role?: unknown }).role === 'string' ? (body as { role: string }).role : 'member'
-    const role = roleRaw === 'org_admin' ? 'org_admin' : 'member'
+    const roleInOrg = roleRaw === 'org_admin' ? 'admin' : 'member'
     const displayName =
       typeof (body as { displayName?: unknown }).displayName === 'string'
         ? (body as { displayName: string }).displayName.trim()
@@ -48,18 +50,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     await ensureUserRow(email, displayName)
 
-    try {
-      await db
-        .update(users)
-        .set({ orgId, role })
-        .where(eq(users.email, email))
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : ''
-      if (msg.includes('unique') || msg.includes('duplicate')) {
-        return res.status(409).json({ ok: false, error: 'User is already in this organization' })
-      }
-      throw e
+    const [dup] = await db
+      .select({ id: orgMembers.id })
+      .from(orgMembers)
+      .where(and(eq(orgMembers.orgId, orgId), eq(orgMembers.userEmail, email)))
+      .limit(1)
+    if (dup) {
+      return res.status(409).json({ ok: false, error: 'User is already in this organization' })
     }
+
+    const id = crypto.randomUUID()
+    await db.insert(orgMembers).values({ id, orgId, userEmail: email, role: roleInOrg })
 
     return res.status(201).json({ ok: true })
   }

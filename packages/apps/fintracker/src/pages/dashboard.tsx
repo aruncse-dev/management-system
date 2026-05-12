@@ -9,7 +9,13 @@ import { BalanceRow, KpiCard, LoadingState, SectionBlock, UiCard } from '../ui'
 export default function Dashboard() {
   const { state } = useStore()
   const { rows, budget, openingBal } = state
-  const { monthlyAccountNames, creditCardNames, informalCreditNames, loading: modesLoading } = useFintrackerModes()
+  const {
+    monthlyAccountNames,
+    creditCardNames,
+    informalCreditNames,
+    paymentModeOptions,
+    loading: modesLoading,
+  } = useFintrackerModes()
 
   const allCreditModes = useMemo(
     () => [...creditCardNames, ...informalCreditNames],
@@ -22,7 +28,7 @@ export default function Dashboard() {
   const exp = sumType(rows, 'Expense') + sumType(rows, 'Savings')
   const cc = sumCC(rows, creditCardNames)
   const ocr = sumOtherCr(rows, informalCreditNames)
-  const flows = acctFlows(rows, openingBal, monthlyAccountNames)
+  const flows = acctFlows(rows, openingBal, monthlyAccountNames, paymentModeOptions)
   const totalSavings = monthlyAccountNames.reduce((s, a) => s + (flows[a]?.current || 0), 0)
   const surplus = inc - exp
   const totalOutstanding = rows.filter(r => allCreditModes.includes(r.m)).reduce((s, r) => s + r.a, 0)

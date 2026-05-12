@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback, type FormEvent, type ReactNode } from 'react';
 import { useRouter } from 'next/router';
-import { Loader2, Link2, Unlink2, SlidersHorizontal, RotateCcw, User, Building2, Wallet, CreditCard, Plus, Users } from 'lucide-react';
+import { Loader2, Link2, Unlink2, SlidersHorizontal, User, Wallet, CreditCard, Plus, Users, Banknote, Landmark, PiggyBank, CalendarRange } from 'lucide-react';
 import { api, type AccountRow, type AccountUsedFor, type CreditSourceCategory, type CreditSourceRow, type ProfileData } from '../api';
 import { THEME_COLORS } from '../config';
 import { LoadingState, SectionBlock, SectionChip, FormField, Spacer, SettingsSectionCard, TransactionCard, UiCard, type SettingField } from '../ui';
 import { useFintrackerModes } from '../context/FintrackerModesContext';
+import type { FintrackerPrefs } from '../expenseCycle';
+import { DEFAULT_FINTRACKER_PREFS, cycleDateRange, cycleSubtitle } from '../expenseCycle';
 
 type SettingsNavTab = 'general' | 'accounts' | 'credits';
 
@@ -14,6 +16,15 @@ interface SettingsSection {
   description: string;
   icon: ReactNode;
   fields: SettingField[];
+}
+
+/** Account row icon from name (case-insensitive); credits use fixed icons. */
+function accountNameIcon(name: string) {
+  const s = name.toLowerCase()
+  if (s.includes('cash')) return <Banknote size={14} aria-hidden />
+  if (s.includes('bank')) return <Landmark size={14} aria-hidden />
+  if (s.includes('wallet')) return <Wallet size={14} aria-hidden />
+  return <PiggyBank size={14} aria-hidden />
 }
 
 const SETTINGS_SECTIONS: SettingsSection[] = [
@@ -68,8 +79,12 @@ export default function Settings() {
   }>({ hasToken: false });
   const [upstoxStatusState, setUpstoxStatusState] = useState<'checking' | 'connected' | 'missing' | 'expired'>('checking');
   const [upstoxBusy, setUpstoxBusy] = useState(false);
-  const [resetBusy, setResetBusy] = useState(false);
   const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [fintrackerDraft, setFintrackerDraft] = useState<FintrackerPrefs>(() => ({
+    expenseCycle: { ...DEFAULT_FINTRACKER_PREFS.expenseCycle },
+  }));
+  const [fintrackerJson, setFintrackerJson] = useState('');
+  const [fintrackerSaving, setFintrackerSaving] = useState(false);
 
   const validateLiveStatus = useCallback(async (forceRefresh = false) => {
     setLoading(true);
@@ -90,6 +105,22 @@ export default function Settings() {
           });
         });
         loaded.usdToInr = settingsResult.value.usdToInr !== undefined ? String(settingsResult.value.usdToInr) : '';
+        const ft = settingsResult.value.fintracker;
+        if (ft && typeof ft === 'object' && ft.expenseCycle) {
+          setFintrackerDraft({
+            expenseCycle: {
+              mode: ft.expenseCycle.mode === 'custom' ? 'custom' : 'regular',
+              anchorDay: Math.min(31, Math.max(2, Math.floor(Number(ft.expenseCycle.anchorDay)) || 19)),
+            },
+          });
+        } else {
+          setFintrackerDraft({ expenseCycle: { ...DEFAULT_FINTRACKER_PREFS.expenseCycle } });
+        }
+        setFintrackerJson(
+          typeof settingsResult.value.fintrackerJson === 'string'
+            ? settingsResult.value.fintrackerJson
+            : JSON.stringify(ft ?? DEFAULT_FINTRACKER_PREFS),
+        );
       }
       setSettings(loaded);
       if (profileResult.status === 'fulfilled') {
@@ -139,6 +170,20 @@ export default function Settings() {
     }
   }
 
+  async function saveFintrackerPrefs() {
+    setFintrackerSaving(true);
+    setError('');
+    try {
+      await api.saveSettings({ fintracker: fintrackerDraft });
+      window.dispatchEvent(new Event('fintracker:prefs'));
+      await validateLiveStatus(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Save failed');
+    } finally {
+      setFintrackerSaving(false);
+    }
+  }
+
   function startEdit(key: string) {
     setEditingKey(key);
     setEditValue(settings[key] || '');
@@ -168,19 +213,6 @@ export default function Settings() {
       setError(e instanceof Error ? e.message : 'Failed to clear Upstox token');
     } finally {
       setUpstoxBusy(false);
-    }
-  }
-
-  async function resetBudgetDefaults() {
-    if (!window.confirm('Reset all budget amounts to default values?')) return;
-    setResetBusy(true);
-    setError('');
-    try {
-      await api.resetBudget();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to reset budgets');
-    } finally {
-      setResetBusy(false);
     }
   }
 
@@ -306,13 +338,6 @@ export default function Settings() {
     setCrDelConfirm(false);
   }
 
-  function accountScopeLabel(u: string) {
-    if (u === 'both') return 'Savings + Monthly';
-    if (u === 'savings') return 'Savings';
-    if (u === 'monthly') return 'Monthly';
-    return u;
-  }
-
   return (
     <div className="ui-kit-page-shell savings-page">
       <nav className="bottom-nav" aria-label="Settings sections">
@@ -345,6 +370,112 @@ export default function Settings() {
       <div className="pg savings-page">
         {settingsTab === 'general' && (
           <>
+            {profile ? (
+              <div className="txn-cards">
+                <TransactionCard
+                  asStatic
+                  tone="navy"
+                  icon={<User size={14} aria-hidden />}
+                  title={(profile.displayName && profile.displayName.trim()) || profile.email}
+                  amount={profile.displayName?.trim() ? profile.email : '\u00a0'}
+                  amountLabel="Email"
+                  type={
+                    profile.activeOrgId
+                      ? profile.orgs.find((o) => o.id === profile.activeOrgId)?.name ?? 'Unknown org'
+                      : '—'
+                  }
+                  typeLabel="Organization"
+                  date={profile.orgs.length ? `${profile.orgs.length} linked` : '—'}
+                  dateLabel="Orgs"
+                />
+              </div>
+            ) : null}
+
+            {loading && (
+              <>
+                {profile ? <Spacer size={6} /> : null}
+                <LoadingState variant="section" />
+              </>
+            )}
+
+            {!loading && (
+              <SectionBlock title="Expense period" icon={<CalendarRange size={14} />}>
+                <div className="ui-stack" style={{ gap: 12 }}>
+                  <FormField label="Cycle">
+                    <select
+                      className="form-inp"
+                      value={fintrackerDraft.expenseCycle.mode}
+                      onChange={(e) =>
+                        setFintrackerDraft((prev) => ({
+                          ...prev,
+                          expenseCycle: {
+                            ...prev.expenseCycle,
+                            mode: e.target.value === 'custom' ? 'custom' : 'regular',
+                          },
+                        }))
+                      }
+                    >
+                      <option value="regular">Regular (calendar month)</option>
+                      <option value="custom">Custom (prev month anchor → this month anchor − 1)</option>
+                    </select>
+                  </FormField>
+                  {fintrackerDraft.expenseCycle.mode === 'custom' ? (
+                    <FormField label="Anchor day (cycle starts this day of previous month)">
+                      <input
+                        className="form-inp"
+                        type="number"
+                        min={2}
+                        max={31}
+                        value={fintrackerDraft.expenseCycle.anchorDay}
+                        onChange={(e) =>
+                          setFintrackerDraft((prev) => ({
+                            ...prev,
+                            expenseCycle: {
+                              ...prev.expenseCycle,
+                              anchorDay: Math.min(
+                                31,
+                                Math.max(2, parseInt(e.target.value || '19', 10) || 19),
+                              ),
+                            },
+                          }))
+                        }
+                      />
+                    </FormField>
+                  ) : null}
+                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                    Example (May 2026):{' '}
+                    <strong style={{ color: 'var(--text)' }}>{cycleSubtitle('May', '2026', fintrackerDraft)}</strong>
+                    {' · '}
+                    {(() => {
+                      try {
+                        const r = cycleDateRange('May', '2026', fintrackerDraft)
+                        return `${r.start} → ${r.end}`
+                      } catch {
+                        return ''
+                      }
+                    })()}
+                  </div>
+                  <details style={{ fontSize: 12, color: 'var(--muted)' }}>
+                    <summary style={{ cursor: 'pointer', marginBottom: 6 }}>
+                      Stored JSON (<code>settings.fintracker</code>)
+                    </summary>
+                    <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 11, margin: 0 }}>{fintrackerJson}</pre>
+                  </details>
+                  <button
+                    type="button"
+                    className="ui-kit-btn ui-kit-btn--solid ui-kit-btn-inline settings-action-btn"
+                    onClick={() => void saveFintrackerPrefs()}
+                    disabled={fintrackerSaving}
+                  >
+                    {fintrackerSaving ? <Loader2 size={14} className="spin-icon" /> : null}
+                    Save expense period
+                  </button>
+                </div>
+              </SectionBlock>
+            )}
+
+            <Spacer size={6} />
+
             <SectionBlock
               title="Upstox"
               icon={<Link2 size={14} />}
@@ -365,34 +496,6 @@ export default function Settings() {
             </SectionBlock>
 
             <Spacer size={6} />
-
-            {!loading && profile && (
-              <SectionBlock title="Profile" icon={<User size={14} />}>
-                <div className="ui-stack">
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', marginBottom: 4 }}>Name</div>
-                    <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>
-                      {(profile.displayName && profile.displayName.trim()) || profile.email}
-                    </div>
-                    {profile.displayName?.trim() ? (
-                      <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>{profile.email}</div>
-                    ) : null}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <Building2 size={14} aria-hidden />
-                      Organization
-                    </div>
-                    <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>
-                      {profile.activeOrgId
-                        ? profile.orgs.find(o => o.id === profile.activeOrgId)?.name ?? 'Unknown org'
-                        : '—'}
-                    </div>
-                  </div>
-                </div>
-              </SectionBlock>
-            )}
-            {loading && <LoadingState variant="section" />}
 
             {!loading && SETTINGS_SECTIONS.map((section, idx) => (
               <div key={section.key}>
@@ -443,16 +546,6 @@ export default function Settings() {
                     </div>
                   </div>
                 </SectionBlock>
-
-                <Spacer size={6} />
-                <SectionBlock title="Actions" icon={<RotateCcw size={14} />}>
-                  <div className="settings-actions">
-                    <button className="ui-kit-btn ui-kit-btn--soft ui-kit-btn-inline settings-action-btn" onClick={resetBudgetDefaults} disabled={resetBusy}>
-                      {resetBusy ? <Loader2 size={14} className="spin-icon" /> : <RotateCcw size={14} />}
-                      Reset Budgets
-                    </button>
-                  </div>
-                </SectionBlock>
               </>
             )}
           </>
@@ -469,26 +562,14 @@ export default function Settings() {
                 {dbAccounts.map(a => (
                   <TransactionCard
                     key={a.id}
-                    title={
-                      <span>
-                        {a.name}
-                        {a.description ? (
-                          <span style={{ display: 'block', fontSize: 12, fontWeight: 400, color: 'var(--muted)', marginTop: 4 }}>{a.description}</span>
-                        ) : null}
-                      </span>
-                    }
-                    amount="—"
-                    type={accountScopeLabel(a.usedFor)}
-                    date="Tap to edit"
+                    compact
+                    title={a.name}
                     tone="navy"
-                    icon={<Wallet size={14} />}
+                    icon={accountNameIcon(a.name)}
                     onClick={() => {
                       startEditAccount(a);
                       setAccountModalOpen(true);
                     }}
-                    amountLabel=" "
-                    typeLabel="Scope"
-                    dateLabel=" "
                   />
                 ))}
               </div>
@@ -508,26 +589,14 @@ export default function Settings() {
                   {dbCredits.filter(c => c.category === 'credit_card').map(c => (
                     <TransactionCard
                       key={c.id}
-                      title={
-                        <span>
-                          {c.name}
-                          {c.description ? (
-                            <span style={{ display: 'block', fontSize: 12, fontWeight: 400, color: 'var(--muted)', marginTop: 4 }}>{c.description}</span>
-                          ) : null}
-                        </span>
-                      }
-                      amount="—"
-                      type="Credit card"
-                      date="Tap to edit"
+                      compact
+                      title={c.name}
                       tone="red"
                       icon={<CreditCard size={14} />}
                       onClick={() => {
                         startEditCredit(c);
                         setCreditModalOpen(true);
                       }}
-                      amountLabel="Balance"
-                      typeLabel="Category"
-                      dateLabel=" "
                     />
                   ))}
                 </div>
@@ -546,26 +615,14 @@ export default function Settings() {
                   {dbCredits.filter(c => c.category === 'informal').map(c => (
                     <TransactionCard
                       key={c.id}
-                      title={
-                        <span>
-                          {c.name}
-                          {c.description ? (
-                            <span style={{ display: 'block', fontSize: 12, fontWeight: 400, color: 'var(--muted)', marginTop: 4 }}>{c.description}</span>
-                          ) : null}
-                        </span>
-                      }
-                      amount="—"
-                      type="Informal"
-                      date="Tap to edit"
+                      compact
+                      title={c.name}
                       tone="amber"
                       icon={<Users size={14} />}
                       onClick={() => {
                         startEditCredit(c);
                         setCreditModalOpen(true);
                       }}
-                      amountLabel="Balance"
-                      typeLabel="Category"
-                      dateLabel=" "
                     />
                   ))}
                 </div>
@@ -665,8 +722,8 @@ export default function Settings() {
                   </FormField>
                   <FormField label="Used for">
                     <select className="form-sel" value={acctUsed} onChange={e => setAcctUsed(e.target.value as AccountUsedFor)}>
-                      <option value="savings">Savings only</option>
-                      <option value="monthly">Monthly expenses only</option>
+                      <option value="savings">Savings</option>
+                      <option value="monthly">Monthly expenses</option>
                       <option value="both">Both</option>
                     </select>
                   </FormField>

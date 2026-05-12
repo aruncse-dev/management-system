@@ -1,32 +1,24 @@
 import Head from 'next/head'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Users, Search, X as XIcon } from 'lucide-react'
+import { UserCog, Search, X as XIcon } from 'lucide-react'
 import { FabButton, FormField, LoadingState, SearchField, SectionChip, SectionBlock, Spacer } from '@fintracker-vault/ui'
 
 type UserRow = {
   email: string
   displayName: string | null
-  role: string
-  orgId: string | null
   status: string
   createdAt: string
 }
 
-type OrgRow = {
-  id: string
-  name: string
-}
-
 export default function AdminUsersPage() {
   const [rows, setRows] = useState<UserRow[]>([])
-  const [orgs, setOrgs] = useState<OrgRow[]>([])
   const [q, setQ] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   const [mode, setMode] = useState<'add' | 'edit' | null>(null)
   const [editingEmail, setEditingEmail] = useState('')
-  const [form, setForm] = useState({ email: '', displayName: '', orgId: '' })
+  const [form, setForm] = useState({ email: '', displayName: '', status: 'active' })
   const [saving, setSaving] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
 
@@ -37,12 +29,15 @@ export default function AdminUsersPage() {
       const uRes = await fetch('/api/admin/users', { credentials: 'same-origin' })
       const uJson = await uRes.json()
       if (!uJson.ok) throw new Error(uJson.error || 'Failed to load users')
-      setRows((uJson.data || []) as UserRow[])
-
-      const oRes = await fetch('/api/admin/orgs', { credentials: 'same-origin' })
-      const oJson = await oRes.json()
-      if (!oJson.ok) throw new Error(oJson.error || 'Failed to load organizations')
-      setOrgs((oJson.data || []) as OrgRow[])
+      const raw = (uJson.data || []) as Record<string, unknown>[]
+      setRows(
+        raw.map(r => ({
+          email: String(r.email),
+          displayName: r.displayName != null ? String(r.displayName) : null,
+          status: String(r.status ?? 'active'),
+          createdAt: String(r.createdAt ?? ''),
+        })),
+      )
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load')
     } finally {
@@ -54,12 +49,6 @@ export default function AdminUsersPage() {
     void load()
   }, [load])
 
-  const orgNameById = useMemo(() => {
-    const map: Record<string, string> = {}
-    for (const o of orgs) map[o.id] = o.name
-    return map
-  }, [orgs])
-
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase()
     if (!term) return rows
@@ -67,14 +56,14 @@ export default function AdminUsersPage() {
       u =>
         u.email.toLowerCase().includes(term) ||
         (u.displayName || '').toLowerCase().includes(term) ||
-        (u.orgId ? orgNameById[u.orgId] || '' : '').toLowerCase().includes(term),
+        u.status.toLowerCase().includes(term),
     )
-  }, [rows, q, orgNameById])
+  }, [rows, q])
 
   function startAdd() {
     setMode('add')
     setEditingEmail('')
-    setForm({ email: '', displayName: '', orgId: '' })
+    setForm({ email: '', displayName: '', status: 'active' })
     setDeleteConfirm(false)
   }
 
@@ -83,43 +72,57 @@ export default function AdminUsersPage() {
     if (!user) return
     setMode('edit')
     setEditingEmail(email)
-    setForm({ email: user.email, displayName: user.displayName || '', orgId: user.orgId || '' })
+    setForm({
+      email: user.email,
+      displayName: user.displayName || '',
+      status: user.status || 'active',
+    })
     setDeleteConfirm(false)
   }
 
   function closeForm() {
     setMode(null)
     setEditingEmail('')
-    setForm({ email: '', displayName: '', orgId: '' })
+    setForm({ email: '', displayName: '', status: 'active' })
     setDeleteConfirm(false)
   }
 
-  async function save(e: FormEvent) {
-    e.preventDefault()
+  async function submitUser(e?: FormEvent) {
+    e?.preventDefault()
     if (!form.email.trim()) {
       setError('Email is required')
-      return
-    }
-    if (!form.orgId) {
-      setError('Organization is required')
       return
     }
 
     setSaving(true)
     setError('')
     try {
-      const r = await fetch('/api/admin/users', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: form.email.trim().toLowerCase(),
-          displayName: form.displayName.trim() || form.email.split('@')[0],
-          orgId: form.orgId,
-        }),
-      })
-      const j = await r.json()
-      if (!j.ok) throw new Error(j.error || 'Save failed')
+      if (mode === 'add') {
+        const r = await fetch('/api/admin/users', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: form.email.trim().toLowerCase(),
+            displayName: form.displayName.trim() || form.email.split('@')[0],
+            status: form.status,
+          }),
+        })
+        const j = await r.json()
+        if (!j.ok) throw new Error(j.error || 'Save failed')
+      } else {
+        const r = await fetch(`/api/admin/users/${encodeURIComponent(editingEmail)}`, {
+          method: 'PUT',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            displayName: form.displayName.trim() || form.email.split('@')[0],
+            status: form.status,
+          }),
+        })
+        const j = await r.json()
+        if (!j.ok) throw new Error(j.error || 'Save failed')
+      }
       await load()
       closeForm()
     } catch (e) {
@@ -160,23 +163,23 @@ export default function AdminUsersPage() {
   return (
     <>
       <Head>
-        <title>Users · Admin</title>
+        <title>Admin users · Admin</title>
       </Head>
       <div className="admin-page" style={{ paddingTop: 0 }}>
         <div>
-          {error && <p style={{ color: '#b91c1c', marginBottom: '1rem', fontSize: '0.9rem', marginTop: '1rem' }}>⚠ {error}</p>}
+          {error ? <p className="admin-error">⚠ {error}</p> : null}
 
           <SectionBlock
-            title="Users"
-            icon={<Users size={16} />}
+            title="Admin users"
+            icon={<UserCog size={16} />}
             rightChip={<SectionChip>{rows.length}</SectionChip>}
           >
             <div>
-              {rows.length > 5 && (
+              {rows.length > 0 && (
                 <>
                   <SearchField
                     value={q}
-                    placeholder="Search users..."
+                    placeholder="Search by email, name, or status…"
                     onChange={setQ}
                     onClear={() => setQ('')}
                     prefix={<Search size={15} />}
@@ -204,7 +207,7 @@ export default function AdminUsersPage() {
                       key={u.email}
                       role="button"
                       tabIndex={0}
-                      className="admin-card-item"
+                      className="admin-card-item admin-menu-item-card"
                       onClick={() => startEdit(u.email)}
                       onKeyDown={e => {
                         if (e.key === 'Enter' || e.key === ' ') {
@@ -214,9 +217,11 @@ export default function AdminUsersPage() {
                       }}
                     >
                       <div className="admin-card-item__body">
-                        <p className="admin-card-item__title">{u.displayName || u.email}</p>
+                        <p className="admin-card-item__title">{u.displayName?.trim() || u.email}</p>
                         <p className="admin-card-item__meta">
-                          {u.email} • {u.orgId ? orgNameById[u.orgId] || 'Unknown org' : 'Unassigned'}
+                          {u.email}
+                          <span className="admin-muted"> · </span>
+                          <span>{u.status}</span>
                         </p>
                       </div>
                     </div>
@@ -228,97 +233,68 @@ export default function AdminUsersPage() {
         </div>
       </div>
 
-      <FabButton label="Add user" onClick={startAdd} />
+      <FabButton label="Add admin user" onClick={startAdd} />
 
       {mode && (
         <div className="modal-bg open" onClick={closeForm}>
           <div className="admin-modal-wrap" onClick={e => e.stopPropagation()}>
             <div className="modal modal-shell">
-            <div className="modal-hd modal-hd--blue">
-              <span className="modal-title">
-                {mode === 'add' ? 'Add User' : 'Edit User'}
-              </span>
-              <button
-                type="button"
-                onClick={closeForm}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#fff',
-                  cursor: 'pointer',
-                  padding: '0.25rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                <XIcon size={18} />
-              </button>
-            </div>
-            <div className="modal-body">
-              <form onSubmit={save} className="admin-form">
-                <FormField label="Email">
-                  <input
-                    type="email"
-                    value={form.email}
-                    onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                    placeholder="user@example.com"
-                    autoFocus
-                    disabled={mode === 'edit'}
-                  />
-                </FormField>
-
-                <FormField label="Display Name">
-                  <input
-                    type="text"
-                    value={form.displayName}
-                    onChange={e => setForm(f => ({ ...f, displayName: e.target.value }))}
-                    placeholder="John Doe"
-                  />
-                </FormField>
-
-                <FormField label="Organization">
-                  <select
-                    className="form-sel"
-                    value={form.orgId}
-                    onChange={e => setForm(f => ({ ...f, orgId: e.target.value }))}
-                    required
-                  >
-                    <option value="" disabled>
-                      Select organization…
-                    </option>
-                    {orgs.map(o => (
-                      <option key={o.id} value={o.id}>
-                        {o.name}
-                      </option>
-                    ))}
-                  </select>
-                </FormField>
-              </form>
-            </div>
-            <div className="modal-foot">
-              {mode === 'edit' ? (
-                <button type="button" className="btn btn-sm btn-red" onClick={confirmDelete} disabled={saving}>
-                  {saving ? 'Deleting...' : deleteConfirm ? 'Confirm delete?' : 'Delete'}
+              <div className="modal-hd modal-hd--blue">
+                <span className="modal-title">{mode === 'add' ? 'Add admin user' : 'Edit admin user'}</span>
+                <button type="button" className="modal-close" onClick={closeForm} aria-label="Close">
+                  <XIcon size={18} />
                 </button>
-              ) : null}
-              <div className="modal-foot-l" />
-              <button
-                type="button"
-                className="btn btn-sm btn-cancel"
-                onClick={closeForm}
-                disabled={saving}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="btn btn-sm btn-green"
-                onClick={save}
-                disabled={saving}
-              >
-                {mode === 'add' ? 'Create' : 'Save'}
-              </button>
-            </div>
+              </div>
+              <div className="modal-body">
+                <form id="admin-user-form" onSubmit={submitUser} className="admin-form">
+                  <FormField label="Email">
+                    <input
+                      type="email"
+                      value={form.email}
+                      onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                      placeholder="user@example.com"
+                      autoFocus={mode === 'add'}
+                      disabled={mode === 'edit'}
+                      autoComplete="email"
+                    />
+                  </FormField>
+
+                  <FormField label="Display name">
+                    <input
+                      type="text"
+                      value={form.displayName}
+                      onChange={e => setForm(f => ({ ...f, displayName: e.target.value }))}
+                      placeholder="John Doe"
+                      autoComplete="name"
+                    />
+                  </FormField>
+
+                  <FormField label="Status">
+                    <select
+                      className="form-sel"
+                      value={form.status}
+                      onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
+                    >
+                      <option value="active">active</option>
+                      <option value="inactive">inactive</option>
+                    </select>
+                  </FormField>
+                </form>
+              </div>
+              <div className="modal-foot">
+                {mode === 'edit' ? (
+                  <button type="button" className="btn btn-sm btn-red" onClick={confirmDelete} disabled={saving}>
+                    {saving ? 'Deleting…' : deleteConfirm ? 'Tap again to confirm' : 'Delete user'}
+                  </button>
+                ) : null}
+                <div className="modal-foot-l" />
+                <button type="button" className="btn btn-sm btn-cancel" onClick={closeForm} disabled={saving}>
+                  Cancel
+                </button>
+                <button type="submit" form="admin-user-form" className="btn btn-sm btn-green" disabled={saving}>
+                  {saving ? 'Saving…' : mode === 'add' ? 'Create' : 'Save'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

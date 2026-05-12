@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { getIronSession } from 'iron-session'
 import { and, asc, eq, isNull } from 'drizzle-orm'
 import type { FtSessionData } from '@fintracker-vault/auth'
-import { accounts, getDb } from '@fintracker-vault/db'
+import { paymentSources, getDb } from '@fintracker-vault/db'
 import { dbApiErrorMessage } from '../../lib/dbApiErrorMessage'
 import { getSessionOptions } from '../../lib/session'
 
@@ -21,9 +21,12 @@ const USED_FOR = new Set(['savings', 'monthly', 'both'])
 
 async function ensureDefaultAccounts(db: ReturnType<typeof getDb>, orgId: string | null) {
   const existing = await db
-    .select({ id: accounts.id })
-    .from(accounts)
-    .where(orgId ? eq(accounts.orgId, orgId) : isNull(accounts.orgId))
+    .select({ id: paymentSources.id })
+    .from(paymentSources)
+    .where(and(
+      orgId ? eq(paymentSources.orgId, orgId) : isNull(paymentSources.orgId),
+      eq(paymentSources.sourceType, 'account')
+    ))
     .limit(1)
   if (existing.length > 0) return
 
@@ -33,11 +36,12 @@ async function ensureDefaultAccounts(db: ReturnType<typeof getDb>, orgId: string
     { name: 'Wallet', usedFor: 'both' as const, sortOrder: 2 },
   ]
   for (const row of defaults) {
-    await db.insert(accounts).values({
+    await db.insert(paymentSources).values({
       id: crypto.randomUUID(),
       orgId,
       name: row.name,
       description: null,
+      sourceType: 'account',
       usedFor: row.usedFor,
       isActive: true,
       sortOrder: row.sortOrder,
@@ -45,7 +49,7 @@ async function ensureDefaultAccounts(db: ReturnType<typeof getDb>, orgId: string
   }
 }
 
-function serializeAccount(row: typeof accounts.$inferSelect) {
+function serializeAccount(row: typeof paymentSources.$inferSelect) {
   return {
     id: row.id,
     name: row.name,
@@ -69,9 +73,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       await ensureDefaultAccounts(db, orgId)
       const rows = await db
         .select()
-        .from(accounts)
-        .where(orgId ? eq(accounts.orgId, orgId) : isNull(accounts.orgId))
-        .orderBy(asc(accounts.sortOrder), asc(accounts.name))
+        .from(paymentSources)
+        .where(and(
+          orgId ? eq(paymentSources.orgId, orgId) : isNull(paymentSources.orgId),
+          eq(paymentSources.sourceType, 'account')
+        ))
+        .orderBy(asc(paymentSources.sortOrder), asc(paymentSources.name))
       return ok(res, rows.map(serializeAccount))
     }
 
@@ -84,11 +91,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const description = body.description != null ? String(body.description) : null
       const sortOrder = typeof body.sortOrder === 'number' ? body.sortOrder : Number(body.sortOrder) || 0
       const id = crypto.randomUUID()
-      await db.insert(accounts).values({
+      await db.insert(paymentSources).values({
         id,
         orgId,
         name,
         description: description || null,
+        sourceType: 'account',
         usedFor,
         isActive: body.isActive === false ? false : true,
         sortOrder,
@@ -102,11 +110,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!id) return fail(res, 400, 'Missing id')
       const [prev] = await db
         .select()
-        .from(accounts)
+        .from(paymentSources)
         .where(
           and(
-            eq(accounts.id, id),
-            orgId ? eq(accounts.orgId, orgId) : isNull(accounts.orgId),
+            eq(paymentSources.id, id),
+            orgId ? eq(paymentSources.orgId, orgId) : isNull(paymentSources.orgId),
+            eq(paymentSources.sourceType, 'account')
           ),
         )
         .limit(1)
@@ -118,7 +127,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const description = body.description != null ? String(body.description) : null
       const sortOrder = typeof body.sortOrder === 'number' ? body.sortOrder : Number(body.sortOrder) || 0
       await db
-        .update(accounts)
+        .update(paymentSources)
         .set({
           name,
           description: description || null,
@@ -128,8 +137,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         })
         .where(
           and(
-            eq(accounts.id, id),
-            orgId ? eq(accounts.orgId, orgId) : isNull(accounts.orgId),
+            eq(paymentSources.id, id),
+            orgId ? eq(paymentSources.orgId, orgId) : isNull(paymentSources.orgId),
+            eq(paymentSources.sourceType, 'account')
           ),
         )
       return ok(res, { id })
@@ -139,11 +149,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const id = typeof req.query.id === 'string' ? req.query.id : ''
       if (!id) return fail(res, 400, 'Missing id')
       await db
-        .delete(accounts)
+        .delete(paymentSources)
         .where(
           and(
-            eq(accounts.id, id),
-            orgId ? eq(accounts.orgId, orgId) : isNull(accounts.orgId),
+            eq(paymentSources.id, id),
+            orgId ? eq(paymentSources.orgId, orgId) : isNull(paymentSources.orgId),
+            eq(paymentSources.sourceType, 'account')
           ),
         )
       return ok(res, true)

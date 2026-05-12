@@ -12,15 +12,9 @@ import Accounts from './accounts'
 import { MNS, BUDGET_GLOBAL_MONTH_KEY } from '../config'
 import { expenseCategoriesWithBudget, incomeCategoriesWithBudget, monthYearApiKey } from '../utils'
 import { useFintrackerModes } from '../context/FintrackerModesContext'
+import { cycleSubtitle } from '../expenseCycle'
 
 type TabId = 'dash' | 'txns' | 'bud' | 'cc' | 'acct'
-
-const CC_CYCLE_DAY = 19
-function cycleSubtitle(month: string) {
-  const mi = MNS.indexOf(month as typeof MNS[number])
-  const prevMi = mi === 0 ? 11 : mi - 1
-  return `${CC_CYCLE_DAY} ${MNS[prevMi]} – ${CC_CYCLE_DAY - 1} ${month}`
-}
 
 const TAB_Q: Record<TabId, string> = { dash: 'dash', txns: 'txns', bud: 'bud', cc: 'cc', acct: 'acct' }
 
@@ -103,7 +97,7 @@ export default function Monthly() {
       showStatus('⚠ Failed to connect to backend')
       dispatch({ type: 'SET_LOADING', payload: false })
     })
-  }, []) // eslint-disable-line
+  }, [state.month, state.year, state.fintracker, loadMonth, dispatch, showStatus])
 
   const expenseCategoryOptions = useMemo(
     () => expenseCategoriesWithBudget(state.budget),
@@ -122,8 +116,7 @@ export default function Monthly() {
     if (newIdx > 11) { newIdx = 0; newYear++ }
     const newMonth = MNS[newIdx]
     dispatch({ type: 'SET_MONTH', payload: { month: newMonth, year: String(newYear) } })
-    await loadMonth(newMonth, String(newYear))
-  }, [state.month, state.year, dispatch, loadMonth])
+  }, [state.month, state.year, dispatch])
 
   const addBudget = useCallback(async () => {
     const val = parseFloat(budgetVal)
@@ -161,7 +154,7 @@ export default function Monthly() {
           <button className="nav-arrow" onClick={() => changeMonth(-1)}><ChevronLeft size={16} /></button>
           <div className="nav-ml">
             {state.month} {state.year}
-            <div style={{ fontSize: 9, opacity: .65, fontWeight: 400 }}>{cycleSubtitle(state.month)}</div>
+            <div style={{ fontSize: 9, opacity: .65, fontWeight: 400 }}>{cycleSubtitle(state.month, state.year, state.fintracker)}</div>
           </div>
           <button className="nav-arrow" onClick={() => changeMonth(1)}><ChevronRight size={16} /></button>
         </div>
@@ -239,7 +232,7 @@ export default function Monthly() {
 
       {modalOpen && (
         <TransactionModal
-          key={`${editRow?.id ?? 'new'}-${paymentModeOptions.join('|')}`}
+          key={`${editRow?.id ?? 'new'}-${paymentModeOptions.join('|')}--${transferTargetOptions.join('|')}`}
           row={editRow}
           month={state.month} year={state.year}
           api={api}

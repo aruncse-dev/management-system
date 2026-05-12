@@ -1,9 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { and, desc, eq, isNull, ne, or } from 'drizzle-orm'
+import { and, between, desc, eq, isNull, ne, or } from 'drizzle-orm'
 import type { FtSessionData } from '@fintracker-vault/auth'
 import type { Transaction } from '../types'
 import { MNS } from '../config'
 import { currentMonthYear, isoDate } from '../utils'
+import { cycleDateRange, parseFintrackerPrefs } from '../expenseCycle'
 import {
   getDb,
   bankingRecords,
@@ -167,7 +168,20 @@ function readOpeningBal(settings: unknown): Record<string, number> {
   return out
 }
 
+function readTransferToFromBody(body: Record<string, unknown>, typeStr: string): string | null {
+  if (String(typeStr) !== 'Transfer') return null
+  const raw =
+    typeof body.transferTo === 'string'
+      ? body.transferTo
+      : typeof body.transfer_to === 'string'
+        ? body.transfer_to
+        : ''
+  const t = raw.trim()
+  return t.length ? t : null
+}
+
 function rowFromDb(r: typeof transactions.$inferSelect): Transaction {
+  const tt = r.transferTo?.trim()
   return {
     id: r.id,
     date: gasDateFromIso(String(r.date)),
@@ -177,6 +191,7 @@ function rowFromDb(r: typeof transactions.$inferSelect): Transaction {
     t: r.type as Transaction['t'],
     m: r.mode ?? '',
     notes: r.notes ?? '',
+    ...(tt ? { transferTo: tt } : {}),
   }
 }
 
@@ -205,7 +220,7 @@ async function computeMonths(db: ReturnType<typeof getDb>, scope: BudgetScope) {
   const txMonths = await db
     .select({ k: transactions.monthYear })
     .from(transactions)
-    .where(budgetRowsBaseWhere(scope))
+    .where(whereOrgFilter(transactions, scope))
     .groupBy(transactions.monthYear)
   const bMonths = await db
     .select({ k: budget.monthYear })
@@ -281,6 +296,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
       if (mod === 'settings' && action === 'get') {
         const u = await loadUserSettingsRow(db, em)
         const s = (u?.settings && typeof u.settings === 'object' ? u.settings : {}) as Record<string, string | number>
+        const fintracker = parseFintrackerPrefs(u?.settings ?? null)
         return ok(res, {
           goldRate: num(s.goldRate),
           usdToInr: s.usdToInr !== undefined ? num(s.usdToInr) : undefined,
@@ -288,6 +304,8 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
           emiSheetName: s.emiSheetName ? String(s.emiSheetName) : undefined,
           expensesSheetId: s.expensesSheetId ? String(s.expensesSheetId) : undefined,
           assetsSheetId: s.assetsSheetId ? String(s.assetsSheetId) : undefined,
+          fintracker,
+          fintrackerJson: JSON.stringify(fintracker),
         })
       }
 
@@ -666,12 +684,14 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
           budgetMonthKey = monthYearKey(c.month, c.year)
         }
         const bud = await loadMergedBudgetForMonth(db, budgetScope, budgetMonthKey)
+        const fintracker = parseFintrackerPrefs(u?.settings ?? null)
         return ok(
           res,
           {
             months,
             budget: bud,
             openingBal: readOpeningBal(u?.settings ?? null),
+            fintracker,
           },
           traceId,
         )
@@ -681,11 +701,19 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         const month = typeof req.query.month === 'string' ? req.query.month : ''
         const year = typeof req.query.year === 'string' ? req.query.year : ''
         if (!month || !year) return fail(res, 400, 'month and year are required', traceId)
-        const my = monthYearKey(month, year)
+        const u = await loadUserSettingsRow(db, em)
+        const prefs = parseFintrackerPrefs(u?.settings ?? null)
+        let start: string
+        let end: string
+        try {
+          ;({ start, end } = cycleDateRange(month, year, prefs))
+        } catch {
+          return fail(res, 400, 'Invalid month or year', traceId)
+        }
         const rows = await db
           .select()
           .from(transactions)
-          .where(and(whereOrgFilter(transactions, budgetScope), eq(transactions.monthYear, my)))
+          .where(and(whereOrgFilter(transactions, budgetScope), between(transactions.date, start, end)))
           .orderBy(desc(transactions.date))
         return ok(res, rows.map(rowFromDb), traceId)
       }
@@ -699,9 +727,18 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
       const mod = typeof body.module === 'string' ? body.module : ''
 
       if (mod === 'settings' && action === 'save') {
+        const u = await loadUserSettingsRow(db, em)
+        const prev = (u?.settings && typeof u.settings === 'object' ? u.settings : {}) as Record<string, unknown>
         const patch: Record<string, unknown> = {}
         for (const k of ['goldRate', 'usdToInr', 'loansSpreadsheetId', 'emiSheetName', 'expensesSheetId', 'assetsSheetId']) {
           if (body[k] !== undefined) patch[k] = body[k]
+        }
+        if (body.fintracker !== undefined && body.fintracker !== null && typeof body.fintracker === 'object') {
+          const prevFt =
+            prev.fintracker && typeof prev.fintracker === 'object' && !Array.isArray(prev.fintracker)
+              ? (prev.fintracker as Record<string, unknown>)
+              : {}
+          patch.fintracker = { ...prevFt, ...(body.fintracker as Record<string, unknown>) }
         }
         await mergeUserSettings(db, em, patch)
         return ok(res, true, traceId)
@@ -1367,6 +1404,8 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         const id = crypto.randomUUID()
         const iso = isoDate(dateUi)
         if (!iso) return fail(res, 400, 'Invalid date', traceId)
+        const typeStr = String(body.t ?? 'Expense')
+        const xferTo = readTransferToFromBody(body, typeStr)
         await db.insert(transactions).values({
           id,
           orgId: orgId,
@@ -1374,8 +1413,9 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
           description: String(body.desc ?? ''),
           amount: String(num(body.a as string | number)),
           category: String(body.c ?? ''),
-          type: String(body.t ?? 'Expense'),
+          type: typeStr,
           mode: String(body.m ?? ''),
+          transferTo: xferTo,
           notes: typeof body.notes === 'string' ? body.notes : '',
           monthYear: my,
         })
@@ -1391,6 +1431,8 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         const my = monthYearKey(month, year)
         const iso = isoDate(dateUi)
         if (!iso) return fail(res, 400, 'Invalid date', traceId)
+        const typeStr = String(body.t ?? 'Expense')
+        const xferTo = readTransferToFromBody(body, typeStr)
         await db
           .update(transactions)
           .set({
@@ -1398,8 +1440,9 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
             description: String(body.desc ?? ''),
             amount: String(num(body.a as string | number)),
             category: String(body.c ?? ''),
-            type: String(body.t ?? 'Expense'),
+            type: typeStr,
             mode: String(body.m ?? ''),
+            transferTo: xferTo,
             notes: typeof body.notes === 'string' ? body.notes : '',
             monthYear: my,
           })
@@ -1424,13 +1467,6 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
 
       if (action === 'ensureMonth') {
         return ok(res, true, traceId)
-      }
-
-      if (action === 'resetBudget') {
-        await db
-          .delete(budget)
-          .where(and(budgetRowsBaseWhere(budgetScope), eq(budget.monthYear, BUDGET_SCOPE_KEY)))
-        return ok(res, [], traceId)
       }
 
       if (action === 'gemini') {
