@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { BarChart3, ChartPie, CreditCard, LayoutGrid, PencilLine, Plus, Shield, TrendingUp, Wallet } from 'lucide-react'
 import {
   BalanceRow,
@@ -20,6 +20,7 @@ import {
   Spacer,
 } from '../ui'
 import { RightLegendDonut } from '../ui'
+import { useMoneyFormatting } from '../hooks/useFormatMoney'
 
 const DONUT = [
   { label: 'Savings', value: 29300, color: '#2563EB' },
@@ -36,6 +37,8 @@ const TABS = [
 ]
 
 export default function Components() {
+  const { format: fmt, zeroPlaceholder } = useMoneyFormatting()
+  const donutFmt = useCallback((value: number) => fmt(Math.round(value)), [fmt])
   const [navActive, setNavActive] = useState('overview')
   const [filter, setFilter] = useState('All')
   const [filterChip, setFilterChip] = useState('All')
@@ -103,10 +106,10 @@ export default function Components() {
 
       <SectionBlock title="Metrics" icon={<Wallet size={13} />} rightChip={<SectionChip>KPIs</SectionChip>}>
         <KpiGrid>
-          <KpiCard label="Balance" value="₹1,28,500" tone="navy" icon={<Wallet size={13} />} />
-          <KpiCard label="Savings" value="₹29,300" tone="green" icon={<TrendingUp size={13} />} />
-          <KpiCard label="Loans" value="₹18,400" tone="red" icon={<CreditCard size={13} />} />
-          <KpiCard label="Invested" value="₹12,150" tone="amber" icon={<BarChart3 size={13} />} />
+          <KpiCard label="Balance" value={fmt(128500)} tone="navy" icon={<Wallet size={13} />} />
+          <KpiCard label="Savings" value={fmt(29300)} tone="green" icon={<TrendingUp size={13} />} />
+          <KpiCard label="Loans" value={fmt(18400)} tone="red" icon={<CreditCard size={13} />} />
+          <KpiCard label="Invested" value={fmt(12150)} tone="amber" icon={<BarChart3 size={13} />} />
         </KpiGrid>
       </SectionBlock>
 
@@ -118,8 +121,8 @@ export default function Components() {
               compact
               showCenter
               centerLabel="NET WORTH"
-              centerValue="₹68.6k"
-              valueFormatter={(value: number) => `₹${Math.round(value).toLocaleString('en-IN')}`}
+              centerValue={fmt(68600)}
+              valueFormatter={donutFmt}
             />
           </div>
           <div className="ui-kit-card" style={{ padding: 12 }}>
@@ -129,9 +132,9 @@ export default function Components() {
               showPct={false}
               showCenter
               centerLabel="NET WORTH"
-              centerValue="₹68.6k"
+              centerValue={fmt(68600)}
               legendPosition="bottom"
-              valueFormatter={(value: number) => `₹${Math.round(value).toLocaleString('en-IN')}`}
+              valueFormatter={donutFmt}
             />
           </div>
           <div className="ui-kit-card" style={{ padding: 12 }}>
@@ -140,9 +143,9 @@ export default function Components() {
               compact
               showCenter
               centerLabel="NET WORTH"
-              centerValue="₹68.6k"
+              centerValue={fmt(68600)}
               showLegend={false}
-              valueFormatter={(value: number) => `₹${Math.round(value).toLocaleString('en-IN')}`}
+              valueFormatter={donutFmt}
             />
           </div>
         </div>
@@ -164,7 +167,7 @@ export default function Components() {
             title="Nestack"
             subtitle="Amma SBI"
             leftLabel="Amount"
-            leftValue="+₹30,000"
+            leftValue={`+${fmt(30000)}`}
             centerLabel="Type"
             centerValue="Income"
             rightLabel="Date"
@@ -176,7 +179,7 @@ export default function Components() {
             className="lending-entry-card"
             onClick={() => {}}
           />
-          <BalanceRow title="Arun IB" value="₹48,500" income="₹18,500" expense="₹7,200" />
+          <BalanceRow title="Arun IB" value={fmt(48500)} income={fmt(18500)} expense={fmt(7200)} />
         </div>
       </SectionBlock>
 
@@ -188,11 +191,11 @@ export default function Components() {
             leftLabel="QTY"
             leftValue="50"
             centerLabel="INVESTED"
-            centerValue="₹36,000"
+            centerValue={fmt(36000)}
             rightLabel="CURRENT"
-            rightValue="₹41,500"
+            rightValue={fmt(41500)}
             pnlLabel="PROFIT"
-            pnlValue="+₹5,500"
+            pnlValue={`+${fmt(5500)}`}
             accentTone="green"
             onClick={() => setHoldingModal(true)}
           />
@@ -248,7 +251,7 @@ export default function Components() {
               <input className="form-inp" type="text" placeholder="Add transaction title" />
             </FormField>
             <FormField label="Amount">
-              <input className="form-inp" type="text" placeholder="₹0" />
+              <input className="form-inp" type="text" placeholder={zeroPlaceholder} />
             </FormField>
             <FormField label="Note">
               <input className="form-inp" type="text" placeholder="Optional note" />
@@ -262,7 +265,7 @@ export default function Components() {
           title="INFY"
           onClose={() => setHoldingModal(false)}
           pnlLabel="Profit"
-          pnlValue="+₹5,500"
+          pnlValue={`+${fmt(5500)}`}
           pnlPct="(+15.3%)"
           accentTone="green"
         >
@@ -272,11 +275,11 @@ export default function Components() {
           </div>
           <div className="ui-kit-holding-detail">
             <div className="ui-kit-holding-detail-label">Avg Price</div>
-            <div className="ui-kit-holding-detail-value">₹720</div>
+            <div className="ui-kit-holding-detail-value">{fmt(720)}</div>
           </div>
           <div className="ui-kit-holding-detail">
             <div className="ui-kit-holding-detail-label">CMP</div>
-            <div className="ui-kit-holding-detail-value">₹830</div>
+            <div className="ui-kit-holding-detail-value">{fmt(830)}</div>
           </div>
         </HoldingModal>
       )}

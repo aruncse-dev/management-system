@@ -1,13 +1,15 @@
 import { useMemo } from 'react'
 import { TrendingUp, CalendarDays, Banknote, CreditCard, Package, AlertTriangle, Wallet, ArrowDownRight, ArrowUpRight } from 'lucide-react'
 import { useStore } from '../store'
-import { sumType, sumCC, sumOtherCr, catMap, budgetSummary, acctFlows, INR } from '../utils'
+import { sumType, sumCC, sumOtherCr, catMap, budgetSummary, acctFlows } from '../utils'
+import { useFormatMoney } from '../hooks/useFormatMoney'
 import { useFintrackerModes } from '../context/FintrackerModesContext'
 import { RightLegendDonut } from '../ui'
 import { BalanceRow, KpiCard, LoadingState, SectionBlock, UiCard } from '../ui'
 
 export default function Dashboard() {
   const { state } = useStore()
+  const fmt = useFormatMoney()
   const { rows, budget, openingBal } = state
   const {
     monthlyAccountNames,
@@ -55,17 +57,17 @@ export default function Dashboard() {
         <div className="dash-overview">
           <BalanceRow
             title="Net Cash"
-            value={`${totalSavings < 0 ? '−' : ''}${INR(Math.abs(totalSavings))}`}
-            income={`+${INR(inc)}`}
-            expense={`−${INR(exp)}`}
+            value={`${totalSavings < 0 ? '−' : ''}${fmt(Math.abs(totalSavings))}`}
+            income={`+${fmt(inc)}`}
+            expense={`−${fmt(exp)}`}
             incomeIcon={<ArrowDownRight size={11} strokeWidth={2.4} />}
             expenseIcon={<ArrowUpRight size={11} strokeWidth={2.4} />}
           />
           <BalanceRow
             title="Outstanding Credit"
-            value={`−${INR(totalOutstanding)}`}
-            income={`−${INR(cc)}`}
-            expense={`−${INR(ocr)}`}
+            value={`−${fmt(totalOutstanding)}`}
+            income={`−${fmt(cc)}`}
+            expense={`−${fmt(ocr)}`}
             incomeIcon={<CreditCard size={11} strokeWidth={2.4} />}
             expenseIcon={<Banknote size={11} strokeWidth={2.4} />}
             incomeLabel="Cards"
@@ -82,7 +84,7 @@ export default function Dashboard() {
           <KpiCard
             key={acc}
             label={acc}
-            value={`${current < 0 ? '−' : ''}${INR(Math.abs(current))}`}
+            value={`${current < 0 ? '−' : ''}${fmt(Math.abs(current))}`}
             tone={current >= 0 ? 'green' : 'red'}
             icon={
               /cash/i.test(acc) ? <Wallet size={14} /> : /wallet|card/i.test(acc) ? <CreditCard size={14} /> : <Banknote size={14} />
@@ -96,9 +98,9 @@ export default function Dashboard() {
         <UiCard subtitle={`${ovCount} overspent categories`}>
           <div className="dash-budget-card">
             <div className="dash-budget-top">
-              <div className="dash-budget-figure">{INR(totalSpent)} / {INR(totalBudget)}</div>
+              <div className="dash-budget-figure">{fmt(totalSpent)} / {fmt(totalBudget)}</div>
               <div className={`dash-budget-state ${totalOver ? 'over' : 'ok'}`}>
-                {totalOver ? `Over by ${INR(totalSpent - totalBudget)}` : `${INR(totalBudget - totalSpent)} left`} · {ovCount} categories
+                {totalOver ? `Over by ${fmt(totalSpent - totalBudget)}` : `${fmt(totalBudget - totalSpent)} left`} · {ovCount} categories
               </div>
             </div>
             <div className="bar-bg dash-budget-bar">
@@ -119,7 +121,7 @@ export default function Dashboard() {
                     className="dash-tag dash-tag-danger"
                   >
                     <span>{item.c}</span>
-                    <span>−{INR(item.s - item.b)}</span>
+                    <span>−{fmt(item.s - item.b)}</span>
                   </div>
                 ))}
               </div>
@@ -138,7 +140,7 @@ export default function Dashboard() {
                 items={incExpData.map(d => ({ label: d.label, value: d.v, color: d.col }))}
                 showCenter
                 centerLabel="NET"
-                centerValue={surplus >= 0 ? `+${INR(surplus)}` : `−${INR(Math.abs(surplus))}`}
+                centerValue={surplus >= 0 ? `+${fmt(surplus)}` : `−${fmt(Math.abs(surplus))}`}
                 legendPosition="bottom"
               />
             </div>

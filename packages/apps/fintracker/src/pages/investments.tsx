@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { BarChart3, LayoutDashboard, PieChart, RefreshCw, Shield, TrendingUp, Wallet } from 'lucide-react';
 import { api, type RawHolding } from '../api';
 import { KpiCard, KpiGrid, LoadingState, SectionBlock, Spacer } from '../ui';
+import { useFormatMoney } from '../hooks/useFormatMoney';
 import Stocks, { clearStocksCache } from './stocks';
 import MutualFunds, { clearMutualFundsCache } from './mutualfunds';
 
@@ -28,11 +29,6 @@ function isValidInvestmentsCache(c: DashboardCache | null): c is DashboardCache 
   return c !== null && c.version === DASHBOARD_CACHE_VERSION;
 }
 
-function formatRupees(value: number) {
-  const sign = value >= 0 ? '' : '-';
-  return `${sign}₹${Math.abs(Math.round(value)).toLocaleString('en-IN')}`;
-}
-
 function sumHoldingValues(holdings: RawHolding[]) {
   const totalInvested = holdings.reduce((sum, h) => sum + (h.qty * h.avgPrice), 0);
   const currentValue = holdings.reduce((sum, h) => sum + (h.qty * h.lastPrice), 0);
@@ -49,17 +45,18 @@ function MetricsSection({
   holdings: RawHolding[];
   icon: ReactNode;
 }) {
+  const fmt = useFormatMoney();
   const stats = sumHoldingValues(holdings);
 
   return (
     <>
       <SectionBlock title={title} icon={icon}>
         <KpiGrid>
-          <KpiCard label="Invested" value={formatRupees(stats.totalInvested)} icon={<Wallet size={14} />} tone="muted" />
-          <KpiCard label="Current" value={formatRupees(stats.currentValue)} icon={<TrendingUp size={14} />} tone="muted" />
+          <KpiCard label="Invested" value={fmt(stats.totalInvested)} icon={<Wallet size={14} />} tone="muted" />
+          <KpiCard label="Current" value={fmt(stats.currentValue)} icon={<TrendingUp size={14} />} tone="muted" />
           <KpiCard
             label="P&L"
-            value={`${stats.pnl >= 0 ? '+' : ''}${formatRupees(stats.pnl)}`}
+            value={`${stats.pnl >= 0 ? '+' : ''}${fmt(stats.pnl)}`}
             icon={<Shield size={14} />}
             tone="muted"
             accentTone={stats.pnl >= 0 ? 'green' : 'red'}
@@ -72,6 +69,7 @@ function MetricsSection({
 }
 
 function DashboardView() {
+  const fmt = useFormatMoney();
   const [loading, setLoading] = useState(() => !isValidInvestmentsCache(INVESTMENTS_CACHE));
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState('');
@@ -182,11 +180,11 @@ function DashboardView() {
         }
       >
         <KpiGrid>
-          <KpiCard label="Total Invested" value={formatRupees(stats.totalInvested)} icon={<Wallet size={14} />} tone="muted" />
-          <KpiCard label="Current Value" value={formatRupees(stats.currentValue)} icon={<TrendingUp size={14} />} tone="muted" />
+          <KpiCard label="Total Invested" value={fmt(stats.totalInvested)} icon={<Wallet size={14} />} tone="muted" />
+          <KpiCard label="Current Value" value={fmt(stats.currentValue)} icon={<TrendingUp size={14} />} tone="muted" />
           <KpiCard
             label="Total P&L"
-            value={`${stats.totalPnL >= 0 ? '+' : ''}${formatRupees(stats.totalPnL)}`}
+            value={`${stats.totalPnL >= 0 ? '+' : ''}${fmt(stats.totalPnL)}`}
             icon={<Shield size={14} />}
             tone="muted"
             accentTone={stats.totalPnL >= 0 ? 'green' : 'red'}

@@ -2,12 +2,8 @@ import { ACCOUNTS, CC_MODES, OTHER_CR, ALL_CR, MNS } from './config'
 import type { Budget, OpeningBal, Transaction } from './types'
 
 export function INR(n: number) {
-  const abs = Math.abs(n)
-  const hasDecimals = abs % 1 !== 0
-  if (hasDecimals) {
-    return '₹' + abs.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
-  }
-  return '₹' + Math.round(abs).toLocaleString('en-IN')
+  const abs = Math.abs(n);
+  return '₹' + abs.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
 export function fd(s: string) {
@@ -82,11 +78,21 @@ export function acctFlows(rows: Transaction[], openingBal: OpeningBal) {
 }
 
 export function currentMonthYear() {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
   const now = new Date()
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+  }).formatToParts(now)
+  const day = Number(parts.find(p => p.type === 'day')!.value)
+  const month = Number(parts.find(p => p.type === 'month')!.value) - 1
+  const year = Number(parts.find(p => p.type === 'year')!.value)
   const cycleDay = 19
-  let mi = now.getMonth()
-  let yr = now.getFullYear()
-  if (now.getDate() >= cycleDay) {
+  let mi = month
+  let yr = year
+  if (day >= cycleDay) {
     mi = (mi + 1) % 12
     if (mi === 0) yr++
   }

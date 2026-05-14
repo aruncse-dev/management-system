@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useStore } from '../store'
-import { acctFlows, INR } from '../utils'
+import { acctFlows } from '../utils'
+import { useFormatMoney } from '../hooks/useFormatMoney'
 import { useFintrackerModes } from '../context/FintrackerModesContext'
 import { ArrowDownRight, ArrowUpRight, Wallet } from 'lucide-react'
 import { BalanceRow, KpiCard, KpiGrid, LoadingState, SectionBlock } from '../ui'
@@ -11,6 +12,7 @@ interface Props {
 
 export default function Accounts({ showStatus: _showStatus }: Props) {
   const { state } = useStore()
+  const fmt = useFormatMoney()
   const { rows, openingBal } = state
   const { monthlyAccountNames, paymentModeOptions, loading: modesLoading } = useFintrackerModes()
 
@@ -41,12 +43,12 @@ export default function Accounts({ showStatus: _showStatus }: Props) {
         <KpiGrid variant="compact">
           <KpiCard
             label="Current Balance"
-            value={`${overview.currentTotal < 0 ? '−' : ''}${INR(Math.abs(overview.currentTotal))}`}
+            value={`${overview.currentTotal < 0 ? '−' : ''}${fmt(Math.abs(overview.currentTotal))}`}
             tone={overview.currentTotal < 0 ? 'red' : 'green'}
             icon={<Wallet size={14} />}
           />
-          <KpiCard label="Inflow" value={INR(overview.inflowTotal)} tone="green" icon={<ArrowDownRight size={14} />} />
-          <KpiCard label="Outflow" value={INR(overview.outflowTotal)} tone="red" icon={<ArrowUpRight size={14} />} />
+          <KpiCard label="Inflow" value={fmt(overview.inflowTotal)} tone="green" icon={<ArrowDownRight size={14} />} />
+          <KpiCard label="Outflow" value={fmt(overview.outflowTotal)} tone="red" icon={<ArrowUpRight size={14} />} />
           <KpiCard label="Accounts" value={String(overview.activeAccounts)} tone="navy" icon={<Wallet size={14} />} />
         </KpiGrid>
       </SectionBlock>
@@ -59,10 +61,10 @@ export default function Accounts({ showStatus: _showStatus }: Props) {
               <BalanceRow
                 key={acc}
                 title={acc}
-                value={`${current < 0 ? '−' : ''}${INR(Math.abs(current))}`}
+                value={`${current < 0 ? '−' : ''}${fmt(Math.abs(current))}`}
                 subtitle={i === 0 ? 'Primary balance view' : undefined}
-                income={INR(inflow)}
-                expense={INR(outflow)}
+                income={fmt(inflow)}
+                expense={fmt(outflow)}
                 incomeIcon={<ArrowDownRight size={11} strokeWidth={2.4} />}
                 expenseIcon={<ArrowUpRight size={11} strokeWidth={2.4} />}
               />

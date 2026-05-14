@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useStore } from '../store'
-import { INR } from '../utils'
+import { useFormatMoney } from '../hooks/useFormatMoney'
 import { MNS } from '../config'
 import { useFintrackerModes } from '../context/FintrackerModesContext'
 import { CreditCard, Users, CircleDollarSign, Banknote, Layers3, Users2 } from 'lucide-react'
@@ -16,6 +16,7 @@ function cycleLabel(month: string, year: string): string {
 
 export default function Credits() {
   const { state } = useStore()
+  const fmt = useFormatMoney()
   const { rows, month, year } = state
   const { creditCardNames, informalCreditNames, loading: modesLoading } = useFintrackerModes()
 
@@ -55,9 +56,9 @@ export default function Credits() {
         right={<SectionChip>{cycleLabel(month, year)}</SectionChip>}
       >
         <KpiGrid variant="compact">
-          <KpiCard label="Overall" value={INR(overall)} tone="red" icon={<Banknote size={14} />} />
-          <KpiCard label="Credit Cards" value={INR(ccNet)} tone="navy" icon={<CreditCard size={14} />} />
-          <KpiCard label="Other Credits" value={INR(otherTotal)} tone="amber" icon={<Users2 size={14} />} />
+          <KpiCard label="Overall" value={fmt(overall)} tone="red" icon={<Banknote size={14} />} />
+          <KpiCard label="Credit Cards" value={fmt(ccNet)} tone="navy" icon={<CreditCard size={14} />} />
+          <KpiCard label="Other Credits" value={fmt(otherTotal)} tone="amber" icon={<Users2 size={14} />} />
           <KpiCard label="Sources" value={String(activeSources)} tone="green" icon={<Layers3 size={14} />} />
         </KpiGrid>
       </SectionBlock>
@@ -68,7 +69,7 @@ export default function Credits() {
             <KpiCard
               key={m}
               label={m}
-              value={INR(totals[m] || 0)}
+              value={fmt(totals[m] || 0)}
               tone="navy"
               accentTone="red"
               icon={<CreditCard size={14} />}
@@ -83,7 +84,7 @@ export default function Credits() {
             <KpiCard
               key={m}
               label={m}
-              value={INR(Math.max(0, totals[m] || 0))}
+              value={fmt(Math.max(0, totals[m] || 0))}
               tone="navy"
               accentTone="green"
               icon={<Users2 size={14} />}

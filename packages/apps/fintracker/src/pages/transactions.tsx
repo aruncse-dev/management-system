@@ -1,7 +1,8 @@
 import { Pencil, X } from 'lucide-react'
 import { useStore, usePage } from '../store'
 import { Transaction } from '../types'
-import { fd, INR, transactionTransferDestination } from '../utils'
+import { fd, transactionTransferDestination } from '../utils'
+import { useFormatMoney } from '../hooks/useFormatMoney'
 import { TXN_PAGE } from '../config'
 import { LoadingState, SectionBlock, SectionChip, TransactionCard } from '../ui'
 import { CatIcon } from '../ui'
@@ -26,6 +27,7 @@ function toneForTransaction(row: Transaction) {
 
 export default function Transactions({ onEdit }: Props) {
   const { state, dispatch } = useStore()
+  const fmt = useFormatMoney()
   const { rows, total, shown } = usePage()
   const rem = total - shown
 
@@ -80,7 +82,7 @@ export default function Transactions({ onEdit }: Props) {
             const isTr = r.t === 'Transfer'
             const tone = toneForTransaction(r)
             const toDest = isTr ? transactionTransferDestination(r) : ''
-            const amountStr = isI || isS ? `+${INR(r.a)}` : isTr ? `↔ ${INR(r.a)}` : `-${INR(r.a)}`
+            const amountStr = isI || isS ? `+${fmt(r.a)}` : isTr ? `↔ ${fmt(r.a)}` : `-${fmt(r.a)}`
             const titleStr =
               isTr && toDest
                 ? r.desc?.trim()

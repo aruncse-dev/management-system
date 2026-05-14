@@ -3,7 +3,7 @@ import { useRouter } from 'next/router'
 import { Search, LayoutDashboard, Handshake, ArrowDownLeft, BarChart3, Shield, User, ArrowUpRight, Plus } from 'lucide-react'
 import { api, RawLendingRow } from '../api'
 import { LENDING_SHEET_SLUG_VIJAYA, normalizeLendingSheetSlug } from '../lib/lendingSheetSlug'
-import { INR } from '../utils'
+import { useFormatMoney, useMoneyFormatting } from '../hooks/useFormatMoney'
 import { FormField, HoldingCard, KpiCard, KpiGrid, LoadingState, SearchField, SectionBlock, SectionChip } from '../ui'
 
 type LendType = 'LEND' | 'RECEIVED'
@@ -99,18 +99,19 @@ interface PersonCardProps {
 }
 
 const PersonCard = memo(function PersonCard({ person, onClick }: PersonCardProps) {
+  const fmt = useFormatMoney()
   const tone = person.outstanding > 0 ? 'red' : person.outstanding < 0 ? 'green' : 'navy'
   return (
     <HoldingCard
       title={person.name}
       leftLabel="Lent"
-      leftValue={INR(person.totalLent)}
+      leftValue={fmt(person.totalLent)}
       rightLabel="Received"
-      rightValue={INR(person.totalRepaid)}
+      rightValue={fmt(person.totalRepaid)}
       centerLabel="Status"
       centerValue={person.outstanding > 0 ? 'GIVEN' : person.outstanding < 0 ? 'CLEAR' : 'SETTLED'}
       pnlLabel="Outstanding"
-      pnlValue={INR(Math.abs(person.outstanding))}
+      pnlValue={fmt(Math.abs(person.outstanding))}
       accentTone={tone}
       icon={person.outstanding > 0 ? <ArrowUpRight size={14} /> : person.outstanding < 0 ? <ArrowDownLeft size={14} /> : <Shield size={14} />}
       iconPosition="right"
@@ -132,6 +133,7 @@ const EntryCard = memo(function EntryCard({
   useDescriptionAsTitle?: boolean
   onClick: () => void
 }) {
+  const fmt = useFormatMoney()
   const title = useDescriptionAsTitle ? (entry.description || entry.name) : entry.name
   const tone = label === 'Given' ? 'red' : 'green'
   return (
@@ -140,7 +142,7 @@ const EntryCard = memo(function EntryCard({
       subtitle={useDescriptionAsTitle ? undefined : entry.description}
       compactTitle={useDescriptionAsTitle}
       leftLabel="Amount"
-      leftValue={INR(entry.amount)}
+      leftValue={fmt(entry.amount)}
       centerLabel=" "
       centerValue=" "
       rightLabel="Date"
@@ -156,6 +158,7 @@ const EntryCard = memo(function EntryCard({
 })
 
 export default function Lending({ sheetSlug: sheetSlugProp, onTabChange }: LendingProps) {
+  const { format: fmt, currency, zeroPlaceholder } = useMoneyFormatting()
   const router = useRouter()
   const sheetQ = router.isReady ? router.query.sheet : undefined
   const sheetFromQuery =
@@ -358,9 +361,9 @@ export default function Lending({ sheetSlug: sheetSlugProp, onTabChange }: Lendi
           <>
             <SectionBlock title="Metrics" icon={<BarChart3 size={14} />}>
               <KpiGrid>
-                <KpiCard label="Given" value={INR(totalLent)} tone="navy" icon={<ArrowUpRight size={14} />} />
-                <KpiCard label="Received" value={INR(totalRepaid)} tone="green" icon={<ArrowDownLeft size={14} />} />
-                <KpiCard label="Outstanding" value={INR(Math.abs(outstanding))} tone="amber" icon={<Shield size={14} />} />
+                <KpiCard label="Given" value={fmt(totalLent)} tone="navy" icon={<ArrowUpRight size={14} />} />
+                <KpiCard label="Received" value={fmt(totalRepaid)} tone="green" icon={<ArrowDownLeft size={14} />} />
+                <KpiCard label="Outstanding" value={fmt(Math.abs(outstanding))} tone="amber" icon={<Shield size={14} />} />
                 <KpiCard label="People" value={totalPeople} tone="muted" icon={<User size={14} />} />
               </KpiGrid>
             </SectionBlock>
@@ -474,8 +477,8 @@ export default function Lending({ sheetSlug: sheetSlugProp, onTabChange }: Lendi
                 <FormField label="Name">
                   <input className="form-inp" type="text" placeholder="Who?" value={form.name} onChange={e => set('name', e.target.value)} />
                 </FormField>
-                <FormField label="Amount (₹)">
-                  <input className="form-inp" type="number" min="0" step="1" placeholder="0" value={form.amount} onChange={e => set('amount', e.target.value)} />
+                <FormField label={`Amount (${currency})`}>
+                  <input className="form-inp" type="number" min="0" step="1" placeholder={zeroPlaceholder} value={form.amount} onChange={e => set('amount', e.target.value)} />
                 </FormField>
                 <FormField label="Date">
                   <input className="form-inp" type="date" value={form.date} onChange={e => set('date', e.target.value)} />
@@ -513,9 +516,9 @@ export default function Lending({ sheetSlug: sheetSlugProp, onTabChange }: Lendi
             <div className="modal-body">
               <div className="ui-stack">
                 <KpiGrid>
-                  <KpiCard label="Lent" value={INR(personDetails.totalLent)} tone="red" icon={<Handshake size={14} />} />
-                  <KpiCard label="Received" value={INR(personDetails.totalRepaid)} tone="green" icon={<ArrowDownLeft size={14} />} />
-                  <KpiCard label="Outstanding" value={INR(Math.abs(personDetails.outstanding))} tone="muted" icon={<Shield size={14} />} />
+                  <KpiCard label="Lent" value={fmt(personDetails.totalLent)} tone="red" icon={<Handshake size={14} />} />
+                  <KpiCard label="Received" value={fmt(personDetails.totalRepaid)} tone="green" icon={<ArrowDownLeft size={14} />} />
+                  <KpiCard label="Outstanding" value={fmt(Math.abs(personDetails.outstanding))} tone="muted" icon={<Shield size={14} />} />
                 </KpiGrid>
                 {personModalEntries.length === 0 ? (
                   <p style={{ color: 'var(--muted)', padding: '0.5rem 0', fontSize: 14, textAlign: 'center' }}>

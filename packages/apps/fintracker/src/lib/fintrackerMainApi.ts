@@ -153,8 +153,8 @@ function gasDateFromIso(iso: string): string {
   return `${d}-${MNS[mi]}-${y.slice(2)}`
 }
 
-function num(v: string | number | null | undefined): number {
-  if (v === null || v === undefined) return 0
+function num(v: string | number | boolean | null | undefined): number {
+  if (v === null || v === undefined || typeof v === 'boolean') return 0
   const n = typeof v === 'number' ? v : parseFloat(v)
   return Number.isFinite(n) ? n : 0
 }
@@ -350,11 +350,13 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
       const mod = typeof req.query.module === 'string' ? req.query.module : ''
 
       if (mod === 'settings' && action === 'get') {
-        const s = (await loadFintrackerSettingsJson(db, em, budgetScope)) as Record<string, string | number>
+        const s = (await loadFintrackerSettingsJson(db, em, budgetScope)) as Record<string, string | number | boolean>
         const fintracker = parseFintrackerPrefs(s)
         return ok(res, {
           goldRate: num(s.goldRate),
           usdToInr: s.usdToInr !== undefined ? num(s.usdToInr) : undefined,
+          currency: s.currency || 'INR',
+          roundOff: s.roundOff !== false,
           loansSpreadsheetId: s.loansSpreadsheetId ? String(s.loansSpreadsheetId) : undefined,
           emiSheetName: s.emiSheetName ? String(s.emiSheetName) : undefined,
           expensesSheetId: s.expensesSheetId ? String(s.expensesSheetId) : undefined,
@@ -767,6 +769,8 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         }
         const bud = await loadMergedBudgetForMonth(db, budgetScope, budgetMonthKey)
         const fintracker = parseFintrackerPrefs(settingsBlob)
+        const currency = (settingsBlob && typeof settingsBlob === 'object' && (settingsBlob as Record<string, unknown>).currency) || 'INR'
+        const roundOff = (settingsBlob && typeof settingsBlob === 'object' && (settingsBlob as Record<string, unknown>).roundOff !== false) !== false
         return ok(
           res,
           {
@@ -774,6 +778,8 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
             budget: bud,
             openingBal: readOpeningBal(settingsBlob),
             fintracker,
+            currency,
+            roundOff,
           },
           traceId,
         )
@@ -811,7 +817,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
       if (mod === 'settings' && action === 'save') {
         const prev = await loadFintrackerSettingsJson(db, em, budgetScope)
         const patch: Record<string, unknown> = {}
-        for (const k of ['goldRate', 'usdToInr', 'loansSpreadsheetId', 'emiSheetName', 'expensesSheetId', 'assetsSheetId']) {
+        for (const k of ['goldRate', 'usdToInr', 'loansSpreadsheetId', 'emiSheetName', 'expensesSheetId', 'assetsSheetId', 'currency', 'roundOff']) {
           if (body[k] !== undefined) patch[k] = body[k]
         }
         if (body.fintracker !== undefined && body.fintracker !== null && typeof body.fintracker === 'object') {

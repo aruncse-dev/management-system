@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Check, Plus, Repeat2, Search, BarChart3, Bell, IndianRupee } from 'lucide-react'
+import { Check, Plus, Repeat2, Search, BarChart3, Bell, DollarSign, IndianRupee, Landmark } from 'lucide-react'
 import { api, type RawSubscriptionRow, type RawVaultAppRow, type GoldSettings } from '../api'
 import { CatIcon, FormField, LoadingState, ModalActions, ModalShell, SearchField, SectionBlock, SectionChip, Spacer, KpiCard, KpiGrid } from '../ui'
-import { INR, mergeCategoriesWithBudgetNames } from '../utils'
+import { mergeCategoriesWithBudgetNames } from '../utils'
+import { useMoneyFormatting } from '../hooks/useFormatMoney'
+import { currencySymbol, type SupportedCurrency } from '../../../../shared/utils/src/formatters'
 import { CATEGORIES } from '../constants'
 import { useStore } from '../store'
 import { useFintrackerModes } from '../context/FintrackerModesContext'
@@ -126,10 +128,20 @@ function autopayAlertTone(daysLeft: number): 'red' | 'amber' | 'green' {
   return 'green'
 }
 
-function amountLabel(amount: number, currency: string) {
-  const c = currency.trim().toUpperCase()
-  if (c === 'USD') return `$${Math.round(amount).toLocaleString('en-US')}`
-  return INR(amount)
+function amountLabel(amount: number, currency: string, roundOff = true) {
+  const c = (currency || 'INR').trim().toUpperCase()
+  const abs = Math.abs(amount)
+  const symbol =
+    c === 'INR' || c === 'USD' || c === 'AED' ? currencySymbol(c as SupportedCurrency) : currencySymbol('INR')
+  const fractionDigits = roundOff ? 0 : 2
+  const formatted = abs.toLocaleString('en-IN', { minimumFractionDigits: fractionDigits, maximumFractionDigits: fractionDigits })
+  return `${symbol}${formatted}`
+}
+
+function currencyKpiIcon(code: SupportedCurrency) {
+  if (code === 'USD') return <DollarSign size={16} aria-hidden />
+  if (code === 'AED') return <Landmark size={16} aria-hidden />
+  return <IndianRupee size={16} aria-hidden />
 }
 
 function rowAmountInr(row: SubscriptionEntry, usdToInr: number): number {
@@ -160,6 +172,7 @@ function normalizeRow(row: RawSubscriptionRow): SubscriptionEntry {
 
 export default function SubscriptionsPage() {
   const { state: appState } = useStore()
+  const { format: fmt, currency: displayCurrency } = useMoneyFormatting()
   const { paymentModeOptions } = useFintrackerModes()
   const subscriptionCategories = useMemo(
     () => mergeCategoriesWithBudgetNames(CATEGORIES, appState.budget),
@@ -408,21 +421,21 @@ export default function SubscriptionsPage() {
               />
               <KpiCard
                 label="Monthly plans"
-                value={loading ? '—' : INR(monthlyPlanSumINR)}
+                value={loading ? '—' : fmt(monthlyPlanSumINR)}
                 tone="navy"
-                icon={<IndianRupee size={16} />}
+                icon={currencyKpiIcon(displayCurrency)}
               />
               <KpiCard
                 label="Yearly plans"
-                value={loading ? '—' : INR(yearlyPlanSumINR)}
+                value={loading ? '—' : fmt(yearlyPlanSumINR)}
                 tone="navy"
-                icon={<IndianRupee size={16} />}
+                icon={currencyKpiIcon(displayCurrency)}
               />
               <KpiCard
                 label="Annual outlook"
-                value={loading ? '—' : INR(annualOutlookINR)}
+                value={loading ? '—' : fmt(annualOutlookINR)}
                 tone="navy"
-                icon={<IndianRupee size={16} />}
+                icon={currencyKpiIcon(displayCurrency)}
               />
             </KpiGrid>
           </SectionBlock>
@@ -460,7 +473,7 @@ export default function SubscriptionsPage() {
                               textOverflow: 'ellipsis',
                             }}
                           >
-                            {row.name || 'Untitled'} · {toShortDate(date)} · {amountLabel(row.amount || 0, row.currency)}
+                            {row.name || 'Untitled'} · {toShortDate(date)} · {amountLabel(row.amount || 0, row.currency, appState.roundOff)}
                           </span>
                           <span className={`ui-pill ${pillTone}`}>{daysLeft}d</span>
                         </div>
@@ -537,7 +550,7 @@ export default function SubscriptionsPage() {
                     <div className="ui-kit-holding-card-grid">
                       <div className="ui-kit-holding-stat">
                         <span>Amount</span>
-                        <strong>{amountLabel(row.amount || 0, row.currency)}</strong>
+                        <strong>{amountLabel(row.amount || 0, row.currency, appState.roundOff)}</strong>
                       </div>
                       <div className="ui-kit-holding-stat ui-kit-holding-stat--center">
                         <span>Start</span>

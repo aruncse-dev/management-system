@@ -16,9 +16,10 @@ import {
   CalendarRange,
   Coins,
   Plug,
-  IndianRupee,
+  DollarSign,
   Gem,
   MapPin,
+  ArrowRightLeft,
 } from 'lucide-react';
 import {
   api,
@@ -35,6 +36,7 @@ import { useFintrackerModes } from '../context/FintrackerModesContext';
 import { MENU_CACHE_UPDATED_EVENT, readMenuCache } from '../lib/profileMenuCache';
 import type { FintrackerPrefs } from '../expenseCycle';
 import { DEFAULT_FINTRACKER_PREFS, cycleDateRange, cycleSubtitle } from '../expenseCycle';
+import { formatCurrency } from '../../../../shared/utils/src/formatters';
 
 type SettingsNavTab = 'general' | 'accounts' | 'gold';
 
@@ -49,7 +51,7 @@ function readMenuHasPath(path: string): boolean {
   });
 }
 
-const GOLD_RATE_FIELD: SettingField = { key: 'goldRate', label: 'Gold Rate (₹/gram)', type: 'number' };
+const GOLD_RATE_FIELD: SettingField = { key: 'goldRate', label: 'Gold rate (INR/gram)', type: 'number' };
 
 /** Same shell as `TransactionCard` lists on Accounts / Credits (holding row + txn border). */
 const GENERAL_SETTINGS_PANEL =
@@ -155,6 +157,11 @@ export default function Settings() {
     expenseCycle: { ...DEFAULT_FINTRACKER_PREFS.expenseCycle },
   }));
   const [fintrackerSaving, setFintrackerSaving] = useState(false);
+  const [settingsDraft, setSettingsDraft] = useState<{ currency?: 'INR' | 'USD' | 'AED'; roundOff?: boolean }>({
+    currency: 'INR',
+    roundOff: true,
+  });
+  const [currencySaving, setCurrencySaving] = useState(false);
   const [upstoxUiOpen, setUpstoxUiOpen] = useState(true);
 
   const validateLiveStatus = useCallback(async (forceRefresh = false) => {
@@ -185,6 +192,10 @@ export default function Settings() {
         } else {
           setFintrackerDraft({ expenseCycle: { ...DEFAULT_FINTRACKER_PREFS.expenseCycle } });
         }
+        setSettingsDraft({
+          currency: (settingsResult.value.currency as 'INR' | 'USD' | 'AED') || 'INR',
+          roundOff: settingsResult.value.roundOff !== false,
+        });
       }
       setSettings(loaded);
       if (profileResult.status === 'fulfilled') {
@@ -246,6 +257,23 @@ export default function Settings() {
       setError(e instanceof Error ? e.message : 'Save failed');
     } finally {
       setFintrackerSaving(false);
+    }
+  }
+
+  async function saveCurrencySettings() {
+    setCurrencySaving(true);
+    setError('');
+    try {
+      await api.saveSettings({
+        currency: settingsDraft.currency,
+        roundOff: settingsDraft.roundOff,
+      });
+      window.dispatchEvent(new Event('currency:settings'));
+      await validateLiveStatus(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Save failed');
+    } finally {
+      setCurrencySaving(false);
     }
   }
 
@@ -736,15 +764,72 @@ export default function Settings() {
             ) : null}
 
             {!loading && hasSubscriptionsMenu ? (
-              <SectionBlock title="Rates" icon={<IndianRupee size={14} aria-hidden />}>
+              <SectionBlock title="Rates" icon={<ArrowRightLeft size={14} aria-hidden />}>
                 <div className="txn-cards">
                   <div className={GENERAL_SETTINGS_PANEL} role="group">
                     <div className="settings-rates-usd-block">
                       <div className="settings-profile-meta-label">USD → INR</div>
                       <div className="settings-gold-usd-value">
-                        ₹{settings.usdToInr ? Number(settings.usdToInr).toFixed(2) : '—'}
+                        {settings.usdToInr
+                          ? formatCurrency(Number(settings.usdToInr), 'INR', false)
+                          : '—'}
                       </div>
                       <div className="settings-gold-usd-note">From settings API when available</div>
+                    </div>
+                  </div>
+                </div>
+              </SectionBlock>
+            ) : null}
+
+            {!loading ? (
+              <SectionBlock title="Currency & Display" icon={<DollarSign size={14} aria-hidden />}>
+                <div className="txn-cards">
+                  <div className={GENERAL_SETTINGS_PANEL} role="group">
+                    <div className="ui-stack settings-general-card-stack">
+                      <FormField label="Currency">
+                        <select
+                          className="form-inp settings-general-fullwidth-control"
+                          value={settingsDraft.currency || 'INR'}
+                          onChange={(e) =>
+                            setSettingsDraft((prev) => ({
+                              ...prev,
+                              currency: e.target.value as 'INR' | 'USD' | 'AED',
+                            }))
+                          }
+                        >
+                          <option value="INR">INR (₹)</option>
+                          <option value="USD">USD ($)</option>
+                          <option value="AED">AED (د.إ)</option>
+                        </select>
+                      </FormField>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: '0.75rem' }}>
+                        <label style={{ flex: 1, marginBottom: 0 }} htmlFor="roundoff-toggle">
+                          <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>Round off amounts</span>
+                        </label>
+                        <button
+                          id="roundoff-toggle"
+                          type="button"
+                          role="switch"
+                          aria-checked={settingsDraft.roundOff !== false}
+                          className={`settings-switch${settingsDraft.roundOff !== false ? ' settings-switch--on' : ''}`}
+                          onClick={() =>
+                            setSettingsDraft((prev) => ({
+                              ...prev,
+                              roundOff: !prev.roundOff,
+                            }))
+                          }
+                          aria-label={settingsDraft.roundOff !== false ? 'Round off amounts' : 'Show decimals'}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        className="ui-kit-btn ui-kit-btn--solid ui-kit-btn-inline settings-action-btn settings-general-save-btn"
+                        onClick={() => void saveCurrencySettings()}
+                        disabled={currencySaving}
+                      >
+                        {currencySaving ? <Loader2 size={14} className="spin-icon" /> : null}
+                        Save
+                      </button>
                     </div>
                   </div>
                 </div>

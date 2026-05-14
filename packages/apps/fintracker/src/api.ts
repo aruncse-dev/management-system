@@ -86,6 +86,8 @@ export interface InitData {
   budget: Budget;
   openingBal: OpeningBal;
   fintracker: FintrackerPrefs;
+  currency?: SupportedCurrency;
+  roundOff?: boolean;
 }
 
 const _initInflightByKey = new Map<string, Promise<InitData>>();
@@ -197,6 +199,8 @@ export interface RawCashLoanHistoryRow {
   note?: string;
 }
 
+export type SupportedCurrency = 'INR' | 'USD' | 'AED';
+
 export interface GoldSettings {
   goldRate: number;
   usdToInr?: number;
@@ -204,6 +208,8 @@ export interface GoldSettings {
   emiSheetName?: string;
   expensesSheetId?: string;
   assetsSheetId?: string;
+  currency?: SupportedCurrency;
+  roundOff?: boolean;
   /** Parsed from org/user settings `.fintracker`. */
   fintracker?: FintrackerPrefs;
   /** Same object as JSON string (for copy / backup). */

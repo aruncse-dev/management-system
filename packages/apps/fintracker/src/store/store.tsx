@@ -28,13 +28,16 @@ type Action =
   | { type: 'SET_CAT_FILTER'; payload: string }
   | { type: 'SET_TXN_PAGE'; payload: number }
   | { type: 'SET_SEARCH'; payload: string }
-  | { type: 'SET_FINTRACKER'; payload: AppState['fintracker'] };
+  | { type: 'SET_FINTRACKER'; payload: AppState['fintracker'] }
+  | { type: 'SET_CURRENCY'; payload: AppState['currency'] }
+  | { type: 'SET_ROUND_OFF'; payload: boolean };
 
 const { month, year } = currentMonthYear();
 
 const initial: AppState = {
   month, year, rows: [], budget: [], openingBal: {},
   months: [], fintracker: { ...DEFAULT_FINTRACKER_PREFS, expenseCycle: { ...DEFAULT_FINTRACKER_PREFS.expenseCycle } },
+  currency: 'INR', roundOff: true,
   loading: true, txnPage: 1, filter: 'All', catFilter: '', search: '',
 };
 
@@ -61,6 +64,8 @@ function reducer(state: AppState, action: Action): AppState {
     }
     case 'SET_OPENING_BAL': return { ...state, openingBal: action.payload };
     case 'SET_FINTRACKER': return { ...state, fintracker: action.payload };
+    case 'SET_CURRENCY': return { ...state, currency: action.payload };
+    case 'SET_ROUND_OFF': return { ...state, roundOff: action.payload };
     case 'SET_FILTER':      return { ...state, filter: action.payload, catFilter: '', txnPage: 1 };
     case 'SET_CAT_FILTER':  return { ...state, catFilter: action.payload, filter: 'All', txnPage: 1 };
     case 'SET_TXN_PAGE':    return { ...state, txnPage: action.payload };
@@ -78,7 +83,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     const bump = () => setPrefsTick((n) => n + 1);
     window.addEventListener('fintracker:prefs', bump);
-    return () => window.removeEventListener('fintracker:prefs', bump);
+    window.addEventListener('currency:settings', bump);
+    return () => {
+      window.removeEventListener('fintracker:prefs', bump);
+      window.removeEventListener('currency:settings', bump);
+    };
   }, []);
 
   useEffect(() => {
@@ -88,6 +97,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         dispatch({ type: 'SET_BUDGET', payload: init.budget });
         dispatch({ type: 'SET_OPENING_BAL', payload: init.openingBal });
         dispatch({ type: 'SET_FINTRACKER', payload: init.fintracker });
+        if (init.currency) dispatch({ type: 'SET_CURRENCY', payload: init.currency });
+        if (init.roundOff !== undefined) dispatch({ type: 'SET_ROUND_OFF', payload: init.roundOff });
       })
       .catch(() => {
         /* auth / network — pages may show their own errors */

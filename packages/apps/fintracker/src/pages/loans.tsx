@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Banknote, BarChart3, CreditCard, Landmark, Clock, Layers3, ArrowDownLeft, ArrowUpRight, Plus } from 'lucide-react'
 import { api, RawCashLoanHistoryRow, RawCashLoanRow, RawEmiRow, RawJewelLoanHistoryRow, RawJewelLoanRow } from '../api'
-import { INR } from '../utils'
+import { useFormatMoney } from '../hooks/useFormatMoney'
 import { FormField, HoldingCard, KpiCard, KpiGrid, LoadingState, ModalActions, ModalShell, SectionBlock, SectionChip } from '../ui'
 
 type LoanSource = 'EMI' | 'Jewel' | 'Cash'
@@ -296,6 +296,7 @@ function buildHistory(
 }
 
 export default function Loans() {
+  const fmt = useFormatMoney()
   const [activeTab, setActiveTab] = useState<LoansTab>('dashboard')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -810,11 +811,11 @@ export default function Loans() {
             right={<SectionChip tone="muted">{metrics.loanCount} loans</SectionChip>}
           >
             <KpiGrid>
-              <KpiCard label="Total Outstanding" value={<span className="kpi-card-v--red">{INR(metrics.totalOutstanding)}</span>} tone="red" icon={<ArrowUpRight size={14} />} full />
-              <KpiCard label="Total Loan Amount" value={INR(metrics.totalLoanAmount)} tone="navy" icon={<CreditCard size={14} />} full />
-              <KpiCard label="Total Principal" value={INR(metrics.totalPrincipal)} tone="muted" icon={<CreditCard size={14} />} />
-              <KpiCard label="Total Interest" value={INR(metrics.totalInterest)} tone="amber" icon={<Landmark size={14} />} />
-              <KpiCard label="Total Paid" value={INR(metrics.totalPaid)} tone="green" icon={<ArrowDownLeft size={14} />} />
+              <KpiCard label="Total Outstanding" value={<span className="kpi-card-v--red">{fmt(metrics.totalOutstanding)}</span>} tone="red" icon={<ArrowUpRight size={14} />} full />
+              <KpiCard label="Total Loan Amount" value={fmt(metrics.totalLoanAmount)} tone="navy" icon={<CreditCard size={14} />} full />
+              <KpiCard label="Total Principal" value={fmt(metrics.totalPrincipal)} tone="muted" icon={<CreditCard size={14} />} />
+              <KpiCard label="Total Interest" value={fmt(metrics.totalInterest)} tone="amber" icon={<Landmark size={14} />} />
+              <KpiCard label="Total Paid" value={fmt(metrics.totalPaid)} tone="green" icon={<ArrowDownLeft size={14} />} />
               <KpiCard label="EMI Loans" value={emiMetrics.totalLoanCount} tone="muted" icon={<CreditCard size={14} />} />
               <KpiCard label="Jewel Loans" value={jewelMetrics.count} tone="muted" icon={<Landmark size={14} />} />
               <KpiCard label="Cash Loans" value={cashLoans.length} tone="muted" icon={<Banknote size={14} />} />
@@ -830,12 +831,12 @@ export default function Loans() {
               right={<SectionChip tone="muted">{emiMetrics.totalLoanCount} loans</SectionChip>}
             >
               <KpiGrid>
-                <KpiCard label="Loan Value" value={INR(emiMetrics.totalLoanValue)} tone="navy" icon={<CreditCard size={14} />} />
-                <KpiCard label="Principal" value={INR(emiRows.reduce((sum, loan) => sum + loan.principal, 0))} tone="navy" icon={<CreditCard size={14} />} />
-                <KpiCard label="Interest" value={INR(emiRows.reduce((sum, loan) => sum + loan.interest, 0))} tone="amber" icon={<Landmark size={14} />} />
-                <KpiCard label="Paid" value={INR(emiRows.reduce((sum, loan) => sum + (loan.emi_amount * loan.paid_emis), 0))} tone="muted" icon={<Banknote size={14} />} />
-                <KpiCard label="Outstanding" value={<span className="kpi-card-v--red">{INR(emiMetrics.totalOutstanding)}</span>} tone="red" icon={<ArrowUpRight size={14} />} />
-                <KpiCard label="Monthly EMIs" value={INR(emiMetrics.totalMonthlyEmis)} tone="green" icon={<ArrowDownLeft size={14} />} />
+                <KpiCard label="Loan Value" value={fmt(emiMetrics.totalLoanValue)} tone="navy" icon={<CreditCard size={14} />} />
+                <KpiCard label="Principal" value={fmt(emiRows.reduce((sum, loan) => sum + loan.principal, 0))} tone="navy" icon={<CreditCard size={14} />} />
+                <KpiCard label="Interest" value={fmt(emiRows.reduce((sum, loan) => sum + loan.interest, 0))} tone="amber" icon={<Landmark size={14} />} />
+                <KpiCard label="Paid" value={fmt(emiRows.reduce((sum, loan) => sum + (loan.emi_amount * loan.paid_emis), 0))} tone="muted" icon={<Banknote size={14} />} />
+                <KpiCard label="Outstanding" value={<span className="kpi-card-v--red">{fmt(emiMetrics.totalOutstanding)}</span>} tone="red" icon={<ArrowUpRight size={14} />} />
+                <KpiCard label="Monthly EMIs" value={fmt(emiMetrics.totalMonthlyEmis)} tone="green" icon={<ArrowDownLeft size={14} />} />
               </KpiGrid>
             </SectionBlock>
 
@@ -885,18 +886,18 @@ export default function Loans() {
                           </div>
                           <div className="ui-kit-holding-stat ui-kit-holding-stat--center">
                             <span>Principal</span>
-                            <strong>{INR(loan.principal)}</strong>
+                            <strong>{fmt(loan.principal)}</strong>
                           </div>
                           <div className="ui-kit-holding-stat ui-kit-holding-stat--right">
                             <span>Amount Paid</span>
-                            <strong>{INR(paid)}</strong>
+                            <strong>{fmt(paid)}</strong>
                           </div>
                         </div>
 
                         <div className="ui-kit-holding-card-grid">
                           <div className="ui-kit-holding-stat">
                             <span>Monthly EMI</span>
-                            <strong>{INR(loan.emi_amount)}</strong>
+                            <strong>{fmt(loan.emi_amount)}</strong>
                           </div>
                           <div className="ui-kit-holding-stat ui-kit-holding-stat--right" style={{ gridColumn: 'span 2' }}>
                             <span>Tenure Left</span>
@@ -907,7 +908,7 @@ export default function Loans() {
                         <div className="ui-kit-holding-pnl ui-tone-red">
                           <div className="ui-kit-holding-pnl-row">
                             <div className="ui-kit-holding-pnl-label">Outstanding</div>
-                            <div className="ui-kit-holding-pnl-value">{INR(outstanding)}</div>
+                            <div className="ui-kit-holding-pnl-value">{fmt(outstanding)}</div>
                           </div>
                         </div>
                       </div>
@@ -937,7 +938,7 @@ export default function Loans() {
                     title={row.title}
                     subtitle={row.subtitle}
                     leftLabel="Amount"
-                    leftValue={INR(row.amount)}
+                    leftValue={fmt(row.amount)}
                     centerLabel="Type"
                     centerValue={row.source}
                     rightLabel="Date"
@@ -963,10 +964,10 @@ export default function Loans() {
               right={<SectionChip tone="muted">{jewelMetrics.count} loans</SectionChip>}
             >
               <KpiGrid>
-                <KpiCard label="Principal" value={INR(jewelMetrics.totalPrincipal)} tone="navy" icon={<CreditCard size={14} />} />
-                <KpiCard label="Paid" value={INR(jewelMetrics.totalPaid)} tone="green" icon={<ArrowDownLeft size={14} />} />
-                <KpiCard label="Outstanding" value={<span className="kpi-card-v--red">{INR(jewelMetrics.totalOutstanding)}</span>} tone="red" icon={<ArrowUpRight size={14} />} />
-                <KpiCard label="Interest" value={INR(jewelMetrics.totalInterest)} tone="amber" icon={<Landmark size={14} />} />
+                <KpiCard label="Principal" value={fmt(jewelMetrics.totalPrincipal)} tone="navy" icon={<CreditCard size={14} />} />
+                <KpiCard label="Paid" value={fmt(jewelMetrics.totalPaid)} tone="green" icon={<ArrowDownLeft size={14} />} />
+                <KpiCard label="Outstanding" value={<span className="kpi-card-v--red">{fmt(jewelMetrics.totalOutstanding)}</span>} tone="red" icon={<ArrowUpRight size={14} />} />
+                <KpiCard label="Interest" value={fmt(jewelMetrics.totalInterest)} tone="amber" icon={<Landmark size={14} />} />
               </KpiGrid>
             </SectionBlock>
 
@@ -1010,22 +1011,22 @@ export default function Loans() {
                         <div className="ui-kit-holding-card-grid">
                           <div className="ui-kit-holding-stat">
                             <span>Principal</span>
-                            <strong>{INR(jewelLoan.principal)}</strong>
+                            <strong>{fmt(jewelLoan.principal)}</strong>
                           </div>
                           <div className="ui-kit-holding-stat ui-kit-holding-stat--center">
                             <span>Interest</span>
-                            <strong>{INR(jewelLoan.interest)}</strong>
+                            <strong>{fmt(jewelLoan.interest)}</strong>
                           </div>
                           <div className="ui-kit-holding-stat ui-kit-holding-stat--right">
                             <span>Paid</span>
-                            <strong>{INR(jewelLoan.paid)}</strong>
+                            <strong>{fmt(jewelLoan.paid)}</strong>
                           </div>
                         </div>
 
                         <div className="ui-kit-holding-card-grid">
                           <div className="ui-kit-holding-stat">
                             <span>Total Payable</span>
-                            <strong>{INR(totalPayable)}</strong>
+                            <strong>{fmt(totalPayable)}</strong>
                           </div>
                           <div className="ui-kit-holding-stat ui-kit-holding-stat--center">
                             <span>Start Date</span>
@@ -1040,7 +1041,7 @@ export default function Loans() {
                         <div className="ui-kit-holding-pnl ui-tone-red">
                           <div className="ui-kit-holding-pnl-row">
                             <div className="ui-kit-holding-pnl-label">Outstanding</div>
-                            <div className="ui-kit-holding-pnl-value">{INR(jewelLoan.outstanding)}</div>
+                            <div className="ui-kit-holding-pnl-value">{fmt(jewelLoan.outstanding)}</div>
                           </div>
                         </div>
                       </div>
@@ -1060,9 +1061,9 @@ export default function Loans() {
               right={<SectionChip tone="muted">{cashLoans.length} loans</SectionChip>}
             >
               <KpiGrid>
-                <KpiCard label="Principal" value={INR(cashLoans.reduce((sum, loan) => sum + loan.principal, 0))} tone="navy" icon={<Banknote size={14} />} />
-                <KpiCard label="Paid" value={INR(cashLoans.reduce((sum, loan) => sum + loan.paid, 0))} tone="green" icon={<ArrowDownLeft size={14} />} />
-                <KpiCard label="Outstanding" value={<span className="kpi-card-v--red">{INR(cashLoans.reduce((sum, loan) => sum + loan.outstanding, 0))}</span>} tone="red" icon={<ArrowUpRight size={14} />} />
+                <KpiCard label="Principal" value={fmt(cashLoans.reduce((sum, loan) => sum + loan.principal, 0))} tone="navy" icon={<Banknote size={14} />} />
+                <KpiCard label="Paid" value={fmt(cashLoans.reduce((sum, loan) => sum + loan.paid, 0))} tone="green" icon={<ArrowDownLeft size={14} />} />
+                <KpiCard label="Outstanding" value={<span className="kpi-card-v--red">{fmt(cashLoans.reduce((sum, loan) => sum + loan.outstanding, 0))}</span>} tone="red" icon={<ArrowUpRight size={14} />} />
                 <KpiCard label="Loans" value={cashLoans.length} tone="muted" icon={<CreditCard size={14} />} />
               </KpiGrid>
             </SectionBlock>
@@ -1106,7 +1107,7 @@ export default function Loans() {
                         <div className="ui-kit-holding-card-grid">
                           <div className="ui-kit-holding-stat">
                             <span>Principal</span>
-                            <strong>{INR(cashLoan.principal)}</strong>
+                            <strong>{fmt(cashLoan.principal)}</strong>
                           </div>
                           <div className="ui-kit-holding-stat ui-kit-holding-stat--center">
                             <span>Date</span>
@@ -1114,14 +1115,14 @@ export default function Loans() {
                           </div>
                           <div className="ui-kit-holding-stat ui-kit-holding-stat--right">
                             <span>Paid</span>
-                            <strong>{INR(cashLoan.paid)}</strong>
+                            <strong>{fmt(cashLoan.paid)}</strong>
                           </div>
                         </div>
 
                         <div className="ui-kit-holding-pnl ui-tone-red">
                           <div className="ui-kit-holding-pnl-row">
                             <div className="ui-kit-holding-pnl-label">Outstanding</div>
-                            <div className="ui-kit-holding-pnl-value">{INR(cashLoan.outstanding)}</div>
+                            <div className="ui-kit-holding-pnl-value">{fmt(cashLoan.outstanding)}</div>
                           </div>
                         </div>
                       </div>

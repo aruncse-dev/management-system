@@ -36,10 +36,9 @@ function pad2(n: number) {
   return String(n).padStart(2, '0')
 }
 
-/** ISO date yyyy-mm-dd for local calendar (month 0 = Jan). */
+/** ISO date yyyy-mm-dd (month 0 = Jan). */
 function isoFromYmd(y: number, m0: number, d: number) {
-  const dt = new Date(y, m0, d)
-  return `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`
+  return `${y}-${pad2(m0 + 1)}-${pad2(d)}`
 }
 
 /** Inclusive calendar-month range for the labelled month/year (MNS + 4-digit year). */
