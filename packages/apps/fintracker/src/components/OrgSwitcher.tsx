@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { clearMenuCache } from '../lib/profileMenuCache'
+import { clearSettingsPageCache } from '../lib/settingsPageCache'
 
 type Org = { id: string; name: string }
 
@@ -39,6 +40,7 @@ export function OrgSwitcher() {
       if (j.ok) {
         setActiveId(orgId)
         clearMenuCache()
+        clearSettingsPageCache()
         window.location.reload()
       }
     } finally {
