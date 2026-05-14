@@ -11,9 +11,12 @@ import { FintrackerModesProvider } from '../context/FintrackerModesContext'
 import {
   MENU_CACHE_UPDATED_EVENT,
   readMenuCache,
+  refreshMenuCacheInBackground,
   writeMenuCache,
+  clearMenuCache,
   type CachedProfileMenuRow,
 } from '../lib/profileMenuCache'
+import { clearSettingsPageCache } from '../lib/settingsPageCache'
 import {
   LENDING_SHEET_SLUG_DEFAULT,
   lendingBookLabel,
@@ -129,7 +132,13 @@ export default function App({ Component, pageProps }: AppProps) {
         settings: '/settings',
         components: '/components',
       }
-      void router.push(pathByModule[id] || '/monthly?tab=dash')
+      const target = pathByModule[id] || '/monthly?tab=dash'
+      try {
+        void router.prefetch(target)
+      } catch {
+        /* invalid href */
+      }
+      void router.push(target)
     },
     [router, lendingSheet],
   )
@@ -144,6 +153,11 @@ export default function App({ Component, pageProps }: AppProps) {
 
   useEffect(() => {
     let cancelled = false
+    const cached = readMenuCache()
+    if (cached?.menu?.length) {
+      refreshMenuCacheInBackground()
+      return
+    }
     void (async () => {
       try {
         const r = await fetch('/api/profile', { credentials: 'same-origin' })
@@ -159,7 +173,66 @@ export default function App({ Component, pageProps }: AppProps) {
     return () => {
       cancelled = true
     }
-  }, [router.pathname])
+  }, [])
+
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === 'visible') refreshMenuCacheInBackground()
+    }
+    document.addEventListener('visibilitychange', onVis)
+    return () => document.removeEventListener('visibilitychange', onVis)
+  }, [])
+
+  useEffect(() => {
+    if (!dynamicMenu.length || typeof window === 'undefined') return
+    const paths = [
+      ...new Set(dynamicMenu.flatMap(s => s.items.map(i => i.path.trim())).filter(Boolean)),
+    ].slice(0, 8)
+    if (!paths.length) return
+    let cancelled = false
+    let idleHandle: number | undefined
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined
+
+    const run = () => {
+      if (cancelled) return
+      for (const p of paths) {
+        if (cancelled) return
+        try {
+          void router.prefetch(p)
+        } catch {
+          /* invalid href */
+        }
+      }
+    }
+
+    if ('requestIdleCallback' in window) {
+      idleHandle = window.requestIdleCallback(run)
+    } else {
+      timeoutHandle = setTimeout(run, 400)
+    }
+
+    return () => {
+      cancelled = true
+      if (idleHandle !== undefined && 'cancelIdleCallback' in window) {
+        window.cancelIdleCallback(idleHandle)
+      }
+      if (timeoutHandle !== undefined) clearTimeout(timeoutHandle)
+    }
+  }, [dynamicMenu, router])
+
+  const navigateFromMenu = useCallback(
+    (path: string) => {
+      const p = path.trim()
+      if (!p) return
+      try {
+        void router.prefetch(p)
+      } catch {
+        /* invalid href */
+      }
+      void router.push(p)
+    },
+    [router],
+  )
 
   const pageTitle = useMemo(() => {
     if (!moduleFromPath) return 'FinTracker'
@@ -175,7 +248,13 @@ export default function App({ Component, pageProps }: AppProps) {
         <meta name="theme-color" content="#1E5CC7" />
       </Head>
       <AppAuthGate appKind="fintracker" googleClientId={googleClientId}>
-        {({ onLogout }) => (
+        {({ onLogout }) => {
+          const handleLogout = () => {
+            clearMenuCache()
+            clearSettingsPageCache()
+            onLogout()
+          }
+          return (
           <StoreProvider>
             <FintrackerModesProvider>
             <div className="with-app-shell">
@@ -189,10 +268,10 @@ export default function App({ Component, pageProps }: AppProps) {
                     title={pageTitle}
                     appName="FinTracker"
                     area={getAppArea(router.asPath)}
-                    onLogout={onLogout}
+                    onLogout={handleLogout}
                     dynamicMenu={dynamicMenu}
                     activeAsPath={router.asPath}
-                    onNavigatePath={(path: string) => void router.push(path)}
+                    onNavigatePath={navigateFromMenu}
                   />
                   <OrgSwitcher />
                 </>
@@ -201,7 +280,8 @@ export default function App({ Component, pageProps }: AppProps) {
             </div>
             </FintrackerModesProvider>
           </StoreProvider>
-        )}
+          )
+        }}
       </AppAuthGate>
     </>
   )

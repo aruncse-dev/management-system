@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type FormEvent } from 'react';
+import { useState, useEffect, useCallback, useLayoutEffect, type FormEvent } from 'react';
 import { useRouter } from 'next/router';
 import {
   Loader2,
@@ -34,6 +34,7 @@ import { THEME_COLORS } from '../config';
 import { LoadingState, SectionBlock, SectionChip, FormField, Spacer, SettingsSectionCard, TransactionCard, type SettingField } from '../ui';
 import { useFintrackerModes } from '../context/FintrackerModesContext';
 import { MENU_CACHE_UPDATED_EVENT, readMenuCache } from '../lib/profileMenuCache';
+import { mergeWriteSettingsPageCache, readSettingsPageCache, type SettingsPageCachePayload } from '../lib/settingsPageCache';
 import type { FintrackerPrefs } from '../expenseCycle';
 import { DEFAULT_FINTRACKER_PREFS, cycleDateRange, cycleSubtitle } from '../expenseCycle';
 import { formatCurrency } from '../../../../shared/utils/src/formatters';
@@ -52,6 +53,8 @@ function readMenuHasPath(path: string): boolean {
 }
 
 const GOLD_RATE_FIELD: SettingField = { key: 'goldRate', label: 'Gold rate (INR/gram)', type: 'number' };
+
+type ValidateLiveArg = boolean | { forceInvalidate?: boolean; background?: boolean };
 
 /** Same shell as `TransactionCard` lists on Accounts / Credits (holding row + txn border). */
 const GENERAL_SETTINGS_PANEL =
@@ -164,64 +167,128 @@ export default function Settings() {
   const [currencySaving, setCurrencySaving] = useState(false);
   const [upstoxUiOpen, setUpstoxUiOpen] = useState(true);
 
-  const validateLiveStatus = useCallback(async (forceRefresh = false) => {
-    setLoading(true);
-    setError('');
-    setUpstoxStatusState('checking');
+  useLayoutEffect(() => {
+    const c = readSettingsPageCache();
+    if (!c) return;
+    setSettings(c.settingsFields);
+    setProfile(c.profile);
+    if (c.fintrackerDraft?.expenseCycle) {
+      setFintrackerDraft(c.fintrackerDraft);
+    }
+    setSettingsDraft(c.settingsDraft ?? { currency: 'INR', roundOff: true });
+    setUpstoxStatus(c.upstoxStatus ?? { hasToken: false });
+    if (c.upstoxStatusState === 'checking') {
+      setUpstoxStatusState(c.upstoxStatus.hasToken ? 'connected' : 'missing');
+    } else {
+      setUpstoxStatusState(c.upstoxStatusState);
+    }
+    if (c.goldResources && Array.isArray(c.goldResources)) {
+      setGoldResources(c.goldResources);
+    }
+    setLoading(false);
+  }, []);
+
+  const validateLiveStatus = useCallback(async (arg: ValidateLiveArg = {}) => {
+    const opts = typeof arg === 'boolean' ? { forceInvalidate: arg, background: false } : arg
+    const { forceInvalidate = false, background = false } = opts
+    if (!background) {
+      setLoading(true)
+    }
+    setError('')
+    if (!background) {
+      setUpstoxStatusState('checking')
+    }
     try {
-      if (forceRefresh) api.invalidateCache({ action: 'get', params: { module: 'settings' } });
+      if (forceInvalidate) api.invalidateCache({ action: 'get', params: { module: 'settings' } })
       const [settingsResult, tokenResult, profileResult] = await Promise.allSettled([
         api.getSettings(),
         api.getTokenStatus(),
         api.getProfile(),
-      ]);
-      const loaded: Record<string, string> = {};
+      ])
+      const loaded: Record<string, string> = {}
+      let nextFintracker: FintrackerPrefs | undefined
+      let nextSettingsDraft: { currency?: 'INR' | 'USD' | 'AED'; roundOff?: boolean } | undefined
+
       if (settingsResult.status === 'fulfilled') {
         loaded[String(GOLD_RATE_FIELD.key)] = String(
           settingsResult.value[GOLD_RATE_FIELD.key as keyof typeof settingsResult.value] || '',
-        );
-        loaded.usdToInr = settingsResult.value.usdToInr !== undefined ? String(settingsResult.value.usdToInr) : '';
-        const ft = settingsResult.value.fintracker;
+        )
+        loaded.usdToInr =
+          settingsResult.value.usdToInr !== undefined ? String(settingsResult.value.usdToInr) : ''
+        const ft = settingsResult.value.fintracker
         if (ft && typeof ft === 'object' && ft.expenseCycle) {
-          setFintrackerDraft({
+          const draft: FintrackerPrefs = {
             expenseCycle: {
               mode: ft.expenseCycle.mode === 'custom' ? 'custom' : 'regular',
               anchorDay: Math.min(31, Math.max(2, Math.floor(Number(ft.expenseCycle.anchorDay)) || 19)),
             },
-          });
+          }
+          setFintrackerDraft(draft)
+          nextFintracker = draft
         } else {
-          setFintrackerDraft({ expenseCycle: { ...DEFAULT_FINTRACKER_PREFS.expenseCycle } });
+          const draft = { expenseCycle: { ...DEFAULT_FINTRACKER_PREFS.expenseCycle } }
+          setFintrackerDraft(draft)
+          nextFintracker = draft
         }
-        setSettingsDraft({
+        const sd = {
           currency: (settingsResult.value.currency as 'INR' | 'USD' | 'AED') || 'INR',
           roundOff: settingsResult.value.roundOff !== false,
-        });
+        }
+        setSettingsDraft(sd)
+        nextSettingsDraft = sd
+        setSettings(loaded)
+      } else if (!background) {
+        setSettings({})
       }
-      setSettings(loaded);
+
       if (profileResult.status === 'fulfilled') {
-        setProfile(profileResult.value);
-      } else {
-        setProfile(null);
+        setProfile(profileResult.value)
+      } else if (!background) {
+        setProfile(null)
+      }
+
+      if (tokenResult.status === 'fulfilled') {
+        setUpstoxStatus(tokenResult.value)
+        const isConnected = Boolean(tokenResult.value.hasToken)
+        setUpstoxStatusState(isConnected ? 'connected' : 'missing')
+      } else if (!background) {
+        setUpstoxStatus({ hasToken: false })
+        setUpstoxStatusState('missing')
+      }
+
+      const cachePatch: Partial<Omit<SettingsPageCachePayload, 'fetchedAt'>> = {}
+      if (settingsResult.status === 'fulfilled') {
+        cachePatch.settingsFields = loaded
+        if (nextFintracker) cachePatch.fintrackerDraft = nextFintracker
+        if (nextSettingsDraft) cachePatch.settingsDraft = nextSettingsDraft
+      }
+      if (profileResult.status === 'fulfilled') {
+        cachePatch.profile = profileResult.value
       }
       if (tokenResult.status === 'fulfilled') {
-        setUpstoxStatus(tokenResult.value);
-        const isConnected = Boolean(tokenResult.value.hasToken);
-        setUpstoxStatusState(isConnected ? 'connected' : 'missing');
-      } else {
-        setUpstoxStatus({ hasToken: false });
-        setUpstoxStatusState('missing');
+        cachePatch.upstoxStatus = tokenResult.value
+        cachePatch.upstoxStatusState = tokenResult.value.hasToken ? 'connected' : 'missing'
+      }
+      if (
+        cachePatch.settingsFields !== undefined ||
+        cachePatch.profile !== undefined ||
+        cachePatch.upstoxStatus !== undefined
+      ) {
+        mergeWriteSettingsPageCache(cachePatch)
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load settings');
-      setUpstoxStatusState('missing');
+      setError(e instanceof Error ? e.message : 'Failed to load settings')
+      if (!background) {
+        setUpstoxStatusState('missing')
+      }
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, []);
+  }, [])
 
   useEffect(() => {
-    validateLiveStatus();
-  }, [validateLiveStatus]);
+    void validateLiveStatus({ background: readSettingsPageCache() !== null })
+  }, [validateLiveStatus])
 
   useEffect(() => {
     setMoneyModalOpen(false);
@@ -436,12 +503,21 @@ export default function Settings() {
   const loadGoldResources = useCallback(
     async (force = false) => {
       if (!hasGoldMenu) return;
-      setGoldResLoading(true);
+      const snap = readSettingsPageCache();
+      const fromCache = !force ? snap?.goldResources : undefined;
+      const hasCachedGold = fromCache !== undefined && Array.isArray(fromCache);
+      if (hasCachedGold) {
+        setGoldResources(fromCache);
+      }
+      if (!hasCachedGold || force) {
+        setGoldResLoading(true);
+      }
       setError('');
       try {
         if (force) api.invalidateCache({ action: 'getResources', params: { module: 'gold' } });
         const rows = await api.getGoldResources();
         setGoldResources(rows);
+        mergeWriteSettingsPageCache({ goldResources: rows });
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Failed to load gold setup');
       } finally {

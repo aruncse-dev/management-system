@@ -3,11 +3,13 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useState,
   type ReactNode,
 } from 'react'
 import { api, type AccountRow, type CreditSourceRow } from '../api'
+import { mergeWriteSettingsPageCache, readSettingsPageCache } from '../lib/settingsPageCache'
 
 export type FintrackerModesContextValue = {
   loading: boolean
@@ -44,23 +46,35 @@ export function FintrackerModesProvider({ children }: { children: ReactNode }) {
   const [creditSources, setCreditSources] = useState<CreditSourceRow[]>([])
   const [loading, setLoading] = useState(true)
 
-  const refresh = useCallback(async () => {
-    setLoading(true)
+  useLayoutEffect(() => {
+    const c = readSettingsPageCache()
+    if (!c) return
+    setAccounts(c.accounts)
+    setCreditSources(c.creditSources)
+    setLoading(false)
+  }, [])
+
+  const refresh = useCallback(async (opts?: { background?: boolean }) => {
+    if (!opts?.background) setLoading(true)
     try {
       const [a, c] = await Promise.all([api.getAccountsList(), api.getCreditSources()])
       setAccounts(a)
       setCreditSources(c)
+      mergeWriteSettingsPageCache({ accounts: a, creditSources: c })
     } catch (e) {
       console.error('[FintrackerModes] accounts/credits load failed', e)
-      setAccounts([])
-      setCreditSources([])
+      if (!opts?.background) {
+        setAccounts([])
+        setCreditSources([])
+      }
     } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    void refresh()
+    const hadCache = readSettingsPageCache() != null
+    void refresh({ background: hadCache })
   }, [refresh])
 
   const monthlyAccountNames = useMemo(
