@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import type { Transaction, TransactionForm } from '@fintracker-vault/types'
 import { CATEGORIES, INCOME_CATS } from '@fintracker-vault/config'
@@ -27,6 +27,10 @@ interface Props {
   expenseCategoryOptions?: readonly string[]
   /** Income categories (e.g. `ALL_CATS` ∪ budget names). Defaults to merged config lists. */
   incomeCategoryOptions?: readonly string[]
+  /** Amount field label (include currency when helpful). */
+  amountLabel?: string
+  /** Amount input placeholder (e.g. formatted zero in display currency). */
+  amountPlaceholder?: string
 }
 
 function todayISO() {
@@ -59,6 +63,170 @@ function isoFromGas(s: string) {
   const m = s.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2})$/)
   if (!m) return todayISO()
   return `20${m[3]}-${months[m[2]]}-${m[1].padStart(2, '0')}`
+}
+
+/** Single-field combobox: blurred shows committed category; focus clears to type-ahead filter (↑/↓, Enter, Esc). */
+function CategoryCombobox({
+  value,
+  options,
+  onChange,
+}: {
+  value: string
+  options: readonly string[]
+  onChange: (v: string) => void
+}) {
+  const comboboxId = useId()
+  const inputRef = useRef<HTMLInputElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  const [focused, setFocused] = useState(false)
+  const [query, setQuery] = useState('')
+  const [highlight, setHighlight] = useState(0)
+
+  const sorted = useMemo(() => {
+    const uniq = new Set(options.map(String))
+    if (value && !uniq.has(value)) uniq.add(value)
+    return [...uniq].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+  }, [options, value])
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return sorted
+    return sorted.filter(c => c.toLowerCase().includes(q))
+  }, [sorted, query])
+
+  useEffect(() => {
+    setHighlight(h => {
+      if (filtered.length === 0) return 0
+      return Math.min(h, filtered.length - 1)
+    })
+  }, [filtered])
+
+  useEffect(() => {
+    if (!focused || filtered.length === 0) return
+    const row = listRef.current?.querySelector(`[data-cat-i="${highlight}"]`)
+    row?.scrollIntoView({ block: 'nearest' })
+  }, [highlight, focused, filtered])
+
+  useEffect(() => {
+    if (!focused) return
+    function onDoc(e: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setFocused(false)
+        setQuery('')
+      }
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [focused])
+
+  function commit(cat: string) {
+    onChange(cat)
+    setQuery('')
+    setFocused(false)
+    setHighlight(0)
+    inputRef.current?.blur()
+  }
+
+  const inputValue = focused ? query : value
+  const showList = focused && (filtered.length > 0 || query.trim().length > 0)
+
+  return (
+    <div ref={rootRef}>
+      <input
+        ref={inputRef}
+        id={comboboxId}
+        className="form-inp"
+        type="text"
+        autoComplete="off"
+        aria-expanded={showList}
+        aria-controls={showList ? `${comboboxId}-listbox` : undefined}
+        aria-autocomplete="list"
+        role="combobox"
+        aria-label="Category"
+        placeholder={focused ? 'Type to filter…' : 'Tap to search categories'}
+        value={inputValue}
+        onFocus={() => {
+          setFocused(true)
+          setQuery('')
+          setHighlight(0)
+        }}
+        onChange={e => {
+          setQuery(e.target.value)
+          setHighlight(0)
+        }}
+        onKeyDown={e => {
+          if (!focused) return
+          if (e.key === 'ArrowDown') {
+            e.preventDefault()
+            setHighlight(h => Math.min(h + 1, Math.max(0, filtered.length - 1)))
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault()
+            setHighlight(h => Math.max(h - 1, 0))
+          } else if (e.key === 'Enter') {
+            const pick = filtered[highlight]
+            if (pick) {
+              e.preventDefault()
+              commit(pick)
+            }
+          } else if (e.key === 'Escape') {
+            e.preventDefault()
+            setFocused(false)
+            setQuery('')
+            inputRef.current?.blur()
+          }
+        }}
+      />
+      {showList && (
+        <div
+          ref={listRef}
+          id={`${comboboxId}-listbox`}
+          role="listbox"
+          style={{
+            marginTop: 8,
+            maxHeight: 'min(40vh, 220px)',
+            overflowY: 'auto',
+            borderRadius: 'var(--r)',
+            border: '1px solid var(--border)',
+            background: 'var(--bg)',
+          }}
+        >
+          {filtered.length === 0 ? (
+            <div style={{ padding: '12px 14px', fontSize: 13, color: 'var(--muted)' }}>No matches</div>
+          ) : (
+            filtered.map((c, i) => (
+              <button
+                key={c}
+                type="button"
+                role="option"
+                aria-selected={(focused && i === highlight) || (!focused && c === value)}
+                data-cat-i={i}
+                onMouseDown={e => {
+                  e.preventDefault()
+                  commit(c)
+                }}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '10px 14px',
+                  fontSize: 14,
+                  border: 'none',
+                  borderBottom: i < filtered.length - 1 ? '1px solid var(--border)' : undefined,
+                  background: i === highlight ? 'var(--navy-lt)' : c === value ? 'rgba(30, 92, 199, 0.08)' : 'transparent',
+                  color: 'var(--text)',
+                  cursor: 'pointer',
+                }}
+              >
+                {c}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function buildTransactionFormFromRow(
@@ -120,6 +288,8 @@ export default function TransactionModal({
   transferTargetOptions,
   expenseCategoryOptions,
   incomeCategoryOptions,
+  amountLabel = 'Amount',
+  amountPlaceholder = '0',
 }: Props) {
   const isEdit = !!row
   const defaultMode = paymentModeOptions[0] ?? 'Cash'
@@ -132,7 +302,7 @@ export default function TransactionModal({
   const [delConfirm, setDelConfirm] = useState(false)
 
   const isTransfer = form.t === 'Transfer'
-  const cats =
+  const cats: readonly string[] =
     form.t === 'Income'
       ? (incomeCategoryOptions ?? ALL_CATS)
       : (expenseCategoryOptions ?? CATEGORIES)
@@ -214,13 +384,13 @@ export default function TransactionModal({
             <input className="form-inp" type="date" value={form.date} onChange={e => set('date', e.target.value)} />
           </div>
           <div className="form-row">
-            <label className="form-lbl">Amount (₹)</label>
+            <label className="form-lbl">{amountLabel}</label>
             <input
               className="form-inp"
               type="number"
               min="0"
               step="1"
-              placeholder="0"
+              placeholder={amountPlaceholder}
               value={form.a}
               onChange={e => set('a', e.target.value)}
             />
@@ -246,11 +416,7 @@ export default function TransactionModal({
           {!isTransfer && (
             <div className="form-row">
               <label className="form-lbl">Category</label>
-              <select className="form-sel" value={form.c} onChange={e => set('c', e.target.value)}>
-                {cats.map(c => (
-                  <option key={c}>{c}</option>
-                ))}
-              </select>
+              <CategoryCombobox value={form.c} options={cats} onChange={v => set('c', v)} />
             </div>
           )}
           <div className="form-row">

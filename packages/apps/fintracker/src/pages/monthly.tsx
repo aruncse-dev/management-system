@@ -13,6 +13,7 @@ import { MNS, BUDGET_GLOBAL_MONTH_KEY } from '../config'
 import { expenseCategoriesWithBudget, incomeCategoriesWithBudget, monthYearApiKey } from '../utils'
 import { useFintrackerModes } from '../context/FintrackerModesContext'
 import { cycleSubtitle } from '../expenseCycle'
+import { useMoneyFormatting } from '../hooks/useFormatMoney'
 
 type TabId = 'dash' | 'txns' | 'bud' | 'cc' | 'acct'
 
@@ -21,6 +22,7 @@ const TAB_Q: Record<TabId, string> = { dash: 'dash', txns: 'txns', bud: 'bud', c
 export default function Monthly() {
   const router = useRouter()
   const { state, dispatch } = useStore()
+  const money = useMoneyFormatting()
   const { paymentModeOptions, transferTargetOptions } = useFintrackerModes()
   const [tab, setTab] = useState<TabId>('dash')
   const [modalOpen, setModalOpen] = useState(false)
@@ -204,8 +206,8 @@ export default function Monthly() {
                 />
               </div>
               <div>
-                <div style={{fontSize:12,fontWeight:600,color:'var(--muted)',marginBottom:5,textTransform:'uppercase',letterSpacing:.4}}>Budget Amount (₹)</div>
-                <input className="form-inp" type="number" placeholder="0" value={budgetVal} onChange={e => setBudgetVal(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addBudget() }} />
+                <div style={{fontSize:12,fontWeight:600,color:'var(--muted)',marginBottom:5,textTransform:'uppercase',letterSpacing:.4}}>{`Budget amount (${money.currency})`}</div>
+                <input className="form-inp" type="number" placeholder={money.zeroPlaceholder} value={budgetVal} onChange={e => setBudgetVal(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addBudget() }} />
               </div>
               <div>
                 <div style={{fontSize:12,fontWeight:600,color:'var(--muted)',marginBottom:8,textTransform:'uppercase',letterSpacing:.4}}>Applies to</div>
@@ -240,6 +242,8 @@ export default function Monthly() {
           transferTargetOptions={transferTargetOptions}
           expenseCategoryOptions={expenseCategoryOptions}
           incomeCategoryOptions={incomeCategoryOptions}
+          amountLabel={`Amount (${money.currency})`}
+          amountPlaceholder={money.zeroPlaceholder}
           onClose={() => setModalOpen(false)}
           onSaved={async () => {
             setModalOpen(false)

@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Pencil, Trash2, X as XIcon, AlertTriangle, Package } from 'lucide-react'
 import { useStore } from '../store'
-import { catMap, budgetSummary, INR, monthYearApiKey } from '../utils'
+import { catMap, budgetSummary, monthYearApiKey } from '../utils'
+import { useMoneyFormatting } from '../hooks/useFormatMoney'
 import { BUDGET_GLOBAL_MONTH_KEY } from '../config'
 import { api } from '../api'
 import { CatIcon } from '../ui'
@@ -14,6 +15,7 @@ interface ModalState { mode: ModalMode; id: string; cat: string; val: string }
 
 export default function Budget({ showStatus, onCategoryClick }: Props) {
   const { state, dispatch } = useStore()
+  const { format: fmt, currency, zeroPlaceholder } = useMoneyFormatting()
   const { budget, rows, month, year } = state
   const cm = catMap(rows, budget)
   const { totalBudget, totalSpent, ovCount, totalOver } = budgetSummary(budget, cm)
@@ -91,9 +93,9 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
     <div className="pg ui-kit-page-shell monthly-subpage">
       <SectionBlock title="Budget Management" icon={<Package size={14} />}>
         <KpiGrid variant="compact">
-          <KpiCard label="Budget" value={INR(totalBudget)} tone="navy" icon={<Package size={14} />} />
-          <KpiCard label="Spent" value={INR(totalSpent)} tone="red" icon={<AlertTriangle size={14} />} />
-          <KpiCard label={totalOver ? 'Over' : 'Remaining'} value={`${totalOver ? '−' : ''}${INR(Math.abs(remaining))}`} tone={totalOver ? 'red' : 'green'} icon={<Package size={14} />} />
+          <KpiCard label="Budget" value={fmt(totalBudget)} tone="navy" icon={<Package size={14} />} />
+          <KpiCard label="Spent" value={fmt(totalSpent)} tone="red" icon={<AlertTriangle size={14} />} />
+          <KpiCard label={totalOver ? 'Over' : 'Remaining'} value={`${totalOver ? '−' : ''}${fmt(Math.abs(remaining))}`} tone={totalOver ? 'red' : 'green'} icon={<Package size={14} />} />
           <KpiCard label="Overspent" value={String(ovCount)} tone="amber" icon={<AlertTriangle size={14} />} />
         </KpiGrid>
       </SectionBlock>
@@ -143,15 +145,15 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
               <div className="budget-row-grid" onClick={() => setCatSheet(cat)} style={{ cursor: 'pointer' }}>
                 <div>
                   <div className="budget-mini-lbl">Budget</div>
-                  <div className="budget-mini-val">{INR(budg)}</div>
+                  <div className="budget-mini-val">{fmt(budg)}</div>
                 </div>
                 <div>
                   <div className="budget-mini-lbl">Spent</div>
-                  <div className="budget-mini-val">{INR(spent)}</div>
+                  <div className="budget-mini-val">{fmt(spent)}</div>
                 </div>
                 <div className="budget-mini-right">
                   <div className="budget-mini-lbl">{over ? 'Over' : 'Left'}</div>
-                  <div className="budget-mini-val" style={{ color: over ? 'var(--red)' : 'var(--gm)' }}>{INR(Math.abs(rowRemaining))}</div>
+                  <div className="budget-mini-val" style={{ color: over ? 'var(--red)' : 'var(--gm)' }}>{fmt(Math.abs(rowRemaining))}</div>
                 </div>
               </div>
             </UiCard>
@@ -210,9 +212,9 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
                   />
                 </div>
                 <div>
-                  <div style={{fontSize:12,fontWeight:600,color:'var(--muted)',marginBottom:5,textTransform:'uppercase',letterSpacing:.4}}>Budget Amount (₹)</div>
+                  <div style={{fontSize:12,fontWeight:600,color:'var(--muted)',marginBottom:5,textTransform:'uppercase',letterSpacing:.4}}>{`Budget amount (${currency})`}</div>
                   <input
-                    className="form-inp" type="number" placeholder="0"
+                    className="form-inp" type="number" placeholder={zeroPlaceholder}
                     value={modal.val} autoFocus={modal.mode === 'edit'}
                     onChange={e => setModal(m => ({...m, val: e.target.value}))}
                     onKeyDown={e => { if (e.key === 'Enter') { modal.mode === 'add' ? confirmAdd() : confirmEdit() } }}
@@ -260,16 +262,16 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
               <div className="sheet-stats" style={{gridTemplateColumns:'1fr 1fr 1fr'}}>
               <div className="card" style={{padding:'10px 12px'}}>
                 <div className="lbl">Budget</div>
-                <div style={{fontSize:14,fontWeight:700,color:'var(--text)',marginTop:4}}>{INR(sheetBudg)}</div>
+                <div style={{fontSize:14,fontWeight:700,color:'var(--text)',marginTop:4}}>{fmt(sheetBudg)}</div>
               </div>
               <div className="card" style={{padding:'10px 12px'}}>
                 <div className="lbl">Spent</div>
-                <div style={{fontSize:14,fontWeight:700,color:'var(--text)',marginTop:4}}>{INR(sheetSpent)}</div>
+                <div style={{fontSize:14,fontWeight:700,color:'var(--text)',marginTop:4}}>{fmt(sheetSpent)}</div>
               </div>
               <div className="card" style={{padding:'10px 12px',background: sheetOver ? 'rgba(239,68,68,.08)' : 'rgba(34,197,94,.08)'}}>
                 <div className="lbl">{sheetOver ? 'Over' : 'Left'}</div>
                 <div style={{fontSize:14,fontWeight:700,color: sheetOver ? 'var(--rm)' : 'var(--gm)',marginTop:4}}>
-                  {INR(Math.abs(sheetBudg - sheetSpent))}
+                  {fmt(Math.abs(sheetBudg - sheetSpent))}
                 </div>
               </div>
             </div>
@@ -287,7 +289,7 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
                         <div style={{fontSize:11,color:'var(--muted)',marginTop:2}}>{txn.m}</div>
                       </div>
                       <div style={{textAlign:'right',flexShrink:0}}>
-                        <div style={{fontWeight:700,fontSize:14,color:'var(--rm)'}}>{INR(txn.a)}</div>
+                        <div style={{fontWeight:700,fontSize:14,color:'var(--rm)'}}>{fmt(txn.a)}</div>
                         <div style={{fontSize:10,color:'var(--muted)',marginTop:1}}>{txn.date}</div>
                       </div>
                     </div>

@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Plus, LayoutDashboard, List, BarChart3, Wallet, Search, TrendingUp, AlertTriangle, ArrowUpRight, ArrowDownRight, Repeat2 } from 'lucide-react'
 import { api, RawSavingsRow } from '../api'
 import { CATEGORIES, THEME_COLORS } from '../config'
-import { INR, mergeCategoriesWithBudgetNames } from '../utils'
+import { mergeCategoriesWithBudgetNames } from '../utils'
+import { useMoneyFormatting } from '../hooks/useFormatMoney'
 import { useStore } from '../store'
 import { BalanceRow, CatIcon, FormField, KpiCard, KpiGrid, LoadingState, SearchField, SectionBlock, SectionChip, Spacer, TransactionCard } from '../ui'
 
@@ -115,11 +116,6 @@ function computeBalances(entries: SavingsEntry[], accounts: readonly string[]): 
   return balances
 }
 
-function signedINR(n: number): string {
-  const value = INR(n)
-  return n < 0 ? `-${value}` : value
-}
-
 function typeTone(type: SavingsType) {
   if (type === 'Income') return 'green'
   if (type === 'Transfer') return 'amber'
@@ -133,6 +129,11 @@ export default function SavingsPage({
   addButtonTitle,
 }: SavingsPageConfig) {
   const { state: appState } = useStore()
+  const { format: fmt, zeroPlaceholder } = useMoneyFormatting()
+  const signedFmt = useCallback((n: number) => {
+    const value = fmt(n)
+    return n < 0 ? `-${value}` : value
+  }, [fmt])
   const [apiAccounts, setApiAccounts] = useState<string[]>([])
   const [accountsLoading, setAccountsLoading] = useState(!accountsProp)
 
@@ -366,9 +367,9 @@ export default function SavingsPage({
             <SectionBlock title={`${title} Metrics`} icon={<BarChart3 size={14} />} right={loading ? <LoadingState variant="inline" /> : null}>
               <div className="savings-page-metrics">
                 <KpiGrid>
-                  <KpiCard full label="Total Balance" value={signedINR(totalBalance)} tone="navy" icon={<Wallet size={14} />} />
-                  <KpiCard label="Total Income" value={INR(totalIncome)} tone="green" icon={<TrendingUp size={14} />} />
-                  <KpiCard label="Total Expenses" value={INR(totalExpenses)} tone="red" icon={<AlertTriangle size={14} />} />
+                  <KpiCard full label="Total Balance" value={signedFmt(totalBalance)} tone="navy" icon={<Wallet size={14} />} />
+                  <KpiCard label="Total Income" value={fmt(totalIncome)} tone="green" icon={<TrendingUp size={14} />} />
+                  <KpiCard label="Total Expenses" value={fmt(totalExpenses)} tone="red" icon={<AlertTriangle size={14} />} />
                 </KpiGrid>
               </div>
             </SectionBlock>
@@ -380,9 +381,9 @@ export default function SavingsPage({
                   <div key={account}>
                     <BalanceRow
                       title={account}
-                      value={signedINR(balance)}
-                      income={INR(income)}
-                      expense={INR(expense)}
+                      value={signedFmt(balance)}
+                      income={fmt(income)}
+                      expense={fmt(expense)}
                       incomeIcon={<ArrowDownRight size={11} strokeWidth={2.4} />}
                       expenseIcon={<ArrowUpRight size={11} strokeWidth={2.4} />}
                     />
@@ -442,7 +443,7 @@ export default function SavingsPage({
                     <TransactionCard
                       key={e.id}
                       title={titleText}
-                      amount={`${e.type === 'Income' ? '+' : e.type === 'Transfer' ? '↔' : '−'}${INR(e.amount)}`}
+                      amount={`${e.type === 'Income' ? '+' : e.type === 'Transfer' ? '↔' : '−'}${fmt(e.amount)}`}
                       type={e.type}
                       date={e.date}
                       tone={typeTone(e.type)}
@@ -505,7 +506,7 @@ export default function SavingsPage({
                   </select>
                 </FormField>
                 <FormField label="Amount">
-                  <input className="form-inp" type="number" min="0" step="1" placeholder="₹0" value={form.amount} onChange={e => setField('amount', e.target.value)} />
+                  <input className="form-inp" type="number" min="0" step="1" placeholder={zeroPlaceholder} value={form.amount} onChange={e => setField('amount', e.target.value)} />
                 </FormField>
                 <FormField label="Description">
                   <input className="form-inp" type="text" placeholder="Add note" value={form.desc} onChange={e => setField('desc', e.target.value)} />

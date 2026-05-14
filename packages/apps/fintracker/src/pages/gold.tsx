@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { Plus, Loader2, Pencil, LayoutDashboard, List, Clock, BarChart3, Shield, Gem, Package, Users, Home, Building2, Lock, ArrowDownRight, ArrowUpRight } from 'lucide-react';
 import { api, RawGoldRow, RawGoldHistoryRow, GoldResource } from '../api';
-import { INR } from '../utils';
+import { useFormatMoney } from '../hooks/useFormatMoney';
 import { THEME_COLORS } from '../config';
 import { RightLegendDonut } from '../ui'
 import { FormField, KpiCard, KpiGrid, LoadingState, ListStack, SearchField, SectionBlock, SectionChip } from '../ui';
@@ -269,6 +269,7 @@ const HistoryCard = memo(function HistoryCard({
 // ──────────────────────────────────────────────────────────────────────────────
 
 export default function Gold() {
+  const fmt = useFormatMoney();
   // Tab navigation
   const [activeTab, setActiveTab] = useState<GoldTab>('dashboard');
 
@@ -659,7 +660,7 @@ export default function Gold() {
             >
               <KpiGrid>
                 <KpiCard label="Total Gold" value={`${Math.round(totalGrams)}g`} tone="navy" icon={<Gem size={14} />} subtitle={`${Math.round(totalPavan)} pavan`} />
-                <KpiCard label="Estimated Value" value={INR(estimatedValue)} tone="amber" icon={<Shield size={14} />} subtitle={`${Math.round(personalGrams)}g @ ₹${goldRate}/g`} />
+                <KpiCard label="Estimated Value" value={fmt(estimatedValue)} tone="amber" icon={<Shield size={14} />} subtitle={`${Math.round(personalGrams)}g · ${goldRate} INR/g`} />
                 <KpiCard label="Items" value={totalItems} tone="muted" icon={<Package size={14} />} subtitle="Tracked pieces" />
                 <KpiCard label="People" value={totalPeople} tone="muted" icon={<Users size={14} />} subtitle="Ownership groups" />
               </KpiGrid>

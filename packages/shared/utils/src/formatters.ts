@@ -1,18 +1,34 @@
 import { MNS } from '@fintracker-vault/config';
 
+export type SupportedCurrency = 'INR' | 'USD' | 'AED';
+
+const CURRENCY_SYMBOL: Record<SupportedCurrency, string> = {
+  INR: '₹',
+  USD: '$',
+  AED: 'د.إ',
+};
+
+export function currencySymbol(currency: SupportedCurrency = 'INR'): string {
+  return CURRENCY_SYMBOL[currency] ?? CURRENCY_SYMBOL.INR;
+}
+
+export function formatCurrency(
+  amount: number,
+  currency: SupportedCurrency = 'INR',
+  roundOff = true,
+): string {
+  const abs = Math.abs(amount);
+  const symbol = CURRENCY_SYMBOL[currency];
+  const fractionDigits = roundOff ? 0 : 2;
+  const formatted = abs.toLocaleString('en-IN', {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  });
+  return `${symbol}${formatted}`;
+}
+
 export function INR(n: number): string {
-  const abs = Math.abs(n);
-  const hasDecimals = abs % 1 !== 0;
-
-  if (hasDecimals) {
-    const formatted = abs.toLocaleString('en-IN', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    });
-    return '₹' + formatted;
-  }
-
-  return '₹' + Math.round(abs).toLocaleString('en-IN');
+  return formatCurrency(n, 'INR', true);
 }
 
 export function fd(s: string): string {

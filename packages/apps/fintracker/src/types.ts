@@ -1,4 +1,5 @@
 import type { FintrackerPrefs } from './expenseCycle'
+import type { SupportedCurrency } from '../../../shared/utils/src/formatters'
 
 export interface Transaction {
   id: string
@@ -52,6 +53,8 @@ export interface AppState {
   months: MonthRef[]
   /** From org or user settings `.fintracker` via init. */
   fintracker: FintrackerPrefs
+  currency: SupportedCurrency
+  roundOff: boolean
   loading: boolean
   txnPage: number
   filter: string

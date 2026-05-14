@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { BarChart3, RefreshCw, TrendingUp } from 'lucide-react';
 import { api } from '../api';
 import { HoldingCard, HoldingModal, InfoCallout, KpiCard, KpiGrid, LoadingState, SectionBlock, SectionChip, Spacer } from '../ui';
+import { useFormatMoney } from '../hooks/useFormatMoney';
 
 interface Holding {
   symbol: string;
@@ -30,6 +31,7 @@ export function clearStocksCache() {
 }
 
 export default function Stocks({ embedded = false }: { embedded?: boolean } = {}) {
+  const fmt = useFormatMoney();
   const [holdings, setHoldings] = useState<Holding[]>(() => getCachedStocks() ?? []);
   const [loading, setLoading] = useState(() => getCachedStocks() === null);
   const [syncing, setSyncing] = useState(false);
@@ -143,11 +145,6 @@ export default function Stocks({ embedded = false }: { embedded?: boolean } = {}
     });
   }, [holdings]);
 
-  function formatRupees(value: number) {
-    const sign = value >= 0 ? '' : '-';
-    return `${sign}₹${Math.abs(Math.round(value)).toLocaleString('en-IN')}`;
-  }
-
   if (embedded && loading) {
     return (
       <div className="pg"><LoadingState /></div>
@@ -174,11 +171,11 @@ export default function Stocks({ embedded = false }: { embedded?: boolean } = {}
             }
           >
             <KpiGrid>
-              <KpiCard label="Total Invested" value={formatRupees(stats.totalInvested)} tone="navy" />
-              <KpiCard label="Current Value" value={formatRupees(stats.currentValue)} tone="navy" />
+              <KpiCard label="Total Invested" value={fmt(stats.totalInvested)} tone="navy" />
+              <KpiCard label="Current Value" value={fmt(stats.currentValue)} tone="navy" />
               <KpiCard
                 label="Total P&L"
-                value={`${stats.totalPnL >= 0 ? '+' : ''}${formatRupees(stats.totalPnL)}`}
+                value={`${stats.totalPnL >= 0 ? '+' : ''}${fmt(stats.totalPnL)}`}
                 tone={stats.totalPnL >= 0 ? 'green' : 'red'}
                 accentTone={stats.totalPnL >= 0 ? 'green' : 'red'}
               />
@@ -236,11 +233,11 @@ export default function Stocks({ embedded = false }: { embedded?: boolean } = {}
                 leftLabel="QTY"
                 leftValue={Math.round(h.qty).toLocaleString('en-IN')}
                 centerLabel="INVESTED"
-                centerValue={formatRupees(h.invested)}
+                centerValue={fmt(h.invested)}
                 rightLabel="CURRENT"
-                rightValue={formatRupees(h.current)}
+                rightValue={fmt(h.current)}
                 pnlLabel={h.pnl >= 0 ? 'PROFIT' : 'LOSS'}
-                pnlValue={`${h.pnl >= 0 ? '+' : ''}${formatRupees(h.pnl)}`}
+                pnlValue={`${h.pnl >= 0 ? '+' : ''}${fmt(h.pnl)}`}
                 accentTone={h.pnl >= 0 ? 'green' : 'red'}
                 onClick={() => setSelectedIndex(i)}
                 className="stock-entry-card"
@@ -254,7 +251,7 @@ export default function Stocks({ embedded = false }: { embedded?: boolean } = {}
             title={enrichedHoldings[selectedIndex].symbol}
             onClose={() => setSelectedIndex(null)}
             pnlLabel={enrichedHoldings[selectedIndex].pnl >= 0 ? 'Profit' : 'Loss'}
-            pnlValue={`${enrichedHoldings[selectedIndex].pnl >= 0 ? '+' : ''}${formatRupees(enrichedHoldings[selectedIndex].pnl)}`}
+            pnlValue={`${enrichedHoldings[selectedIndex].pnl >= 0 ? '+' : ''}${fmt(enrichedHoldings[selectedIndex].pnl)}`}
             pnlPct={`(${enrichedHoldings[selectedIndex].pnlPct >= 0 ? '+' : ''}${Number(enrichedHoldings[selectedIndex].pnlPct.toFixed(2))}%)`}
             accentTone={enrichedHoldings[selectedIndex].pnl >= 0 ? 'green' : 'red'}
           >
@@ -268,19 +265,19 @@ export default function Stocks({ embedded = false }: { embedded?: boolean } = {}
             </div>
             <div className="ui-kit-holding-detail">
               <div className="ui-kit-holding-detail-label">Avg Price</div>
-              <div className="ui-kit-holding-detail-value">{formatRupees(enrichedHoldings[selectedIndex].avgPrice)}</div>
+              <div className="ui-kit-holding-detail-value">{fmt(enrichedHoldings[selectedIndex].avgPrice)}</div>
             </div>
             <div className="ui-kit-holding-detail">
               <div className="ui-kit-holding-detail-label">CMP</div>
-              <div className="ui-kit-holding-detail-value">{formatRupees(enrichedHoldings[selectedIndex].lastPrice)}</div>
+              <div className="ui-kit-holding-detail-value">{fmt(enrichedHoldings[selectedIndex].lastPrice)}</div>
             </div>
             <div className="ui-kit-holding-detail">
               <div className="ui-kit-holding-detail-label">Invested</div>
-              <div className="ui-kit-holding-detail-value">{formatRupees(enrichedHoldings[selectedIndex].invested)}</div>
+              <div className="ui-kit-holding-detail-value">{fmt(enrichedHoldings[selectedIndex].invested)}</div>
             </div>
             <div className="ui-kit-holding-detail">
               <div className="ui-kit-holding-detail-label">Current Value</div>
-              <div className="ui-kit-holding-detail-value">{formatRupees(enrichedHoldings[selectedIndex].current)}</div>
+              <div className="ui-kit-holding-detail-value">{fmt(enrichedHoldings[selectedIndex].current)}</div>
             </div>
             <div className="ui-kit-holding-detail">
               <div className="ui-kit-holding-detail-label">Day Change</div>

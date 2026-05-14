@@ -1,8 +1,10 @@
 import { MNS, CATEGORIES, INCOME_CATS, BUDGET_GLOBAL_MONTH_KEY } from './config'
 import type { Budget, BudgetEntry, OpeningBal, Transaction } from './types'
+import { formatCurrency } from '../../../shared/utils/src/formatters'
 
+/** Legacy helper: always formats as INR (used only if something still imports `INR`). */
 export function INR(n: number) {
-  return '₹' + Math.round(Math.abs(n)).toLocaleString('en-IN')
+  return formatCurrency(n, 'INR', true)
 }
 
 export function fd(s: string) {
@@ -184,11 +186,21 @@ export function acctFlows(
 }
 
 export function currentMonthYear() {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
   const now = new Date()
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+  }).formatToParts(now)
+  const day = Number(parts.find(p => p.type === 'day')!.value)
+  const month = Number(parts.find(p => p.type === 'month')!.value) - 1
+  const year = Number(parts.find(p => p.type === 'year')!.value)
   const cycleDay = 19
-  let mi = now.getMonth()
-  let yr = now.getFullYear()
-  if (now.getDate() >= cycleDay) {
+  let mi = month
+  let yr = year
+  if (day >= cycleDay) {
     mi = (mi + 1) % 12
     if (mi === 0) yr++
   }
