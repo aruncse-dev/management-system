@@ -6,6 +6,7 @@ export type StaffMember = {
   id: string
   name: string
   active: boolean
+  gender?: string
   salaryType: SalaryBasis
   salaryAmount: number
 }
@@ -16,8 +17,5 @@ export type AttendanceRow = {
   staffId: string
   worked: boolean
   overtime: boolean
-}
-
-export type StaffSettings = {
-  staffAttendanceSpreadsheetId: string
+  notes?: string
 }

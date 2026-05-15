@@ -1,5 +1,5 @@
 import { API_URL } from './constants'
-import type { AttendanceRow, MonthRef, SalaryBasis, StaffMember, StaffSettings } from './types'
+import type { AttendanceRow, MonthRef, SalaryBasis, StaffMember } from './types'
 
 type ApiResponse<T> =
   | { ok: true; data: T; traceId?: string; debug?: Record<string, unknown> }
@@ -81,17 +81,9 @@ export const api = {
   invalidateCache,
   clearPersistentCache,
 
-  getSettings: () => get<StaffSettings>('getSettings', {}),
-
-  saveSettings: async (staffAttendanceSpreadsheetId: string) => {
-    const result = await post<boolean>({ action: 'saveSettings', staffAttendanceSpreadsheetId })
-    invalidateCache({ action: 'getSettings', params: {} })
-    return result
-  },
-
   listStaff: () => get<StaffMember[]>('listStaff', {}),
 
-  addStaff: async (payload: { name: string; salaryType?: SalaryBasis; salaryAmount?: number }) => {
+  addStaff: async (payload: { name: string; gender?: string; salaryType?: SalaryBasis; salaryAmount?: number }) => {
     const result = await post<StaffMember>({ action: 'addStaff', ...payload })
     invalidateCache({ action: 'listStaff', params: {} })
     return result
@@ -101,6 +93,7 @@ export const api = {
     id: string
     name: string
     active?: boolean
+    gender?: string
     salaryType: SalaryBasis
     salaryAmount: number
   }) => {
@@ -127,6 +120,7 @@ export const api = {
     staffId: string
     worked: boolean
     overtime: boolean
+    notes?: string
   }) => {
     const { month, year } = payload
     const result = await post<AttendanceRow>({ action: 'setAttendance', ...payload })

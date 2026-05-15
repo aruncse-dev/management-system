@@ -44,6 +44,7 @@ export default function StaffsPage() {
   const [modalMode, setModalMode] = useState<ModalMode | null>(null)
   const [editId, setEditId] = useState<string | null>(null)
   const [name, setName] = useState('')
+  const [gender, setGender] = useState('')
   const [salaryType, setSalaryType] = useState<SalaryBasis>('daily')
   const [salaryAmount, setSalaryAmount] = useState('')
   const [saving, setSaving] = useState(false)
@@ -72,6 +73,7 @@ export default function StaffsPage() {
     setModalMode('add')
     setEditId(null)
     setName('')
+    setGender('')
     setSalaryType('daily')
     setSalaryAmount('')
   }
@@ -81,6 +83,7 @@ export default function StaffsPage() {
     setModalMode('edit')
     setEditId(s.id)
     setName(s.name)
+    setGender(s.gender ?? '')
     setSalaryType(s.salaryType)
     setSalaryAmount(String(s.salaryAmount ?? 0))
   }
@@ -109,10 +112,10 @@ export default function StaffsPage() {
     let closedModal = false
     try {
       if (modalMode === 'add') {
-        await api.addStaff({ name: n, salaryType, salaryAmount: amt })
+        await api.addStaff({ name: n, gender: gender || undefined, salaryType, salaryAmount: amt })
         successMsg = '✓ Added'
       } else if (modalMode === 'edit' && editId) {
-        await api.updateStaff({ id: editId, name: n, salaryType, salaryAmount: amt })
+        await api.updateStaff({ id: editId, name: n, gender: gender || undefined, salaryType, salaryAmount: amt })
         successMsg = '✓ Saved'
       }
       setModalMode(null)
@@ -192,8 +195,8 @@ export default function StaffsPage() {
                 key={s.id}
                 title={s.name}
                 amount={`₹${s.salaryAmount}`}
-                type=""
-                typeLabel=""
+                type={s.gender || '—'}
+                typeLabel="Gender"
                 date={s.salaryType === 'monthly' ? 'Monthly' : 'Per day'}
                 dateLabel="Basis"
                 tone="navy"
@@ -227,6 +230,14 @@ export default function StaffsPage() {
             {modalErr ? <div className="staff-modal-alert staff-modal-alert--error">{modalErr}</div> : null}
             <FormField label="Name">
               <input className="form-inp" value={name} onChange={e => setName(e.target.value)} placeholder="Full name" />
+            </FormField>
+            <FormField label="Gender">
+              <select className="form-sel" value={gender} onChange={e => setGender(e.target.value)}>
+                <option value="">—</option>
+                <option value="Female">Female</option>
+                <option value="Male">Male</option>
+                <option value="Other">Other</option>
+              </select>
             </FormField>
             <FormField label="Salary basis">
               <div className="ui-kit-filter-chips" role="radiogroup" aria-label="Salary basis">
