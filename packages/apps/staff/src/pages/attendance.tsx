@@ -65,6 +65,7 @@ export default function AttendancePage() {
   const [dayModalDate, setDayModalDate] = useState<string | null>(null)
   const [addStaffId, setAddStaffId] = useState('')
   const [addOt, setAddOt] = useState(false)
+  const [addNotes, setAddNotes] = useState('')
   const [modalBusy, setModalBusy] = useState(false)
   const [deleteConfirmStaffId, setDeleteConfirmStaffId] = useState('')
   const monthRef = useRef(month)
@@ -159,6 +160,7 @@ export default function AttendancePage() {
   useEffect(() => {
     if (!dayModalDate) return
     setAddOt(false)
+    setAddNotes('')
     setAddStaffId(staffAvailableForAdd[0]?.id ?? '')
   }, [dayModalDate, staffAvailableForAdd])
 
@@ -222,9 +224,11 @@ export default function AttendancePage() {
         staffId: addStaffId,
         worked: true,
         overtime: addOt,
+        notes: addNotes || undefined,
       })
       await refreshAttendance()
       setAddOt(false)
+      setAddNotes('')
       showStatus('✓ Added')
     } catch (e) {
       showStatus('⚠ ' + (e instanceof Error ? e.message : 'Add failed'))
@@ -237,6 +241,7 @@ export default function AttendancePage() {
     if (modalBusy) return
     setDayModalDate(null)
     setDeleteConfirmStaffId('')
+    setAddNotes('')
   }
 
   return (
@@ -411,9 +416,12 @@ export default function AttendancePage() {
                           border: '1px solid var(--border)',
                         }}
                       >
-                        <div>
+                        <div style={{ flex: 1 }}>
                           <div style={{ fontWeight: 700, fontSize: 14 }}>{name}</div>
-                          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{e.overtime ? 'Worked · OT' : 'Worked'}</div>
+                          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+                            {e.overtime ? 'Worked · OT' : 'Worked'}
+                            {e.notes && <span> · {e.notes}</span>}
+                          </div>
                         </div>
                         <button
                           type="button"
@@ -471,6 +479,15 @@ export default function AttendancePage() {
                     />
                     Overtime (OT)
                   </label>
+                  <FormField label="Notes (optional)">
+                    <input
+                      className="form-inp"
+                      value={addNotes}
+                      onChange={e => setAddNotes(e.target.value)}
+                      placeholder="Add notes…"
+                      disabled={modalBusy}
+                    />
+                  </FormField>
                   <button
                     type="button"
                     className="ui-kit-btn ui-kit-btn--solid"

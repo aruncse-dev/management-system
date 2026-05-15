@@ -5,8 +5,11 @@ export const staffMembers = pgTable('staff_members', {
   orgId: text('org_id'),
   name: text('name').notNull(),
   role: text('role'),
+  gender: text('gender'),
   joinedDate: date('joined_date'),
   status: text('status').default('active').notNull(),
+  salaryType: text('salary_type'),
+  salaryAmount: text('salary_amount'),
 })
 
 export const attendance = pgTable('attendance', {

@@ -1,7 +1,7 @@
 import type { AppProps } from 'next/app'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
-import { CalendarDays, Settings as SettingsIcon, Users } from 'lucide-react'
+import { CalendarDays, Users } from 'lucide-react'
 import { AppAuthGate, SimpleAppNav, type SimpleAppNavSection } from '@fintracker-vault/ui'
 import { getClientAuthEnv } from '../clientAuthEnv'
 import { StaffWorkspaceProvider } from '../StaffWorkspaceContext'
@@ -11,7 +11,6 @@ import '../styles/globals.css'
 const STAFF_PAGE_TITLES: Record<string, string> = {
   '/attendance': 'Attendance',
   '/staffs': 'Staffs',
-  '/settings': 'Settings',
 }
 
 const STAFF_NAV_SECTIONS: SimpleAppNavSection[] = [
@@ -51,7 +50,6 @@ export default function App({ Component, pageProps }: AppProps) {
                   void router.push(path)
                 }}
                 sections={STAFF_NAV_SECTIONS}
-                settingsItem={{ path: '/settings', label: 'Settings', icon: <SettingsIcon size={18} /> }}
                 onLogout={onLogout}
               />
               <Component {...pageProps} />
