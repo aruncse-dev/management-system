@@ -36,6 +36,10 @@ export interface BudgetEntry {
   amount: number
   /** `__global__` or `YYYY-MM` — month-specific lines override global for that month in the UI. */
   monthYear: string
+  /** `YYYY-MM` or null (from beginning). */
+  startMonth: string | null
+  /** `YYYY-MM` or null (never ends). */
+  endMonth: string | null
 }
 
 export type Budget = BudgetEntry[]

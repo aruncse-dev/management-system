@@ -18,13 +18,16 @@ export const transactions = pgTable('transactions', {
   monthYear: text('month_year').notNull(),
 })
 
-/** `month_year`: `__global__` = default template; `YYYY-MM` overrides global for that month only (same category). */
+/** `month_year`: `__global__` = default template; `YYYY-MM` overrides global for that month only (same category).
+    `start_month`/`end_month`: null = no bound (from beginning or never ends); both set = pinned month. */
 export const budget = pgTable('budget', {
   id: text('id').primaryKey(),
   orgId: text('org_id'),
   monthYear: text('month_year').notNull(),
   category: text('category').notNull(),
   amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
+  startMonth: text('start_month'),
+  endMonth: text('end_month'),
 })
 
 /** Unified table: accounts, credit cards, and informal credits. */

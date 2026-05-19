@@ -75,6 +75,8 @@ export function coerceBudget(raw: unknown): Budget {
             typeof o.monthYear === 'string' && o.monthYear.trim()
               ? o.monthYear.trim()
               : BUDGET_GLOBAL_MONTH_KEY,
+          startMonth: typeof o.startMonth === 'string' ? o.startMonth : null,
+          endMonth: typeof o.endMonth === 'string' ? o.endMonth : null,
         }
       })
       .filter((e): e is BudgetEntry => e != null)
@@ -85,6 +87,8 @@ export function coerceBudget(raw: unknown): Budget {
       name,
       amount: Number(amount) || 0,
       monthYear: BUDGET_GLOBAL_MONTH_KEY,
+      startMonth: null,
+      endMonth: null,
     }))
   }
   return []

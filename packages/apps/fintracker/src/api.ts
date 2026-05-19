@@ -378,20 +378,22 @@ export const api = {
       ...(opts?.month !== undefined ? { month: opts.month } : {}),
       ...(opts?.year !== undefined ? { year: opts.year } : {}),
     }),
-  addBudgetEntry:    (name: string, amt: number, monthYear?: string) =>
+  addBudgetEntry:    (name: string, amt: number, startMonth?: string | null, endMonth?: string | null) =>
     post<BudgetEntry>({
       action: 'addBudgetEntry',
       name,
       amt,
-      ...(monthYear !== undefined ? { monthYear } : {}),
+      ...(startMonth !== undefined ? { startMonth } : {}),
+      ...(endMonth !== undefined ? { endMonth } : {}),
     }),
-  updateBudgetEntry: (id: string, name: string, amt: number, monthYear?: string) =>
+  updateBudgetEntry: (id: string, name: string, amt: number, startMonth?: string | null, endMonth?: string | null) =>
     post<boolean>({
       action: 'updateBudgetEntry',
       id,
       name,
       amt,
-      ...(monthYear !== undefined ? { monthYear } : {}),
+      ...(startMonth !== undefined ? { startMonth } : {}),
+      ...(endMonth !== undefined ? { endMonth } : {}),
     }),
   deleteBudgetEntry: (id: string)                  => post<boolean>({ action: 'deleteBudgetEntry', id }),
   saveOpeningBal:(data: OpeningBal)             => post<boolean>({ action: 'saveOpeningBal', data }),

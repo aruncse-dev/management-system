@@ -5,7 +5,7 @@ import { CATEGORIES, THEME_COLORS } from '../config'
 import { mergeCategoriesWithBudgetNames } from '../utils'
 import { useMoneyFormatting } from '../hooks/useFormatMoney'
 import { useStore } from '../store'
-import { BalanceRow, CatIcon, FormField, KpiCard, KpiGrid, LoadingState, SearchField, SectionBlock, SectionChip, Spacer, TransactionCard } from '../ui'
+import { BalanceRow, CategoryCombobox, CatIcon, FormField, KpiCard, KpiGrid, LoadingState, SearchField, SectionBlock, SectionChip, Spacer, TransactionCard } from '../ui'
 
 type SavingsType = 'Income' | 'Expense' | 'Transfer'
 type SavingsTab = 'dashboard' | 'transactions'
@@ -520,9 +520,7 @@ export default function SavingsPage({
                 </FormField>
                 {form.type === 'Expense' && (
                   <FormField label="Category">
-                    <select className="form-sel" value={form.category} onChange={e => setField('category', e.target.value)}>
-                      {savingsExpenseCategories.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
+                    <CategoryCombobox value={form.category} options={savingsExpenseCategories} onChange={(v: string) => setField('category', v)} />
                   </FormField>
                 )}
                 {form.type === 'Transfer' && (

@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { and, between, desc, eq, isNull, ne, or } from 'drizzle-orm'
+import { and, between, desc, eq, isNull, lte, gte, ne, or } from 'drizzle-orm'
 import type { FtSessionData } from '@fintracker-vault/auth'
 import type { Transaction } from '../types'
 import { MNS } from '../config'
@@ -97,37 +97,61 @@ function resolvePostedBudgetMonthYearOrDefault(
   return resolvePostedBudgetMonthYear(body)
 }
 
+function resolvePostedBudgetRange(
+  body: Record<string, unknown>,
+): { ok: true; startMonth: string | null; endMonth: string | null; monthYear: string } | { ok: false; error: string } {
+  const str = (k: string) => (typeof body[k] === 'string' ? (body[k] as string).trim() : '')
+  const startMonth = str('startMonth') || null
+  const endMonth = str('endMonth') || null
+  if (startMonth && !/^\d{4}-\d{2}$/.test(startMonth)) return { ok: false, error: 'Invalid startMonth (use YYYY-MM)' }
+  if (endMonth && !/^\d{4}-\d{2}$/.test(endMonth)) return { ok: false, error: 'Invalid endMonth (use YYYY-MM)' }
+  let monthYear = BUDGET_SCOPE_KEY
+  if (startMonth === endMonth && startMonth) monthYear = startMonth
+  return { ok: true, startMonth, endMonth, monthYear }
+}
+
 async function loadMergedBudgetForMonth(
   db: ReturnType<typeof getDb>,
   scope: BudgetScope,
   monthKey: string,
-): Promise<{ id: string; name: string; amount: number; monthYear: string }[]> {
+): Promise<{ id: string; name: string; amount: number; monthYear: string; startMonth: string | null; endMonth: string | null }[]> {
   const base = budgetRowsBaseWhere(scope)
-  if (monthKey === BUDGET_SCOPE_KEY) {
-    const rows = await db.select().from(budget).where(and(base, eq(budget.monthYear, BUDGET_SCOPE_KEY)))
-    return rows.map((r) => ({
-      id: r.id,
-      name: r.category,
-      amount: num(r.amount),
-      monthYear: r.monthYear,
-    }))
-  }
   const rows = await db
     .select()
     .from(budget)
-    .where(and(base, or(eq(budget.monthYear, monthKey), eq(budget.monthYear, BUDGET_SCOPE_KEY))))
+    .where(
+      and(
+        base,
+        or(
+          isNull(budget.startMonth),
+          lte(budget.startMonth, monthKey)
+        ),
+        or(
+          isNull(budget.endMonth),
+          gte(budget.endMonth, monthKey)
+        )
+      )
+    )
   const byCat = new Map<string, (typeof rows)[number]>()
   for (const r of rows) {
-    if (r.monthYear === BUDGET_SCOPE_KEY) byCat.set(r.category, r)
-  }
-  for (const r of rows) {
-    if (r.monthYear === monthKey) byCat.set(r.category, r)
+    const existing = byCat.get(r.category)
+    if (!existing) {
+      byCat.set(r.category, r)
+    } else {
+      const isCurrentPinned = r.startMonth === r.endMonth && r.startMonth !== null
+      const isExistingPinned = existing.startMonth === existing.endMonth && existing.startMonth !== null
+      if (isCurrentPinned && !isExistingPinned) {
+        byCat.set(r.category, r)
+      }
+    }
   }
   return [...byCat.values()].map((r) => ({
     id: r.id,
     name: r.category,
     amount: num(r.amount),
     monthYear: r.monthYear,
+    startMonth: r.startMonth ?? null,
+    endMonth: r.endMonth ?? null,
   }))
 }
 
@@ -1441,19 +1465,26 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
       }
 
       if (action === 'saveBudget') {
-        const budgets = body.budgets as { id?: string; name: string; amount: number }[] | undefined
+        const budgets = body.budgets as { id?: string; name: string; amount: number; startMonth?: string | null; endMonth?: string | null }[] | undefined
         if (!Array.isArray(budgets)) return fail(res, 400, 'Invalid budgets', traceId)
-        const mk = resolvePostedBudgetMonthYear(body)
-        if (!mk.ok) return fail(res, 400, mk.error, traceId)
-        await db.delete(budget).where(and(budgetRowsBaseWhere(budgetScope), eq(budget.monthYear, mk.key)))
+        const rng = resolvePostedBudgetRange(body)
+        if (!rng.ok) return fail(res, 400, rng.error, traceId)
+        const deleteWhere = and(
+          budgetRowsBaseWhere(budgetScope),
+          rng.startMonth ? eq(budget.startMonth, rng.startMonth) : isNull(budget.startMonth),
+          rng.endMonth ? eq(budget.endMonth, rng.endMonth) : isNull(budget.endMonth)
+        )
+        await db.delete(budget).where(deleteWhere)
         for (const e of budgets) {
           if (!e?.name?.trim()) continue
           await db.insert(budget).values({
             id: e.id && typeof e.id === 'string' ? e.id : crypto.randomUUID(),
             orgId: scopeOrgId,
-            monthYear: mk.key,
+            monthYear: rng.monthYear,
             category: e.name.trim(),
             amount: String(num(e.amount)),
+            startMonth: e.startMonth ?? rng.startMonth,
+            endMonth: e.endMonth ?? rng.endMonth,
           })
         }
         return ok(res, true, traceId)
@@ -1463,30 +1494,38 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         const name = typeof body.name === 'string' ? body.name.trim() : ''
         const amt = num(body.amt as string | number)
         if (!name) return fail(res, 400, 'Invalid budget entry', traceId)
-        const mk = resolvePostedBudgetMonthYear(body)
-        if (!mk.ok) return fail(res, 400, mk.error, traceId)
+        const rng = resolvePostedBudgetRange(body)
+        if (!rng.ok) return fail(res, 400, rng.error, traceId)
         const base = budgetRowsBaseWhere(budgetScope)
+        const selectWhere = and(
+          base,
+          eq(budget.category, name),
+          rng.startMonth ? eq(budget.startMonth, rng.startMonth) : isNull(budget.startMonth),
+          rng.endMonth ? eq(budget.endMonth, rng.endMonth) : isNull(budget.endMonth)
+        )
         const [existing] = await db
           .select()
           .from(budget)
-          .where(and(base, eq(budget.monthYear, mk.key), eq(budget.category, name)))
+          .where(selectWhere)
           .limit(1)
         if (existing) {
           await db
             .update(budget)
             .set({ amount: String(amt) })
             .where(eq(budget.id, existing.id))
-          return ok(res, { id: existing.id, name, amount: amt, monthYear: mk.key }, traceId)
+          return ok(res, { id: existing.id, name, amount: amt, monthYear: rng.monthYear, startMonth: rng.startMonth, endMonth: rng.endMonth }, traceId)
         }
         const id = crypto.randomUUID()
         await db.insert(budget).values({
           id,
           orgId: scopeOrgId,
-          monthYear: mk.key,
+          monthYear: rng.monthYear,
           category: name,
           amount: String(amt),
+          startMonth: rng.startMonth,
+          endMonth: rng.endMonth,
         })
-        return ok(res, { id, name, amount: amt, monthYear: mk.key }, traceId)
+        return ok(res, { id, name, amount: amt, monthYear: rng.monthYear, startMonth: rng.startMonth, endMonth: rng.endMonth }, traceId)
       }
 
       if (action === 'updateBudgetEntry') {
@@ -1497,16 +1536,27 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         const base = budgetRowsBaseWhere(budgetScope)
         const [existingRow] = await db.select().from(budget).where(and(eq(budget.id, id), base)).limit(1)
         if (!existingRow) return fail(res, 404, 'Budget entry not found', traceId)
-        const mk = resolvePostedBudgetMonthYearOrDefault(body, existingRow.monthYear)
-        if (!mk.ok) return fail(res, 400, mk.error, traceId)
-        await db
-          .delete(budget)
-          .where(
-            and(base, eq(budget.monthYear, mk.key), eq(budget.category, name), ne(budget.id, id)),
-          )
+        const str = (k: string) => (typeof body[k] === 'string' ? (body[k] as string).trim() : '')
+        const hasExplicitRange = str('startMonth') !== '' || str('endMonth') !== ''
+        let rng: { startMonth: string | null; endMonth: string | null; monthYear: string }
+        if (hasExplicitRange) {
+          const parsed = resolvePostedBudgetRange(body)
+          if (!parsed.ok) return fail(res, 400, parsed.error, traceId)
+          rng = parsed
+        } else {
+          rng = { startMonth: existingRow.startMonth, endMonth: existingRow.endMonth, monthYear: existingRow.monthYear }
+        }
+        const deleteWhere2 = and(
+          base,
+          eq(budget.category, name),
+          rng.startMonth ? eq(budget.startMonth, rng.startMonth) : isNull(budget.startMonth),
+          rng.endMonth ? eq(budget.endMonth, rng.endMonth) : isNull(budget.endMonth),
+          ne(budget.id, id)
+        )
+        await db.delete(budget).where(deleteWhere2)
         await db
           .update(budget)
-          .set({ monthYear: mk.key, category: name, amount: String(amt) })
+          .set({ monthYear: rng.monthYear, category: name, amount: String(amt), startMonth: rng.startMonth, endMonth: rng.endMonth })
           .where(and(eq(budget.id, id), base))
         return ok(res, true, traceId)
       }
