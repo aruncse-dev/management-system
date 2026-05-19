@@ -2,9 +2,9 @@
 -- PostgreSQL database dump
 --
 
-\restrict J4MYve3sh5EjumgpeGAW4gF5Vb9VwwLjX10nj4yBgS9jTkHUbp9Gpn0fE9GmPGI
+\restrict PlrHbNcGAv9ObuUoN7olpMvIw27FubsH6Bze7Z8UB2idyxhTmladVqn5gKjuoQi
 
--- Dumped from database version 17.8 (ad62774)
+-- Dumped from database version 17.8 (9c8634e)
 -- Dumped by pg_dump version 18.3
 
 SET statement_timeout = 0;
@@ -179,22 +179,6 @@ CREATE TABLE neon_auth.verification (
 
 
 --
--- Name: accounts; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.accounts (
-    id text NOT NULL,
-    name text NOT NULL,
-    type text,
-    org_id text,
-    description text,
-    used_for text DEFAULT 'both'::text NOT NULL,
-    is_active boolean DEFAULT true,
-    sort_order integer DEFAULT 0
-);
-
-
---
 -- Name: attendance; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -240,7 +224,9 @@ CREATE TABLE public.budget (
     org_id text,
     month_year text NOT NULL,
     category text NOT NULL,
-    amount numeric(12,2) NOT NULL
+    amount numeric(12,2) NOT NULL,
+    start_month text,
+    end_month text
 );
 
 
@@ -269,21 +255,6 @@ CREATE TABLE public.cash_loans (
     start_date date NOT NULL,
     paid_amount numeric(12,2) DEFAULT '0'::numeric NOT NULL,
     org_id text
-);
-
-
---
--- Name: credit_sources; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.credit_sources (
-    id text NOT NULL,
-    org_id text,
-    name text NOT NULL,
-    description text,
-    category text NOT NULL,
-    is_active boolean DEFAULT true,
-    sort_order integer DEFAULT 0
 );
 
 
@@ -329,9 +300,22 @@ CREATE TABLE public.gold_items (
     id text NOT NULL,
     name text NOT NULL,
     weight_g numeric(10,3) NOT NULL,
-    person text,
-    location text,
-    org_id text
+    org_id text,
+    person_id text,
+    location_id text
+);
+
+
+--
+-- Name: gold_resources; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.gold_resources (
+    id text NOT NULL,
+    org_id text,
+    type text NOT NULL,
+    name text NOT NULL,
+    skip boolean DEFAULT false NOT NULL
 );
 
 
@@ -405,7 +389,8 @@ CREATE TABLE public.lending (
     amount numeric(12,2) NOT NULL,
     type text NOT NULL,
     description text,
-    org_id text
+    org_id text,
+    sheet_slug text DEFAULT 'lending'::text NOT NULL
 );
 
 
@@ -472,7 +457,24 @@ CREATE TABLE public.organizations (
     created_at timestamp without time zone DEFAULT now() NOT NULL,
     updated_at timestamp without time zone DEFAULT now() NOT NULL,
     enabled_apps jsonb DEFAULT '[]'::jsonb,
-    enabled_menus jsonb DEFAULT '{}'::jsonb
+    enabled_menus jsonb DEFAULT '{}'::jsonb,
+    settings jsonb DEFAULT '{}'::jsonb
+);
+
+
+--
+-- Name: payment_sources; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.payment_sources (
+    id text NOT NULL,
+    org_id text,
+    name text NOT NULL,
+    description text,
+    source_type text NOT NULL,
+    used_for text DEFAULT 'both'::text NOT NULL,
+    is_active boolean DEFAULT true,
+    sort_order integer DEFAULT 0
 );
 
 
@@ -506,7 +508,9 @@ CREATE TABLE public.savings (
     type text NOT NULL,
     to_account text,
     category text,
-    org_id text
+    org_id text,
+    payment_source_id text,
+    transfer_to_id text
 );
 
 
@@ -531,7 +535,10 @@ CREATE TABLE public.staff_members (
     role text,
     joined_date date,
     status text DEFAULT 'active'::text NOT NULL,
-    org_id text
+    org_id text,
+    gender text,
+    salary_type text,
+    salary_amount text
 );
 
 
@@ -611,7 +618,11 @@ CREATE TABLE public.transactions (
     mode text,
     notes text,
     month_year text NOT NULL,
-    org_id text
+    org_id text,
+    transfer_to text,
+    payment_source_id text,
+    transfer_to_id text,
+    category_id text
 );
 
 
@@ -772,14 +783,6 @@ ALTER TABLE ONLY neon_auth.verification
 
 
 --
--- Name: accounts accounts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.accounts
-    ADD CONSTRAINT accounts_pkey PRIMARY KEY (id);
-
-
---
 -- Name: attendance attendance_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -820,14 +823,6 @@ ALTER TABLE ONLY public.cash_loans
 
 
 --
--- Name: credit_sources credit_sources_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.credit_sources
-    ADD CONSTRAINT credit_sources_pkey PRIMARY KEY (id);
-
-
---
 -- Name: emi_loans emi_loans_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -849,6 +844,14 @@ ALTER TABLE ONLY public.gold_history
 
 ALTER TABLE ONLY public.gold_items
     ADD CONSTRAINT gold_items_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: gold_resources gold_resources_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.gold_resources
+    ADD CONSTRAINT gold_resources_pkey PRIMARY KEY (id);
 
 
 --
@@ -921,6 +924,14 @@ ALTER TABLE ONLY public.organizations
 
 ALTER TABLE ONLY public.organizations
     ADD CONSTRAINT organizations_slug_unique UNIQUE (slug);
+
+
+--
+-- Name: payment_sources payment_sources_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.payment_sources
+    ADD CONSTRAINT payment_sources_pkey PRIMARY KEY (id);
 
 
 --
@@ -1052,13 +1063,6 @@ CREATE INDEX verification_identifier_idx ON neon_auth.verification USING btree (
 
 
 --
--- Name: idx_accounts_org_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_accounts_org_id ON public.accounts USING btree (org_id) WHERE (org_id IS NOT NULL);
-
-
---
 -- Name: idx_attendance_org_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1098,13 +1102,6 @@ CREATE INDEX idx_cash_loan_repayments_org_id ON public.cash_loan_repayments USIN
 --
 
 CREATE INDEX idx_cash_loans_org_id ON public.cash_loans USING btree (org_id) WHERE (org_id IS NOT NULL);
-
-
---
--- Name: idx_credit_sources_org_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_credit_sources_org_id ON public.credit_sources USING btree (org_id);
 
 
 --
@@ -1227,6 +1224,13 @@ CREATE INDEX idx_vault_apps_org_id ON public.vault_apps USING btree (org_id) WHE
 
 
 --
+-- Name: lending_org_sheet_slug_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX lending_org_sheet_slug_idx ON public.lending USING btree (org_id, sheet_slug);
+
+
+--
 -- Name: account account_userId_fkey; Type: FK CONSTRAINT; Schema: neon_auth; Owner: -
 --
 
@@ -1326,5 +1330,5 @@ ALTER TABLE ONLY public.jewel_loan_repayments
 -- PostgreSQL database dump complete
 --
 
-\unrestrict J4MYve3sh5EjumgpeGAW4gF5Vb9VwwLjX10nj4yBgS9jTkHUbp9Gpn0fE9GmPGI
+\unrestrict PlrHbNcGAv9ObuUoN7olpMvIw27FubsH6Bze7Z8UB2idyxhTmladVqn5gKjuoQi
 

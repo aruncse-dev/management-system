@@ -817,6 +817,7 @@ export {
   type SimpleAppNavSection,
 } from './SimpleAppNav'
 export { default as TransactionModal, type TransactionModalApi } from './TransactionModal'
+export { CategoryCombobox } from './CategoryCombobox'
 export {
   default as AppAuthGate,
   type AppAuthGateProps,

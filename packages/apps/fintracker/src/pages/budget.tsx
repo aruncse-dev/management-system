@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Pencil, Trash2, X as XIcon, AlertTriangle, Package } from 'lucide-react'
 import { useStore } from '../store'
 import { catMap, budgetSummary, monthYearApiKey } from '../utils'
 import { useMoneyFormatting } from '../hooks/useFormatMoney'
-import { BUDGET_GLOBAL_MONTH_KEY } from '../config'
+import { BUDGET_GLOBAL_MONTH_KEY, MNS } from '../config'
 import { api } from '../api'
 import { CatIcon } from '../ui'
 import { KpiCard, KpiGrid, SectionBlock, UiCard } from '../ui'
@@ -11,7 +11,7 @@ import { KpiCard, KpiGrid, SectionBlock, UiCard } from '../ui'
 interface Props { showStatus: (msg: string) => void; onCategoryClick: (cat: string) => void }
 
 type ModalMode = 'add' | 'edit' | 'delete' | null
-interface ModalState { mode: ModalMode; id: string; cat: string; val: string }
+interface ModalState { mode: ModalMode; id: string; cat: string; val: string; startMonth: string | null; endMonth: string | null }
 
 export default function Budget({ showStatus, onCategoryClick }: Props) {
   const { state, dispatch } = useStore()
@@ -20,20 +20,31 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
   const cm = catMap(rows, budget)
   const { totalBudget, totalSpent, ovCount, totalOver } = budgetSummary(budget, cm)
   const listed = budget.filter(e => e.name.trim())
-  const [modal, setModal] = useState<ModalState>({ mode: null, id: '', cat: '', val: '' })
+  const [modal, setModal] = useState<ModalState>({ mode: null, id: '', cat: '', val: '', startMonth: null, endMonth: null })
   const [saving, setSaving] = useState(false)
   const [catSheet, setCatSheet] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const [budgetAddScope, setBudgetAddScope] = useState<'global' | 'month'>('global')
   const remaining = totalBudget - totalSpent
-  function openEdit(id: string, cat: string, budg: number, rowMonthYear: string) {
-    setBudgetAddScope(rowMonthYear === BUDGET_GLOBAL_MONTH_KEY ? 'global' : 'month')
-    setModal({ mode: 'edit', id, cat, val: String(budg) })
+
+  const monthOptions = useMemo(() => {
+    const now = new Date(parseInt(year, 10), MNS.indexOf(month as any))
+    const opts: Array<{ label: string; value: string }> = []
+    for (let i = -24; i <= 12; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
+      const y = d.getFullYear()
+      const m = String(d.getMonth() + 1).padStart(2, '0')
+      const mIdx = d.getMonth()
+      opts.push({ label: `${MNS[mIdx]} ${y}`, value: `${y}-${m}` })
+    }
+    return opts
+  }, [month, year])
+
+  function openEdit(id: string, cat: string, budg: number, start: string | null, end: string | null) {
+    setModal({ mode: 'edit', id, cat, val: String(budg), startMonth: start, endMonth: end })
   }
-  function openDelete(id: string, cat: string) { setModal({ mode: 'delete', id, cat, val: '' }) }
+  function openDelete(id: string, cat: string) { setModal({ mode: 'delete', id, cat, val: '', startMonth: null, endMonth: null }) }
   function closeModal() {
-    setBudgetAddScope('global')
-    setModal({ mode: null, id: '', cat: '', val: '' })
+    setModal({ mode: null, id: '', cat: '', val: '', startMonth: null, endMonth: null })
   }
 
   async function confirmAdd() {
@@ -42,15 +53,12 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
     if (!name || isNaN(val) || val < 0) { showStatus('⚠ Enter name and a valid amount'); return }
     setSaving(true)
     try {
-      const monthYear =
-        budgetAddScope === 'month' ? monthYearApiKey(month, year) : BUDGET_GLOBAL_MONTH_KEY
-      await api.addBudgetEntry(name, val, monthYear)
+      await api.addBudgetEntry(name, val, modal.startMonth, modal.endMonth)
       api.invalidateCache({ action: 'getBudget' })
       api.invalidateCache({ action: 'init' })
       const init = await api.init(month, year)
       dispatch({ type: 'SET_BUDGET', payload: init.budget })
       showStatus('✓ Budget saved')
-      setBudgetAddScope('global')
       closeModal()
     } catch (e) { showStatus('⚠ ' + (e instanceof Error ? e.message : 'Save failed')) }
     finally { setSaving(false) }
@@ -62,9 +70,7 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
     if (!name || isNaN(val) || val < 0) { closeModal(); return }
     setSaving(true)
     try {
-      const monthYear =
-        budgetAddScope === 'month' ? monthYearApiKey(month, year) : BUDGET_GLOBAL_MONTH_KEY
-      await api.updateBudgetEntry(modal.id, name, val, monthYear)
+      await api.updateBudgetEntry(modal.id, name, val, modal.startMonth, modal.endMonth)
       api.invalidateCache({ action: 'getBudget' })
       api.invalidateCache({ action: 'init' })
       const init = await api.init(month, year)
@@ -117,13 +123,23 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
 
       <SectionBlock title="Categories" icon={<AlertTriangle size={14} />}>
         <div className="budget-list">
-        {listed.filter(e => e.name.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>(cm[b.name]||0)-(cm[a.name]||0)).map(({ id, name: cat, amount: budg, monthYear: budMy }) => {
+        {listed.filter(e => e.name.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>(cm[b.name]||0)-(cm[a.name]||0)).map(({ id, name: cat, amount: budg, monthYear: budMy, startMonth, endMonth }) => {
           const spent = cm[cat] || 0
           const over = spent > budg
           const rowRemaining = budg - spent
           const pct = budg > 0 ? (spent / budg) * 100 : 0
           const status = over ? 'OVER' : pct >= 90 ? 'CRITICAL' : pct >= 75 ? 'NEAR' : 'OK'
           const badgeClass = over ? 'budget-badge over' : pct >= 90 ? 'budget-badge critical' : pct >= 75 ? 'budget-badge near' : 'budget-badge ok'
+          let dateRangeBadge = null
+          if (startMonth && endMonth && startMonth === endMonth) {
+            dateRangeBadge = `${startMonth}`
+          } else if (startMonth && !endMonth) {
+            dateRangeBadge = `From ${startMonth}`
+          } else if (!startMonth && endMonth) {
+            dateRangeBadge = `Until ${endMonth}`
+          } else if (startMonth && endMonth) {
+            dateRangeBadge = `${startMonth} to ${endMonth}`
+          }
           return (
             <UiCard
               key={id}
@@ -131,14 +147,14 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                   <CatIcon cat={cat} size={14} />
                   {cat}
-                  {budMy !== BUDGET_GLOBAL_MONTH_KEY && (
-                    <span className="budget-badge near" style={{ fontSize: 10 }}>This month</span>
+                  {dateRangeBadge && (
+                    <span className="budget-badge near" style={{ fontSize: 10 }}>{dateRangeBadge}</span>
                   )}
                 </span>
               }
               right={<div className="budget-row-actions">
                 <span className={badgeClass}>{status}</span>
-                <button className="icon-btn" onClick={(e) => { e.stopPropagation(); openEdit(id, cat, budg, budMy) }} aria-label={`Edit ${cat}`} title={`Edit ${cat}`}><Pencil size={13} /></button>
+                <button className="icon-btn" onClick={(e) => { e.stopPropagation(); openEdit(id, cat, budg, startMonth ?? null, endMonth ?? null) }} aria-label={`Edit ${cat}`} title={`Edit ${cat}`}><Pencil size={13} /></button>
                 <button className="icon-btn" style={{color:'var(--red)'}} onClick={(e) => { e.stopPropagation(); openDelete(id, cat) }} aria-label={`Delete ${cat}`} title={`Delete ${cat}`}><Trash2 size={13} /></button>
               </div>}
             >
@@ -221,17 +237,42 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
                   />
                 </div>
                 {(modal.mode === 'add' || modal.mode === 'edit') && (
-                  <div>
-                    <div style={{fontSize:12,fontWeight:600,color:'var(--muted)',marginBottom:8,textTransform:'uppercase',letterSpacing:.4}}>Applies to</div>
-                    <select
-                      className="form-inp"
-                      value={budgetAddScope}
-                      onChange={e => setBudgetAddScope(e.target.value === 'month' ? 'month' : 'global')}
-                    >
-                      <option value="global">All months (default template)</option>
-                      <option value="month">{month} {year} only</option>
-                    </select>
-                  </div>
+                  <>
+                    <div>
+                      <div style={{fontSize:12,fontWeight:600,color:'var(--muted)',marginBottom:8,textTransform:'uppercase',letterSpacing:.4}}>Start date</div>
+                      <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                        <label style={{display:'flex',alignItems:'center',gap:6,flex:1,cursor:'pointer'}}>
+                          <input type="radio" checked={!modal.startMonth} onChange={() => setModal(m => ({...m, startMonth: null}))} />
+                          <span style={{fontSize:14}}>From beginning</span>
+                        </label>
+                        {modal.startMonth && (
+                          <select className="form-inp" style={{flex:1}} value={modal.startMonth} onChange={e => setModal(m => ({...m, startMonth: e.target.value}))}>
+                            {monthOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                          </select>
+                        )}
+                        {!modal.startMonth && (
+                          <button type="button" className="btn btn-sm" style={{flex:0}} onClick={() => setModal(m => ({...m, startMonth: monthYearApiKey(month, year)}))}>Set month</button>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{fontSize:12,fontWeight:600,color:'var(--muted)',marginBottom:8,textTransform:'uppercase',letterSpacing:.4}}>End date</div>
+                      <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                        <label style={{display:'flex',alignItems:'center',gap:6,flex:1,cursor:'pointer'}}>
+                          <input type="radio" checked={!modal.endMonth} onChange={() => setModal(m => ({...m, endMonth: null}))} />
+                          <span style={{fontSize:14}}>Never</span>
+                        </label>
+                        {modal.endMonth && (
+                          <select className="form-inp" style={{flex:1}} value={modal.endMonth} onChange={e => setModal(m => ({...m, endMonth: e.target.value}))}>
+                            {monthOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                          </select>
+                        )}
+                        {!modal.endMonth && (
+                          <button type="button" className="btn btn-sm" style={{flex:0}} onClick={() => setModal(m => ({...m, endMonth: monthYearApiKey(month, year)}))}>Set month</button>
+                        )}
+                      </div>
+                    </div>
+                  </>
                 )}
               </div>
               <div className="modal-foot">
