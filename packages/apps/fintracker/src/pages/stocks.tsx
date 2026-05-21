@@ -30,7 +30,10 @@ export function clearStocksCache() {
   STOCKS_CACHE = null;
 }
 
-export default function Stocks({ embedded = false }: { embedded?: boolean } = {}) {
+export default function Stocks({
+  embedded = false,
+  alwaysLoadFromDb = false,
+}: { embedded?: boolean; alwaysLoadFromDb?: boolean } = {}) {
   const fmt = useFormatMoney();
   const [holdings, setHoldings] = useState<Holding[]>(() => getCachedStocks() ?? []);
   const [loading, setLoading] = useState(() => getCachedStocks() === null);
@@ -39,19 +42,18 @@ export default function Stocks({ embedded = false }: { embedded?: boolean } = {}
   const [hasToken, setHasToken] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
-  // Load token status and holdings on mount
   useEffect(() => {
-    loadHoldings();
-    loadTokenStatus();
-  }, []);
+    void loadHoldings(alwaysLoadFromDb);
+    void loadTokenStatus(alwaysLoadFromDb);
+  }, [alwaysLoadFromDb]);
 
   const loadTokenStatus = async (forceRefresh = false) => {
     try {
       if (forceRefresh) {
         api.invalidateCache({ action: 'getTokenStatus', params: { module: 'stocks' } });
       }
-      const status = await api.getTokenStatus();
-      const connected = Boolean((status.hasToken || status.hasAccessToken || status.hasExtendedToken) && !status.expired);
+      const status = await api.getIntegrationStatus('upstox');
+      const connected = Boolean(status.hasToken && !status.expired);
       setHasToken(connected);
     } catch (err) {
       console.error('Failed to load token status:', err);
@@ -96,7 +98,7 @@ export default function Stocks({ embedded = false }: { embedded?: boolean } = {}
       setSyncing(true);
       setError('');
       api.invalidateCache({ action: 'getHoldings', params: { module: 'stocks' } });
-      await api.syncStocks();
+      await api.syncPortfolio();
       await loadHoldings(true);
       await loadTokenStatus(true);
     } catch (err: any) {

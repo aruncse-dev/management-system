@@ -26,7 +26,12 @@ type MenuRow = {
   enabled?: boolean
 }
 
-// Build static app list
+type IntegrationRow = {
+  slug: string
+  name: string
+  enabled?: boolean
+}
+
 function buildAppList(): AppRow[] {
   const staticAppNames: Record<string, string> = {
     fintracker: 'FinTracker',
@@ -45,12 +50,14 @@ export default function AdminOrgDetailPage() {
   const { id } = router.query as { id?: string }
 
   const [org, setOrg] = useState<OrgRow | null>(null)
-  const [apps, setApps] = useState<AppRow[]>([])
+  const [apps] = useState<AppRow[]>(() => buildAppList())
   const [menusByApp, setMenusByApp] = useState<Record<string, MenuRow[]>>({})
+  const [integrationsByApp, setIntegrationsByApp] = useState<Record<string, IntegrationRow[]>>({})
   const [selectedAppTab, setSelectedAppTab] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [savingMenus, setSavingMenus] = useState(false)
+  const [savingIntegrations, setSavingIntegrations] = useState(false)
 
   const load = useCallback(async () => {
     if (!id) return
@@ -61,12 +68,12 @@ export default function AdminOrgDetailPage() {
       const orgJson = await orgRes.json()
       if (!orgJson.ok) throw new Error(orgJson.error || 'Failed to load organization')
 
-      const appRows = buildAppList()
       setOrg(orgJson.data)
-      setApps(appRows)
+      setSelectedAppTab(apps[0]?.slug || '')
 
       const menusByApp: Record<string, MenuRow[]> = {}
-      for (const app of appRows) {
+      const integrationsByApp: Record<string, IntegrationRow[]> = {}
+      for (const app of apps) {
         const menuRes = await fetch(
           `/api/admin/orgs/${encodeURIComponent(id)}/menu?app=${encodeURIComponent(app.slug)}`,
           { credentials: 'same-origin' },
@@ -74,15 +81,27 @@ export default function AdminOrgDetailPage() {
         const menuJson = await menuRes.json()
         if (!menuJson.ok) throw new Error(menuJson.error || `Failed to load ${app.slug} menus`)
         menusByApp[app.slug] = (menuJson.data || []) as MenuRow[]
+
+        const intRes = await fetch(
+          `/api/admin/orgs/${encodeURIComponent(id)}/integrations?app=${encodeURIComponent(app.slug)}`,
+          { credentials: 'same-origin' },
+        )
+        const intJson = await intRes.json()
+        if (!intJson.ok) throw new Error(intJson.error || `Failed to load ${app.slug} integrations`)
+        integrationsByApp[app.slug] = (intJson.data || []).map((r: IntegrationRow) => ({
+          slug: r.slug,
+          name: r.name,
+          enabled: r.enabled,
+        }))
       }
       setMenusByApp(menusByApp)
-      setSelectedAppTab(appRows[0]?.slug || '')
+      setIntegrationsByApp(integrationsByApp)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load')
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, apps])
 
   useEffect(() => {
     void load()
@@ -118,6 +137,39 @@ export default function AdminOrgDetailPage() {
       setError(e instanceof Error ? e.message : 'Save failed')
     } finally {
       setSavingMenus(false)
+    }
+  }
+
+  async function toggleIntegration(appSlug: string, slug: string) {
+    setSavingIntegrations(true)
+    setError('')
+    try {
+      const current = integrationsByApp[appSlug] || []
+      const enabledIds = current.filter((i) => i.enabled).map((i) => i.slug)
+      const idx = enabledIds.indexOf(slug)
+      if (idx >= 0) enabledIds.splice(idx, 1)
+      else enabledIds.push(slug)
+
+      const res = await fetch(`/api/admin/orgs/${encodeURIComponent(id || '')}/integrations`, {
+        method: 'PUT',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appSlug, enabledIntegrationIds: enabledIds }),
+      })
+      const json = await res.json()
+      if (!json.ok) throw new Error(json.error || 'Failed to save integrations')
+
+      setIntegrationsByApp((prev) => ({
+        ...prev,
+        [appSlug]: (prev[appSlug] || []).map((i) => ({
+          ...i,
+          enabled: enabledIds.includes(i.slug),
+        })),
+      }))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Save failed')
+    } finally {
+      setSavingIntegrations(false)
     }
   }
 
@@ -162,29 +214,18 @@ export default function AdminOrgDetailPage() {
 
         {!loading && org && (
           <>
-            <section style={{ marginBottom: '2rem' }}>
-              <h2 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem' }}>
-                Menus by App
+            <section className="admin-org-config" style={{ marginBottom: '1rem' }}>
+              <h2 className="admin-org-config__title" style={{ fontSize: '1rem' }}>
+                Menus by app
               </h2>
 
-              <div className="admin-internal-tabs" style={{ marginBottom: '1.5rem' }}>
+              <div className="admin-internal-tabs">
                 {apps.map(a => (
                   <button
                     key={a.id}
                     type="button"
                     className={selectedAppTab === a.slug ? 'active' : ''}
                     onClick={() => setSelectedAppTab(a.slug)}
-                    style={{
-                      padding: '0.5rem 1rem',
-                      border: 'none',
-                      borderRadius: '8px',
-                      background: selectedAppTab === a.slug ? '#1e5cc7' : '#e5e7eb',
-                      color: selectedAppTab === a.slug ? '#fff' : '#0f172a',
-                      cursor: 'pointer',
-                      fontSize: '0.9rem',
-                      fontWeight: 600,
-                      marginRight: '0.5rem',
-                    }}
                   >
                     {a.name}
                     <span style={{ marginLeft: '0.5rem', opacity: 0.8 }}>
@@ -196,54 +237,53 @@ export default function AdminOrgDetailPage() {
 
               {selectedAppTab && (
                 <div>
-                  <div style={{ marginBottom: '1rem' }}>
-                    <p style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '0.75rem' }}>
-                      Menus for {apps.find(a => a.slug === selectedAppTab)?.name}
+                  <div>
+                    <p className="admin-org-config__subtitle">
+                      Menus for <strong>{apps.find(a => a.slug === selectedAppTab)?.name}</strong>
                     </p>
-                    <div className="admin-card-list">
-                      {(menusByApp[selectedAppTab] || []).length === 0 ? (
-                        <p style={{ color: '#6b7280', textAlign: 'center', padding: '1rem' }}>
-                          No menus available.
-                        </p>
-                      ) : (
-                        (menusByApp[selectedAppTab] || []).map(m => (
-                          <label
-                            key={m.id}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.75rem',
-                              padding: '0.75rem',
-                              cursor: 'pointer',
-                              userSelect: 'none',
-                            }}
-                          >
+                    {(menusByApp[selectedAppTab] || []).length === 0 ? (
+                      <p className="admin-muted" style={{ margin: 0, fontSize: '0.85rem' }}>
+                        No menus available.
+                      </p>
+                    ) : (
+                      <div className="admin-menu-grid">
+                        {(menusByApp[selectedAppTab] || []).map(m => (
+                          <label key={m.id} className="admin-menu-item">
                             <input
                               type="checkbox"
                               checked={m.enabled || false}
                               onChange={() => void toggleMenu(selectedAppTab, m.id)}
                               disabled={savingMenus}
-                              style={{ width: '1rem', height: '1rem', cursor: 'pointer' }}
                             />
-                            <div style={{ flex: 1 }}>
-                              <p style={{ margin: 0, fontWeight: 600, fontSize: '0.95rem' }}>
-                                {m.label}
-                              </p>
-                              <p
-                                style={{
-                                  margin: '0.25rem 0 0 0',
-                                  color: '#6b7280',
-                                  fontSize: '0.8rem',
-                                }}
-                              >
-                                {m.sectionLabel} • {m.path}
-                              </p>
-                            </div>
+                            <span>
+                              {m.label} <span className="admin-meta">({m.sectionLabel})</span>
+                            </span>
                           </label>
-                        ))
-                      )}
-                    </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
+
+                  {(integrationsByApp[selectedAppTab] || []).length > 0 ? (
+                    <div>
+                      <p className="admin-org-config__subtitle">
+                        Integrations for <strong>{apps.find(a => a.slug === selectedAppTab)?.name}</strong>
+                      </p>
+                      <div className="admin-menu-grid">
+                        {(integrationsByApp[selectedAppTab] || []).map((i) => (
+                          <label key={i.slug} className="admin-menu-item">
+                            <input
+                              type="checkbox"
+                              checked={i.enabled || false}
+                              onChange={() => void toggleIntegration(selectedAppTab, i.slug)}
+                              disabled={savingIntegrations}
+                            />
+                            <span>{i.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               )}
             </section>

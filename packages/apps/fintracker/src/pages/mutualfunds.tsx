@@ -30,17 +30,19 @@ export function clearMutualFundsCache() {
   MF_CACHE = null;
 }
 
-export default function MutualFunds({ embedded = false }: { embedded?: boolean } = {}) {
+export default function MutualFunds({
+  embedded = false,
+  alwaysLoadFromDb = false,
+}: { embedded?: boolean; alwaysLoadFromDb?: boolean } = {}) {
   const fmt = useFormatMoney();
   const [holdings, setHoldings] = useState<Holding[]>(() => getCachedHoldings() ?? []);
   const [loading, setLoading] = useState(() => getCachedHoldings() === null);
   const [error, setError] = useState<string>('');
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
-  // Load holdings on mount
   useEffect(() => {
-    loadHoldings();
-  }, []);
+    void loadHoldings(alwaysLoadFromDb);
+  }, [alwaysLoadFromDb]);
 
   const loadHoldings = async (forceRefresh = false) => {
     try {

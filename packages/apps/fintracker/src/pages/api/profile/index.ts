@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { getIronSession } from 'iron-session'
 import { eq } from 'drizzle-orm'
 import type { FtSessionData } from '@fintracker-vault/auth'
-import { getDb, getEnabledOrgMenu, organizations, users } from '@fintracker-vault/db'
+import { getDb, getEnabledOrgIntegrations, getEnabledOrgMenu, organizations, users } from '@fintracker-vault/db'
 import { applyDefaultOrgToSession, listOrgsForUserEmail } from '../../../lib/dbAuth'
 import { getSessionOptions } from '../../../lib/session'
 
@@ -27,8 +27,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       await session.save()
     }
     let menu: Awaited<ReturnType<typeof getEnabledOrgMenu>> = []
+    let integrations: Awaited<ReturnType<typeof getEnabledOrgIntegrations>> = []
     if (session.activeOrgId) {
       menu = await getEnabledOrgMenu(session.activeOrgId, 'fintracker')
+      integrations = await getEnabledOrgIntegrations(session.activeOrgId, 'fintracker')
     }
 
     let settingsPayload: unknown = user.settings
@@ -55,6 +57,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         orgs,
         activeOrgId: session.activeOrgId ?? null,
         menu,
+        integrations,
       },
     })
   }

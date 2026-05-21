@@ -832,4 +832,6 @@ export {
 } from './GoogleAuthCard'
 export { ConfirmDialog } from './ConfirmDialog'
 export { FabButton, FormCard, DataPageHeader, AdminDataListSearch } from './AdminShell'
+export { UpstoxIcon } from './UpstoxIcon'
+export { IntegrationIcon } from './IntegrationIcon'
 export { DynamicLucide } from './DynamicLucide'

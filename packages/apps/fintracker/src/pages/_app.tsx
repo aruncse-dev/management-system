@@ -164,7 +164,8 @@ export default function App({ Component, pageProps }: AppProps) {
         const j = await r.json()
         if (cancelled || !j.ok) return
         const menu = (j.data?.menu ?? []) as CachedProfileMenuRow[]
-        writeMenuCache(j.data?.activeOrgId ?? null, menu)
+        const integrations = (j.data?.integrations ?? []) as import('../lib/profileMenuCache').CachedIntegrationProvider[]
+        writeMenuCache(j.data?.activeOrgId ?? null, menu, integrations)
         setDynamicMenu(groupNavMenu(menu))
       } catch {
         if (!cancelled) setDynamicMenu([])

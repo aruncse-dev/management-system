@@ -29,7 +29,6 @@ const nextConfig = {
     '@fintracker-vault/types',
     '@fintracker-vault/config',
     '@fintracker-vault/utils',
-    '@fintracker-vault/db',
   ],
 }
 

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { BarChart3, LayoutDashboard, PieChart, RefreshCw, Shield, TrendingUp, Wallet } from 'lucide-react';
 import { api, type RawHolding } from '../api';
+import { readEnabledIntegrations } from '../lib/profileMenuCache';
 import { KpiCard, KpiGrid, LoadingState, SectionBlock, Spacer } from '../ui';
 import { useFormatMoney } from '../hooks/useFormatMoney';
 import Stocks, { clearStocksCache } from './stocks';
@@ -21,7 +22,7 @@ type DashboardCache = {
   lastSynced: string | null;
 };
 
-const DASHBOARD_CACHE_VERSION = 2;
+const DASHBOARD_CACHE_VERSION = 3;
 
 let INVESTMENTS_CACHE: DashboardCache | null = null;
 
@@ -78,32 +79,23 @@ function DashboardView() {
     isValidInvestmentsCache(INVESTMENTS_CACHE) ? INVESTMENTS_CACHE.data : { stocks: [], mutualFunds: [] },
   );
 
-  const loadDashboard = async (forceRefresh = false) => {
+  const loadDashboard = async (forceRefresh = true) => {
     try {
       setLoading(true);
       setError('');
-      if (!forceRefresh && isValidInvestmentsCache(INVESTMENTS_CACHE)) {
-        setHasToken(INVESTMENTS_CACHE.hasToken);
-        setData(INVESTMENTS_CACHE.data);
-        setLoading(false);
-        return;
-      }
-      if (forceRefresh) {
-        clearStocksCache();
-        clearMutualFundsCache();
-        api.invalidateCache({ action: 'getTokenStatus', params: { module: 'stocks' } });
-        api.invalidateCache({ action: 'getHoldings', params: { module: 'stocks' } });
-        api.invalidateCache({ action: 'getHoldings', params: { module: 'mutualfunds' } });
-        INVESTMENTS_CACHE = null;
-      }
-      const [status, stocks, mutualFunds] = await Promise.all([
-        api.getTokenStatus(),
+      clearStocksCache();
+      clearMutualFundsCache();
+      api.invalidateCache({ action: 'getHoldings', params: { module: 'stocks' } });
+      api.invalidateCache({ action: 'getHoldings', params: { module: 'mutualfunds' } });
+      INVESTMENTS_CACHE = null;
+
+      const enabled = readEnabledIntegrations();
+      const [stocks, mutualFunds, ...statuses] = await Promise.all([
         api.getStocks(),
         api.getMutualFunds(),
+        ...enabled.map((p) => api.getIntegrationStatus(p.slug)),
       ]);
-      const connected = Boolean(
-        (status.hasToken || status.hasAccessToken || status.hasExtendedToken) && !status.expired,
-      );
+      const connected = statuses.some((s) => Boolean(s.hasToken && !s.expired));
       setHasToken(connected);
       const next = { stocks: stocks as RawHolding[], mutualFunds: mutualFunds as RawHolding[] };
       setData(next);
@@ -128,7 +120,7 @@ function DashboardView() {
   };
 
   useEffect(() => {
-    loadDashboard();
+    void loadDashboard(true);
   }, []);
 
   const syncAll = async () => {
@@ -137,13 +129,22 @@ function DashboardView() {
       setError('');
       clearStocksCache();
       clearMutualFundsCache();
-      api.invalidateCache({ action: 'getTokenStatus', params: { module: 'stocks' } });
       api.invalidateCache({ action: 'getHoldings', params: { module: 'stocks' } });
       api.invalidateCache({ action: 'getHoldings', params: { module: 'mutualfunds' } });
-      await api.syncStocks();
+      await api.syncPortfolio();
       await loadDashboard(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Sync failed');
+      const msg = e instanceof Error ? e.message : 'Sync failed';
+      if (msg === 'REAUTH_REQUIRED' || msg === 'TOKEN_EXPIRED') {
+        setHasToken(false);
+        setError(
+          msg === 'TOKEN_EXPIRED'
+            ? 'Access token expired. Reconnect in Settings → Integrations.'
+            : 'Connect an integration in Settings to sync.',
+        );
+      } else {
+        setError(msg);
+      }
     } finally {
       setSyncing(false);
     }
@@ -241,8 +242,8 @@ export default function Investments() {
 
       <div className="pg">
         {activeTab === 'dashboard' && <DashboardView />}
-        {activeTab === 'stocks' && <Stocks embedded />}
-        {activeTab === 'mutualFunds' && <MutualFunds embedded />}
+        {activeTab === 'stocks' && <Stocks key="stocks-tab" embedded alwaysLoadFromDb />}
+        {activeTab === 'mutualFunds' && <MutualFunds key="mf-tab" embedded alwaysLoadFromDb />}
       </div>
     </div>
   );

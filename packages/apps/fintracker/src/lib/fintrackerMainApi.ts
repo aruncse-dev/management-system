@@ -25,11 +25,23 @@ import {
   stocks,
   subscriptions,
   transactions,
+  getIntegrationProviderBySlug,
+  integrationHasCredentials,
   listOrgsForUserEmail,
   users,
   vaultApps,
 } from '@fintracker-vault/db'
 import { normalizeLendingSheetSlug } from './lendingSheetSlug'
+import {
+  connectionStatusToLegacyToken,
+  disconnectOrgIntegration,
+  getIntegrationAuthUrl,
+  getIntegrationStatus,
+  requireOrgIdForIntegrations,
+  syncOrgMutualFundsFromIntegrations,
+  syncOrgPortfolioFromIntegrations,
+  syncOrgStocksFromIntegrations,
+} from './integrations'
 
 const BUDGET_SCOPE_KEY = '__global__'
 
@@ -395,15 +407,38 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         return ok(res, { vaultSpreadsheetId: s.vaultSpreadsheetId ? String(s.vaultSpreadsheetId) : undefined })
       }
 
-      if (mod === 'stocks' && action === 'getTokenStatus') {
-        const s = await loadFintrackerSettingsJson(db, em, budgetScope)
-        const tok = s.upstoxToken
-        const has = typeof tok === 'string' && tok.length > 0
-        return ok(res, { hasToken: has, tokenType: has ? 'legacy' : undefined })
+      if ((mod === 'integrations' || mod === 'stocks') && action === 'getTokenStatus') {
+        const provider =
+          typeof req.query.provider === 'string' && req.query.provider.trim()
+            ? req.query.provider.trim()
+            : 'upstox'
+        const orgId = await requireOrgIdForIntegrations(em, session.activeOrgId)
+        if (!orgId) return ok(res, { hasToken: false }, traceId)
+        const status = await getIntegrationStatus(orgId, provider)
+        return ok(res, connectionStatusToLegacyToken(status), traceId)
       }
 
-      if (mod === 'stocks' && action === 'getAuthUrl') {
-        return fail(res, 501, 'Upstox OAuth is not configured for this deployment.', traceId)
+      if ((mod === 'integrations' || mod === 'stocks') && action === 'getAuthUrl') {
+        const provider =
+          typeof req.query.provider === 'string' && req.query.provider.trim()
+            ? req.query.provider.trim()
+            : 'upstox'
+        const orgId = await requireOrgIdForIntegrations(em, session.activeOrgId)
+        if (!orgId) return fail(res, 400, 'Organization required for integrations', traceId)
+        const auth = await getIntegrationAuthUrl(orgId, provider, req.headers)
+        if (!auth) {
+          const row = await getIntegrationProviderBySlug(provider)
+          if (!row || !integrationHasCredentials(row)) {
+            return fail(
+              res,
+              400,
+              'Integration API key and secret are missing. Set them in Admin → Integrations or via INTEGRATION_<SLUG>_CLIENT_ID / _CLIENT_SECRET env.',
+              traceId,
+            )
+          }
+          return fail(res, 501, 'Integration is not configured or not enabled for this organization.', traceId)
+        }
+        return ok(res, { url: auth.url, redirectUri: auth.redirectUri }, traceId)
       }
 
       if (mod === 'lending' && action === 'getEntries') {
@@ -735,6 +770,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         return ok(
           res,
           rows.map((r) => ({
+            providerSlug: r.providerSlug ?? '',
             symbol: r.symbol,
             company: r.company ?? '',
             isin: r.isin ?? '',
@@ -756,19 +792,26 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
             const units = num(r.units)
             const purchased = num(r.purchased)
             const currentValue = num(r.currentValue)
-            const avgPrice = units > 0 ? purchased / units : 0
-            const lastPrice = units > 0 ? currentValue / units : 0
+            const storedAvg = num(r.avgPrice)
+            const storedLast = num(r.lastPrice)
+            const avgPrice = storedAvg > 0 ? storedAvg : units > 0 ? purchased / units : 0
+            const lastPrice = storedLast > 0 ? storedLast : units > 0 ? currentValue / units : 0
             const name = r.fundName
             return {
-              symbol: r.schemeCode || r.folioNo || name.slice(0, 12),
+              providerSlug: r.providerSlug ?? '',
+              symbol: r.instrumentKey || r.schemeCode || r.folioNo || name.slice(0, 12),
               company: name,
-              isin: '',
+              isin: r.instrumentKey ?? '',
               qty: units,
               avgPrice,
               lastPrice,
               pnl: num(r.profitLoss),
               dayChangePct: 0,
-              synced: '',
+              synced: r.syncedAt ? r.syncedAt.toISOString() : '',
+              folioNo: r.folioNo ?? '',
+              instrumentKey: r.instrumentKey ?? '',
+              lastPriceDate: r.lastPriceDate ?? '',
+              pledgedQuantity: num(r.pledgedQuantity),
             }
           }),
         )
@@ -862,23 +905,58 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         return ok(res, true, traceId)
       }
 
-      if (mod === 'stocks' && action === 'setToken') {
-        const token = typeof body.token === 'string' ? body.token : ''
-        await mergeFintrackerSettings(db, em, budgetScope, { upstoxToken: token })
+      if ((mod === 'integrations' || mod === 'stocks') && (action === 'resetAuth' || action === 'disconnect')) {
+        const provider =
+          typeof body.provider === 'string' && body.provider.trim() ? body.provider.trim() : 'upstox'
+        const orgId = await requireOrgIdForIntegrations(em, session.activeOrgId)
+        if (!orgId) return fail(res, 400, 'Organization required for integrations', traceId)
+        await disconnectOrgIntegration(orgId, provider)
         return ok(res, true, traceId)
       }
 
-      if (mod === 'stocks' && action === 'resetAuth') {
-        await mergeFintrackerSettings(db, em, budgetScope, { upstoxToken: '' })
-        return ok(res, true, traceId)
+      if (mod === 'integrations' && action === 'syncPortfolio') {
+        const orgId = await requireOrgIdForIntegrations(em, session.activeOrgId)
+        if (!orgId) return fail(res, 401, 'REAUTH_REQUIRED', traceId)
+        try {
+          const result = await syncOrgPortfolioFromIntegrations(orgId)
+          return ok(res, result, traceId)
+        } catch (e) {
+          const code = e && typeof e === 'object' && 'code' in e ? String((e as { code?: string }).code) : ''
+          if (code === 'TOKEN_EXPIRED' || code === 'REAUTH_REQUIRED') {
+            return fail(res, 401, code, traceId)
+          }
+          return fail(res, 502, e instanceof Error ? e.message : 'Sync failed', traceId)
+        }
       }
 
       if (mod === 'stocks' && action === 'sync') {
-        return ok(res, { count: 0 }, traceId)
+        const orgId = await requireOrgIdForIntegrations(em, session.activeOrgId)
+        if (!orgId) return fail(res, 401, 'REAUTH_REQUIRED', traceId)
+        try {
+          const result = await syncOrgStocksFromIntegrations(orgId)
+          return ok(res, result, traceId)
+        } catch (e) {
+          const code = e && typeof e === 'object' && 'code' in e ? String((e as { code?: string }).code) : ''
+          if (code === 'TOKEN_EXPIRED' || code === 'REAUTH_REQUIRED') {
+            return fail(res, 401, code, traceId)
+          }
+          return fail(res, 502, e instanceof Error ? e.message : 'Sync failed', traceId)
+        }
       }
 
       if (mod === 'mutualfunds' && action === 'sync') {
-        return ok(res, { count: 0 }, traceId)
+        const orgId = await requireOrgIdForIntegrations(em, session.activeOrgId)
+        if (!orgId) return fail(res, 401, 'REAUTH_REQUIRED', traceId)
+        try {
+          const result = await syncOrgMutualFundsFromIntegrations(orgId)
+          return ok(res, result, traceId)
+        } catch (e) {
+          const code = e && typeof e === 'object' && 'code' in e ? String((e as { code?: string }).code) : ''
+          if (code === 'TOKEN_EXPIRED' || code === 'REAUTH_REQUIRED') {
+            return fail(res, 401, code, traceId)
+          }
+          return fail(res, 502, e instanceof Error ? e.message : 'Sync failed', traceId)
+        }
       }
 
       if (mod === 'lending') {

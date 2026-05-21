@@ -1,7 +1,15 @@
 import Head from 'next/head'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Search, LayoutGrid, Settings, X as XIcon } from 'lucide-react'
-import { FabButton, FormField, LoadingState, SearchField, SectionChip, SectionBlock, Spacer } from '@fintracker-vault/ui'
+import {
+  FabButton,
+  FormField,
+  LoadingState,
+  SearchField,
+  SectionChip,
+  SectionBlock,
+  Spacer,
+} from '@fintracker-vault/ui'
 import { APP_MENUS, APP_SLUGS } from '@fintracker-vault/config'
 
 type OrgRow = {
@@ -24,6 +32,12 @@ type MenuRow = {
   label: string
   path: string
   sectionLabel: string
+  enabled?: boolean
+}
+
+type IntegrationRow = {
+  slug: string
+  name: string
   enabled?: boolean
 }
 
@@ -80,6 +94,8 @@ export default function AdminOrgsPage() {
   const [appTab, setAppTab] = useState('')
   const [menusByApp, setMenusByApp] = useState<Record<string, MenuRow[]>>({})
   const [enabledByApp, setEnabledByApp] = useState<Record<string, string[]>>({})
+  const [integrationsByApp, setIntegrationsByApp] = useState<Record<string, IntegrationRow[]>>({})
+  const [enabledIntegrationsByApp, setEnabledIntegrationsByApp] = useState<Record<string, string[]>>({})
   const [saving, setSaving] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
 
@@ -128,6 +144,8 @@ export default function AdminOrgsPage() {
     setForm({ name: '' })
     setMenusByApp({})
     setEnabledByApp({})
+    setIntegrationsByApp({})
+    setEnabledIntegrationsByApp({})
     setAppTab(apps[0]?.slug || '')
     setDeleteConfirm(false)
   }
@@ -146,11 +164,14 @@ export default function AdminOrgsPage() {
     setEditingId(orgId)
     setMenusByApp({})
     setEnabledByApp({})
+    setIntegrationsByApp({})
+    setEnabledIntegrationsByApp({})
     setAppTab(apps[0]?.slug || '')
     setDeleteConfirm(false)
 
     try {
-      for (const app of apps) {
+      const appRows = apps.length > 0 ? apps : buildAppList()
+      for (const app of appRows) {
         const menuRes = await fetch(
           `/api/admin/orgs/${encodeURIComponent(orgId)}/menu?app=${encodeURIComponent(app.slug)}`,
           { credentials: 'same-origin' },
@@ -165,6 +186,17 @@ export default function AdminOrgsPage() {
           [app.slug]: enabledIds,
         }))
         setMenuCatalogByApp(prev => ({ ...prev, [app.slug]: menuRows.map(({ enabled, ...rest }) => rest) }))
+
+        const intRes = await fetch(
+          `/api/admin/orgs/${encodeURIComponent(orgId)}/integrations?app=${encodeURIComponent(app.slug)}`,
+          { credentials: 'same-origin' },
+        )
+        const intJson = await intRes.json()
+        if (!intJson.ok) throw new Error(intJson.error || `Failed to load ${app.slug} integrations`)
+        const intRows = (intJson.data || []) as IntegrationRow[]
+        const enabledIntegrationIds = intRows.filter((i) => i.enabled).map((i) => i.slug)
+        setIntegrationsByApp((prev) => ({ ...prev, [app.slug]: intRows }))
+        setEnabledIntegrationsByApp((prev) => ({ ...prev, [app.slug]: enabledIntegrationIds }))
       }
       orgLookupCache = {
         apps,
@@ -186,6 +218,8 @@ export default function AdminOrgsPage() {
     setForm({ name: '' })
     setMenusByApp({})
     setEnabledByApp({})
+    setIntegrationsByApp({})
+    setEnabledIntegrationsByApp({})
     setDeleteConfirm(false)
   }
 
@@ -196,6 +230,19 @@ export default function AdminOrgsPage() {
       else selected.add(menuId)
       return { ...prev, [appSlug]: [...selected] }
     })
+  }
+
+  function toggleIntegration(appSlug: string, slug: string) {
+    setEnabledIntegrationsByApp((prev) => {
+      const selected = new Set(prev[appSlug] || [])
+      if (selected.has(slug)) selected.delete(slug)
+      else selected.add(slug)
+      return { ...prev, [appSlug]: [...selected] }
+    })
+  }
+
+  function integrationRowsForApp(appSlug: string): IntegrationRow[] {
+    return integrationsByApp[appSlug] || []
   }
 
   async function save() {
@@ -244,6 +291,17 @@ export default function AdminOrgsPage() {
           const menuJson = await menuRes.json()
           if (!menuJson.ok) throw new Error(menuJson.error || `Failed to save ${app.slug} menus`)
           setMenuCatalogByApp(prev => ({ ...prev, [app.slug]: (menuJson.data || []) as MenuRow[] }))
+
+          const enabledIntegrationIds = enabledIntegrationsByApp[app.slug] ?? []
+          const intRes = await fetch(`/api/admin/orgs/${encodeURIComponent(editingId)}/integrations`, {
+            method: 'PUT',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ appSlug: app.slug, enabledIntegrationIds }),
+          })
+          const intJson = await intRes.json()
+          if (!intJson.ok) throw new Error(intJson.error || `Failed to save ${app.slug} integrations`)
+          setIntegrationsByApp((prev) => ({ ...prev, [app.slug]: (intJson.data || []) as IntegrationRow[] }))
         }
         orgLookupCache = {
           apps,
@@ -392,7 +450,11 @@ export default function AdminOrgsPage() {
               className="modal-hd modal-hd--blue"
             >
               <span className="modal-title">
-                {mode === 'add' ? 'Add Organization' : mode === 'edit' ? 'Edit Organization' : 'Configure Apps & Menus'}
+                {mode === 'add'
+                  ? 'Add Organization'
+                  : mode === 'edit'
+                    ? 'Edit Organization'
+                    : 'Configure apps, menus & integrations'}
               </span>
               <button className="modal-close" onClick={closeForm}><XIcon size={16} /></button>
             </div>
@@ -420,11 +482,9 @@ export default function AdminOrgsPage() {
               )}
 
               {mode === 'configure' && (
-                <div style={{ display: 'grid', gap: '1.5rem' }}>
+                <div className="admin-org-config">
                   <div>
-                    <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '0.95rem', fontWeight: 700, color: '#0f172a' }}>
-                      Select Apps & Menus
-                    </h3>
+                    <h3 className="admin-org-config__title">Apps, menus & integration providers</h3>
                     <div className="admin-internal-tabs">
                       {apps.map(a => {
                         const total = (menusByApp[a.slug] || menuCatalogByApp[a.slug] || []).length
@@ -452,7 +512,7 @@ export default function AdminOrgsPage() {
 
                   {appTab && (menusByApp[appTab] || menuCatalogByApp[appTab] || []).length > 0 && (
                     <div>
-                      <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.9rem', color: '#6b7280' }}>
+                      <p className="admin-org-config__subtitle">
                         Menus for <strong>{apps.find(a => a.slug === appTab)?.name}</strong>
                       </p>
                       <div className="admin-menu-grid">
@@ -471,6 +531,26 @@ export default function AdminOrgsPage() {
                       </div>
                     </div>
                   )}
+
+                  {appTab && integrationRowsForApp(appTab).length > 0 ? (
+                    <div>
+                      <p className="admin-org-config__subtitle">
+                        Integrations for <strong>{apps.find((a) => a.slug === appTab)?.name}</strong>
+                      </p>
+                      <div className="admin-menu-grid">
+                        {integrationRowsForApp(appTab).map((i) => (
+                          <label key={i.slug} className="admin-menu-item">
+                            <input
+                              type="checkbox"
+                              checked={(enabledIntegrationsByApp[appTab] || []).includes(i.slug)}
+                              onChange={() => toggleIntegration(appTab, i.slug)}
+                            />
+                            <span>{i.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               )}
               </form>

@@ -216,11 +216,30 @@ export interface GoldSettings {
   fintrackerJson?: string;
 }
 
+export type IntegrationProviderInfo = {
+  slug: string;
+  name: string;
+  menuSlugs?: string[];
+  actions?: {
+    login?: boolean;
+    syncStocks?: boolean;
+    syncMutualFunds?: boolean;
+  };
+};
+
+export type IntegrationTokenStatus = {
+  hasToken: boolean;
+  hasAccessToken?: boolean;
+  accessTokenExpiry?: string;
+  expired?: boolean;
+};
+
 export interface ProfileData {
   email: string;
   displayName: string | null;
   activeOrgId: string | null;
   orgs: { id: string; name: string }[];
+  integrations?: IntegrationProviderInfo[];
 }
 
 export type AccountUsedFor = 'savings' | 'monthly' | 'both';
@@ -569,14 +588,49 @@ export const api = {
     invalidateCache({ action: 'getEntries', params: { module: 'subscriptions' } })
     return result
   },
-  getTokenStatus: ()                           => get<{ hasToken: boolean; tokenType?: string; hasAccessToken?: boolean; hasExtendedToken?: boolean; hasRefreshToken?: boolean; accessTokenExpiry?: string; extendedTokenExpiry?: string; expired?: boolean }>('getTokenStatus', { module: 'stocks' }, { cache: false }),
-  getUpstoxAuthUrl: ()                         => get<{ authUrl: string }>('getAuthUrl', { module: 'stocks' }, { cache: false }),
-  setUpstoxToken: (token: string)              => post<boolean>({ module: 'stocks', action: 'setToken', token }),
-  clearUpstoxAuth: ()                          => post<boolean>({ module: 'stocks', action: 'resetAuth' }),
+  getIntegrationStatus: (provider: string) =>
+    get<IntegrationTokenStatus>('getTokenStatus', { module: 'integrations', provider }, { cache: false }),
+  connectIntegration: async (provider: string) => {
+    const { url, redirectUri } = await get<{ url: string; redirectUri?: string }>(
+      'getAuthUrl',
+      { module: 'integrations', provider },
+      { cache: false },
+    );
+    if (!url?.startsWith('http')) {
+      throw new Error('Invalid authorization URL from server');
+    }
+    if (redirectUri) {
+      try {
+        sessionStorage.setItem('ft_integration_oauth_redirect', redirectUri);
+      } catch {
+        /* ignore */
+      }
+      if (DEBUG) {
+        console.log('[integrations] Register this redirect URL in Upstox Developer → Apps:', redirectUri);
+      }
+    }
+    window.location.assign(url);
+  },
+  disconnectIntegration: (provider: string) =>
+    post<boolean>({ module: 'integrations', action: 'disconnect', provider }),
+  /** @deprecated Use getIntegrationStatus('upstox') */
+  getTokenStatus: () => get<IntegrationTokenStatus>('getTokenStatus', { module: 'integrations', provider: 'upstox' }, { cache: false }),
+  /** @deprecated Use connectIntegration('upstox') */
+  getUpstoxAuthUrl: async () => {
+    const { url } = await get<{ url: string }>('getAuthUrl', { module: 'integrations', provider: 'upstox' }, { cache: false });
+    window.location.href = url;
+  },
+  /** @deprecated Use disconnectIntegration('upstox') */
+  clearUpstoxAuth: () => post<boolean>({ module: 'integrations', action: 'disconnect', provider: 'upstox' }),
   getStocks:      ()                           => get<RawHolding[]>('getHoldings', { module: 'stocks' }),
-  syncStocks:     ()                           => post<{ count: number }>({ module: 'stocks', action: 'sync' }),
+  syncStocks:     ()                           => post<{ count: number; syncedAt?: string; providers?: string[] }>({ module: 'stocks', action: 'sync' }),
   getMutualFunds: ()                           => get<RawHolding[]>('getHoldings', { module: 'mutualfunds' }),
-  syncMutualFunds: ()                          => post<{ count: number }>({ module: 'mutualfunds', action: 'sync' }),
+  syncMutualFunds: ()                          => post<{ count: number; syncedAt?: string; providers?: string[] }>({ module: 'mutualfunds', action: 'sync' }),
+  syncPortfolio: () =>
+    post<{
+      stocks: { count: number; syncedAt: string; providers: string[] }
+      mutualFunds: { count: number; syncedAt: string; providers: string[] }
+    }>({ module: 'integrations', action: 'syncPortfolio' }),
   configure:     (expensesSheetId: string, assetsSheetId?: string) => post<boolean>({ action: 'configure', expensesSheetId, assetsSheetId }),
   ensureMonth:   (month: string, year: string)  => post<boolean>({ action: 'ensureMonth', month, year }),
   gemini:        (system: string, prompt: string, forceTool?: boolean) => post<string>({ action: 'gemini', system, prompt, forceTool }),

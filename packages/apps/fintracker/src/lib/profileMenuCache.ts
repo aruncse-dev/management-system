@@ -14,9 +14,21 @@ export type CachedProfileMenuRow = {
   sortOrder: number
 }
 
+export type CachedIntegrationProvider = {
+  slug: string
+  name: string
+  menuSlugs?: string[]
+  actions?: {
+    login?: boolean
+    syncStocks?: boolean
+    syncMutualFunds?: boolean
+  }
+}
+
 type MenuCachePayload = {
   orgId: string | null
   menu: CachedProfileMenuRow[]
+  integrations: CachedIntegrationProvider[]
   fetchedAt: number
 }
 
@@ -32,19 +44,28 @@ export function readMenuCache(): MenuCachePayload | null {
     if (!raw) return null
     const j = JSON.parse(raw) as MenuCachePayload
     if (!j || !Array.isArray(j.menu)) return null
+    if (!Array.isArray(j.integrations)) j.integrations = []
     return j
   } catch {
     return null
   }
 }
 
-export function writeMenuCache(orgId: string | null, menu: CachedProfileMenuRow[]): void {
+export function readEnabledIntegrations(): CachedIntegrationProvider[] {
+  return readMenuCache()?.integrations ?? []
+}
+
+export function writeMenuCache(
+  orgId: string | null,
+  menu: CachedProfileMenuRow[],
+  integrations: CachedIntegrationProvider[] = [],
+): void {
   if (typeof window === 'undefined') return
   try {
     const prev = readMenuCache()
     const prevSig = prev ? menuPayloadSignature(prev.orgId, prev.menu) : null
     const nextSig = menuPayloadSignature(orgId, menu)
-    const payload: MenuCachePayload = { orgId, menu, fetchedAt: Date.now() }
+    const payload: MenuCachePayload = { orgId, menu, integrations, fetchedAt: Date.now() }
     sessionStorage.setItem(FINTRACKER_MENU_CACHE_KEY, JSON.stringify(payload))
     if (nextSig !== prevSig) {
       window.dispatchEvent(new CustomEvent(MENU_CACHE_UPDATED_EVENT))
@@ -80,9 +101,18 @@ export function firstMenuPathFromRows(menu: CachedProfileMenuRow[]): string | nu
 export function refreshMenuCacheInBackground(): void {
   void fetch('/api/profile', { credentials: 'same-origin' })
     .then((r) => r.json())
-    .then((j: { ok?: boolean; data?: { activeOrgId?: string | null; menu?: CachedProfileMenuRow[] } }) => {
+    .then(
+      (j: {
+        ok?: boolean
+        data?: {
+          activeOrgId?: string | null
+          menu?: CachedProfileMenuRow[]
+          integrations?: CachedIntegrationProvider[]
+        }
+      }) => {
       if (!j?.ok || !j.data) return
-      writeMenuCache(j.data.activeOrgId ?? null, j.data.menu ?? [])
-    })
+      writeMenuCache(j.data.activeOrgId ?? null, j.data.menu ?? [], j.data.integrations ?? [])
+    },
+    )
     .catch(() => {})
 }
