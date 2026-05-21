@@ -4,7 +4,7 @@ import type { FtSessionData } from '@fintracker-vault/auth'
 import type { Transaction } from '../types'
 import { MNS } from '../config'
 import { currentMonthYear, isoDate } from '../utils'
-import { cycleDateRange, parseFintrackerPrefs } from '../expenseCycle'
+import { budgetAppliesToLabelMonth, cycleDateRange, parseFintrackerPrefs } from '../expenseCycle'
 import {
   getDb,
   bankingRecords,
@@ -144,8 +144,14 @@ async function loadMergedBudgetForMonth(
         )
       )
     )
-  const byCat = new Map<string, (typeof rows)[number]>()
-  for (const r of rows) {
+  const applicable = rows.filter(r =>
+    budgetAppliesToLabelMonth(
+      { monthYear: r.monthYear, startMonth: r.startMonth ?? null, endMonth: r.endMonth ?? null },
+      monthKey,
+    ),
+  )
+  const byCat = new Map<string, (typeof applicable)[number]>()
+  for (const r of applicable) {
     const existing = byCat.get(r.category)
     if (!existing) {
       byCat.set(r.category, r)

@@ -1,12 +1,31 @@
-import { neon } from '@neondatabase/serverless'
-import { drizzle } from 'drizzle-orm/neon-http'
+import pg from 'pg'
+import { drizzle } from 'drizzle-orm/node-postgres'
 import * as schema from './schema/index'
 
-export function getDb() {
+const { Pool } = pg
+
+let pool: pg.Pool | null = null
+
+function getPool(): pg.Pool {
   const url = process.env.DATABASE_URL
   if (!url) {
-    throw new Error('DATABASE_URL is not configured')
+    throw new Error(
+      'DATABASE_URL is not configured. Add it to packages/apps/<app>/.env.local (gitignored). See docs/troubleshooting.md and run pnpm db:check.',
+    )
   }
-  const sql = neon(url)
-  return drizzle(sql, { schema })
+  if (!pool) {
+    /** Use connection string as-is (sslmode, channel_binding, etc. from Neon dashboard). */
+    pool = new Pool({
+      connectionString: url,
+      max: Number(process.env.DATABASE_POOL_MAX || 10),
+      idleTimeoutMillis: 30_000,
+      connectionTimeoutMillis: 20_000,
+    })
+  }
+  return pool
+}
+
+/** Node `pg` (TCP) — same path as `psql`; Neon HTTP `fetch` often fails locally. */
+export function getDb() {
+  return drizzle(getPool(), { schema })
 }

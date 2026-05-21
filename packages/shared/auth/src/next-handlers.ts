@@ -73,7 +73,20 @@ export async function handleGoogleAuthPost(
       typeof (body as { displayName?: unknown }).displayName === 'string'
         ? (body as { displayName: string }).displayName
         : undefined
-    const verdict = await hooks.onVerified({ email, displayName })
+    let verdict: Awaited<ReturnType<NonNullable<GoogleAuthHooks['onVerified']>>>
+    try {
+      verdict = await hooks.onVerified({ email, displayName })
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : String(e)
+      console.error('[auth] onVerified database error', e)
+      return res.status(503).json({
+        ok: false,
+        error:
+          process.env.NODE_ENV === 'production'
+            ? 'Database unavailable. Check DATABASE_URL in packages/apps/<app>/.env.local, run pnpm db:check, see docs/troubleshooting.md.'
+            : `Database unavailable: ${detail}`,
+      })
+    }
     if (!verdict.allowed) {
       return res
         .status(verdict.statusCode ?? 403)

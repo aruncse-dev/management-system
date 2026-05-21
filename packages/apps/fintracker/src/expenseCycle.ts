@@ -1,4 +1,4 @@
-import { MNS } from './config'
+import { BUDGET_GLOBAL_MONTH_KEY, MNS } from './config'
 
 /** Stored under `organizations.settings.fintracker` when an org is active; otherwise `users.settings.fintracker`. */
 export type ExpenseCycleMode = 'regular' | 'custom'
@@ -82,6 +82,33 @@ export function cycleDateRange(month: string, year: string, prefs: FintrackerPre
 }
 
 /** Subtitle under month nav (e.g. `19 Apr – 18 May` or `1 May – 31 May`). */
+const MONTH_KEY_RE = /^\d{4}-\d{2}$/
+
+/**
+ * Whether a budget row applies to the labelled nav month (`viewKey` = `YYYY-MM`).
+ * Used so e.g. June-only budgets do not appear when viewing July (including custom credit cycles).
+ */
+export function budgetAppliesToLabelMonth(
+  entry: { monthYear: string; startMonth: string | null; endMonth: string | null },
+  viewKey: string,
+): boolean {
+  if (!MONTH_KEY_RE.test(viewKey)) return true
+  const start = entry.startMonth?.trim() || null
+  const end = entry.endMonth?.trim() || null
+  const monthYear = entry.monthYear?.trim() || BUDGET_GLOBAL_MONTH_KEY
+
+  if (!start && !end) {
+    if (monthYear === BUDGET_GLOBAL_MONTH_KEY || !MONTH_KEY_RE.test(monthYear)) return true
+    return monthYear === viewKey
+  }
+
+  if (start && end && start === end) return start === viewKey
+
+  if (start && start > viewKey) return false
+  if (end && end < viewKey) return false
+  return true
+}
+
 export function cycleSubtitle(month: string, year: string, prefs: FintrackerPrefs): string {
   try {
     const { start, end } = cycleDateRange(month, year, prefs)

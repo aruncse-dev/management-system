@@ -9,6 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 pnpm dev:fintracker          # port 3000
 pnpm dev:vault               # port 3001
 pnpm dev:staff               # port 3002
+pnpm dev:admin               # port 3003
 
 # Fresh start (kills ports 3000-3003, clears .next + .turbo cache)
 pnpm dev:fintracker:fresh
@@ -19,7 +20,7 @@ pnpm type-check
 # Lint all packages
 pnpm lint
 
-# Run tests (fintracker and vault only; staff has no test script)
+# Run tests (fintracker and vault only; staff and admin have no test scripts)
 pnpm test
 # Run a single test file
 pnpm --filter fintracker test -- --testPathPattern="<filename>"
@@ -28,22 +29,27 @@ pnpm --filter fintracker test -- --testPathPattern="<filename>"
 pnpm build                   # all apps
 pnpm build:fintracker        # single app
 
-# Apply DB schema changes to Neon
-pnpm --filter @fintracker-vault/db run drizzle:push
-
-# Regenerate migrations/schema.sql (full CREATE DDL snapshot)
-pnpm --filter @fintracker-vault/db run export-schema
+# Database migrations (manual SQL workflow)
+# 1. Write .sql file in packages/shared/db/migrations/
+# 2. Run in Neon: psql $DATABASE_URL < packages/shared/db/migrations/<file>.sql
+# 3. Update Drizzle TS schema in packages/shared/db/src/schema/ to match
+# See ai/docs/migrations.md for detailed workflow
 
 # After editing @fintracker-vault/ui or @fintracker-vault/auth, build them first
 pnpm --filter @fintracker-vault/ui build
 pnpm --filter @fintracker-vault/auth build
+
+# Local DB / login 500 troubleshooting
+pnpm db:check
+pnpm db:check:admin
+# See docs/troubleshooting.md
 ```
 
 ## Architecture
 
 ### Monorepo layout
 
-Turborepo + pnpm workspaces. Three Next.js 14 (pages router) apps share a set of published-but-local packages.
+Turborepo + pnpm workspaces. Four Next.js 14 (pages router) apps share a set of published-but-local packages.
 
 ```
 packages/
@@ -51,10 +57,11 @@ packages/
     fintracker/   # expense tracking, gold, loans, investments, subscriptions (port 3000)
     vault/        # insurance, passwords, documents, health (port 3001)
     staff/        # attendance calendar, staff management (port 3002)
+    admin/        # org/user/integration management, platform admin (port 3003)
   shared/
     db/           # @fintracker-vault/db  — Drizzle ORM schema + all DB query helpers
     auth/         # @fintracker-vault/auth — iron-session handlers, Google OAuth, middleware
-    ui/           # @fintracker-vault/ui  — shared React components (KpiCard, AppAuthGate, etc.)
+    ui/           # @fintracker-vault/ui  — shared React components (KpiCard, SectionBlock, etc.)
     config/       # @fintracker-vault/config — app menus catalog, env helpers
     utils/        # @fintracker-vault/utils — formatters, calculators, validators
     types/        # @fintracker-vault/types — shared domain types
@@ -85,16 +92,18 @@ The canonical menu catalog is `packages/shared/config/src/appMenus.ts`. `getEnab
 
 ### DB schema
 
-Schema files: `packages/shared/db/src/schema/`. Apply changes with `drizzle:push` (no migration files needed for existing DBs). Never edit `migrations/schema.sql` by hand — regenerate it with `export-schema`. Do not commit ad-hoc `pg_dump` files.
+**Workflow:** Write `.sql` migration files → run locally → update Drizzle TS schema → regenerate `schema.sql` snapshot.
+
+See `ai/docs/migrations.md` for step-by-step workflow. Schema files: `packages/shared/db/src/schema/`. Never hand-edit `schema.sql` — regenerate with `export-schema`. Do not commit ad-hoc `pg_dump` files.
 
 ## Non-Negotiables
 
-1. All changes to `main` via PR — no direct push (tags are exempt).
-2. Run `pnpm type-check` before pushing.
-3. Global CSS only in `_app.tsx` / `_document.tsx`.
-4. Cross-package imports via `@fintracker-vault/*` aliases.
-5. Google OAuth client ID must use one of: `VITE_GOOGLE_CLIENT_ID`, `NEXT_PUBLIC_GOOGLE_CLIENT_ID`, or `GOOGLE_CLIENT_ID`. Do not invent new names. New apps must use `getGoogleAuthEnv(__dirname)` in `next.config.js`.
-6. After editing `@fintracker-vault/ui` or `@fintracker-vault/auth`, build those packages before running an app.
+1. Run `pnpm type-check` before pushing.
+2. Global CSS only in `_app.tsx` / `_document.tsx`.
+3. Cross-package imports via `@fintracker-vault/*` aliases.
+4. Google OAuth client ID must use one of: `VITE_GOOGLE_CLIENT_ID`, `NEXT_PUBLIC_GOOGLE_CLIENT_ID`, or `GOOGLE_CLIENT_ID`. Do not invent new names. New apps must use `getGoogleAuthEnv(__dirname)` in `next.config.js`.
+5. After editing `@fintracker-vault/ui` or `@fintracker-vault/auth`, build those packages before running an app.
+6. Database changes: write `.sql` files, apply manually to Neon, then update Drizzle TS schema. No automation.
 
 ## Environment Variables
 
@@ -104,9 +113,24 @@ Merge order: repo `.env` → `.env.local` → `web/.env` → `packages/apps/<app
 
 Obsolete (do not use): `VITE_GAS_URL`, `VITE_API_TOKEN`, `GAS_EXEC_URL`, `NEXT_PUBLIC_GAS_URL`, `VITE_API_URL`, `VITE_APP_PASSWORD`, `NEXT_PUBLIC_APP_PASSWORD`.
 
-## Reference Docs
+## Guides (in `ai/` folder)
 
+### Skills (how to implement)
+- `ai/skills/ui-patterns.md` — global UI patterns every page must follow
+- `ai/skills/db-workflow.md` — database migration workflow
+- `ai/skills/api-patterns.md` — single-dispatcher API pattern
+- `ai/skills/auth-patterns.md` — session/OAuth/PIN authentication
+- `ai/skills/monorepo-guidelines.md` — workspace rules and conventions
+- `ai/skills/git-workflow.md` — PR-only to main; branch naming; commits
+- `ai/skills/google-oauth-env.md` — OAuth environment variable rules
+
+### Docs (reference and diagrams)
+- `ai/docs/architecture.md` — monorepo structure, multi-tenancy, auth flow overview
+- `ai/docs/schema-diagram.md` — Mermaid ERD with all tables and relationships
+- `ai/docs/migrations.md` — detailed step-by-step migration guide
+- `ai/docs/integrations-encryption.md` — OAuth provider setup and token encryption
+- `ai/docs/sensitive-field-encryption.md` — AES-256-GCM encryption for secrets/PII
+
+## Quick Links
 - `README.md` — setup and deployment
-- `docs/neon-schema-migrations.md` — schema workflow details
-- `.cursor/rules/google-oauth-env.mdc` — OAuth env key rules
-- `.cursor/rules/monorepo-guidelines.mdc` — monorepo constraints
+- `docs/troubleshooting.md` — local 500 / DATABASE_URL / login failures (`pnpm db:check`)

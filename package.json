@@ -25,6 +25,8 @@
     "dev:vault:fresh": "pnpm run kill-ports && pnpm run clean:cache && pnpm run dev:vault",
     "dev:staff:fresh": "pnpm run kill-ports && pnpm run clean:cache && pnpm run dev:staff",
     "dev:admin:fresh": "pnpm run kill-ports && pnpm run clean:cache && pnpm run dev:admin",
+    "db:check": "node packages/shared/db/scripts/check-connection.mjs fintracker",
+    "db:check:admin": "node packages/shared/db/scripts/check-connection.mjs admin",
     "build": "turbo run build",
     "build:fintracker": "turbo run build --scope=fintracker",
     "build:vault": "turbo run build --scope=vault",

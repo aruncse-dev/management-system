@@ -5,7 +5,7 @@ import type { FtAdminSessionData, FtSessionData } from './session'
 import type { GetFtSessionOptions } from './session'
 
 const SESSION_SETUP_MESSAGE =
-  'Server auth misconfigured: set SESSION_SECRET (32+ random characters, e.g. openssl rand -base64 32) in .env.local. See CLAUDE.md and packages/apps/<app>/.env.local.example.'
+  'Server auth misconfigured: set SESSION_SECRET (32+ random characters, e.g. openssl rand -base64 32) in packages/apps/<app>/.env.local (gitignored). See CLAUDE.md.'
 
 export function stripTrailingSlash(p: string): string {
   if (p.length > 1 && p.endsWith('/')) return p.slice(0, -1)
