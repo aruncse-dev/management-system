@@ -1,4 +1,3 @@
-import dns from 'node:dns'
 import pg from 'pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import * as schema from './schema/index'
@@ -15,24 +14,18 @@ function getPool(): pg.Pool {
     )
   }
   if (!pool) {
+    /** Use connection string as-is (sslmode, channel_binding, etc. from Neon dashboard). */
     pool = new Pool({
       connectionString: url,
       max: Number(process.env.DATABASE_POOL_MAX || 10),
       idleTimeoutMillis: 30_000,
       connectionTimeoutMillis: 20_000,
-      ssl: { rejectUnauthorized: true },
-      lookup:
-        process.env.DATABASE_PG_FORCE_IPV4 === '0'
-          ? undefined
-          : (hostname, _opts, cb) => {
-              dns.lookup(hostname, { family: 4 }, cb)
-            },
     })
   }
   return pool
 }
 
-/** Node `pg` over TCP (same as `psql`). Use Neon pooler URL in `DATABASE_URL`. */
+/** Node `pg` (TCP) — same path as `psql`; Neon HTTP `fetch` often fails locally. */
 export function getDb() {
   return drizzle(getPool(), { schema })
 }

@@ -80,8 +80,9 @@ Removed / obsolete: **`VITE_GAS_URL`**, **`VITE_API_TOKEN`**, **`GAS_EXEC_URL`**
 ### Monorepo dev shortcuts
 
 ```bash
-pnpm dev              # all apps (turbo)
-pnpm dev:fresh        # kill ports, clear caches, then dev
+pnpm dev:all          # all apps in parallel (3000–3003)
+pnpm dev              # same as dev:all
+pnpm dev:fresh        # kill ports, clear caches, then dev:all
 ```
 
 (`.env.local` files are gitignored — never committed)

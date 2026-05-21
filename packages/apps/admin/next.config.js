@@ -25,6 +25,7 @@ const nextConfig = {
   env: clientEnv,
   transpilePackages: [
     '@fintracker-vault/auth',
+    '@fintracker-vault/db',
     '@fintracker-vault/ui',
     '@fintracker-vault/types',
     '@fintracker-vault/config',

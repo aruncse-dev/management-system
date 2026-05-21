@@ -16,8 +16,11 @@ function dbQueryHint(e: unknown): string {
     }
   }
   const msg = parts.join(' — ')
-  if (/fetch failed|ECONNREFUSED|ENOTFOUND|connection timeout|Connection terminated/i.test(msg)) {
-    return `${msg} (cannot reach Neon — verify DATABASE_URL in .env.local, run pnpm db:check, see docs/troubleshooting.md)`
+  if (/fetch failed/i.test(msg)) {
+    return `${msg} (Neon HTTP driver issue — restart next dev after pull; app should use pg. Run pnpm db:check)`
+  }
+  if (/ECONNREFUSED|ENOTFOUND|connection timeout|Connection terminated/i.test(msg)) {
+    return `${msg} (cannot reach Neon — verify DATABASE_URL in .env.local, run pnpm db:check)`
   }
   if (/password authentication failed|28P01/i.test(msg)) {
     return `${msg} (rotate Neon password and update every packages/apps/*/.env.local)`

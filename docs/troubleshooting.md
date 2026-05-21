@@ -2,6 +2,38 @@
 
 Use this when login/API returns **500**, HTML error pages, or `Failed query` on `users` (Google auth, PIN, or any API).
 
+## Running all apps (`pnpm dev:all`)
+
+Starts **four** Next dev servers in parallel:
+
+| App | Port | `.env.local` path |
+|-----|------|-------------------|
+| FinTracker | 3000 | `packages/apps/fintracker/.env.local` |
+| Vault | 3001 | `packages/apps/vault/.env.local` |
+| Staff | 3002 | `packages/apps/staff/.env.local` |
+| Admin | 3003 | `packages/apps/admin/.env.local` |
+
+Before `pnpm dev:all`:
+
+```bash
+unset DATABASE_URL SESSION_SECRET
+pnpm db:check && pnpm db:check:admin
+pnpm --filter @fintracker-vault/auth build
+pnpm --filter @fintracker-vault/ui build
+```
+
+Copy `DATABASE_URL`, `SESSION_SECRET`, and Google client id into **each** app’s `.env.local` (Vault/Staff need them too, not only fintracker).
+
+If ports are stuck or login still fails after env fixes:
+
+```bash
+pnpm dev:fresh
+```
+
+(same as `dev:all` but kills ports 3000–3003 and clears `.next` / turbo cache first).
+
+---
+
 ## Quick checklist (do in order)
 
 1. **Stop dev servers** (`Ctrl+C`), then run a DB smoke test:
@@ -63,13 +95,17 @@ Failed query: select ... from "users" where "users"."email" = $1
 
 `next.config.js` merges repo `.env` → `.env.local` → `web/.env` → **app** `.env.local` (see `packages/apps/resolve-google-env.cjs`). Restart `next dev` after any edit.
 
-### B. Connection string shape (Neon + `pg` driver)
+### B. Connection string shape (Neon)
 
-Apps use the Node **`pg`** driver (TCP), not Neon HTTP `fetch`. Prefer Neon’s **pooled** connection string (`*-pooler.*.neon.tech`).
+Use the **full** connection string from the Neon dashboard in each app’s `.env.local`, including query params if present, for example:
 
-- **Remove** `channel_binding=require` if present (can break some clients).
-- Keep `sslmode=require`.
-- If `pnpm db:check` fails with **fetch failed**, restart dev after pulling latest — older code used Neon HTTP; current code uses `pg`.
+`DATABASE_URL="postgresql://…@…neon.tech/neondb?sslmode=require&channel_binding=require"`
+
+**Quote the value** when it contains `&` (required in `.env.local`). Unquoted `&` can truncate the URL or break shell `source`.
+
+**⚠️ Important:** For local development, use the **direct connection** (not pooled). See `ai/docs/neon-connection-strings.md` for the difference and how to fix connection timeouts.
+
+Apps use the Node **`pg`** driver (same TCP path as `psql`). If the error still says **`fetch failed`**, the dev server is running **old code** — stop all `next dev` processes and run `pnpm dev:fresh` (or `pnpm dev:all` after `pnpm run clean:cache`).
 
 ### C. Schema behind the app
 

@@ -5,7 +5,6 @@
  *   pnpm db:check
  *   pnpm db:check -- admin
  */
-import dns from 'node:dns'
 import { createRequire } from 'node:module'
 import pg from 'pg'
 
@@ -35,11 +34,6 @@ console.log(`[db:check] app=${app} host=${host} driver=pg`)
 const pool = new pg.Pool({
   connectionString: url,
   connectionTimeoutMillis: 20_000,
-  ssl: { rejectUnauthorized: true },
-  lookup:
-    process.env.DATABASE_PG_FORCE_IPV4 === '0'
-      ? undefined
-      : (hostname, _opts, cb) => dns.lookup(hostname, { family: 4 }, cb),
 })
 try {
   const { rows } = await pool.query('select email, role, status from users limit 1')
@@ -49,10 +43,9 @@ try {
   console.error('[db:check] FAILED —', msg)
   console.error('')
   console.error('Common fixes (docs/troubleshooting.md):')
-  console.error('  1. Rotate Neon password; paste new URL into every packages/apps/*/.env.local you use')
-  console.error('  2. Use the pooler host (*-pooler.*.neon.tech) from Neon dashboard')
-  console.error('  3. Unset stale DATABASE_URL in your shell: unset DATABASE_URL')
-  console.error('  4. pnpm --filter @fintracker-vault/db run drizzle:push')
+  console.error('  1. Use the full Neon URL from the dashboard in packages/apps/<app>/.env.local')
+  console.error('  2. unset DATABASE_URL  # avoid stale shell override')
+  console.error('  3. pnpm --filter @fintracker-vault/db run drizzle:push')
   process.exit(1)
 } finally {
   await pool.end()
