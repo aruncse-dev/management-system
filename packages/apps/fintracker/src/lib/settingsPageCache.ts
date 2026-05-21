@@ -1,4 +1,4 @@
-import type { AccountRow, CreditSourceRow, GoldResource, ProfileData } from '../api'
+import type { AccountRow, CreditSourceRow, GoldResource, IntegrationTokenStatus, ProfileData } from '../api'
 import type { FintrackerPrefs } from '../expenseCycle'
 import { DEFAULT_FINTRACKER_PREFS } from '../expenseCycle'
 
@@ -16,14 +16,20 @@ export type SettingsPageUpstoxStatus = {
 
 export type SettingsPageUpstoxState = 'checking' | 'connected' | 'missing' | 'expired'
 
+export type SettingsPageIntegrationUiState = SettingsPageUpstoxState
+
 export type SettingsPageCachePayload = {
   fetchedAt: number
   settingsFields: Record<string, string>
   fintrackerDraft: FintrackerPrefs
   settingsDraft: { currency?: 'INR' | 'USD' | 'AED'; roundOff?: boolean }
   profile: ProfileData | null
-  upstoxStatus: SettingsPageUpstoxStatus
-  upstoxStatusState: SettingsPageUpstoxState
+  integrationStatus?: Record<string, IntegrationTokenStatus>
+  integrationUiState?: Record<string, SettingsPageIntegrationUiState>
+  /** @deprecated use integrationStatus */
+  upstoxStatus?: SettingsPageUpstoxStatus
+  /** @deprecated use integrationUiState */
+  upstoxStatusState?: SettingsPageUpstoxState
   accounts: AccountRow[]
   creditSources: CreditSourceRow[]
   goldResources?: GoldResource[]
@@ -74,6 +80,20 @@ function parsePayload(raw: unknown): SettingsPageCachePayload | null {
   const upstoxStatusState: SettingsPageUpstoxState =
     uss === 'checking' || uss === 'connected' || uss === 'missing' || uss === 'expired' ? uss : 'missing'
 
+  let integrationStatus: Record<string, IntegrationTokenStatus> | undefined
+  if (isRecord(raw.integrationStatus)) {
+    integrationStatus = raw.integrationStatus as Record<string, IntegrationTokenStatus>
+  } else if (isRecord(us)) {
+    integrationStatus = { upstox: upstoxStatus }
+  }
+
+  let integrationUiState: Record<string, SettingsPageIntegrationUiState> | undefined
+  if (isRecord(raw.integrationUiState)) {
+    integrationUiState = raw.integrationUiState as Record<string, SettingsPageIntegrationUiState>
+  } else if (uss) {
+    integrationUiState = { upstox: upstoxStatusState }
+  }
+
   const accounts = Array.isArray(raw.accounts) ? (raw.accounts as AccountRow[]) : []
   const creditSources = Array.isArray(raw.creditSources) ? (raw.creditSources as CreditSourceRow[]) : []
   const goldResources = Array.isArray(raw.goldResources) ? (raw.goldResources as GoldResource[]) : undefined
@@ -84,6 +104,8 @@ function parsePayload(raw: unknown): SettingsPageCachePayload | null {
     fintrackerDraft,
     settingsDraft,
     profile,
+    integrationStatus,
+    integrationUiState,
     upstoxStatus,
     upstoxStatusState,
     accounts,
@@ -122,9 +144,13 @@ export function mergeWriteSettingsPageCache(
       settingsDraft:
         partial.settingsDraft !== undefined ? partial.settingsDraft : prev?.settingsDraft ?? { currency: 'INR', roundOff: true },
       profile: partial.profile !== undefined ? partial.profile : prev?.profile ?? null,
-      upstoxStatus: partial.upstoxStatus !== undefined ? partial.upstoxStatus : prev?.upstoxStatus ?? { hasToken: false },
+      integrationStatus:
+        partial.integrationStatus !== undefined ? partial.integrationStatus : prev?.integrationStatus,
+      integrationUiState:
+        partial.integrationUiState !== undefined ? partial.integrationUiState : prev?.integrationUiState,
+      upstoxStatus: partial.upstoxStatus !== undefined ? partial.upstoxStatus : prev?.upstoxStatus,
       upstoxStatusState:
-        partial.upstoxStatusState !== undefined ? partial.upstoxStatusState : prev?.upstoxStatusState ?? 'missing',
+        partial.upstoxStatusState !== undefined ? partial.upstoxStatusState : prev?.upstoxStatusState,
       accounts: partial.accounts !== undefined ? partial.accounts : prev?.accounts ?? [],
       creditSources: partial.creditSources !== undefined ? partial.creditSources : prev?.creditSources ?? [],
       goldResources: partial.goldResources !== undefined ? partial.goldResources : prev?.goldResources,

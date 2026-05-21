@@ -32,6 +32,7 @@ CREATE TABLE "organizations" (
 	"notes" text,
 	"enabled_apps" jsonb DEFAULT '[]',
 	"enabled_menus" jsonb DEFAULT '{}',
+	"enabled_integrations" jsonb DEFAULT '{}',
 	"settings" jsonb DEFAULT '{}',
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL,
@@ -49,7 +50,9 @@ CREATE TABLE "budget" (
 	"org_id" text,
 	"month_year" text NOT NULL,
 	"category" text NOT NULL,
-	"amount" numeric(12, 2) NOT NULL
+	"amount" numeric(12, 2) NOT NULL,
+	"start_month" text,
+	"end_month" text
 );
 
 CREATE TABLE "payment_sources" (
@@ -270,18 +273,21 @@ CREATE TABLE "vault_apps" (
 CREATE TABLE "mutual_funds" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"org_id" text,
+	"provider_slug" text,
 	"fund_name" text NOT NULL,
 	"folio_no" text,
 	"units" numeric(14, 4),
 	"purchased" numeric(14, 2),
 	"current_value" numeric(14, 2),
 	"profit_loss" numeric(14, 2),
-	"scheme_code" text
+	"scheme_code" text,
+	"synced_at" timestamp
 );
 
 CREATE TABLE "stocks" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"org_id" text,
+	"provider_slug" text,
 	"symbol" text NOT NULL,
 	"company" text,
 	"isin" text,
@@ -291,6 +297,33 @@ CREATE TABLE "stocks" (
 	"pnl" numeric(14, 2),
 	"day_change_pct" numeric(8, 4),
 	"synced_at" timestamp
+);
+
+CREATE TABLE "integration_providers" (
+	"slug" text PRIMARY KEY NOT NULL,
+	"name" text NOT NULL,
+	"status" text DEFAULT 'active' NOT NULL,
+	"client_id" text NOT NULL,
+	"client_secret_enc" text NOT NULL,
+	"endpoints" jsonb DEFAULT '{}' NOT NULL,
+	"app_menus" jsonb DEFAULT '{}' NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL
+);
+
+CREATE TABLE "org_integrations" (
+	"id" text PRIMARY KEY NOT NULL,
+	"org_id" text NOT NULL,
+	"provider_slug" text NOT NULL,
+	"status" text DEFAULT 'disconnected' NOT NULL,
+	"access_token_enc" text,
+	"refresh_token_enc" text,
+	"token_expires_at" timestamp,
+	"connected_by_email" text,
+	"last_sync_at" timestamp,
+	"last_error" text,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 
 CREATE TABLE "attendance" (
@@ -308,8 +341,11 @@ CREATE TABLE "staff_members" (
 	"org_id" text,
 	"name" text NOT NULL,
 	"role" text,
+	"gender" text,
 	"joined_date" date,
-	"status" text DEFAULT 'active' NOT NULL
+	"status" text DEFAULT 'active' NOT NULL,
+	"salary_type" text,
+	"salary_amount" text
 );
 
 CREATE UNIQUE INDEX "org_members_org_user_unique" ON "org_members" USING btree ("org_id","user_email");

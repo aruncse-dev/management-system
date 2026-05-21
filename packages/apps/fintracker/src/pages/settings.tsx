@@ -15,11 +15,12 @@ import {
   PiggyBank,
   CalendarRange,
   Coins,
-  Plug,
   DollarSign,
   Gem,
   MapPin,
   ArrowRightLeft,
+  Plug,
+  RefreshCw,
 } from 'lucide-react';
 import {
   api,
@@ -31,9 +32,24 @@ import {
   type ProfileData,
 } from '../api';
 import { THEME_COLORS } from '../config';
-import { LoadingState, SectionBlock, SectionChip, FormField, Spacer, SettingsSectionCard, TransactionCard, type SettingField } from '../ui';
+import {
+  LoadingState,
+  SectionBlock,
+  SectionChip,
+  FormField,
+  Spacer,
+  SettingsSectionCard,
+  TransactionCard,
+  type SettingField,
+} from '../ui';
 import { useFintrackerModes } from '../context/FintrackerModesContext';
-import { MENU_CACHE_UPDATED_EVENT, readMenuCache } from '../lib/profileMenuCache';
+import {
+  MENU_CACHE_UPDATED_EVENT,
+  readEnabledIntegrations,
+  readMenuCache,
+  type CachedIntegrationProvider,
+} from '../lib/profileMenuCache';
+import type { IntegrationTokenStatus } from '../api';
 import { mergeWriteSettingsPageCache, readSettingsPageCache, type SettingsPageCachePayload } from '../lib/settingsPageCache';
 import type { FintrackerPrefs } from '../expenseCycle';
 import { DEFAULT_FINTRACKER_PREFS, cycleDateRange, cycleSubtitle } from '../expenseCycle';
@@ -50,6 +66,23 @@ function readMenuHasPath(path: string): boolean {
     const p = (m.path ?? '').trim().replace(/\/+$/, '');
     return p === target;
   });
+}
+
+function readUserMenuSlugs(): string[] {
+  const menu = readMenuCache()?.menu ?? [];
+  const slugs = new Set<string>();
+  for (const m of menu) {
+    const p = (m.path ?? '').trim().replace(/\/+$/, '').replace(/^\//, '');
+    const slug = p.split('/')[0] || p;
+    if (slug) slugs.add(slug);
+  }
+  return [...slugs];
+}
+
+function integrationVisibleForUser(provider: CachedIntegrationProvider, userMenuSlugs: string[]): boolean {
+  const required = provider.menuSlugs ?? [];
+  if (required.length === 0) return true;
+  return required.some((slug) => userMenuSlugs.includes(slug));
 }
 
 const GOLD_RATE_FIELD: SettingField = { key: 'goldRate', label: 'Gold rate (INR/gram)', type: 'number' };
@@ -88,6 +121,23 @@ export default function Settings() {
     }
   }, [router, rawTab, router.isReady]);
 
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (router.query.integration_error === '1' || router.query.upstox_error === '1') {
+      let redirectHint = 'http://localhost:3000/api/integrations/oauth/callback';
+      try {
+        const stored = sessionStorage.getItem('ft_integration_oauth_redirect');
+        if (stored) redirectHint = stored;
+      } catch {
+        /* ignore */
+      }
+      setError(
+        `Integration connection failed. If Upstox showed 401 or invalid credentials, add this Redirect URL in Upstox Developer → Apps (exact match): ${redirectHint} — and confirm the Client ID in Admin → Integrations matches your Upstox API key.`,
+      );
+      void router.replace({ pathname: '/settings' }, undefined, { shallow: true });
+    }
+  }, [router.isReady, router.query.integration_error, router.query.upstox_error, router]);
+
   const [moneyModalOpen, setMoneyModalOpen] = useState(false);
   const [moneyModalKind, setMoneyModalKind] = useState<'account' | 'credit'>('account');
   const [acctDelConfirm, setAcctDelConfirm] = useState(false);
@@ -102,12 +152,18 @@ export default function Settings() {
     savingsAccountNames,
   } = useFintrackerModes();
 
+  const [enabledIntegrations, setEnabledIntegrations] = useState<CachedIntegrationProvider[]>(() =>
+    readEnabledIntegrations(),
+  );
+  const [userMenuSlugs, setUserMenuSlugs] = useState<string[]>(() => readUserMenuSlugs());
   const [hasInvestmentsMenu, setHasInvestmentsMenu] = useState(() => readMenuHasPath('/investments'));
   const [hasGoldMenu, setHasGoldMenu] = useState(() => readMenuHasPath('/gold'));
   const [hasSubscriptionsMenu, setHasSubscriptionsMenu] = useState(() => readMenuHasPath('/subscriptions'));
 
   useEffect(() => {
     const syncMenuFlags = () => {
+      setEnabledIntegrations(readEnabledIntegrations());
+      setUserMenuSlugs(readUserMenuSlugs());
       setHasInvestmentsMenu(readMenuHasPath('/investments'));
       setHasGoldMenu(readMenuHasPath('/gold'));
       setHasSubscriptionsMenu(readMenuHasPath('/subscriptions'));
@@ -146,15 +202,10 @@ export default function Settings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [upstoxStatus, setUpstoxStatus] = useState<{
-    hasToken: boolean;
-    hasAccessToken?: boolean;
-    hasExtendedToken?: boolean;
-    hasRefreshToken?: boolean;
-    expired?: boolean;
-  }>({ hasToken: false });
-  const [upstoxStatusState, setUpstoxStatusState] = useState<'checking' | 'connected' | 'missing' | 'expired'>('checking');
-  const [upstoxBusy, setUpstoxBusy] = useState(false);
+  type IntegrationUiState = 'checking' | 'connected' | 'missing' | 'expired';
+  const [integrationStatus, setIntegrationStatus] = useState<Record<string, IntegrationTokenStatus>>({});
+  const [integrationUiState, setIntegrationUiState] = useState<Record<string, IntegrationUiState>>({});
+  const [integrationBusy, setIntegrationBusy] = useState<Record<string, boolean>>({});
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [fintrackerDraft, setFintrackerDraft] = useState<FintrackerPrefs>(() => ({
     expenseCycle: { ...DEFAULT_FINTRACKER_PREFS.expenseCycle },
@@ -165,8 +216,6 @@ export default function Settings() {
     roundOff: true,
   });
   const [currencySaving, setCurrencySaving] = useState(false);
-  const [upstoxUiOpen, setUpstoxUiOpen] = useState(true);
-
   useLayoutEffect(() => {
     const c = readSettingsPageCache();
     if (!c) return;
@@ -176,12 +225,8 @@ export default function Settings() {
       setFintrackerDraft(c.fintrackerDraft);
     }
     setSettingsDraft(c.settingsDraft ?? { currency: 'INR', roundOff: true });
-    setUpstoxStatus(c.upstoxStatus ?? { hasToken: false });
-    if (c.upstoxStatusState === 'checking') {
-      setUpstoxStatusState(c.upstoxStatus.hasToken ? 'connected' : 'missing');
-    } else {
-      setUpstoxStatusState(c.upstoxStatusState);
-    }
+    if (c.integrationStatus) setIntegrationStatus(c.integrationStatus);
+    if (c.integrationUiState) setIntegrationUiState(c.integrationUiState);
     if (c.goldResources && Array.isArray(c.goldResources)) {
       setGoldResources(c.goldResources);
     }
@@ -195,16 +240,26 @@ export default function Settings() {
       setLoading(true)
     }
     setError('')
+    const providers = readEnabledIntegrations();
     if (!background) {
-      setUpstoxStatusState('checking')
+      setIntegrationUiState(Object.fromEntries(providers.map((p) => [p.slug, 'checking' as const])));
     }
     try {
       if (forceInvalidate) api.invalidateCache({ action: 'get', params: { module: 'settings' } })
-      const [settingsResult, tokenResult, profileResult] = await Promise.allSettled([
+      const [settingsResult, profileResult] = await Promise.allSettled([
         api.getSettings(),
-        api.getTokenStatus(),
         api.getProfile(),
       ])
+      const integrationSlugs =
+        profileResult.status === 'fulfilled'
+          ? (profileResult.value.integrations ?? providers).map((p) => p.slug)
+          : providers.map((p) => p.slug);
+      setEnabledIntegrations(
+        profileResult.status === 'fulfilled' ? (profileResult.value.integrations ?? providers) : providers,
+      );
+      const statusResults = await Promise.allSettled(
+        integrationSlugs.map((slug) => api.getIntegrationStatus(slug)),
+      );
       const loaded: Record<string, string> = {}
       let nextFintracker: FintrackerPrefs | undefined
       let nextSettingsDraft: { currency?: 'INR' | 'USD' | 'AED'; roundOff?: boolean } | undefined
@@ -247,14 +302,22 @@ export default function Settings() {
         setProfile(null)
       }
 
-      if (tokenResult.status === 'fulfilled') {
-        setUpstoxStatus(tokenResult.value)
-        const isConnected = Boolean(tokenResult.value.hasToken)
-        setUpstoxStatusState(isConnected ? 'connected' : 'missing')
-      } else if (!background) {
-        setUpstoxStatus({ hasToken: false })
-        setUpstoxStatusState('missing')
-      }
+      const nextStatus: Record<string, IntegrationTokenStatus> = {}
+      const nextUiState: Record<string, IntegrationUiState> = {}
+      integrationSlugs.forEach((slug, i) => {
+        const r = statusResults[i]
+        if (r?.status === 'fulfilled') {
+          nextStatus[slug] = r.value
+          const expired = Boolean(r.value.expired)
+          const isConnected = Boolean(r.value.hasToken) && !expired
+          nextUiState[slug] = expired ? 'expired' : isConnected ? 'connected' : 'missing'
+        } else {
+          nextStatus[slug] = { hasToken: false }
+          nextUiState[slug] = 'missing'
+        }
+      })
+      setIntegrationStatus(nextStatus)
+      setIntegrationUiState(nextUiState)
 
       const cachePatch: Partial<Omit<SettingsPageCachePayload, 'fetchedAt'>> = {}
       if (settingsResult.status === 'fulfilled') {
@@ -265,21 +328,19 @@ export default function Settings() {
       if (profileResult.status === 'fulfilled') {
         cachePatch.profile = profileResult.value
       }
-      if (tokenResult.status === 'fulfilled') {
-        cachePatch.upstoxStatus = tokenResult.value
-        cachePatch.upstoxStatusState = tokenResult.value.hasToken ? 'connected' : 'missing'
-      }
+      cachePatch.integrationStatus = nextStatus
+      cachePatch.integrationUiState = nextUiState
       if (
         cachePatch.settingsFields !== undefined ||
         cachePatch.profile !== undefined ||
-        cachePatch.upstoxStatus !== undefined
+        cachePatch.integrationStatus !== undefined
       ) {
         mergeWriteSettingsPageCache(cachePatch)
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load settings')
       if (!background) {
-        setUpstoxStatusState('missing')
+        setIntegrationUiState({})
       }
     } finally {
       setLoading(false)
@@ -289,6 +350,13 @@ export default function Settings() {
   useEffect(() => {
     void validateLiveStatus({ background: readSettingsPageCache() !== null })
   }, [validateLiveStatus])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const h = window.location.hash;
+    if (h !== '#integrations' && h !== '#upstox') return;
+    void validateLiveStatus({ forceInvalidate: true, background: false });
+  }, [validateLiveStatus]);
 
   useEffect(() => {
     setMoneyModalOpen(false);
@@ -349,31 +417,36 @@ export default function Settings() {
     setEditValue(settings[key] ?? '');
   }
 
-  async function connectUpstox() {
-    setUpstoxBusy(true);
+  async function connectIntegration(slug: string) {
+    setIntegrationBusy((b) => ({ ...b, [slug]: true }));
     setError('');
     try {
-      const response = await api.getUpstoxAuthUrl();
-      window.location.assign(response.authUrl);
+      await api.connectIntegration(slug);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to open Upstox auth');
-    } finally {
-      setUpstoxBusy(false);
+      setError(e instanceof Error ? e.message : 'Failed to open integration auth');
+      setIntegrationBusy((b) => ({ ...b, [slug]: false }));
     }
   }
 
-  async function clearUpstox() {
-    setUpstoxBusy(true);
+  async function disconnectIntegration(slug: string) {
+    setIntegrationBusy((b) => ({ ...b, [slug]: true }));
     setError('');
     try {
-      await api.clearUpstoxAuth();
-      setUpstoxStatus({ hasToken: false });
-      setUpstoxStatusState('missing');
+      await api.disconnectIntegration(slug);
+      setIntegrationStatus((s) => ({ ...s, [slug]: { hasToken: false } }));
+      setIntegrationUiState((s) => ({ ...s, [slug]: 'missing' }));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to clear Upstox token');
+      setError(e instanceof Error ? e.message : 'Failed to disconnect');
     } finally {
-      setUpstoxBusy(false);
+      setIntegrationBusy((b) => ({ ...b, [slug]: false }));
     }
+  }
+
+  function integrationStateLabel(state: IntegrationUiState | undefined) {
+    if (state === 'checking') return '…';
+    if (state === 'connected') return 'Connected';
+    if (state === 'expired') return 'Token expired';
+    return 'Not connected';
   }
 
   function resetAcctForm() {
@@ -767,73 +840,71 @@ export default function Settings() {
               </SectionBlock>
             ) : null}
 
-            {hasInvestmentsMenu ? (
+            {enabledIntegrations.filter((p) => integrationVisibleForUser(p, userMenuSlugs)).length > 0 ? (
               <SectionBlock title="Integrations" icon={<Plug size={14} aria-hidden />}>
                 <div className="txn-cards">
                   <div className={GENERAL_SETTINGS_PANEL} role="group">
-                    <div className="settings-upstox-toggle-row">
-                      <span className="settings-upstox-toggle-label">Upstox</span>
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={upstoxUiOpen}
-                        className={`settings-switch${upstoxUiOpen ? ' settings-switch--on' : ''}`}
-                        onClick={() => setUpstoxUiOpen((v) => !v)}
-                        aria-label={upstoxUiOpen ? 'Hide Upstox connection controls' : 'Show Upstox connection controls'}
-                      />
+                    <div className="ui-stack settings-general-card-stack settings-upstox-body">
+                        {enabledIntegrations
+                          .filter((provider) => integrationVisibleForUser(provider, userMenuSlugs))
+                          .map((provider) => {
+                          const slug = provider.slug;
+                          const status = integrationStatus[slug];
+                          const uiState = integrationUiState[slug];
+                          const busy = integrationBusy[slug];
+                          const canLogin = provider.actions?.login !== false;
+                          return (
+                            <div key={slug} className="settings-integration-provider-block">
+                              <div className="settings-upstox-status-row">
+                                <span className="settings-upstox-status-label">{provider.name}</span>
+                                <span className="settings-upstox-collapsed-hint">
+                                  {integrationStateLabel(uiState)}
+                                </span>
+                              </div>
+                              {uiState === 'expired' ? (
+                                <p className="settings-upstox-collapsed-hint">
+                                  Token expired — reconnect to sync portfolio data.
+                                </p>
+                              ) : null}
+                              {status?.accessTokenExpiry ? (
+                                <div className="settings-upstox-token-lines">
+                                  Access token expires:{' '}
+                                  {new Date(status.accessTokenExpiry).toLocaleString()}
+                                </div>
+                              ) : null}
+                              <div className="settings-actions settings-general-upstox-actions">
+                                {canLogin ? (
+                                  <button
+                                    type="button"
+                                    className="ui-kit-btn ui-kit-btn--solid ui-kit-btn-inline settings-action-btn"
+                                    onClick={() => void connectIntegration(slug)}
+                                    disabled={busy}
+                                  >
+                                    <Link2 size={14} />
+                                    {status?.hasToken ? 'Re-login' : 'Connect'}
+                                  </button>
+                                ) : null}
+                                {canLogin ? (
+                                  <button
+                                    type="button"
+                                    className="ui-kit-btn ui-kit-btn--soft ui-kit-btn-inline settings-action-btn"
+                                    onClick={() => void disconnectIntegration(slug)}
+                                    disabled={busy || !status?.hasToken}
+                                  >
+                                    <Unlink2 size={14} />
+                                    Logout
+                                  </button>
+                                ) : null}
+                                {provider.actions?.syncStocks && status?.hasToken ? (
+                                  <span className="settings-upstox-collapsed-hint" style={{ alignSelf: 'center' }}>
+                                    <RefreshCw size={14} aria-hidden /> Sync via Investments
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
+                          );
+                        })}
                     </div>
-                    {upstoxUiOpen ? (
-                      <div className="ui-stack settings-general-card-stack settings-upstox-body">
-                      <div className="settings-upstox-status-row">
-                        <span className="settings-upstox-status-label">Status</span>
-                        <SectionChip>
-                          {upstoxStatusState === 'checking' ? '…' : upstoxStatusState === 'connected' ? 'Connected' : 'Not connected'}
-                        </SectionChip>
-                      </div>
-                      {(upstoxStatus.hasAccessToken !== undefined ||
-                        upstoxStatus.hasRefreshToken !== undefined ||
-                        upstoxStatus.expired !== undefined) && (
-                        <div className="settings-upstox-token-lines">
-                          {upstoxStatus.hasAccessToken !== undefined ? (
-                            <div>Access token: {upstoxStatus.hasAccessToken ? 'yes' : 'no'}</div>
-                          ) : null}
-                          {upstoxStatus.hasExtendedToken !== undefined ? (
-                            <div>Extended token: {upstoxStatus.hasExtendedToken ? 'yes' : 'no'}</div>
-                          ) : null}
-                          {upstoxStatus.hasRefreshToken !== undefined ? (
-                            <div>Refresh token: {upstoxStatus.hasRefreshToken ? 'yes' : 'no'}</div>
-                          ) : null}
-                          {upstoxStatus.expired !== undefined ? (
-                            <div>Expired: {upstoxStatus.expired ? 'yes' : 'no'}</div>
-                          ) : null}
-                        </div>
-                      )}
-                      <div className="settings-actions settings-general-upstox-actions">
-                        <button
-                          type="button"
-                          className="ui-kit-btn ui-kit-btn--solid ui-kit-btn-inline settings-action-btn"
-                          onClick={() => void connectUpstox()}
-                          disabled={upstoxBusy}
-                        >
-                          <Link2 size={14} />
-                          {upstoxStatus.hasToken ? 'Re-login' : 'Connect'}
-                        </button>
-                        <button
-                          type="button"
-                          className="ui-kit-btn ui-kit-btn--soft ui-kit-btn-inline settings-action-btn"
-                          onClick={() => void clearUpstox()}
-                          disabled={upstoxBusy || !upstoxStatus.hasToken}
-                        >
-                          <Unlink2 size={14} />
-                          Logout
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="settings-upstox-collapsed-hint">
-                      Turn on to connect or manage your Upstox session.
-                    </p>
-                  )}
                   </div>
                 </div>
               </SectionBlock>

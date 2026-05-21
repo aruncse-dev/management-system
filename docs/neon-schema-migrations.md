@@ -2,13 +2,21 @@
 
 TypeScript schema: `packages/shared/db/src/schema/`.
 
-## Existing database (recommended)
+## Existing database
 
-With `DATABASE_URL` set (same as the app):
+**Option A — Drizzle push** (recommended day to day):
 
 ```bash
 pnpm --filter @fintracker-vault/db run drizzle:push
 ```
+
+**Option B — SQL migration file** (reviewable, CI-friendly):
+
+```bash
+psql "$DATABASE_URL" -f packages/shared/db/migrations/20250519120000_integrations_and_org_flags.sql
+```
+
+Use the dated `migrations/*.sql` files for incremental **ALTER** / new tables on databases that already have data. Add a new dated file per schema change batch; do not edit applied migration files.
 
 ## `packages/shared/db/migrations/schema.sql` — CREATE only
 

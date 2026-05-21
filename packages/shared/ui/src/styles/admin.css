@@ -373,6 +373,123 @@ body,
   align-items: center;
   gap: 0.5rem;
   font-size: 0.875rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.admin-menu-item input[type='checkbox'] {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  cursor: pointer;
+  accent-color: var(--navy, #1e5cc7);
+}
+
+.admin-switch {
+  position: relative;
+  width: 44px;
+  height: 26px;
+  border-radius: 13px;
+  border: none;
+  padding: 0;
+  background: var(--admin-border, #cbd5e1);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+
+.admin-switch--on {
+  background: var(--navy, #1e5cc7);
+}
+
+.admin-switch::after {
+  content: '';
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.15s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.admin-switch--on::after {
+  transform: translateX(18px);
+}
+
+.admin-switch:focus-visible {
+  outline: 2px solid var(--navy, #1e5cc7);
+  outline-offset: 2px;
+}
+
+.admin-integration-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.admin-form-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.admin-config-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.admin-config-section__title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--admin-text, #0f172a);
+}
+
+.admin-config-section__hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--admin-muted, #64748b);
+  line-height: 1.4;
+}
+
+.admin-config-section--bordered {
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--admin-border, #e2e8f0);
+}
+
+.admin-endpoint-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.admin-endpoint-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--admin-border, #e2e8f0);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.admin-endpoint-card__hd {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.admin-endpoint-card__hd .form-inp {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-endpoint-card__hd .icon-btn {
+  flex-shrink: 0;
 }
 
 .admin-login-stack {
@@ -442,6 +559,44 @@ body,
   border-color: var(--navy, #1e5cc7);
   color: var(--navy, #1e5cc7);
   font-weight: 600;
+}
+
+/* Org configure: tighter modal / page layout */
+.admin-org-config {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.admin-org-config__title {
+  margin: 0 0 0.25rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--admin-text, #0f172a);
+}
+
+.admin-org-config__subtitle {
+  margin: 0 0 0.35rem;
+  font-size: 0.85rem;
+  color: var(--admin-muted, #6b7280);
+}
+
+.admin-org-config .admin-internal-tabs {
+  margin-bottom: 0;
+  gap: 0.35rem;
+}
+
+.admin-org-config .admin-internal-tabs button {
+  padding: 0.25rem 0.6rem;
+  font-size: 0.8125rem;
+}
+
+.admin-org-config .admin-menu-grid {
+  gap: 0.25rem 0.65rem;
+}
+
+.admin-org-config .admin-menu-item {
+  font-size: 0.8125rem;
 }
 
 .admin-card-list {
