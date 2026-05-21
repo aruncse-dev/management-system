@@ -32,10 +32,13 @@ Apply the migration to your local Neon database:
 psql $DATABASE_URL < packages/shared/db/migrations/20260521130000_add_account_type_to_savings.sql
 ```
 
-`$DATABASE_URL` must be set in your `.env.local`:
+Put `DATABASE_URL` in **`packages/apps/fintracker/.env.local`** (gitignored). `drizzle:push` and `pnpm db:check` load it automatically.
 
-```env
-DATABASE_URL=postgresql://user:password@db.neon.tech/dbname
+For manual `psql`, use the same URL from that file (do not commit it):
+
+```bash
+set -a && . packages/apps/fintracker/.env.local && set +a
+psql "$DATABASE_URL" < packages/shared/db/migrations/<file>.sql
 ```
 
 ### Step 3: Update the Drizzle TypeScript schema
@@ -61,62 +64,91 @@ export const savings = pgTable('savings', {
 })
 ```
 
-### Step 4: Regenerate the schema snapshot
-
-```bash
-pnpm --filter @fintracker-vault/db run export-schema
-```
-
-This command:
-1. Introspects the Drizzle TS schema files
-2. Generates full DDL and saves it to `packages/shared/db/migrations/schema.sql`
-3. Overwrites the snapshot — **do not hand-edit `schema.sql`**
-
-### Step 5: Commit everything
+### Step 4: Commit the migration and schema update
 
 ```bash
 git add packages/shared/db/migrations/20260521130000_add_account_type_to_savings.sql
 git add packages/shared/db/src/schema/savings.ts
-git add packages/shared/db/migrations/schema.sql
 git commit -m "feat(db): add account_type and institution to savings"
 ```
 
+The `.sql` file is your audit trail. The TS schema is your source of truth for the codebase.
+
 ---
 
-## Deployment to Neon (production)
+## Applying migrations to Neon (production)
 
-The migration is already applied locally (Step 2). Neon stays in sync if:
+Migrations are manual — you apply `.sql` files directly to Neon.
 
-1. Another dev already applied the migration to the shared Neon instance, OR
-2. You apply it yourself (if you have access)
-
-The `.sql` files in version control serve as the audit trail. CI/CD pipelines can apply pending migrations automatically.
-
-**To verify Neon is up-to-date:**
+### Option A: psql command line (recommended)
 
 ```bash
-# Compare Neon schema against your local Drizzle schema
-drizzle-kit introspect:pg --casing snake  # inspect Neon
-# then check diff against packages/shared/db/src/schema/
+psql postgresql://<user>:<password>@<host>/fintracker < packages/shared/db/migrations/20260521_add_account_type_to_savings.sql
 ```
 
+- Replace `<user>`, `<password>`, `<host>` with your Neon credentials
+- Or use `$DATABASE_URL` if set: `psql $DATABASE_URL < path/to/migration.sql`
+
+### Option B: Neon console (web UI)
+
+1. Log in to [Neon console](https://console.neon.tech)
+2. Select your project and database
+3. Open the **SQL editor**
+4. Copy-paste the contents of the `.sql` file
+5. Click **Run**
+
+### Option C: Query your DATABASE_URL
+
+If you have the full `DATABASE_URL` env var:
+
+```bash
+# Find the URL in your Neon console or .env
+echo $DATABASE_URL
+# Run migration
+psql "$DATABASE_URL" < packages/shared/db/migrations/20260521_add_account_type_to_savings.sql
+```
+
+### Verify success
+
+After applying, check that the table has the new column:
+
+```bash
+psql "$DATABASE_URL" -c "\d <table_name>"
+```
+
+Example:
+```bash
+psql "$DATABASE_URL" -c "\d savings"
+```
+
+Should show the new columns `account_type` and `institution`.
+
 ---
 
-## Fresh database setup
+## Fresh Neon database setup
 
-For a brand new database (empty local Postgres, or a new Neon branch):
+When setting up a brand new Neon database:
 
-**Option A: Run full schema at once**
+1. Create the database in Neon console
+2. Get the `DATABASE_URL` connection string from Neon
+3. Apply the full schema:
+
 ```bash
+export DATABASE_URL="postgresql://..."
 psql $DATABASE_URL < packages/shared/db/migrations/schema.sql
 ```
 
-**Option B: Use Drizzle push (equivalent for empty DBs)**
-```bash
-pnpm --filter @fintracker-vault/db run drizzle:push
-```
+This populates all 28 tables in one shot. Then start making incremental changes with new `.sql` migration files.
 
-Both populate the DB with the full current schema in one shot.
+---
+
+## Rules
+
+- Individual `.sql` migration files are the audit trail — keep them, never delete
+- Write idempotent SQL (`ADD COLUMN IF NOT EXISTS`, `DROP COLUMN IF EXISTS`) so files can be re-run safely
+- Update the Drizzle TS schema **in the same commit** as the migration file
+- `schema.sql` is just a reference snapshot — it's not auto-generated or synced
+- Never auto-sync the database — all migrations are manual, applied directly to Neon
 
 ---
 
@@ -145,10 +177,9 @@ Both populate the DB with the full current schema in one shot.
    ALTER TABLE savings DROP COLUMN IF EXISTS institution;
    ```
 
-2. Run it locally (Step 2 in the workflow above)
+2. Apply it to Neon (using one of the options above)
 3. Revert the Drizzle TS schema (remove the new fields)
-4. Regenerate schema snapshot: `pnpm --filter @fintracker-vault/db run export-schema`
-5. Commit the rollback migration, schema revert, and updated snapshot
+4. Commit the rollback migration and schema revert
 
 Never delete historical `.sql` files — they form the audit trail.
 
@@ -215,17 +246,19 @@ Requires `FIELD_ENCRYPTION_KEY` env var (32-byte base64 string). See `ai/docs/se
 
 ## Troubleshooting
 
-**Error: "migration lock is held"**
-- Another process is running drizzle-kit. Wait or kill the process.
-
 **Error: "role 'postgres' cannot access schema public"**
-- Neon connection string may have wrong user/password or DB doesn't exist.
+- Neon connection string may have wrong user/password, DB doesn't exist, or you lack permissions
 
-**Schema snapshot out of sync with TS files**
-- Run `pnpm --filter @fintracker-vault/db run export-schema` again.
+**Error: "relation 'table_name' does not exist"**
+- Table hasn't been created in Neon yet. Check if the `.sql` migration was applied.
 
-**Rolled back Neon, TS schema ahead**
-- Apply the rolled-back state's `.sql` files again to Neon, then regenerate snapshot.
+**Migration applied locally but not in Neon**
+- The databases are separate. You must apply the `.sql` file to Neon using psql or Neon console.
+
+**TS schema and Neon are out of sync**
+- Review your recent `.sql` files
+- Verify they were applied to Neon (check with `psql "$DATABASE_URL" -c "\dt"`)
+- Update the TS schema to match Neon's current state
 
 ---
 

@@ -23,7 +23,7 @@ export function getFtSessionOptions(cookieName: string): SessionOptions {
   const secret = process.env.SESSION_SECRET
   if (!secret || secret.length < SESSION_SECRET_MIN_LEN) {
     throw new Error(
-      `SESSION_SECRET must be set to at least ${SESSION_SECRET_MIN_LEN} characters (e.g. openssl rand -base64 32). See packages/apps/<app>/.env.local.example.`,
+      `SESSION_SECRET must be set to at least ${SESSION_SECRET_MIN_LEN} characters (e.g. openssl rand -base64 32). Set it in packages/apps/<app>/.env.local (gitignored). See CLAUDE.md.`,
     )
   }
   return {

@@ -28,17 +28,27 @@ ALTER TABLE savings ADD COLUMN IF NOT EXISTS account_type text;
 ALTER TABLE savings ADD COLUMN IF NOT EXISTS institution text;
 ```
 
-### 2. Run it locally
+### 2. Apply to Neon
 
+Apply the migration directly to your Neon database. Choose one method:
+
+**Method A: psql command line (recommended)**
 ```bash
 psql $DATABASE_URL < packages/shared/db/migrations/20260521_add_account_type_to_savings.sql
 ```
 
-`$DATABASE_URL` is the Neon connection string from your `.env.local`.
+Get `DATABASE_URL` from your `.env.local` or Neon console (do not commit).
+
+**Method B: Neon web console**
+1. Go to [console.neon.tech](https://console.neon.tech)
+2. Select your project and database
+3. Open **SQL editor**
+4. Paste the `.sql` file contents
+5. Click **Run**
 
 ### 3. Update the Drizzle TS schema
 
-Edit the relevant file in `packages/shared/db/src/schema/` to match the new columns. Example:
+Edit the relevant file in `packages/shared/db/src/schema/` to match the new columns:
 
 ```ts
 // savings.ts
@@ -46,19 +56,10 @@ accountType: text('account_type'),
 institution: text('institution'),
 ```
 
-### 4. Regenerate the schema snapshot
-
-```bash
-pnpm --filter @fintracker-vault/db run export-schema
-```
-
-This overwrites `packages/shared/db/migrations/schema.sql` with the current full DDL.
-
-### 5. Commit both files
+### 4. Commit the changes
 
 ```bash
 git add packages/shared/db/migrations/20260521_add_account_type_to_savings.sql
-git add packages/shared/db/migrations/schema.sql
 git add packages/shared/db/src/schema/savings.ts
 git commit -m "feat(db): add account_type and institution to savings"
 ```
@@ -67,25 +68,27 @@ git commit -m "feat(db): add account_type and institution to savings"
 
 ## Rules
 
-- `schema.sql` is always a **generated snapshot** — never hand-edit it
 - Individual `.sql` migration files are the audit trail — keep them, never delete
 - Write idempotent SQL (`ADD COLUMN IF NOT EXISTS`, `DROP COLUMN IF EXISTS`) so files can be re-run safely
 - Update the Drizzle TS schema **in the same commit** as the migration file
-- `drizzle:push` still works for fresh dev environments; the `.sql` files are the canonical migration history
+- `schema.sql` is a reference snapshot only — never auto-generated or synced
+- All migrations are manual — apply directly to Neon, no automation
 
 ---
 
-## Fresh environment setup
+## Neon setup (first time)
 
-For a brand new database (local dev, new deployment):
+When setting up a brand new Neon database:
+
+1. Create the database in Neon console
+2. Get the `DATABASE_URL` connection string
+3. Apply the full schema in one shot:
 
 ```bash
-# Apply full schema in one shot
 psql $DATABASE_URL < packages/shared/db/migrations/schema.sql
-
-# Or use Drizzle push (equivalent for empty DBs)
-pnpm --filter @fintracker-vault/db run drizzle:push
 ```
+
+This populates all tables. Then make incremental changes with new `.sql` migration files.
 
 ---
 
@@ -103,6 +106,6 @@ pnpm --filter @fintracker-vault/db run drizzle:push
 
 ## Related
 
-- `ai/docs/schema-diagram.md` — visual ERD of all tables
-- `ai/docs/migrations.md` — detailed migration workflow reference
-- `packages/shared/db/src/integrationCrypto.ts` — field encryption helpers
+- `ai/docs/migrations.md` — detailed step-by-step migration guide
+- `ai/docs/schema-diagram.md` — visual ERD of all 28 tables with FKs
+- `ai/docs/sensitive-field-encryption.md` — field encryption for secrets/PII

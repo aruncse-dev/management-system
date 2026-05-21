@@ -65,7 +65,7 @@ ai/
 These belong in the root or are version-controlled:
 - `CLAUDE.md` — Claude Code's project instructions (root)
 - `README.md` — setup and deployment (root)
-- `.env.local.example` — env var template (root)
+- `packages/apps/<app>/.env.local` — local secrets (gitignored; see `docs/troubleshooting.md`)
 - Git history, recent changes → use `git log` / `git blame`
 - Debugging solutions → check code comments and commit messages
 

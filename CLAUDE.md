@@ -29,16 +29,20 @@ pnpm --filter fintracker test -- --testPathPattern="<filename>"
 pnpm build                   # all apps
 pnpm build:fintracker        # single app
 
-# Database migrations
+# Database migrations (manual SQL workflow)
 # 1. Write .sql file in packages/shared/db/migrations/
-# 2. Run locally: psql $DATABASE_URL < packages/shared/db/migrations/<file>.sql
-# 3. Update Drizzle TS schema in packages/shared/db/src/schema/
-# 4. Regenerate snapshot: pnpm --filter @fintracker-vault/db run export-schema
+# 2. Run in Neon: psql $DATABASE_URL < packages/shared/db/migrations/<file>.sql
+# 3. Update Drizzle TS schema in packages/shared/db/src/schema/ to match
 # See ai/docs/migrations.md for detailed workflow
 
 # After editing @fintracker-vault/ui or @fintracker-vault/auth, build them first
 pnpm --filter @fintracker-vault/ui build
 pnpm --filter @fintracker-vault/auth build
+
+# Local DB / login 500 troubleshooting
+pnpm db:check
+pnpm db:check:admin
+# See docs/troubleshooting.md
 ```
 
 ## Architecture
@@ -94,12 +98,12 @@ See `ai/docs/migrations.md` for step-by-step workflow. Schema files: `packages/s
 
 ## Non-Negotiables
 
-1. All changes to `main` via PR — no direct push (tags are exempt).
-2. Run `pnpm type-check` before pushing.
-3. Global CSS only in `_app.tsx` / `_document.tsx`.
-4. Cross-package imports via `@fintracker-vault/*` aliases.
-5. Google OAuth client ID must use one of: `VITE_GOOGLE_CLIENT_ID`, `NEXT_PUBLIC_GOOGLE_CLIENT_ID`, or `GOOGLE_CLIENT_ID`. Do not invent new names. New apps must use `getGoogleAuthEnv(__dirname)` in `next.config.js`.
-6. After editing `@fintracker-vault/ui` or `@fintracker-vault/auth`, build those packages before running an app.
+1. Run `pnpm type-check` before pushing.
+2. Global CSS only in `_app.tsx` / `_document.tsx`.
+3. Cross-package imports via `@fintracker-vault/*` aliases.
+4. Google OAuth client ID must use one of: `VITE_GOOGLE_CLIENT_ID`, `NEXT_PUBLIC_GOOGLE_CLIENT_ID`, or `GOOGLE_CLIENT_ID`. Do not invent new names. New apps must use `getGoogleAuthEnv(__dirname)` in `next.config.js`.
+5. After editing `@fintracker-vault/ui` or `@fintracker-vault/auth`, build those packages before running an app.
+6. Database changes: write `.sql` files, apply manually to Neon, then update Drizzle TS schema. No automation.
 
 ## Environment Variables
 
@@ -129,4 +133,4 @@ Obsolete (do not use): `VITE_GAS_URL`, `VITE_API_TOKEN`, `GAS_EXEC_URL`, `NEXT_P
 
 ## Quick Links
 - `README.md` — setup and deployment
-- `.env.local.example` — environment variable template
+- `docs/troubleshooting.md` — local 500 / DATABASE_URL / login failures (`pnpm db:check`)

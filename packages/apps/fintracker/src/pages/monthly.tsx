@@ -9,7 +9,8 @@ import Transactions from './transactions'
 import Budget from './budget'
 import Credits from './credits'
 import Accounts from './accounts'
-import { MNS, BUDGET_GLOBAL_MONTH_KEY } from '../config'
+import { MNS } from '../config'
+import { BudgetMonthRangeFields } from '../components/BudgetMonthRangeFields'
 import { expenseCategoriesWithBudget, incomeCategoriesWithBudget, monthYearApiKey } from '../utils'
 import { useFintrackerModes } from '../context/FintrackerModesContext'
 import { cycleSubtitle } from '../expenseCycle'
@@ -33,8 +34,16 @@ export default function Monthly() {
   const [budgetName, setBudgetName] = useState('')
   const [budgetVal, setBudgetVal] = useState('')
   const [budgetSaving, setBudgetSaving] = useState(false)
-  /** `global` = `__global__` row; `month` = override for current nav month only */
-  const [budgetAddScope, setBudgetAddScope] = useState<'global' | 'month'>('global')
+  const [budgetStartMonth, setBudgetStartMonth] = useState<string | null>(null)
+  const [budgetEndMonth, setBudgetEndMonth] = useState<string | null>(null)
+
+  const closeBudgetAdd = useCallback(() => {
+    setBudgetAddOpen(false)
+    setBudgetName('')
+    setBudgetVal('')
+    setBudgetStartMonth(null)
+    setBudgetEndMonth(null)
+  }, [])
 
   const goTab = useCallback(
     (id: TabId) => {
@@ -120,6 +129,19 @@ export default function Monthly() {
     dispatch({ type: 'SET_MONTH', payload: { month: newMonth, year: String(newYear) } })
   }, [state.month, state.year, dispatch])
 
+  const budgetMonthOptions = useMemo(() => {
+    const now = new Date(parseInt(state.year, 10), MNS.indexOf(state.month as typeof MNS[number]))
+    const opts: Array<{ label: string; value: string }> = []
+    for (let i = -24; i <= 12; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
+      const y = d.getFullYear()
+      const m = String(d.getMonth() + 1).padStart(2, '0')
+      const mIdx = d.getMonth()
+      opts.push({ label: `${MNS[mIdx]} ${y}`, value: `${y}-${m}` })
+    }
+    return opts
+  }, [state.month, state.year])
+
   const addBudget = useCallback(async () => {
     const val = parseFloat(budgetVal)
     const name = budgetName.trim()
@@ -129,24 +151,19 @@ export default function Monthly() {
     }
     setBudgetSaving(true)
     try {
-      const monthYear =
-        budgetAddScope === 'month' ? monthYearApiKey(state.month, state.year) : BUDGET_GLOBAL_MONTH_KEY
-      await api.addBudgetEntry(name, val, monthYear)
+      await api.addBudgetEntry(name, val, budgetStartMonth, budgetEndMonth)
       api.invalidateCache({ action: 'getBudget' })
       api.invalidateCache({ action: 'init' })
       const init = await api.init(state.month, state.year)
       dispatch({ type: 'SET_BUDGET', payload: init.budget })
       showStatus('✓ Budget saved')
-      setBudgetAddOpen(false)
-      setBudgetName('')
-      setBudgetVal('')
-      setBudgetAddScope('global')
+      closeBudgetAdd()
     } catch (e) {
       showStatus('⚠ ' + (e instanceof Error ? e.message : 'Save failed'))
     } finally {
       setBudgetSaving(false)
     }
-  }, [budgetAddScope, budgetName, budgetVal, dispatch, showStatus, state.month, state.year])
+  }, [budgetEndMonth, budgetName, budgetStartMonth, budgetVal, closeBudgetAdd, dispatch, showStatus, state.month, state.year])
 
   return (
     <div className="monthly-wrap">
@@ -187,11 +204,11 @@ export default function Monthly() {
       >+</button>
 
       {budgetAddOpen && (
-        <div className="modal-bg open" onClick={() => setBudgetAddOpen(false)}>
+        <div className="modal-bg open" onClick={closeBudgetAdd}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-hd modal-hd--blue">
               <span className="modal-title">Add Budget</span>
-              <button className="modal-close" onClick={() => setBudgetAddOpen(false)}><XIcon size={16} /></button>
+              <button className="modal-close" onClick={closeBudgetAdd}><XIcon size={16} /></button>
             </div>
             <div className="modal-body">
               <div>
@@ -209,21 +226,18 @@ export default function Monthly() {
                 <div style={{fontSize:12,fontWeight:600,color:'var(--muted)',marginBottom:5,textTransform:'uppercase',letterSpacing:.4}}>{`Budget amount (${money.currency})`}</div>
                 <input className="form-inp" type="number" placeholder={money.zeroPlaceholder} value={budgetVal} onChange={e => setBudgetVal(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addBudget() }} />
               </div>
-              <div>
-                <div style={{fontSize:12,fontWeight:600,color:'var(--muted)',marginBottom:8,textTransform:'uppercase',letterSpacing:.4}}>Applies to</div>
-                <select
-                  className="form-inp"
-                  value={budgetAddScope}
-                  onChange={e => setBudgetAddScope(e.target.value === 'month' ? 'month' : 'global')}
-                >
-                  <option value="global">All months (default template)</option>
-                  <option value="month">{state.month} {state.year} only</option>
-                </select>
-              </div>
+              <BudgetMonthRangeFields
+                startMonth={budgetStartMonth}
+                endMonth={budgetEndMonth}
+                onStartChange={setBudgetStartMonth}
+                onEndChange={setBudgetEndMonth}
+                monthOptions={budgetMonthOptions}
+                defaultMonthKey={monthYearApiKey(state.month, state.year)}
+              />
             </div>
             <div className="modal-foot">
               <div className="modal-foot-l" />
-              <button className="btn btn-sm btn-cancel" onClick={() => setBudgetAddOpen(false)}>Cancel</button>
+              <button className="btn btn-sm btn-cancel" onClick={closeBudgetAdd}>Cancel</button>
               <button className="btn btn-sm btn-green" onClick={addBudget} disabled={budgetSaving}>
                 {budgetSaving ? '…' : 'Save'}
               </button>

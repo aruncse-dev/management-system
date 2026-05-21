@@ -3,14 +3,40 @@ import { getDb } from './neon'
 import { organizations, orgMembers } from './schema/orgs'
 import { users } from './schema/users'
 
+function dbQueryHint(e: unknown): string {
+  const parts: string[] = []
+  let cur: unknown = e
+  for (let i = 0; i < 6 && cur; i++) {
+    if (cur instanceof Error) {
+      if (cur.message) parts.push(cur.message)
+      cur = (cur as Error & { cause?: unknown }).cause
+    } else {
+      parts.push(String(cur))
+      break
+    }
+  }
+  const msg = parts.join(' — ')
+  if (/fetch failed|ECONNREFUSED|ENOTFOUND|connection timeout|Connection terminated/i.test(msg)) {
+    return `${msg} (cannot reach Neon — verify DATABASE_URL in .env.local, run pnpm db:check, see docs/troubleshooting.md)`
+  }
+  if (/password authentication failed|28P01/i.test(msg)) {
+    return `${msg} (rotate Neon password and update every packages/apps/*/.env.local)`
+  }
+  return msg || 'unknown database error'
+}
+
 export async function getUserFromDb(email: string) {
   const db = getDb()
-  const [user] = await db
-    .select()
-    .from(users)
-    .where(eq(users.email, email.toLowerCase()))
-    .limit(1)
-  return user ?? null
+  try {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email.toLowerCase()))
+      .limit(1)
+    return user ?? null
+  } catch (e) {
+    throw new Error(`users lookup failed: ${dbQueryHint(e)}. See docs/troubleshooting.md`)
+  }
 }
 
 /** First active platform admin (`users.role = admin`), for PIN-only session bootstrap when `PIN_SESSION_EMAIL` is unset. */

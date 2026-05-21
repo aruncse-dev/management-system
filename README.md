@@ -24,20 +24,21 @@ All apps share UI/components via a pnpm monorepo. Frontend + API deploy to **Ver
    pnpm install
    ```
 
-2. **Configure FinTracker** — copy [packages/apps/fintracker/.env.local.example](./packages/apps/fintracker/.env.local.example) to `packages/apps/fintracker/.env.local` and set at minimum:
+2. **Configure FinTracker** — create **`packages/apps/fintracker/.env.local`** (gitignored; never commit). Set at minimum:
    - **`SESSION_SECRET`** — 32+ random characters (e.g. `openssl rand -base64 32`)
    - **`VITE_GOOGLE_CLIENT_ID`** — OAuth Web client ID (see `.cursor/rules/google-oauth-env.mdc`)
    - **`DATABASE_URL`** — Neon Postgres URL (`postgresql://...`)
    - **`VITE_ALLOWED_EMAILS`** — comma-separated emails allowed to sign in (vault/staff still use this in `next.config`; fintracker auth is DB-aware but allowlist remains useful for other apps)
 
+   Optional: repo root **`.env.local`** or **`.env`** for shared keys (see merge order in `CLAUDE.md`). Same variables can be set per app under `packages/apps/<app>/.env.local`.
+
    Platform admin (`packages/apps/admin`): set **`users.role = 'admin'`** (and `status = 'active'`) in Neon for the Google account that should manage orgs — not an env var.
 
-3. **Apply database schema** (creates tables in Neon). From repo root:
+3. **Apply database schema** (creates tables in Neon). Uses `DATABASE_URL` from **`packages/apps/fintracker/.env.local`** (no manual export):
    ```bash
-   export DATABASE_URL="postgresql://..."
    pnpm --filter @fintracker-vault/db run drizzle:push
    ```
-   Schema is defined in `packages/shared/db/src/schema` and applied with `drizzle:push`. After changing schema files, run `pnpm --filter @fintracker-vault/db run export-schema` (updates **`packages/shared/db/migrations/schema.sql`** — full CREATE DDL). For existing DBs that lag behind, use `drizzle:push`. See [docs/neon-schema-migrations.md](./docs/neon-schema-migrations.md).
+   Schema is defined in `packages/shared/db/src/schema` and applied with `drizzle:push`. After changing schema files, run `pnpm --filter @fintracker-vault/db run export-schema` (updates **`packages/shared/db/migrations/schema.sql`** — full CREATE DDL). For existing DBs that lag behind, use `drizzle:push`. See [ai/docs/migrations.md](./ai/docs/migrations.md).
 
 4. **Run FinTracker**
    ```bash
@@ -45,7 +46,7 @@ All apps share UI/components via a pnpm monorepo. Frontend + API deploy to **Ver
    ```
    Open [http://localhost:3000](http://localhost:3000), sign in with Google.
 
-5. **Platform admin app** (separate package, port **3003**) — copy `packages/apps/admin/.env.local.example` to `packages/apps/admin/.env.local` (same `SESSION_SECRET`, `DATABASE_URL`, and Google keys as FinTracker). Then:
+5. **Platform admin app** (separate package, port **3003**) — create **`packages/apps/admin/.env.local`** with the same `SESSION_SECRET`, `DATABASE_URL`, and Google keys as FinTracker. Then:
    ```bash
    pnpm dev:admin
    ```
@@ -60,7 +61,7 @@ pnpm dev:vault    # http://localhost:3001
 pnpm dev:staff    # http://localhost:3002
 ```
 
-Use each app’s `.env.local.example` as a template. Set **`SESSION_SECRET`**, **`VITE_GOOGLE_CLIENT_ID`**, **`DATABASE_URL`**, and **`VITE_ALLOWED_EMAILS`** as needed.
+Create **`packages/apps/<app>/.env.local`** for each app you run (gitignored). Set **`SESSION_SECRET`**, **`VITE_GOOGLE_CLIENT_ID`**, **`DATABASE_URL`**, and **`VITE_ALLOWED_EMAILS`** as needed.
 
 ### Env naming (trimmed)
 
@@ -84,6 +85,8 @@ pnpm dev:fresh        # kill ports, clear caches, then dev
 ```
 
 (`.env.local` files are gitignored — never committed)
+
+**Local 500 / login / `Failed query` on `users`:** see **[docs/troubleshooting.md](./docs/troubleshooting.md)** — start with `pnpm db:check`.
 
 ---
 

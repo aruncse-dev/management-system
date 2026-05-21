@@ -70,12 +70,24 @@ function readMergedDotenv(appDir) {
   }
 }
 
-function getGoogleAuthEnv(appDir) {
-  const monoRoot = findMonorepoRoot(appDir)
-  const webEnvPath = path.join(monoRoot, 'web', '.env')
-  const rootEnvPath = path.join(monoRoot, '.env')
-  const rootEnvLocalPath = path.join(monoRoot, '.env.local')
-  const appEnvLocalPath = path.join(path.resolve(appDir), '.env.local')
+/**
+ * Resolve app package dir: slug (`fintracker`) or absolute/relative path to `packages/apps/<app>`.
+ */
+function resolveAppDir(appDirOrSlug) {
+  const monoRoot = findMonorepoRoot(__dirname)
+  const raw = String(appDirOrSlug || 'fintracker').trim()
+  if (raw.includes('/') || path.isAbsolute(raw)) {
+    return path.resolve(raw)
+  }
+  return path.join(monoRoot, 'packages/apps', raw)
+}
+
+/**
+ * Load gitignored env files into process.env (shell/Vercel values still win if already set).
+ * Order: repo `.env` → `.env.local` → `web/.env` → `packages/apps/<app>/.env.local`
+ */
+function applyMergedDotenv(appDirOrSlug = 'fintracker') {
+  const appDir = resolveAppDir(appDirOrSlug)
   const fileVars = readMergedDotenv(appDir)
   for (const [k, v] of Object.entries(fileVars)) {
     if (!k) continue
@@ -83,6 +95,16 @@ function getGoogleAuthEnv(appDir) {
       process.env[k] = v
     }
   }
+  return { appDir, keys: Object.keys(fileVars) }
+}
+
+function getGoogleAuthEnv(appDir) {
+  const monoRoot = findMonorepoRoot(appDir)
+  const webEnvPath = path.join(monoRoot, 'web', '.env')
+  const rootEnvPath = path.join(monoRoot, '.env')
+  const rootEnvLocalPath = path.join(monoRoot, '.env.local')
+  const appEnvLocalPath = path.join(path.resolve(appDir), '.env.local')
+  applyMergedDotenv(appDir)
 
   const googleClientId =
     process.env.VITE_GOOGLE_CLIENT_ID ||
@@ -117,4 +139,11 @@ function getGoogleAuthEnv(appDir) {
   }
 }
 
-module.exports = { getGoogleAuthEnv, readEnvFile, findMonorepoRoot, readMergedDotenv }
+module.exports = {
+  getGoogleAuthEnv,
+  readEnvFile,
+  findMonorepoRoot,
+  readMergedDotenv,
+  resolveAppDir,
+  applyMergedDotenv,
+}
