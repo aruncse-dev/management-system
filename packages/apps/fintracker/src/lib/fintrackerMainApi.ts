@@ -109,17 +109,61 @@ function resolvePostedBudgetMonthYearOrDefault(
   return resolvePostedBudgetMonthYear(body)
 }
 
-function resolvePostedBudgetRange(
+function readPostedBudgetRangeMonth(
   body: Record<string, unknown>,
+  key: 'startMonth' | 'endMonth',
+): string | null {
+  if (!Object.prototype.hasOwnProperty.call(body, key)) return null
+  const v = body[key]
+  if (v === null || v === undefined) return null
+  if (typeof v === 'string') {
+    const t = v.trim()
+    return t || null
+  }
+  return null
+}
+
+function budgetRangeFromMonths(
+  startMonth: string | null,
+  endMonth: string | null,
 ): { ok: true; startMonth: string | null; endMonth: string | null; monthYear: string } | { ok: false; error: string } {
-  const str = (k: string) => (typeof body[k] === 'string' ? (body[k] as string).trim() : '')
-  const startMonth = str('startMonth') || null
-  const endMonth = str('endMonth') || null
   if (startMonth && !/^\d{4}-\d{2}$/.test(startMonth)) return { ok: false, error: 'Invalid startMonth (use YYYY-MM)' }
   if (endMonth && !/^\d{4}-\d{2}$/.test(endMonth)) return { ok: false, error: 'Invalid endMonth (use YYYY-MM)' }
   let monthYear = BUDGET_SCOPE_KEY
   if (startMonth === endMonth && startMonth) monthYear = startMonth
   return { ok: true, startMonth, endMonth, monthYear }
+}
+
+function resolvePostedBudgetRange(
+  body: Record<string, unknown>,
+): { ok: true; startMonth: string | null; endMonth: string | null; monthYear: string } | { ok: false; error: string } {
+  return budgetRangeFromMonths(
+    readPostedBudgetRangeMonth(body, 'startMonth'),
+    readPostedBudgetRangeMonth(body, 'endMonth'),
+  )
+}
+
+function resolvePostedBudgetRangeForUpdate(
+  body: Record<string, unknown>,
+  existing: { startMonth: string | null; endMonth: string | null; monthYear: string },
+): { ok: true; startMonth: string | null; endMonth: string | null; monthYear: string } | { ok: false; error: string } {
+  const hasStart = Object.prototype.hasOwnProperty.call(body, 'startMonth')
+  const hasEnd = Object.prototype.hasOwnProperty.call(body, 'endMonth')
+  if (!hasStart && !hasEnd) {
+    return {
+      ok: true,
+      startMonth: existing.startMonth ?? null,
+      endMonth: existing.endMonth ?? null,
+      monthYear: existing.monthYear,
+    }
+  }
+  const startMonth = hasStart
+    ? readPostedBudgetRangeMonth(body, 'startMonth')
+    : (existing.startMonth ?? null)
+  const endMonth = hasEnd
+    ? readPostedBudgetRangeMonth(body, 'endMonth')
+    : (existing.endMonth ?? null)
+  return budgetRangeFromMonths(startMonth, endMonth)
 }
 
 async function loadMergedBudgetForMonth(
@@ -1620,15 +1664,24 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         const base = budgetRowsBaseWhere(budgetScope)
         const [existingRow] = await db.select().from(budget).where(and(eq(budget.id, id), base)).limit(1)
         if (!existingRow) return fail(res, 404, 'Budget entry not found', traceId)
-        const str = (k: string) => (typeof body[k] === 'string' ? (body[k] as string).trim() : '')
-        const hasExplicitRange = str('startMonth') !== '' || str('endMonth') !== ''
+        const hasRangeFields =
+          Object.prototype.hasOwnProperty.call(body, 'startMonth') ||
+          Object.prototype.hasOwnProperty.call(body, 'endMonth')
         let rng: { startMonth: string | null; endMonth: string | null; monthYear: string }
-        if (hasExplicitRange) {
-          const parsed = resolvePostedBudgetRange(body)
+        if (hasRangeFields) {
+          const parsed = resolvePostedBudgetRangeForUpdate(body, {
+            startMonth: existingRow.startMonth ?? null,
+            endMonth: existingRow.endMonth ?? null,
+            monthYear: existingRow.monthYear,
+          })
           if (!parsed.ok) return fail(res, 400, parsed.error, traceId)
           rng = parsed
         } else {
-          rng = { startMonth: existingRow.startMonth, endMonth: existingRow.endMonth, monthYear: existingRow.monthYear }
+          rng = {
+            startMonth: existingRow.startMonth ?? null,
+            endMonth: existingRow.endMonth ?? null,
+            monthYear: existingRow.monthYear,
+          }
         }
         const deleteWhere2 = and(
           base,
