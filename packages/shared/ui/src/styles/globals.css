@@ -1908,6 +1908,41 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
   min-width: 0;
 }
 
+.login-auth-card__pin-input {
+  width: 100%;
+  max-width: 280px;
+  margin-inline: auto;
+  min-height: 48px;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.35em;
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(191, 219, 254, 0.85);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+.login-auth-card__pin-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+  text-align: center;
+  max-width: 320px;
+  margin-inline: auto;
+}
+
+.login-auth-card__pin-submit {
+  width: fit-content;
+  min-width: 180px;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--navy);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 999px;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+}
+
 .login-auth-card__config-warn {
   max-width: 320px;
   text-align: center;

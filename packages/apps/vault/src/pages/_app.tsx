@@ -6,7 +6,6 @@ import {
   Grid2X2,
   HeartPulse,
   Landmark,
-  Settings as SettingsIcon,
   Shield,
   Target,
   Users,
@@ -21,7 +20,6 @@ const VAULT_PAGE_TITLES: Record<string, string> = {
   '/vault': 'Banking',
   '/vaultinsurance': 'Insurance',
   '/vaultapps': 'Apps',
-  '/vaultsettings': 'Settings',
   '/vaultpersons': 'Persons',
   '/vaultdocuments': 'Documents',
   '/vaulthealth': 'Health',
@@ -84,7 +82,6 @@ export default function App({ Component, pageProps }: AppProps) {
                 void router.push(path)
               }}
               sections={VAULT_NAV_SECTIONS}
-              settingsItem={{ path: '/vaultsettings', label: 'Settings', icon: <SettingsIcon size={18} /> }}
               onLogout={onLogout}
             />
             <Component {...pageProps} />

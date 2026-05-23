@@ -210,14 +210,14 @@ CREATE TABLE "banking_records" (
 	"org_id" text,
 	"holder_name" text,
 	"bank_name" text NOT NULL,
-	"account_no" text,
+	"account_no_enc" text,
 	"ifsc" text,
-	"cif" text,
-	"username" text,
-	"password" text,
-	"transaction_password" text,
-	"profile_password" text,
-	"mpin" text,
+	"cif_enc" text,
+	"username_enc" text,
+	"password_enc" text,
+	"transaction_password_enc" text,
+	"profile_password_enc" text,
+	"mpin_enc" text,
 	"app_uuid" text,
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
@@ -263,23 +263,97 @@ CREATE TABLE "vault_apps" (
 	"category" text,
 	"logo" text,
 	"app_link" text,
-	"username" text,
-	"password" text,
+	"username_enc" text,
+	"password_enc" text,
 	"two_factor" boolean DEFAULT false,
 	"notes" text,
 	"updated_at" timestamp DEFAULT now() NOT NULL
+);
+
+CREATE TABLE "vault_documents" (
+	"doc_uuid" text PRIMARY KEY NOT NULL,
+	"org_id" text NOT NULL,
+	"person_uuid" text NOT NULL,
+	"doc_type" text NOT NULL,
+	"doc_number" text,
+	"drive_url" text,
+	"expiry" date,
+	"notes" text,
+	"created_at" timestamp DEFAULT now() NOT NULL
+);
+
+CREATE TABLE "vault_habit_logs" (
+	"log_uuid" text PRIMARY KEY NOT NULL,
+	"org_id" text NOT NULL,
+	"habit_uuid" text NOT NULL,
+	"person_uuid" text NOT NULL,
+	"log_date" date NOT NULL,
+	"completed" boolean DEFAULT false NOT NULL
+);
+
+CREATE TABLE "vault_habits" (
+	"habit_uuid" text PRIMARY KEY NOT NULL,
+	"org_id" text NOT NULL,
+	"person_uuid" text NOT NULL,
+	"name" text NOT NULL,
+	"category" text,
+	"target_frequency" text,
+	"created_at" timestamp DEFAULT now() NOT NULL
+);
+
+CREATE TABLE "vault_health_vitals" (
+	"vital_uuid" text PRIMARY KEY NOT NULL,
+	"org_id" text NOT NULL,
+	"person_uuid" text NOT NULL,
+	"recorded_at" timestamp NOT NULL,
+	"height_cm" numeric(6, 2),
+	"weight_kg" numeric(6, 2),
+	"systolic" numeric(5, 1),
+	"diastolic" numeric(5, 1),
+	"blood_sugar" numeric(6, 2),
+	"notes" text
+);
+
+CREATE TABLE "vault_illnesses" (
+	"illness_uuid" text PRIMARY KEY NOT NULL,
+	"org_id" text NOT NULL,
+	"person_uuid" text NOT NULL,
+	"name" text NOT NULL,
+	"diagnosed_on" date,
+	"status" text,
+	"notes" text
+);
+
+CREATE TABLE "vault_medications" (
+	"med_uuid" text PRIMARY KEY NOT NULL,
+	"org_id" text NOT NULL,
+	"person_uuid" text NOT NULL,
+	"illness_uuid" text,
+	"name" text NOT NULL,
+	"dosage" text,
+	"frequency" text,
+	"start_date" date,
+	"end_date" date,
+	"reminder_times" text,
+	"notes" text
 );
 
 CREATE TABLE "mutual_funds" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"org_id" text,
 	"provider_slug" text,
+	"holding_key" text,
 	"fund_name" text NOT NULL,
 	"folio_no" text,
+	"instrument_key" text,
 	"units" numeric(14, 4),
+	"avg_price" numeric(12, 4),
+	"last_price" numeric(12, 4),
+	"last_price_date" text,
 	"purchased" numeric(14, 2),
 	"current_value" numeric(14, 2),
 	"profit_loss" numeric(14, 2),
+	"pledged_quantity" numeric(14, 4),
 	"scheme_code" text,
 	"synced_at" timestamp
 );

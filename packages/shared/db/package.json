@@ -23,6 +23,7 @@
   "devDependencies": {
     "@types/pg": "^8.20.0",
     "drizzle-kit": "^0.31.4",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "xlsx": "^0.18.5"
   }
 }

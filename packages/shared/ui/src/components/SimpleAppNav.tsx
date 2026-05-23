@@ -6,12 +6,6 @@ const AUTH_GOOGLE_COOKIE = 'ft_google_authed'
 /** Clears FinTracker-style Google session cookie + lock state and reloads (client-only guard). */
 export function performGoogleAppLogout() {
   document.cookie = `${AUTH_GOOGLE_COOKIE}=; path=/; max-age=0; samesite=lax`
-  try {
-    localStorage.removeItem('ft_last_active')
-    localStorage.setItem('ft_lock_mode', 'google')
-  } catch {
-    /* ignore */
-  }
   window.location.reload()
 }
 

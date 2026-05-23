@@ -9,7 +9,6 @@ export {
   handleGoogleAuthPost,
   handleSessionGet,
   handleLogoutPost,
-  handleVerifyPinPost,
 } from './next-handlers'
 export {
   handleAdminGoogleAuthPost,

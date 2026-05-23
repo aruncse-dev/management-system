@@ -35,8 +35,29 @@ async function parseResponse<T>(res: Response): Promise<T> {
   return json.data;
 }
 
+const GET_CACHE_TTL_MS = 60_000;
+
+type CacheEntry = { at: number; data: unknown };
+const getCache = new Map<string, CacheEntry>();
+const inflightGets = new Map<string, Promise<unknown>>();
+
+function cacheKey(action: string, params: Record<string, string>) {
+  const sorted = Object.entries(params).sort(([a], [b]) => a.localeCompare(b));
+  return `${action}\0${JSON.stringify(sorted)}`;
+}
+
 function invalidateCache(matcher?: { action?: string; params?: Record<string, string> }) {
-  void matcher;
+  if (!matcher) {
+    getCache.clear();
+    return;
+  }
+  const prefix = matcher.action ? `${matcher.action}\0` : '';
+  const paramKey = matcher.params ? JSON.stringify(Object.entries(matcher.params).sort()) : null;
+  for (const key of [...getCache.keys()]) {
+    if (matcher.action && !key.startsWith(prefix)) continue;
+    if (paramKey && !key.includes(paramKey)) continue;
+    getCache.delete(key);
+  }
 }
 
 function clearPersistentCache() {
@@ -48,16 +69,43 @@ async function get<T>(
   params: Record<string, string> = {},
   options: { cache?: boolean } = {}
 ): Promise<T> {
-  void options;
+  const useCache = options.cache !== false;
+  const key = cacheKey(action, params);
 
-  const url = new URL(BASE, window.location.origin);
-  const traceId = generateTraceId();
-  url.searchParams.set('action', action);
-  url.searchParams.set('traceId', traceId);
-  if (DEBUG) url.searchParams.set('debug', 'true');
-  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-  const res = await fetch(url.toString(), { credentials: 'same-origin', redirect: 'follow', cache: 'no-store' });
-  return parseResponse<T>(res);
+  if (useCache) {
+    const hit = getCache.get(key);
+    if (hit && Date.now() - hit.at < GET_CACHE_TTL_MS) {
+      return hit.data as T;
+    }
+    const pending = inflightGets.get(key);
+    if (pending) return pending as Promise<T>;
+  }
+
+  const run = (async () => {
+    const url = new URL(BASE, window.location.origin);
+    const traceId = generateTraceId();
+    url.searchParams.set('action', action);
+    url.searchParams.set('traceId', traceId);
+    if (DEBUG) url.searchParams.set('debug', 'true');
+    Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+    const res = await fetch(url.toString(), { credentials: 'same-origin', redirect: 'follow', cache: 'no-store' });
+    const data = await parseResponse<T>(res);
+    if (useCache) {
+      getCache.set(key, { at: Date.now(), data });
+    }
+    return data;
+  })();
+
+  if (useCache) {
+    inflightGets.set(key, run);
+    try {
+      return await run;
+    } finally {
+      inflightGets.delete(key);
+    }
+  }
+
+  return run;
 }
 
 async function post<T>(body: Record<string, unknown>): Promise<T> {
@@ -180,9 +228,6 @@ export interface GoldSettings {
   assetsSheetId?: string;
 }
 
-export interface VaultSettings {
-  vaultSpreadsheetId?: string;
-}
 
 export interface RawBankingRow {
   id: string;
@@ -370,8 +415,6 @@ export const api = {
   deleteCashLoanHistory: (id: string)                 => post<boolean>({ module: 'loans', action: 'deleteHistory', type: 'cash', id }),
   getSettings:   ()                            => get<GoldSettings>('get', { module: 'settings' }),
   saveSettings:  (p: Record<string, unknown>) => post<boolean>({ module: 'settings', action: 'save', ...p }),
-  getVaultSettings: ()                      => get<VaultSettings>('get', { module: 'vault' }),
-  saveVaultSettings:(p: Record<string, unknown>) => post<boolean>({ module: 'vault', action: 'save', ...p }),
   getBankingEntries: ()                       => get<RawBankingRow[]>('getEntries', { module: 'vault' }),
   getBankingEntry: (id: string)               => get<RawBankingRow>('getEntry', { module: 'vault', id }),
   addBankingEntry: async (p: Record<string, unknown>) => {

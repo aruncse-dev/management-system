@@ -30,6 +30,12 @@ packages/apps/**/.env.local
 .turbo/
 .plans/
 
+# Accidental TypeScript emit beside sources (real build output is dist/)
+packages/shared/**/src/**/*.js
+packages/shared/**/src/**/*.d.ts
+packages/shared/**/src/**/*.js.map
+packages/shared/**/src/**/*.d.ts.map
+
 # OS
 Thumbs.db
 
