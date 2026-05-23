@@ -54,7 +54,6 @@ import { mergeWriteSettingsPageCache, readSettingsPageCache, type SettingsPageCa
 import type { FintrackerPrefs } from '../expenseCycle';
 import { DEFAULT_FINTRACKER_PREFS, cycleDateRange, cycleSubtitle } from '../expenseCycle';
 import { formatCurrency } from '../../../../shared/utils/src/formatters';
-
 type SettingsNavTab = 'general' | 'accounts' | 'gold';
 
 /** New gold resource rows use server-generated UUIDs. */
@@ -982,6 +981,7 @@ export default function Settings() {
                 </div>
               </SectionBlock>
             ) : null}
+
           </>
         )}
 

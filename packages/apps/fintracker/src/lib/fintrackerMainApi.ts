@@ -7,7 +7,6 @@ import { currentMonthYear, isoDate } from '../utils'
 import { budgetAppliesToLabelMonth, cycleDateRange, parseFintrackerPrefs } from '../expenseCycle'
 import {
   getDb,
-  bankingRecords,
   budget,
   cashLoanRepayments,
   cashLoans,
@@ -15,7 +14,6 @@ import {
   goldHistory,
   goldItems,
   goldResources,
-  insurance,
   jewelLoanRepayments,
   jewelLoans,
   lending,
@@ -29,7 +27,6 @@ import {
   integrationHasCredentials,
   listOrgsForUserEmail,
   users,
-  vaultApps,
 } from '@fintracker-vault/db'
 import { normalizeLendingSheetSlug } from './lendingSheetSlug'
 import {
@@ -452,11 +449,6 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         })
       }
 
-      if (mod === 'vault' && action === 'get') {
-        const s = await loadFintrackerSettingsJson(db, em, budgetScope)
-        return ok(res, { vaultSpreadsheetId: s.vaultSpreadsheetId ? String(s.vaultSpreadsheetId) : undefined })
-      }
-
       if ((mod === 'integrations' || mod === 'stocks') && action === 'getTokenStatus') {
         const provider =
           typeof req.query.provider === 'string' && req.query.provider.trim()
@@ -671,122 +663,6 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         }
       }
 
-      if (mod === 'vault' && action === 'getEntries') {
-        const rows = await db.select().from(bankingRecords).where(whereOrgFilter(bankingRecords, budgetScope))
-        return ok(
-          res,
-          rows.map((r) => ({
-            id: r.id,
-            account_holder_name: r.holderName ?? '',
-            bank_name: r.bankName,
-            app_uuid: r.appUuid ?? undefined,
-            account_no: r.accountNo ?? '',
-            ifsc: r.ifsc ?? '',
-            cif: r.cif ?? '',
-            username: r.username ?? '',
-            password: r.password ?? '',
-            transaction_password: r.transactionPassword ?? '',
-            profile_password: r.profilePassword ?? '',
-            mpin: r.mpin ?? '',
-            updated_at: r.updatedAt ? r.updatedAt.toISOString() : undefined,
-          })),
-        )
-      }
-
-      if (mod === 'vault' && action === 'getEntry') {
-        const id = typeof req.query.id === 'string' ? req.query.id : ''
-        if (!id) return fail(res, 400, 'Missing id', traceId)
-        const [r] = await db
-          .select()
-          .from(bankingRecords)
-          .where(and(whereOrgFilter(bankingRecords, budgetScope), eq(bankingRecords.id, id)))
-          .limit(1)
-        if (!r) return fail(res, 404, 'Not found', traceId)
-        return ok(res, {
-          id: r.id,
-          account_holder_name: r.holderName ?? '',
-          bank_name: r.bankName,
-          app_uuid: r.appUuid ?? undefined,
-          account_no: r.accountNo ?? '',
-          ifsc: r.ifsc ?? '',
-          cif: r.cif ?? '',
-          username: r.username ?? '',
-          password: r.password ?? '',
-          transaction_password: r.transactionPassword ?? '',
-          profile_password: r.profilePassword ?? '',
-          mpin: r.mpin ?? '',
-          updated_at: r.updatedAt ? r.updatedAt.toISOString() : undefined,
-        })
-      }
-
-      if (mod === 'vault' && action === 'getApps') {
-        const rows = await db.select().from(vaultApps).where(whereOrgFilter(vaultApps, budgetScope)).orderBy(desc(vaultApps.updatedAt))
-        return ok(
-          res,
-          rows.map((r) => ({
-            app_uuid: r.id,
-            app_name: r.appName,
-            category: r.category ?? '',
-            logo: r.logo ?? '',
-            app_link: r.appLink ?? '',
-            username: r.username ?? '',
-            password: r.password ?? '',
-            two_factor_enabled: Boolean(r.twoFactor),
-            notes: r.notes ?? '',
-            updated_at: r.updatedAt.toISOString(),
-          })),
-        )
-      }
-
-      if (mod === 'vault' && action === 'getApp') {
-        const app_uuid = typeof req.query.app_uuid === 'string' ? req.query.app_uuid : ''
-        if (!app_uuid) return fail(res, 400, 'Missing app_uuid', traceId)
-        const [r] = await db
-          .select()
-          .from(vaultApps)
-          .where(and(whereOrgFilter(vaultApps, budgetScope), eq(vaultApps.id, app_uuid)))
-          .limit(1)
-        if (!r) return fail(res, 404, 'Not found', traceId)
-        return ok(res, {
-          app_uuid: r.id,
-          app_name: r.appName,
-          category: r.category ?? '',
-          logo: r.logo ?? '',
-          app_link: r.appLink ?? '',
-          username: r.username ?? '',
-          password: r.password ?? '',
-          two_factor_enabled: Boolean(r.twoFactor),
-          notes: r.notes ?? '',
-          updated_at: r.updatedAt.toISOString(),
-        })
-      }
-
-      if (mod === 'insurance' && action === 'getEntries') {
-        const rows = await db.select().from(insurance).where(whereOrgFilter(insurance, budgetScope)).orderBy(desc(insurance.updatedAt))
-        return ok(
-          res,
-          rows.map((r) => ({
-            id: r.id,
-            policy_type: r.policyType ?? '',
-            plan_name: r.planName,
-            insurer: r.insurer ?? '',
-            app_uuid: r.appId ?? undefined,
-            policy_number: r.policyNo ?? '',
-            policy_owner: r.owner ?? '',
-            premium_amount: r.premium ?? '',
-            premium_mode: r.premiumMode ?? '',
-            payment_method: r.paymentMethod ?? '',
-            policy_term: '',
-            issue_date: r.issueDate ? String(r.issueDate) : '',
-            maturity_date: r.maturityDate ? String(r.maturityDate) : '',
-            sum_assured: r.sumAssured ?? '',
-            cash_value: r.cashValue ?? '',
-            nominee_name: r.nominee ?? '',
-            notes: r.notes ?? '',
-            updated_at: r.updatedAt.toISOString(),
-          })),
-        )
-      }
 
       if (mod === 'subscriptions' && action === 'getEntries') {
         const rows = await db
@@ -944,13 +820,6 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
               : {}
           patch.fintracker = { ...prevFt, ...(body.fintracker as Record<string, unknown>) }
         }
-        await mergeFintrackerSettings(db, em, budgetScope, patch)
-        return ok(res, true, traceId)
-      }
-
-      if (mod === 'vault' && action === 'save') {
-        const patch: Record<string, unknown> = {}
-        if (body.vaultSpreadsheetId !== undefined) patch.vaultSpreadsheetId = body.vaultSpreadsheetId
         await mergeFintrackerSettings(db, em, budgetScope, patch)
         return ok(res, true, traceId)
       }
@@ -1364,166 +1233,6 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
           await db.delete(cashLoanRepayments).where(and(whereOrgFilter(cashLoanRepayments, budgetScope), eq(cashLoanRepayments.id, id)))
-          return ok(res, true, traceId)
-        }
-      }
-
-      if (mod === 'vault') {
-        if (action === 'addEntry') {
-          const id = crypto.randomUUID()
-          await db.insert(bankingRecords).values({
-            orgId: scopeOrgId,
-            id,
-            holderName: typeof body.account_holder_name === 'string' ? body.account_holder_name : null,
-            bankName: String(body.bank_name ?? ''),
-            accountNo: typeof body.account_no === 'string' ? body.account_no : null,
-            ifsc: typeof body.ifsc === 'string' ? body.ifsc : null,
-            cif: typeof body.cif === 'string' ? body.cif : null,
-            username: typeof body.username === 'string' ? body.username : null,
-            password: typeof body.password === 'string' ? body.password : null,
-            transactionPassword: typeof body.transaction_password === 'string' ? body.transaction_password : null,
-            profilePassword: typeof body.profile_password === 'string' ? body.profile_password : null,
-            mpin: typeof body.mpin === 'string' ? body.mpin : null,
-            appUuid: typeof body.app_uuid === 'string' ? body.app_uuid : null,
-          })
-          return ok(res, id, traceId)
-        }
-        if (action === 'updateEntry') {
-          const id = typeof body.id === 'string' ? body.id : ''
-          if (!id) return fail(res, 400, 'Missing id', traceId)
-          await db
-            .update(bankingRecords)
-            .set({
-              holderName: typeof body.account_holder_name === 'string' ? body.account_holder_name : undefined,
-              bankName: typeof body.bank_name === 'string' ? body.bank_name : undefined,
-              accountNo: typeof body.account_no === 'string' ? body.account_no : undefined,
-              ifsc: typeof body.ifsc === 'string' ? body.ifsc : undefined,
-              cif: typeof body.cif === 'string' ? body.cif : undefined,
-              username: typeof body.username === 'string' ? body.username : undefined,
-              password: typeof body.password === 'string' ? body.password : undefined,
-              transactionPassword: typeof body.transaction_password === 'string' ? body.transaction_password : undefined,
-              profilePassword: typeof body.profile_password === 'string' ? body.profile_password : undefined,
-              mpin: typeof body.mpin === 'string' ? body.mpin : undefined,
-              appUuid: typeof body.app_uuid === 'string' ? body.app_uuid : undefined,
-              updatedAt: new Date(),
-            })
-            .where(and(whereOrgFilter(bankingRecords, budgetScope), eq(bankingRecords.id, id)))
-          return ok(res, true, traceId)
-        }
-        if (action === 'deleteEntry') {
-          const id = typeof body.id === 'string' ? body.id : ''
-          if (!id) return fail(res, 400, 'Missing id', traceId)
-          await db.delete(bankingRecords).where(and(whereOrgFilter(bankingRecords, budgetScope), eq(bankingRecords.id, id)))
-          return ok(res, true, traceId)
-        }
-        if (action === 'addApp') {
-          const id = crypto.randomUUID()
-          await db.insert(vaultApps).values({
-            orgId: scopeOrgId,
-            id,
-            appName: String(body.app_name ?? ''),
-            category: typeof body.category === 'string' ? body.category : null,
-            logo: typeof body.logo === 'string' ? body.logo : null,
-            appLink: typeof body.app_link === 'string' ? body.app_link : null,
-            username: typeof body.username === 'string' ? body.username : null,
-            password: typeof body.password === 'string' ? body.password : null,
-            twoFactor: Boolean(body.two_factor_enabled),
-            notes: typeof body.notes === 'string' ? body.notes : null,
-          })
-          return ok(res, id, traceId)
-        }
-        if (action === 'updateApp') {
-          const app_uuid = typeof body.app_uuid === 'string' ? body.app_uuid : ''
-          if (!app_uuid) return fail(res, 400, 'Missing app_uuid', traceId)
-          await db
-            .update(vaultApps)
-            .set({
-              appName: typeof body.app_name === 'string' ? body.app_name : undefined,
-              category: typeof body.category === 'string' ? body.category : undefined,
-              logo: typeof body.logo === 'string' ? body.logo : undefined,
-              appLink: typeof body.app_link === 'string' ? body.app_link : undefined,
-              username: typeof body.username === 'string' ? body.username : undefined,
-              password: typeof body.password === 'string' ? body.password : undefined,
-              twoFactor:
-                body.two_factor_enabled !== undefined ? Boolean(body.two_factor_enabled) : undefined,
-              notes: typeof body.notes === 'string' ? body.notes : undefined,
-              updatedAt: new Date(),
-            })
-            .where(and(whereOrgFilter(vaultApps, budgetScope), eq(vaultApps.id, app_uuid)))
-          return ok(res, true, traceId)
-        }
-        if (action === 'deleteApp') {
-          const app_uuid = typeof body.app_uuid === 'string' ? body.app_uuid : ''
-          if (!app_uuid) return fail(res, 400, 'Missing app_uuid', traceId)
-          await db.delete(vaultApps).where(and(whereOrgFilter(vaultApps, budgetScope), eq(vaultApps.id, app_uuid)))
-          return ok(res, true, traceId)
-        }
-      }
-
-      if (mod === 'insurance') {
-        if (action === 'addEntry') {
-          const id = crypto.randomUUID()
-          await db.insert(insurance).values({
-            orgId: scopeOrgId,
-            id,
-            policyType: typeof body.policy_type === 'string' ? body.policy_type : null,
-            planName: String(body.plan_name ?? ''),
-            insurer: typeof body.insurer === 'string' ? body.insurer : null,
-            appId: typeof body.app_uuid === 'string' ? body.app_uuid : null,
-            policyNo: typeof body.policy_number === 'string' ? body.policy_number : null,
-            owner: typeof body.policy_owner === 'string' ? body.policy_owner : null,
-            premium:
-              body.premium_amount !== undefined && body.premium_amount !== ''
-                ? String(num(body.premium_amount as string | number))
-                : null,
-            premiumMode: typeof body.premium_mode === 'string' ? body.premium_mode : null,
-            paymentMethod: typeof body.payment_method === 'string' ? body.payment_method : null,
-            issueDate: typeof body.issue_date === 'string' ? body.issue_date : null,
-            maturityDate: typeof body.maturity_date === 'string' ? body.maturity_date : null,
-            sumAssured:
-              body.sum_assured !== undefined && body.sum_assured !== ''
-                ? String(num(body.sum_assured as string | number))
-                : null,
-            cashValue:
-              body.cash_value !== undefined && body.cash_value !== ''
-                ? String(num(body.cash_value as string | number))
-                : null,
-            nominee: typeof body.nominee_name === 'string' ? body.nominee_name : null,
-            notes: typeof body.notes === 'string' ? body.notes : null,
-          })
-          return ok(res, id, traceId)
-        }
-        if (action === 'updateEntry') {
-          const id = typeof body.id === 'string' ? body.id : ''
-          if (!id) return fail(res, 400, 'Missing id', traceId)
-          await db
-            .update(insurance)
-            .set({
-              policyType: typeof body.policy_type === 'string' ? body.policy_type : undefined,
-              planName: typeof body.plan_name === 'string' ? body.plan_name : undefined,
-              insurer: typeof body.insurer === 'string' ? body.insurer : undefined,
-              appId: typeof body.app_uuid === 'string' ? body.app_uuid : undefined,
-              policyNo: typeof body.policy_number === 'string' ? body.policy_number : undefined,
-              owner: typeof body.policy_owner === 'string' ? body.policy_owner : undefined,
-              premium:
-                body.premium_amount !== undefined ? String(num(body.premium_amount as string | number)) : undefined,
-              premiumMode: typeof body.premium_mode === 'string' ? body.premium_mode : undefined,
-              paymentMethod: typeof body.payment_method === 'string' ? body.payment_method : undefined,
-              issueDate: typeof body.issue_date === 'string' ? body.issue_date : undefined,
-              maturityDate: typeof body.maturity_date === 'string' ? body.maturity_date : undefined,
-              sumAssured: body.sum_assured !== undefined ? String(num(body.sum_assured as string | number)) : undefined,
-              cashValue: body.cash_value !== undefined ? String(num(body.cash_value as string | number)) : undefined,
-              nominee: typeof body.nominee_name === 'string' ? body.nominee_name : undefined,
-              notes: typeof body.notes === 'string' ? body.notes : undefined,
-              updatedAt: new Date(),
-            })
-            .where(and(whereOrgFilter(insurance, budgetScope), eq(insurance.id, id)))
-          return ok(res, true, traceId)
-        }
-        if (action === 'deleteEntry') {
-          const id = typeof body.id === 'string' ? body.id : ''
-          if (!id) return fail(res, 400, 'Missing id', traceId)
-          await db.delete(insurance).where(and(whereOrgFilter(insurance, budgetScope), eq(insurance.id, id)))
           return ok(res, true, traceId)
         }
       }

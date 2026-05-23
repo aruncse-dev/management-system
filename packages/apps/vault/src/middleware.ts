@@ -5,7 +5,6 @@ const LOWERCASE_ROUTES = new Set([
   '/vault',
   '/vaultinsurance',
   '/vaultapps',
-  '/vaultsettings',
   '/vaultpersons',
   '/vaultdocuments',
   '/vaulthealth',

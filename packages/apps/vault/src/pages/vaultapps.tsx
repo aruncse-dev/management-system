@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Check, Copy, Globe, GraduationCap, Layers3, Lock, Plus, Search, AppWindow } from 'lucide-react'
 import { api, type RawVaultAppRow } from '../api'
 import { FormField, ModalActions, ModalShell, SearchField, SectionBlock, SectionChip, Spacer } from '../ui'
@@ -73,7 +73,6 @@ export default function VaultAppsPage() {
   const [editingUuid, setEditingUuid] = useState('')
   const [detail, setDetail] = useState<RawVaultAppRow | null>(null)
   const [toast, setToast] = useState('')
-  const [authCopy, setAuthCopy] = useState<{ label: string; text: string } | null>(null)
   const [deleteUuid, setDeleteUuid] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState(false)
 
@@ -194,10 +193,6 @@ export default function VaultAppsPage() {
     await navigator.clipboard.writeText(text)
     setToast(`${label} copied`)
     window.setTimeout(() => setToast(''), 1400)
-  }
-
-  const copyWithAuth = async (label: string, text: string) => {
-    setAuthCopy({ label, text })
   }
 
   return (
@@ -371,28 +366,11 @@ export default function VaultAppsPage() {
               {detail.category && <RowDetail label="Category" value={detail.category} />}
               {detail.app_link && <RowDetail label="Launch URL" value={detail.app_link} action={<button type="button" className="ui-kit-btn ui-kit-btn--soft ui-kit-btn-inline" onClick={() => copy('URL', detail.app_link)} title="Copy URL" aria-label="Copy URL"><Copy size={14} /></button>} />}
               {detail.username && <RowDetail label="Username" value={detail.username} action={<button type="button" className="ui-kit-btn ui-kit-btn--soft ui-kit-btn-inline" onClick={() => copy('Username', detail.username)} title="Copy username" aria-label="Copy username"><Copy size={14} /></button>} />}
-              {detail.password && <RowDetail label="Password" value={masked(detail.password)} action={<button type="button" className="ui-kit-btn ui-kit-btn--soft ui-kit-btn-inline" onClick={() => copyWithAuth('Password', detail.password)} title="Copy password" aria-label="Copy password"><Copy size={14} /></button>} />}
+              {detail.password && <RowDetail label="Password" value={masked(detail.password)} action={<button type="button" className="ui-kit-btn ui-kit-btn--soft ui-kit-btn-inline" onClick={() => copy('Password', detail.password)} title="Copy password" aria-label="Copy password"><Copy size={14} /></button>} />}
               {detail.two_factor_enabled && <RowDetail label="2FA" value={normalizeBoolean(!!detail.two_factor_enabled)} />}
               {detail.notes && <RowDetail label="Notes" value={detail.notes} />}
             </div>
           </div>
-        </ModalShell>
-      )}
-
-      {authCopy && (
-        <ModalShell
-          title={`Copy ${authCopy.label}`}
-          onClose={() => setAuthCopy(null)}
-        >
-          <PasswordCopyLock
-            onUnlock={async () => {
-              const next = authCopy
-              setAuthCopy(null)
-              window.setTimeout(() => {
-                void copy(next.label, next.text)
-              }, 0)
-            }}
-          />
         </ModalShell>
       )}
 
@@ -415,86 +393,5 @@ function RowDetail({ label, value, action }: { label: string; value: string; act
         {action}
       </div>
     </div>
-  )
-}
-
-function PasswordCopyLock({
-  onUnlock,
-}: {
-  onUnlock: () => Promise<void> | void
-}) {
-  const [password, setPassword] = useState(['', '', '', ''])
-  const [error, setError] = useState('')
-  const inputRefs = useRef<Array<HTMLInputElement | null>>([])
-
-  useEffect(() => {
-    inputRefs.current[0]?.focus()
-  }, [])
-
-  const focusBox = (index: number) => {
-    inputRefs.current[index]?.focus()
-    inputRefs.current[index]?.select()
-  }
-
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    const pin = password.join('')
-    setError('')
-    try {
-      const r = await fetch('/api/auth/verify-pin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ pin }),
-      })
-      const data = (await r.json().catch(() => ({}))) as { error?: string }
-      if (!r.ok) {
-        setError(data.error || 'Incorrect password')
-        setPassword(['', '', '', ''])
-        focusBox(0)
-        return
-      }
-      await onUnlock()
-    } catch {
-      setError('Request failed')
-      setPassword(['', '', '', ''])
-      focusBox(0)
-    }
-  }
-
-  return (
-    <form onSubmit={handleSubmit} style={{ width: '100%', display: 'grid', gap: 16 }}>
-      {error && <div style={{ width: '100%', maxWidth: 320, padding: '6px 2px', color: 'var(--rm)', fontSize: 13, fontWeight: 600, lineHeight: 1.4, textAlign: 'left' }}>{error}</div>}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 48px)', gap: 8, justifyContent: 'center' }}>
-        {password.map((digit, index) => (
-          <input
-            key={index}
-            ref={el => { inputRefs.current[index] = el }}
-            type="password"
-            inputMode="numeric"
-            maxLength={1}
-            value={digit}
-            pattern="[0-9]*"
-            onChange={e => {
-              const next = e.target.value.replace(/\D/g, '').slice(-1)
-              const updated = [...password]
-              updated[index] = next
-              setPassword(updated)
-              if (next && index < 3) focusBox(index + 1)
-            }}
-            onKeyDown={e => {
-              if (e.key === 'Backspace' && !password[index] && index > 0) {
-                focusBox(index - 1)
-              }
-            }}
-            className="form-inp"
-            style={{ textAlign: 'center', fontSize: 18, padding: '10px 0' }}
-          />
-        ))}
-      </div>
-      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-        <button type="submit" className="ui-kit-btn ui-kit-btn--solid">Unlock & Copy</button>
-      </div>
-    </form>
   )
 }

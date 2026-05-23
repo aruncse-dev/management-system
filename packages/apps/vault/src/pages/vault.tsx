@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Check, Copy, ExternalLink, Landmark, Plus, Search } from 'lucide-react'
 import { api, type RawBankingRow } from '../api'
 import { FormField, HoldingCard, ModalActions, ModalShell, SearchField, SectionBlock, SectionChip, Spacer } from '../ui'
@@ -86,7 +86,6 @@ export function VaultBankingPage() {
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState('')
   const [search, setSearch] = useState('')
-  const [authCopy, setAuthCopy] = useState<{ label: string; text: string } | null>(null)
   const [deleteId, setDeleteId] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState(false)
 
@@ -199,10 +198,6 @@ export function VaultBankingPage() {
     const next = `${label} copied`
     setToast(next)
     window.setTimeout(() => setToast(''), 1400)
-  }
-
-  const copyWithAuth = async (label: string, text: string) => {
-    setAuthCopy({ label, text })
   }
 
   const detailRows = [
@@ -381,7 +376,7 @@ export function VaultBankingPage() {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                     <div style={{ color: 'var(--text)', fontWeight: 600, wordBreak: 'break-word', minWidth: 0 }}>{maskedValue(label, value)}</div>
                     {canCopy && (
-                      <button type="button" className="ui-kit-btn ui-kit-btn--soft ui-kit-btn-inline" onClick={() => (isSensitiveLabel(label) ? copyWithAuth(label, value) : copy(label, value))} style={{ width: 32, height: 32, padding: 0, justifyContent: 'center', flexShrink: 0 }} aria-label={`Copy ${label}`} title={`Copy ${label}`}>
+                      <button type="button" className="ui-kit-btn ui-kit-btn--soft ui-kit-btn-inline" onClick={() => copy(label, value)} style={{ width: 32, height: 32, padding: 0, justifyContent: 'center', flexShrink: 0 }} aria-label={`Copy ${label}`} title={`Copy ${label}`}>
                         <Copy size={14} />
                       </button>
                     )}
@@ -393,22 +388,6 @@ export function VaultBankingPage() {
         </ModalShell>
       )}
 
-      {authCopy && (
-        <ModalShell
-          title={`Copy ${authCopy.label}`}
-          onClose={() => setAuthCopy(null)}
-        >
-          <PasswordCopyLock
-            onUnlock={async () => {
-              setAuthCopy(null)
-              window.setTimeout(() => {
-                void copy(authCopy.label, authCopy.text)
-              }, 0)
-            }}
-          />
-        </ModalShell>
-      )}
-
       {toast && (
         <div style={{ position: 'fixed', left: '50%', bottom: 18, transform: 'translateX(-50%)', zIndex: 500, background: '#ECFDF5', color: '#166534', border: '1px solid #BBF7D0', borderRadius: 999, padding: '10px 14px', fontSize: 12, fontWeight: 700, boxShadow: '0 12px 28px rgba(22, 101, 52, .14)', display: 'flex', alignItems: 'center', gap: 8 }}>
           <Check size={14} />
@@ -416,86 +395,6 @@ export function VaultBankingPage() {
         </div>
       )}
     </div>
-  )
-}
-
-function PasswordCopyLock({
-  onUnlock,
-}: {
-  onUnlock: () => Promise<void> | void
-}) {
-  const [password, setPassword] = useState(['', '', '', ''])
-  const [error, setError] = useState('')
-  const inputRefs = useRef<Array<HTMLInputElement | null>>([])
-
-  useEffect(() => {
-    inputRefs.current[0]?.focus()
-  }, [])
-
-  const focusBox = (index: number) => {
-    inputRefs.current[index]?.focus()
-    inputRefs.current[index]?.select()
-  }
-
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    const pin = password.join('')
-    setError('')
-    try {
-      const r = await fetch('/api/auth/verify-pin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ pin }),
-      })
-      const data = (await r.json().catch(() => ({}))) as { error?: string }
-      if (!r.ok) {
-        setError(data.error || 'Incorrect password')
-        setPassword(['', '', '', ''])
-        focusBox(0)
-        return
-      }
-      await onUnlock()
-    } catch {
-      setError('Request failed')
-      setPassword(['', '', '', ''])
-      focusBox(0)
-    }
-  }
-
-  return (
-    <form onSubmit={handleSubmit} style={{ width: '100%', display: 'grid', gap: 16 }}>
-      {error && <div style={{ width: '100%', maxWidth: 320, padding: '6px 2px', color: 'var(--rm)', fontSize: 13, fontWeight: 600, lineHeight: 1.4, textAlign: 'left' }}>{error}</div>}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 48px)', gap: 8, justifyContent: 'center' }}>
-        {password.map((digit, index) => (
-          <input
-            key={index}
-            ref={el => { inputRefs.current[index] = el }}
-            type="password"
-            inputMode="numeric"
-            maxLength={1}
-            value={digit}
-            pattern="[0-9]*"
-            onChange={e => {
-              const next = e.target.value.replace(/\D/g, '').slice(-1)
-              const updated = [...password]
-              updated[index] = next
-              setPassword(updated)
-              if (error) setError('')
-              if (next && index < 3) focusBox(index + 1)
-            }}
-            onKeyDown={e => { if (e.key === 'Backspace' && !password[index] && index > 0) focusBox(index - 1) }}
-            className="form-inp"
-            style={{ width: '100%', aspectRatio: '1 / 1', minHeight: 48, textAlign: 'center', fontSize: 16, fontWeight: 700, background: '#fff', borderColor: 'rgba(191, 219, 254, .85)', color: 'var(--text)', boxShadow: '0 8px 20px rgba(15, 23, 42, 0.08)' }}
-            autoComplete={index === 0 ? 'current-password' : 'off'}
-            aria-label={`Password digit ${index + 1}`}
-          />
-        ))}
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 8, width: '100%' }}>
-        <button className="ui-kit-btn" type="submit" style={{ width: 'fit-content', minWidth: 180, justifyContent: 'center', background: 'rgba(255,255,255,.92)', color: 'var(--navy)', border: '1px solid rgba(255,255,255,.45)', borderRadius: 999, boxShadow: '0 6px 16px rgba(15, 23, 42, 0.08)' }}>Unlock</button>
-      </div>
-    </form>
   )
 }
 
