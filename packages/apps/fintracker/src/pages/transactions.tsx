@@ -9,7 +9,7 @@ import { CatIcon } from '../ui'
 
 const FILTERS = ['All','Expense','Income','Transfer','Savings','Cash','ICICI','HDFC','Ramya']
 
-interface Props { onEdit: (r: Transaction) => void }
+interface Props { onEdit: (r: Transaction) => void; onDuplicate?: (r: Transaction) => void }
 
 function toneForKey(key: string) {
   const tones = ['green', 'amber', 'navy', 'red'] as const
@@ -25,7 +25,7 @@ function toneForTransaction(row: Transaction) {
   return toneForKey(row.c)
 }
 
-export default function Transactions({ onEdit }: Props) {
+export default function Transactions({ onEdit, onDuplicate }: Props) {
   const { state, dispatch } = useStore()
   const fmt = useFormatMoney()
   const { rows, total, shown } = usePage()
@@ -99,6 +99,7 @@ export default function Transactions({ onEdit }: Props) {
                 tone={tone}
                 icon={<CatIcon cat={r.c} size={14} />}
                 onClick={() => onEdit(r)}
+                onDuplicate={onDuplicate ? (e) => { e.stopPropagation(); onDuplicate(r) } : undefined}
               />
             )
           })}

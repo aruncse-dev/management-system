@@ -3,7 +3,7 @@ import { AlertCircle } from 'lucide-react'
 interface Props {
   error: string
   onRetry?: () => void
-  /** Public path to app icon (vault may use `/apple-touch-icon.png`). */
+  /** Public path to app icon (e.g. `/icon-192.png`). */
   iconSrc?: string
 }
 

@@ -48,7 +48,7 @@ export default function AdminLoginPage() {
       </Head>
       <GoogleAuthCard
         iconSrc="/favicon.svg"
-        iconAlt="FinTracker"
+        iconAlt="Admin"
         title="Admin"
         subtitle="Sign in with Google."
         error={error}

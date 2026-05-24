@@ -183,7 +183,16 @@ export default function Monthly() {
 
       <main>
         {tab === 'dash' && <Dashboard />}
-        {tab === 'txns' && <Transactions onEdit={r => { setEditRow(r); setModalOpen(true) }} />}
+        {tab === 'txns' && (
+          <Transactions
+            onEdit={r => { setEditRow(r); setModalOpen(true) }}
+            onDuplicate={r => {
+              const today = new Date().toISOString().split('T')[0]
+              setEditRow({ ...r, id: '', date: today })
+              setModalOpen(true)
+            }}
+          />
+        )}
         {tab === 'bud'  && <Budget showStatus={showStatus} onCategoryClick={cat => { dispatch({ type:'SET_CAT_FILTER', payload:cat }); goTab('txns') }} />}
         {tab === 'cc'   && <Credits />}
         {tab === 'acct' && <Accounts showStatus={showStatus} />}
