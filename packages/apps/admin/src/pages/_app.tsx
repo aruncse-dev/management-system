@@ -37,6 +37,7 @@ export default function App({ Component, pageProps }: AppProps) {
         <title>Admin · FinTracker</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
         <meta name="theme-color" content="#1E5CC7" />
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
       </Head>
       <GoogleOAuthProvider clientId={googleClientId || ''}>
         <div className="with-app-shell admin-surface">

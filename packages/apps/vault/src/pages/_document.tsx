@@ -25,8 +25,7 @@ export default class MyDocument extends Document<Props> {
         <Head>
           <link rel="manifest" href="/manifest.json" />
           <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-          <link rel="icon" href="/favicon.png" type="image/png" sizes="32x32" />
-          <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+          <link rel="apple-touch-icon" href="/vault-192.png" />
           <meta name="color-scheme" content="light" />
           <meta name="theme-color" content="#1E5CC7" />
           <meta name="apple-mobile-web-app-capable" content="yes" />

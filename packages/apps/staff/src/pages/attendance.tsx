@@ -279,21 +279,6 @@ export default function AttendancePage() {
           </div>
         ) : (
           <>
-            <div className="dashboard-page">
-              <KpiGrid style={{ marginBottom: 0 }}>
-                {dashboardRows.map(({ staff, workedDays, otDays }) => (
-                  <KpiCard
-                    key={staff.id}
-                    label={staff.name}
-                    value={workedDays}
-                    subtitle={otDays === 1 ? '1 OT day' : `${otDays} OT days`}
-                    tone="navy"
-                    icon={<Users size={14} />}
-                  />
-                ))}
-              </KpiGrid>
-            </div>
-            <Spacer size={12} />
             <SectionBlock title="Calendar" icon={<Calendar size={16} />} right={<SectionChip>{month}</SectionChip>}>
               <div
                 style={{
@@ -375,6 +360,21 @@ export default function AttendancePage() {
                 })}
               </div>
             </SectionBlock>
+            <Spacer size={12} />
+            <div className="dashboard-page">
+              <KpiGrid style={{ marginBottom: 0 }}>
+                {dashboardRows.map(({ staff, workedDays, otDays }) => (
+                  <KpiCard
+                    key={staff.id}
+                    label={staff.name}
+                    value={workedDays}
+                    subtitle={otDays === 1 ? '1 OT day' : `${otDays} OT days`}
+                    tone="navy"
+                    icon={<Users size={14} />}
+                  />
+                ))}
+              </KpiGrid>
+            </div>
           </>
         )}
       </main>

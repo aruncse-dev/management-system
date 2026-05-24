@@ -19,9 +19,8 @@ function brandName(kind: AppAuthKind) {
 }
 
 function iconAsset(kind: AppAuthKind) {
-  if (kind === 'vault') return 'vault-rect.png'
-  if (kind === 'staff') return 'staff-rect.png'
-  return 'icon-rect.png'
+  if (kind === 'vault') return 'vault-192.png'
+  return 'icon-192.png'
 }
 
 function iconUrl(kind: AppAuthKind) {

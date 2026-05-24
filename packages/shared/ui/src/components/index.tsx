@@ -1,5 +1,5 @@
 import { useEffect, type ReactNode } from 'react'
-import { ExternalLink, Loader2 } from 'lucide-react'
+import { ExternalLink, Loader2, Copy } from 'lucide-react'
 import type { UiTone } from './uiTone'
 import { UiCard } from './UiCard'
 
@@ -683,6 +683,7 @@ export function TransactionCard({
   tone,
   icon,
   onClick,
+  onDuplicate,
   className = '',
   amountLabel = 'Amount',
   typeLabel = 'Type',
@@ -699,6 +700,8 @@ export function TransactionCard({
   tone: Extract<UiTone, 'green' | 'red' | 'amber' | 'navy' | 'muted'>
   icon: ReactNode
   onClick?: () => void
+  /** Callback when duplicate button is clicked. */
+  onDuplicate?: (e: React.MouseEvent) => void
   className?: string
   /** Column header above `amount` (default: Amount). */
   amountLabel?: string
@@ -732,7 +735,29 @@ export function TransactionCard({
             <span>{title}</span>
           </div>
         </div>
-        <div className="ui-kit-holding-card-head-right">{iconWrap}</div>
+        <div className="ui-kit-holding-card-head-right">
+          {onDuplicate && (
+            <button
+              type="button"
+              className="ui-kit-icon-btn"
+              onClick={onDuplicate}
+              title="Duplicate transaction"
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: '4px 8px',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                marginRight: '8px',
+                color: 'var(--muted)',
+              }}
+            >
+              <Copy size={16} />
+            </button>
+          )}
+          {iconWrap}
+        </div>
       </div>
       {!compact && (
         <div className="ui-kit-holding-card-grid">
