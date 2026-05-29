@@ -740,7 +740,11 @@ export function TransactionCard({
             <button
               type="button"
               className="ui-kit-icon-btn"
-              onClick={onDuplicate}
+              onClick={e => {
+                e.stopPropagation()
+                e.preventDefault()
+                onDuplicate(e)
+              }}
               title="Duplicate transaction"
               style={{
                 background: 'none',
