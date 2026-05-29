@@ -674,6 +674,26 @@ export function HoldingModal({
   )
 }
 
+/** Clickable card shell — `div` + `onClick` so action buttons (e.g. duplicate) are not nested inside `<button>`. */
+function TransactionCardShell({
+  className,
+  onClick,
+  children,
+}: {
+  className: string
+  onClick?: () => void
+  children: ReactNode
+}) {
+  if (!onClick) {
+    return <div className={className}>{children}</div>
+  }
+  return (
+    <div className={className} onClick={onClick}>
+      {children}
+    </div>
+  )
+}
+
 /** Ledger / savings entry card: holding header + optional Amount · Type · Date grid. */
 export function TransactionCard({
   title,
@@ -737,21 +757,13 @@ export function TransactionCard({
         </div>
         <div className="ui-kit-holding-card-head-right">
           {onDuplicate && (
-            <div
-              role="button"
-              tabIndex={0}
+            <button
+              type="button"
               className="ui-kit-icon-btn"
               onClick={e => {
                 e.stopPropagation()
                 e.preventDefault()
                 onDuplicate(e)
-              }}
-              onKeyDown={e => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.stopPropagation()
-                  e.preventDefault()
-                  onDuplicate(e as any)
-                }
               }}
               title="Duplicate transaction"
               style={{
@@ -766,7 +778,7 @@ export function TransactionCard({
               }}
             >
               <Copy size={16} />
-            </div>
+            </button>
           )}
           {iconWrap}
         </div>
@@ -799,9 +811,9 @@ export function TransactionCard({
       )
     }
     return (
-      <button type="button" className={btnClass} onClick={onClick}>
+      <TransactionCardShell className={btnClass} onClick={onClick}>
         {body}
-      </button>
+      </TransactionCardShell>
     )
   }
 
@@ -812,9 +824,9 @@ export function TransactionCard({
           {body}
         </div>
       ) : (
-        <button type="button" className={btnClass} onClick={onClick}>
+        <TransactionCardShell className={btnClass} onClick={onClick}>
           {body}
-        </button>
+        </TransactionCardShell>
       )}
       <a
         className="ui-kit-holding-card-linkrow ui-kit-holding-card-previewlink"
