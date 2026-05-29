@@ -470,12 +470,21 @@ export default function Lending({ sheetSlug: sheetSlugProp, onTabChange }: Lendi
               <div className="ui-stack">
                 <FormField label="Type">
                   <select className="form-sel" value={form.type} onChange={e => set('type', e.target.value as LendType)}>
-                    <option value="LEND">LEND</option>
-                    <option value="RECEIVED">RECEIVED</option>
+                    <option value="LEND">Given</option>
+                    <option value="RECEIVED">Received</option>
                   </select>
                 </FormField>
-                <FormField label="Name">
-                  <input className="form-inp" type="text" placeholder="Who?" value={form.name} onChange={e => set('name', e.target.value)} />
+                <FormField label={form.type === 'RECEIVED' ? 'From Person' : 'To Person'}>
+                  {form.type === 'RECEIVED' ? (
+                    <select className="form-sel" value={form.name} onChange={e => set('name', e.target.value)}>
+                      <option value="">Select person</option>
+                      {people.map(p => (
+                        <option key={p.name} value={p.name}>{p.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input className="form-inp" type="text" placeholder="Who?" value={form.name} onChange={e => set('name', e.target.value)} />
+                  )}
                 </FormField>
                 <FormField label={`Amount (${currency})`}>
                   <input className="form-inp" type="number" min="0" step="1" placeholder={zeroPlaceholder} value={form.amount} onChange={e => set('amount', e.target.value)} />

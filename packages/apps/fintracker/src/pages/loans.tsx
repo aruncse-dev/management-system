@@ -43,14 +43,12 @@ interface JewelFormState {
   rate: string
   start_date: string
   end_date: string
-  paid_amount: string
 }
 
 interface CashFormState {
   person_name: string
   amount_received: string
   start_date: string
-  paid_amount: string
 }
 
 interface PaymentFormState {
@@ -162,7 +160,6 @@ function emptyJewelForm(): JewelFormState {
     rate: '',
     start_date: new Date().toISOString().split('T')[0],
     end_date: new Date().toISOString().split('T')[0],
-    paid_amount: '0',
   }
 }
 
@@ -171,7 +168,6 @@ function emptyCashForm(): CashFormState {
     person_name: '',
     amount_received: '',
     start_date: new Date().toISOString().split('T')[0],
-    paid_amount: '0',
   }
 }
 
@@ -242,6 +238,30 @@ function buildCashLoans(rows: RawCashLoanRow[]): CombinedLoan[] {
   return rows.map(raw => {
     const principal = parseNumber(raw.amount_received)
     const paid = Math.round(parseNumber(raw.paid_amount))
+    return {
+      kind: 'Cash' as const,
+      id: raw.id,
+      name: String(raw.person_name ?? '').trim(),
+      principal,
+      paid,
+      outstanding: principal - paid,
+      startDate: String(raw.start_date ?? ''),
+      endDate: '',
+      status: 'Ongoing',
+    }
+  })
+}
+
+function buildCashLoansWithHistory(rows: RawCashLoanRow[], history: RawCashLoanHistoryRow[]): CombinedLoan[] {
+  const historyByLoanId = new Map<string, number>()
+  history.forEach(h => {
+    const current = historyByLoanId.get(h.loan_id) || 0
+    historyByLoanId.set(h.loan_id, current + parseNumber(h.amount))
+  })
+
+  return rows.map(raw => {
+    const principal = parseNumber(raw.amount_received)
+    const paid = Math.round(historyByLoanId.get(raw.id) || 0)
     return {
       kind: 'Cash' as const,
       id: raw.id,
@@ -358,7 +378,7 @@ export default function Loans() {
 
       setEmiLoans(buildEmiLoans(emiRows))
       setJewelLoans(buildJewelLoans(jewelRows))
-      setCashLoans(buildCashLoans(cashRows))
+      setCashLoans(buildCashLoansWithHistory(cashRows, cashPayments))
       setJewelHistory(jewelPayments)
       setCashHistory(cashPayments)
     } catch (e) {
@@ -486,7 +506,6 @@ export default function Loans() {
       rate: String(loan.rate),
       start_date: formatDateForInput(loan.startDate),
       end_date: formatDateForInput(loan.endDate),
-      paid_amount: String(loan.paid),
     })
     setJewelModalOpen(true)
     setJewelDeleteConfirm(false)
@@ -510,7 +529,7 @@ export default function Loans() {
       rate: parseFloat(jewelForm.rate) || 0,
       start_date: jewelForm.start_date,
       end_date: jewelForm.end_date,
-      paid_amount: parseFloat(jewelForm.paid_amount) || 0,
+      paid_amount: 0,
       status: 'Ongoing',
     }
     try {
@@ -554,7 +573,6 @@ export default function Loans() {
       person_name: loan.name,
       amount_received: String(loan.principal),
       start_date: formatDateForInput(loan.startDate),
-      paid_amount: String(loan.paid),
     })
     setCashModalOpen(true)
     setCashDeleteConfirm(false)
@@ -575,7 +593,6 @@ export default function Loans() {
       person_name: cashForm.person_name.trim(),
       amount_received: parseFloat(cashForm.amount_received),
       start_date: cashForm.start_date,
-      paid_amount: parseFloat(cashForm.paid_amount) || 0,
     }
     try {
       if (cashEditItem) await api.updateCashLoan({ ...payload, id: cashEditItem.id })
@@ -1230,7 +1247,6 @@ export default function Loans() {
             <FormField label="Rate"><input className="form-inp" type="number" value={jewelForm.rate} onChange={e => setJewelForm(f => ({ ...f, rate: e.target.value }))} /></FormField>
             <FormField label="Start Date"><input className="form-inp" type="date" value={jewelForm.start_date} onChange={e => setJewelForm(f => ({ ...f, start_date: e.target.value }))} /></FormField>
             <FormField label="End Date"><input className="form-inp" type="date" value={jewelForm.end_date} onChange={e => setJewelForm(f => ({ ...f, end_date: e.target.value }))} /></FormField>
-            <FormField label="Paid Amount"><input className="form-inp" type="number" value={jewelForm.paid_amount} onChange={e => setJewelForm(f => ({ ...f, paid_amount: e.target.value }))} /></FormField>
           </div>
         </ModalShell>
       )}
@@ -1258,7 +1274,6 @@ export default function Loans() {
             <FormField label="Person Name"><input className="form-inp" value={cashForm.person_name} onChange={e => setCashForm(f => ({ ...f, person_name: e.target.value }))} /></FormField>
             <FormField label="Amount Received"><input className="form-inp" type="number" value={cashForm.amount_received} onChange={e => setCashForm(f => ({ ...f, amount_received: e.target.value }))} /></FormField>
             <FormField label="Start Date"><input className="form-inp" type="date" value={cashForm.start_date} onChange={e => setCashForm(f => ({ ...f, start_date: e.target.value }))} /></FormField>
-            <FormField label="Paid Amount"><input className="form-inp" type="number" value={cashForm.paid_amount} onChange={e => setCashForm(f => ({ ...f, paid_amount: e.target.value }))} /></FormField>
           </div>
         </ModalShell>
       )}
