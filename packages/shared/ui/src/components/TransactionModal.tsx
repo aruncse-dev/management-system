@@ -129,7 +129,7 @@ export default function TransactionModal({
   amountLabel = 'Amount',
   amountPlaceholder = '0',
 }: Props) {
-  const isEdit = !!row
+  const isEdit = Boolean(row?.id)
   const defaultMode = paymentModeOptions[0] ?? 'Cash'
   const defaultTo = transferTargetOptions[0] ?? paymentModeOptions[0] ?? 'Cash'
   const [form, setForm] = useState<TransactionForm>(() =>
@@ -171,7 +171,7 @@ export default function TransactionModal({
       ...(isTransfer ? { transferTo } : {}),
     }
     try {
-      if (isEdit && row) await api.updateRow({ ...p, id: row.id })
+      if (isEdit && row?.id) await api.updateRow({ ...p, id: row.id })
       else await api.addRow(p)
       onSaved()
     } catch (e) {
