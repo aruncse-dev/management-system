@@ -737,13 +737,21 @@ export function TransactionCard({
         </div>
         <div className="ui-kit-holding-card-head-right">
           {onDuplicate && (
-            <button
-              type="button"
+            <div
+              role="button"
+              tabIndex={0}
               className="ui-kit-icon-btn"
               onClick={e => {
                 e.stopPropagation()
                 e.preventDefault()
                 onDuplicate(e)
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.stopPropagation()
+                  e.preventDefault()
+                  onDuplicate(e as any)
+                }
               }}
               title="Duplicate transaction"
               style={{
@@ -758,7 +766,7 @@ export function TransactionCard({
               }}
             >
               <Copy size={16} />
-            </button>
+            </div>
           )}
           {iconWrap}
         </div>
