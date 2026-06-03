@@ -1,5 +1,6 @@
-# Publishes a GitHub Release when a date tag vYYYYMMDD is pushed.
-# From main after merge: pnpm release:tag --push
+# Publishes or updates a GitHub Release when a date tag vYYYYMMDD is pushed.
+# Release notes = GitHub-generated changelog from previous date tag → this tag.
+# Same UTC day: pnpm release:tag --push moves the tag to HEAD and regenerates notes.
 name: Release
 
 on:
@@ -19,11 +20,46 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Create GitHub Release
+      - name: Resolve previous release tag
+        id: prev
+        run: |
+          CURRENT="${GITHUB_REF_NAME}"
+          PREV=$(git tag -l 'v20[0-9][0-9][0-9][0-9][0-9][0-9]' --sort=-creatordate | grep -v "^${CURRENT}$" | head -1 || true)
+          echo "current=${CURRENT}" >> "$GITHUB_OUTPUT"
+          echo "previous=${PREV}" >> "$GITHUB_OUTPUT"
+          if [ -n "$PREV" ]; then
+            echo "Release notes will include changes since ${PREV}"
+          else
+            echo "No previous date tag; notes will cover all history for this tag"
+          fi
+
+      - name: Generate release notes from commits
+        id: notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          ARGS=(
+            --method POST
+            "/repos/${GITHUB_REPOSITORY}/releases/generate-notes"
+            -f "tag_name=${{ steps.prev.outputs.current }}"
+            -f "target_commitish=${GITHUB_SHA}"
+          )
+          if [ -n "${{ steps.prev.outputs.previous }}" ]; then
+            ARGS+=(-f "previous_tag_name=${{ steps.prev.outputs.previous }}")
+          fi
+          gh api "${ARGS[@]}" --jq .body > release-notes.md
+          echo "body_path=release-notes.md" >> "$GITHUB_OUTPUT"
+          echo "--- Release notes preview ---"
+          head -40 release-notes.md || true
+
+      - name: Create or update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
-          generate_release_notes: true
+          body_path: release-notes.md
+          allowUpdates: true
+          make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

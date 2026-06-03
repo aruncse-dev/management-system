@@ -14,6 +14,9 @@ pnpm dev:admin               # port 3003
 # Fresh start (kills ports 3000-3003, clears .next + .turbo cache)
 pnpm dev:fintracker:fresh
 
+# Pre-push gate (type-check + lint)
+pnpm prepush
+
 # Type-check all packages (required before pushing)
 pnpm type-check
 
@@ -134,3 +137,4 @@ Obsolete (do not use): `VITE_GAS_URL`, `VITE_API_TOKEN`, `GAS_EXEC_URL`, `NEXT_P
 ## Quick Links
 - `README.md` — setup and deployment
 - `docs/troubleshooting.md` — local 500 / DATABASE_URL / login failures (`pnpm db:check`)
+- `ai/docs/cursor-commands.md` — Cursor `/` slash commands (`.cursor/commands/`)

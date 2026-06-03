@@ -54,14 +54,14 @@ Examples:
 
 ## Tags / releases
 
-Release tags use **UTC calendar dates**: `vYYYYMMDD` (e.g. `v20260604`). One tag per day; package.json semver (`pnpm release:bump`) is separate from the git tag.
+Release tags use **UTC calendar dates**: `vYYYYMMDD` (e.g. `v20260604`). **One tag name per UTC day** — a second release the same day **moves that tag to latest `main`** and force-pushes (GitHub Release is updated, release notes regenerated). Package.json semver (`pnpm release:bump`) is separate from the git tag.
 
 ```bash
 # On main after merge (optional: pnpm release:bump patch for app package versions)
 pnpm release:tag --push
 ```
 
-GitHub Actions (`.github/workflows/release.yml`) publishes the release when the date tag is pushed.
+GitHub Actions (`.github/workflows/release.yml`) creates or updates the release. Notes are built via GitHub’s `generate-notes` API from **commits/PRs since the previous `vYYYYMMDD` tag** (same-day retag uses the prior day’s tag as baseline, so one release includes all of that day’s merges). Preview locally: `pnpm release:notes:preview`.
 
 ---
 

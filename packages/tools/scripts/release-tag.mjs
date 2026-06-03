@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 /**
- * Create an annotated git tag vYYYYMMDD (UTC) on HEAD.
+ * Create or refresh an annotated git tag vYYYYMMDD (UTC) on HEAD.
+ * Same UTC day: moves the existing tag to HEAD and force-pushes (overwrites release).
+ *
  * Usage:
  *   node packages/tools/scripts/release-tag.mjs          # tag only
- *   node packages/tools/scripts/release-tag.mjs --push   # tag + git push origin <tag>
- *   node packages/tools/scripts/release-tag.mjs --date 20260523  # override date (testing / backfill)
+ *   node packages/tools/scripts/release-tag.mjs --push   # tag + git push origin <tag> [--force]
+ *   node packages/tools/scripts/release-tag.mjs --date 20260523  # override date (backfill)
  */
 import { execFileSync, execSync } from 'node:child_process'
 import { dirname, join } from 'node:path'
@@ -30,6 +32,28 @@ function resolveDateKey() {
   return `${y}${m}${d}`
 }
 
+function tagExistsLocal(tag) {
+  try {
+    execSync(`git rev-parse -q --verify refs/tags/${tag}`, { cwd: root, stdio: 'pipe' })
+    return true
+  } catch {
+    return false
+  }
+}
+
+function tagExistsRemote(tag) {
+  try {
+    const out = execSync(`git ls-remote --tags origin refs/tags/${tag}`, {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim()
+    return out.length > 0
+  } catch {
+    return false
+  }
+}
+
 const dateKey = resolveDateKey()
 const tag = `v${dateKey}`
 const doPush = process.argv.includes('--push')
@@ -41,26 +65,34 @@ try {
   process.exit(1)
 }
 
-let exists = false
-try {
-  execSync(`git rev-parse -q --verify refs/tags/${tag}`, { cwd: root, stdio: 'pipe' })
-  exists = true
-} catch {
-  exists = false
-}
+const hadLocal = tagExistsLocal(tag)
+const hadRemote = doPush ? tagExistsRemote(tag) : false
+const isUpdate = hadLocal || hadRemote
 
-if (exists) {
-  console.error(`Tag ${tag} already exists. Use another day or delete the tag first.`)
-  process.exit(1)
-}
+const head = execSync('git rev-parse --short HEAD', { cwd: root, encoding: 'utf8' }).trim()
+const msg = isUpdate
+  ? `Release ${tag} (updated to ${head})`
+  : `Release ${tag}`
 
-const msg = `Release ${tag}`
-execFileSync('git', ['tag', '-a', tag, '-m', msg], { cwd: root, stdio: 'inherit' })
-console.log(`Created annotated tag ${tag} on HEAD`)
+if (isUpdate) {
+  console.log(
+    `Tag ${tag} already exists — moving to current HEAD (${head}) and ${doPush ? 'updating' : 'will update'} the GitHub release.`,
+  )
+  execFileSync('git', ['tag', '-f', '-a', tag, '-m', msg], { cwd: root, stdio: 'inherit' })
+} else {
+  execFileSync('git', ['tag', '-a', tag, '-m', msg], { cwd: root, stdio: 'inherit' })
+  console.log(`Created annotated tag ${tag} on HEAD (${head})`)
+}
 
 if (doPush) {
-  execFileSync('git', ['push', 'origin', tag], { cwd: root, stdio: 'inherit' })
-  console.log(`Pushed ${tag} (GitHub Actions will publish the release if configured).`)
+  const pushArgs = isUpdate ? ['push', 'origin', tag, '--force'] : ['push', 'origin', tag]
+  execFileSync('git', pushArgs, { cwd: root, stdio: 'inherit' })
+  console.log(
+    isUpdate
+      ? `Force-pushed ${tag}. GitHub Actions will regenerate release notes from commits since the previous date tag.`
+      : `Pushed ${tag}. GitHub Actions will publish the release with generated notes.`,
+  )
 } else {
-  console.log(`To publish: git push origin ${tag}`)
+  const flag = isUpdate ? '--force' : ''
+  console.log(`To publish: git push origin ${tag}${flag ? ` ${flag}` : ''}`)
 }
