@@ -147,10 +147,12 @@ export interface RawSavingsRow {
   id: string;
   date: string;
   account: string;
+  accountName?: string;
   amount: number | string;
   desc: string;
   type: string;
   toAccount?: string;
+  toAccountName?: string;
 }
 
 export interface RawGoldRow {

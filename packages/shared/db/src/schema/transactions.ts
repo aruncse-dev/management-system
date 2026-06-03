@@ -9,11 +9,10 @@ export const transactions = pgTable('transactions', {
   category: text('category'),
   categoryId: text('category_id'),
   type: text('type').notNull(),
+  /** Payment source label (account/credit name). See `payment_sources` for configured accounts. */
   mode: text('mode'),
-  paymentSourceId: text('payment_source_id'),
-  /** Transfer destination account/credit label (`mode` is the source). Legacy rows may leave this null and encode `→…` in `notes`. */
+  /** Transfer destination (`mode` is source). Legacy rows may encode `→…` in `notes`. */
   transferTo: text('transfer_to'),
-  transferToId: text('transfer_to_id'),
   notes: text('notes'),
   monthYear: text('month_year').notNull(),
 })

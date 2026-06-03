@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Plus, LayoutDashboard, List, BarChart3, Wallet, Search, TrendingUp, AlertTriangle, ArrowUpRight, ArrowDownRight, Repeat2 } from 'lucide-react'
-import { api, RawSavingsRow } from '../api'
+import { api, RawSavingsRow, type AccountRow } from '../api'
 import { CATEGORIES, THEME_COLORS } from '../config'
 import { mergeCategoriesWithBudgetNames } from '../utils'
 import { useMoneyFormatting } from '../hooks/useFormatMoney'
@@ -10,9 +10,11 @@ import { BalanceRow, CategoryCombobox, CatIcon, FormField, KpiCard, KpiGrid, Loa
 type SavingsType = 'Income' | 'Expense' | 'Transfer'
 type SavingsTab = 'dashboard' | 'transactions'
 
+type SavingsAccount = { id: string; name: string }
+
 export interface SavingsPageConfig {
   sheetName: string
-  /** When set (e.g. Bommi sheet), skips DB account list and uses these names only. */
+  /** Legacy sheets: name-only list (id = name). Prefer DB accounts when omitted. */
   accounts?: readonly string[]
   title: string
   addButtonTitle?: string
@@ -22,10 +24,12 @@ interface SavingsEntry {
   id: string
   date: string
   account: string
+  accountName: string
   amount: number
   desc: string
   type: SavingsType
   toAccount?: string
+  toAccountName?: string
   category?: string
 }
 
@@ -67,50 +71,85 @@ function toDateInput(dateStr: string): string {
   return todayISO()
 }
 
-function makeEmptyForm(accounts: readonly string[]): SavingsFormState {
+function accountsFromRows(rows: AccountRow[]): SavingsAccount[] {
+  return rows
+    .filter(a => a.isActive !== false && (a.usedFor === 'savings' || a.usedFor === 'both'))
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name))
+    .map(a => ({ id: a.id, name: a.name }))
+}
+
+function accountsFromLegacyNames(names: readonly string[]): SavingsAccount[] {
+  return names.map(n => ({ id: n, name: n }))
+}
+
+function makeEmptyForm(accounts: readonly SavingsAccount[]): SavingsFormState {
   return {
     date: todayISO(),
-    account: accounts[0] ?? '',
+    account: accounts[0]?.id ?? '',
     amount: '',
     desc: '',
     type: 'Income',
-    toAccount: accounts[1] ?? accounts[0] ?? '',
+    toAccount: accounts[1]?.id ?? accounts[0]?.id ?? '',
     category: 'Others',
   }
 }
 
-function parseRow(raw: RawSavingsRow, accounts: readonly string[]): SavingsEntry | null {
+function resolveStoredAccountId(
+  stored: string,
+  displayName: string | undefined,
+  accounts: readonly SavingsAccount[],
+): string | null {
+  const key = stored.trim()
+  if (!key) return null
+  const byId = accounts.find(a => a.id === key)
+  if (byId) return byId.id
+  const byName = accounts.find(a => a.name === key || (displayName && a.name === displayName))
+  if (byName) return byName.id
+  return null
+}
+
+function accountNameById(accounts: readonly SavingsAccount[], id: string, fallback?: string): string {
+  return accounts.find(a => a.id === id)?.name ?? fallback ?? id
+}
+
+function parseRow(raw: RawSavingsRow, accounts: readonly SavingsAccount[]): SavingsEntry | null {
   const type = String(raw.type ?? '').trim().toUpperCase()
   if (type !== 'INCOME' && type !== 'EXPENSE' && type !== 'TRANSFER') return null
   const amount = parseFloat(String(raw.amount))
   if (isNaN(amount) || amount <= 0) return null
-  const account = String(raw.account ?? '').trim()
-  if (!accounts.includes(account)) return null
+
+  const accountId = resolveStoredAccountId(String(raw.account ?? ''), raw.accountName, accounts)
+  if (!accountId) return null
 
   const entry: SavingsEntry = {
     id: raw.id,
     date: String(raw.date ?? '').trim(),
-    account,
+    account: accountId,
+    accountName: raw.accountName?.trim() || accountNameById(accounts, accountId, String(raw.account ?? '')),
     amount,
     desc: String(raw.desc ?? '').trim(),
     type: (type === 'INCOME' ? 'Income' : type === 'EXPENSE' ? 'Expense' : 'Transfer') as SavingsType,
     category: type === 'EXPENSE' ? (String(raw.category ?? '').trim() || 'Others') : undefined,
   }
-  if (type === 'TRANSFER') {
-    const to = String(raw.toAccount ?? '').trim()
-    if (accounts.includes(to)) entry.toAccount = to
+
+  if (type === 'TRANSFER' && raw.toAccount) {
+    const toId = resolveStoredAccountId(String(raw.toAccount), raw.toAccountName, accounts)
+    if (toId) {
+      entry.toAccount = toId
+      entry.toAccountName = raw.toAccountName?.trim() || accountNameById(accounts, toId, String(raw.toAccount))
+    }
   }
   return entry
 }
 
-function computeBalances(entries: SavingsEntry[], accounts: readonly string[]): Record<string, number> {
-  const balances = Object.fromEntries(accounts.map(a => [a, 0])) as Record<string, number>
+function computeBalances(entries: SavingsEntry[], accounts: readonly SavingsAccount[]): Record<string, number> {
+  const balances = Object.fromEntries(accounts.map(a => [a.id, 0])) as Record<string, number>
   for (const e of entries) {
-    if (e.type === 'Income') balances[e.account] += e.amount
-    if (e.type === 'Expense') balances[e.account] -= e.amount
+    if (e.type === 'Income') balances[e.account] = (balances[e.account] || 0) + e.amount
+    if (e.type === 'Expense') balances[e.account] = (balances[e.account] || 0) - e.amount
     if (e.type === 'Transfer') {
-      balances[e.account] -= e.amount
-      if (e.toAccount) balances[e.toAccount] += e.amount
+      balances[e.account] = (balances[e.account] || 0) - e.amount
+      if (e.toAccount) balances[e.toAccount] = (balances[e.toAccount] || 0) + e.amount
     }
   }
   return balances
@@ -134,11 +173,11 @@ export default function SavingsPage({
     const value = fmt(n)
     return n < 0 ? `-${value}` : value
   }, [fmt])
-  const [apiAccounts, setApiAccounts] = useState<string[]>([])
+  const [apiAccounts, setApiAccounts] = useState<SavingsAccount[]>([])
   const [accountsLoading, setAccountsLoading] = useState(!accountsProp)
 
   const accounts = useMemo(
-    () => (accountsProp ? [...accountsProp] : apiAccounts),
+    () => (accountsProp ? accountsFromLegacyNames(accountsProp) : apiAccounts),
     [accountsProp, apiAccounts],
   )
   const savingsExpenseCategories = useMemo(
@@ -153,7 +192,7 @@ export default function SavingsPage({
   const [search, setSearch] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [editEntry, setEditEntry] = useState<SavingsEntry | null>(null)
-  const [form, setForm] = useState<SavingsFormState>(() => makeEmptyForm(accountsProp ?? []))
+  const [form, setForm] = useState<SavingsFormState>(() => makeEmptyForm(accountsProp ? accountsFromLegacyNames(accountsProp) : []))
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [delConfirm, setDelConfirm] = useState(false)
@@ -166,11 +205,7 @@ export default function SavingsPage({
       try {
         const list = await api.getAccountsList()
         if (cancelled) return
-        const names = list
-          .filter(a => a.isActive !== false && (a.usedFor === 'savings' || a.usedFor === 'both'))
-          .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name))
-          .map(a => a.name)
-        setApiAccounts(names)
+        setApiAccounts(accountsFromRows(list))
       } catch {
         if (!cancelled) setApiAccounts([])
       } finally {
@@ -185,7 +220,7 @@ export default function SavingsPage({
   useEffect(() => {
     if (accounts.length === 0) return
     setForm(f => {
-      if (f.account && accounts.includes(f.account)) return f
+      if (f.account && accounts.some(a => a.id === f.account)) return f
       return makeEmptyForm(accounts)
     })
   }, [accounts])
@@ -209,18 +244,18 @@ export default function SavingsPage({
   }, [loadData])
 
   const balances = useMemo(() => computeBalances(entries, accounts), [accounts, entries])
-  const totalBalance = useMemo(() => accounts.reduce((s, a) => s + (balances[a] || 0), 0), [accounts, balances])
+  const totalBalance = useMemo(() => accounts.reduce((s, a) => s + (balances[a.id] || 0), 0), [accounts, balances])
   const totalIncome = useMemo(() => entries.filter(e => e.type === 'Income' || e.type === 'Transfer').reduce((s, e) => s + e.amount, 0), [entries])
   const totalExpenses = useMemo(() => entries.filter(e => e.type === 'Expense' || e.type === 'Transfer').reduce((s, e) => s + e.amount, 0), [entries])
 
   const accountSummary = useMemo(
-    () => accounts.map(account => {
-      const accountEntries = entries.filter(e => e.account === account)
+    () => accounts.map(({ id, name }) => {
+      const accountEntries = entries.filter(e => e.account === id)
       const transferOut = accountEntries.filter(e => e.type === 'Transfer').reduce((s, e) => s + e.amount, 0)
-      const transferIn = entries.filter(e => e.type === 'Transfer' && e.toAccount === account).reduce((s, e) => s + e.amount, 0)
+      const transferIn = entries.filter(e => e.type === 'Transfer' && e.toAccount === id).reduce((s, e) => s + e.amount, 0)
       const income = accountEntries.filter(e => e.type === 'Income').reduce((s, e) => s + e.amount, 0) + transferIn
       const expense = accountEntries.filter(e => e.type === 'Expense').reduce((s, e) => s + e.amount, 0) + transferOut
-      return { account, balance: balances[account] || 0, income, expense }
+      return { id, name, balance: balances[id] || 0, income, expense }
     }),
     [accounts, balances, entries],
   )
@@ -230,7 +265,12 @@ export default function SavingsPage({
       .filter(e => typeFilter === 'All' || e.type === typeFilter)
       .filter(e => {
         const q = search.toLowerCase()
-        return !q || e.desc.toLowerCase().includes(q) || e.account.toLowerCase().includes(q) || e.type.toLowerCase().includes(q) || (e.category?.toLowerCase().includes(q) ?? false)
+        return !q
+          || e.desc.toLowerCase().includes(q)
+          || e.accountName.toLowerCase().includes(q)
+          || (e.toAccountName?.toLowerCase().includes(q) ?? false)
+          || e.type.toLowerCase().includes(q)
+          || (e.category?.toLowerCase().includes(q) ?? false)
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   }, [entries, typeFilter, search])
@@ -266,7 +306,7 @@ export default function SavingsPage({
       amount: String(e.amount),
       desc: e.desc,
       type: e.type,
-      toAccount: e.toAccount ?? accounts.find(a => a !== e.account) ?? accounts[0] ?? '',
+      toAccount: e.toAccount ?? accounts.find(a => a.id !== e.account)?.id ?? accounts[0]?.id ?? '',
       category: e.category ?? 'Others',
     })
     setModalOpen(true)
@@ -377,10 +417,10 @@ export default function SavingsPage({
             <Spacer size={6} />
             <SectionBlock title="Accounts" icon={<Wallet size={14} />}>
               <div className="ui-stack">
-                {accountSummary.map(({ account, balance, income, expense }) => (
-                  <div key={account}>
+                {accountSummary.map(({ id, name, balance, income, expense }) => (
+                  <div key={id}>
                     <BalanceRow
-                      title={account}
+                      title={name}
                       value={signedFmt(balance)}
                       income={fmt(income)}
                       expense={fmt(expense)}
@@ -426,10 +466,12 @@ export default function SavingsPage({
               <div className="txn-cards">
                 {filteredEntries.map(e => {
                   let titleText = ''
-                  if (e.type === 'Transfer' && e.toAccount) {
-                    titleText = e.desc?.trim() ? `${e.desc} · ${e.account} → ${e.toAccount}` : `${e.account} → ${e.toAccount}`
+                  if (e.type === 'Transfer' && e.toAccountName) {
+                    titleText = e.desc?.trim()
+                      ? `${e.desc} · ${e.accountName} → ${e.toAccountName}`
+                      : `${e.accountName} → ${e.toAccountName}`
                   } else {
-                    titleText = e.desc || e.account
+                    titleText = e.desc || e.accountName
                   }
                   const txnIcon =
                     e.type === 'Income'
@@ -498,11 +540,11 @@ export default function SavingsPage({
                     const newAccount = e.target.value
                     setField('account', newAccount)
                     if (form.toAccount === newAccount) {
-                      const newToAcct = accounts.find(a => a !== newAccount)
-                      if (newToAcct) setField('toAccount', newToAcct)
+                      const newToAcct = accounts.find(a => a.id !== newAccount)
+                      if (newToAcct) setField('toAccount', newToAcct.id)
                     }
                   }}>
-                    {accounts.map(a => <option key={a} value={a}>{a}</option>)}
+                    {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                   </select>
                 </FormField>
                 <FormField label="Amount">
@@ -526,7 +568,7 @@ export default function SavingsPage({
                 {form.type === 'Transfer' && (
                   <FormField label="To Account">
                     <select className="form-sel" value={form.toAccount} onChange={e => setField('toAccount', e.target.value)}>
-                      {accounts.filter(a => a !== form.account).map(a => <option key={a} value={a}>{a}</option>)}
+                      {accounts.filter(a => a.id !== form.account).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                     </select>
                   </FormField>
                 )}

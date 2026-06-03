@@ -117,11 +117,15 @@ export interface RawLendingRow {
 export interface RawSavingsRow {
   id: string;
   date: string;
+  /** payment_sources.id */
   account: string;
+  accountName?: string;
   amount: number | string;
   desc: string;
   type: string;
+  /** payment_sources.id */
   toAccount?: string;
+  toAccountName?: string;
   category?: string;
 }
 

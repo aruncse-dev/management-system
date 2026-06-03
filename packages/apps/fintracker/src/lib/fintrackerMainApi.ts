@@ -30,6 +30,11 @@ import {
 } from '@fintracker-vault/db'
 import { normalizeLendingSheetSlug } from './lendingSheetSlug'
 import {
+  loadSavingsAccountLookup,
+  resolveSavingsAccountId,
+  savingsAccountDisplayName,
+} from './savingsAccounts'
+import {
   connectionStatusToLegacyToken,
   disconnectOrgIntegration,
   getIntegrationAuthUrl,
@@ -511,18 +516,25 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
 
       if (mod === 'savings' && action === 'getEntries') {
         const rows = await db.select().from(savings).where(whereOrgFilter(savings, budgetScope)).orderBy(desc(savings.date))
+        const acctLookup = await loadSavingsAccountLookup(db, scopeOrgId)
         return ok(
           res,
-          rows.map((r) => ({
-            id: r.id,
-            date: String(r.date),
-            account: r.account,
-            amount: r.amount,
-            desc: r.description ?? '',
-            type: r.type,
-            toAccount: r.toAccount ?? undefined,
-            category: r.category ?? undefined,
-          })),
+          rows.map((r) => {
+            const accountStored = String(r.account ?? '')
+            const toStored = r.toAccount ? String(r.toAccount) : undefined
+            return {
+              id: r.id,
+              date: String(r.date),
+              account: accountStored,
+              accountName: savingsAccountDisplayName(acctLookup, accountStored),
+              amount: r.amount,
+              desc: r.description ?? '',
+              type: r.type,
+              toAccount: toStored,
+              toAccountName: toStored ? savingsAccountDisplayName(acctLookup, toStored) : undefined,
+              category: r.category ?? undefined,
+            }
+          }),
         )
       }
 
@@ -922,30 +934,45 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
       }
 
       if (mod === 'savings') {
-        if (action === 'addEntry') {
-          const id = crypto.randomUUID()
-          const dateStr = typeof body.date === 'string' ? body.date : new Date().toISOString().slice(0, 10)
-          await db.insert(savings).values({
-            id,
-            orgId: scopeOrgId,
-            date: dateStr,
-            account: String(body.account ?? ''),
-            amount: String(num(body.amount as string | number)),
-            description: typeof body.desc === 'string' ? body.desc : typeof body.description === 'string' ? body.description : null,
-            type: String(body.type ?? ''),
-            toAccount: typeof body.toAccount === 'string' ? body.toAccount : null,
-            category: typeof body.category === 'string' ? body.category : null,
-          })
-          return ok(res, id, traceId)
-        }
-        if (action === 'updateEntry') {
+        if (action === 'addEntry' || action === 'updateEntry') {
+          const acctLookup = await loadSavingsAccountLookup(db, scopeOrgId)
+          const accountRaw = typeof body.account === 'string' ? body.account : ''
+          const accountId = resolveSavingsAccountId(acctLookup, accountRaw)
+          if (!accountId) return fail(res, 400, 'Invalid account', traceId)
+
+          const typeStr = String(body.type ?? '').trim()
+          const isTransfer = typeStr.toUpperCase() === 'TRANSFER'
+          let toAccountId: string | null = null
+          if (isTransfer) {
+            const toRaw = typeof body.toAccount === 'string' ? body.toAccount : ''
+            toAccountId = resolveSavingsAccountId(acctLookup, toRaw)
+            if (!toAccountId) return fail(res, 400, 'Invalid to account', traceId)
+          }
+
+          if (action === 'addEntry') {
+            const id = crypto.randomUUID()
+            const dateStr = typeof body.date === 'string' ? body.date : new Date().toISOString().slice(0, 10)
+            await db.insert(savings).values({
+              id,
+              orgId: scopeOrgId,
+              date: dateStr,
+              account: accountId,
+              amount: String(num(body.amount as string | number)),
+              description: typeof body.desc === 'string' ? body.desc : typeof body.description === 'string' ? body.description : null,
+              type: typeStr,
+              toAccount: toAccountId,
+              category: typeof body.category === 'string' ? body.category : null,
+            })
+            return ok(res, id, traceId)
+          }
+
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
           await db
             .update(savings)
             .set({
               date: typeof body.date === 'string' ? body.date : undefined,
-              account: typeof body.account === 'string' ? body.account : undefined,
+              account: accountId,
               amount: body.amount !== undefined ? String(num(body.amount as string | number)) : undefined,
               description:
                 typeof body.desc === 'string'
@@ -953,8 +980,8 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
                   : typeof body.description === 'string'
                     ? body.description
                     : undefined,
-              type: typeof body.type === 'string' ? body.type : undefined,
-              toAccount: typeof body.toAccount === 'string' ? body.toAccount : undefined,
+              type: typeStr ? typeStr : undefined,
+              toAccount: toAccountId,
               category: typeof body.category === 'string' ? body.category : undefined,
             })
             .where(and(whereOrgFilter(savings, budgetScope), eq(savings.id, id)))

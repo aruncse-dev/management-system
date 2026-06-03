@@ -87,11 +87,11 @@ erDiagram
 - **Owner:** fintracker
 
 ### `transactions`
-- **Columns:** org_id, date, description, amount, category, type, mode, payment_source_id (FK), month_year
+- **Columns:** org_id, date, description, amount, category, type, mode (payment label), transfer_to, month_year
 - **Owner:** fintracker
 
 ### `savings`
-- **Columns:** org_id, date, account, amount, type (e.g., "savings", "current"), account_type, institution
+- **Columns:** org_id, date, account (`payment_sources.id`), to_account (`payment_sources.id` for transfers), amount, type (INCOME/EXPENSE/TRANSFER), category
 - **Owner:** fintracker
 
 ### `lending`
