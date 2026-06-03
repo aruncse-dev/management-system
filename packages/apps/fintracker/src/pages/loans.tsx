@@ -2,10 +2,31 @@ import { useEffect, useMemo, useState } from 'react'
 import { Banknote, BarChart3, CreditCard, Landmark, Clock, Layers3, ArrowDownLeft, ArrowUpRight, Plus } from 'lucide-react'
 import { api, RawCashLoanHistoryRow, RawCashLoanRow, RawEmiRow, RawJewelLoanHistoryRow, RawJewelLoanRow } from '../api'
 import { useFormatMoney } from '../hooks/useFormatMoney'
-import { FormField, HoldingCard, KpiCard, KpiGrid, LoadingState, ModalActions, ModalShell, SectionBlock, SectionChip } from '../ui'
+import { FilterChips, FormField, HoldingCard, KpiCard, KpiGrid, LoadingState, ModalActions, ModalShell, SectionBlock, SectionChip } from '../ui'
 
 type LoanSource = 'EMI' | 'Jewel' | 'Cash'
 type LoansTab = 'dashboard' | 'emi' | 'jewel' | 'cash' | 'history'
+type LoanStatus = 'Ongoing' | 'Closed'
+type LoanListFilter = 'active' | 'all' | 'closed'
+
+function normalizeLoanStatus(status: string | undefined | null): LoanStatus {
+  return String(status ?? '').trim() === 'Closed' ? 'Closed' : 'Ongoing'
+}
+
+function isActiveLoan(loan: CombinedLoan) {
+  return normalizeLoanStatus(loan.status) === 'Ongoing'
+}
+
+function formatLoanCountChip(active: number, closed: number) {
+  if (closed === 0) return `${active} active`
+  return `${active} active · ${closed} closed`
+}
+
+function filterLoansByListFilter<T extends CombinedLoan>(loans: T[], filter: LoanListFilter): T[] {
+  if (filter === 'all') return loans
+  if (filter === 'active') return loans.filter(isActiveLoan)
+  return loans.filter(l => !isActiveLoan(l))
+}
 
 type CombinedLoan =
   | { kind: 'EMI'; id: string; name: string; bank: string; principal: number; rate: number; tenure_months: number; emi_amount: number; paid_emis: number; interest: number; paid: number; outstanding: number; startDate: string; endDate: string; status: string }
@@ -34,6 +55,7 @@ interface EmiFormState {
   tenure_months: string
   emi_amount: string
   paid_emis: string
+  status: LoanStatus
 }
 
 interface JewelFormState {
@@ -43,12 +65,14 @@ interface JewelFormState {
   rate: string
   start_date: string
   end_date: string
+  status: LoanStatus
 }
 
 interface CashFormState {
   person_name: string
   amount_received: string
   start_date: string
+  status: LoanStatus
 }
 
 interface PaymentFormState {
@@ -149,6 +173,7 @@ function emptyEmiForm(): EmiFormState {
     tenure_months: '',
     emi_amount: '',
     paid_emis: '0',
+    status: 'Ongoing',
   }
 }
 
@@ -160,6 +185,7 @@ function emptyJewelForm(): JewelFormState {
     rate: '',
     start_date: new Date().toISOString().split('T')[0],
     end_date: new Date().toISOString().split('T')[0],
+    status: 'Ongoing',
   }
 }
 
@@ -168,6 +194,7 @@ function emptyCashForm(): CashFormState {
     person_name: '',
     amount_received: '',
     start_date: new Date().toISOString().split('T')[0],
+    status: 'Ongoing',
   }
 }
 
@@ -205,16 +232,22 @@ function buildEmiLoans(rows: RawEmiRow[]): CombinedLoan[] {
       outstanding: totalPayable - paid,
       startDate: String(raw.start_date ?? ''),
       endDate: addMonths(String(raw.start_date ?? ''), tenure_months),
-      status: String(raw.status ?? 'Ongoing').trim(),
+      status: normalizeLoanStatus(raw.status),
     }
   })
 }
 
-function buildJewelLoans(rows: RawJewelLoanRow[]): CombinedLoan[] {
+function buildJewelLoansWithHistory(rows: RawJewelLoanRow[], history: RawJewelLoanHistoryRow[]): CombinedLoan[] {
+  const historyByLoanId = new Map<string, number>()
+  history.forEach(h => {
+    const current = historyByLoanId.get(h.loan_id) || 0
+    historyByLoanId.set(h.loan_id, current + parseNumber(h.amount))
+  })
+
   return rows.map(raw => {
     const principal = parseNumber(raw.principal)
     const rate = parseNumber(raw.rate)
-    const paid = Math.round(parseNumber(raw.paid_amount))
+    const paid = Math.round(historyByLoanId.get(raw.id) || 0)
     const totalPayable = Math.round(principal * (1 + rate / 100))
     const interest = Math.max(totalPayable - principal, 0)
     return {
@@ -229,7 +262,7 @@ function buildJewelLoans(rows: RawJewelLoanRow[]): CombinedLoan[] {
       outstanding: totalPayable - paid,
       startDate: String(raw.start_date ?? ''),
       endDate: String(raw.end_date ?? ''),
-      status: String(raw.status ?? 'Ongoing').trim(),
+      status: normalizeLoanStatus(raw.status),
     }
   })
 }
@@ -271,7 +304,7 @@ function buildCashLoansWithHistory(rows: RawCashLoanRow[], history: RawCashLoanH
       outstanding: principal - paid,
       startDate: String(raw.start_date ?? ''),
       endDate: '',
-      status: 'Ongoing',
+      status: normalizeLoanStatus(raw.status),
     }
   })
 }
@@ -315,6 +348,54 @@ function buildHistory(
   return rows.sort((a, b) => parseDate(b.date).getTime() - parseDate(a.date).getTime())
 }
 
+function LoanListFilterBar({
+  value,
+  onChange,
+  activeCount,
+  closedCount,
+  totalCount,
+}: {
+  value: LoanListFilter
+  onChange: (next: LoanListFilter) => void
+  activeCount: number
+  closedCount: number
+  totalCount: number
+}) {
+  const chipOptions: { id: LoanListFilter; label: string }[] = [
+    { id: 'active', label: `Active (${activeCount})` },
+    { id: 'all', label: `All (${totalCount})` },
+    { id: 'closed', label: `Closed (${closedCount})` },
+  ]
+  const activeLabel = chipOptions.find(o => o.id === value)?.label ?? chipOptions[0].label
+  return (
+    <FilterChips
+      items={chipOptions.map(o => o.label)}
+      active={activeLabel}
+      onChange={label => {
+        const next = chipOptions.find(o => o.label === label)?.id
+        if (next) onChange(next)
+      }}
+    />
+  )
+}
+
+function LoanStatusField({
+  value,
+  onChange,
+}: {
+  value: LoanStatus
+  onChange: (next: LoanStatus) => void
+}) {
+  return (
+    <FormField label="Status">
+      <select className="form-inp" value={value} onChange={e => onChange(e.target.value === 'Closed' ? 'Closed' : 'Ongoing')}>
+        <option value="Ongoing">Ongoing</option>
+        <option value="Closed">Closed</option>
+      </select>
+    </FormField>
+  )
+}
+
 export default function Loans() {
   const fmt = useFormatMoney()
   const [activeTab, setActiveTab] = useState<LoansTab>('dashboard')
@@ -342,6 +423,9 @@ export default function Loans() {
   const [repayForm, setRepayForm] = useState<PaymentFormState>(emptyPaymentForm())
   const [repayType, setRepayType] = useState<'jewel' | 'cash'>('jewel')
   const [repayEditItem, setRepayEditItem] = useState<CombinedHistoryRow | null>(null)
+  const [emiListFilter, setEmiListFilter] = useState<LoanListFilter>('all')
+  const [jewelListFilter, setJewelListFilter] = useState<LoanListFilter>('all')
+  const [cashListFilter, setCashListFilter] = useState<LoanListFilter>('all')
   const fabStyle = {
     position: 'fixed' as const,
     bottom: 24,
@@ -377,7 +461,7 @@ export default function Loans() {
       ])
 
       setEmiLoans(buildEmiLoans(emiRows))
-      setJewelLoans(buildJewelLoans(jewelRows))
+      setJewelLoans(buildJewelLoansWithHistory(jewelRows, jewelPayments))
       setCashLoans(buildCashLoansWithHistory(cashRows, cashPayments))
       setJewelHistory(jewelPayments)
       setCashHistory(cashPayments)
@@ -410,55 +494,68 @@ export default function Loans() {
     [cashLoans],
   )
 
+  const activeEmiRows = useMemo(() => emiRows.filter(isActiveLoan), [emiRows])
+  const activeJewelRows = useMemo(() => jewelRows.filter(isActiveLoan), [jewelRows])
+  const activeCashRows = useMemo(() => cashRows.filter(isActiveLoan), [cashRows])
+  const activeLoans = useMemo(() => allLoans.filter(isActiveLoan), [allLoans])
+
+  const filteredEmiRows = useMemo(() => filterLoansByListFilter(emiRows, emiListFilter), [emiRows, emiListFilter])
+  const filteredJewelRows = useMemo(() => filterLoansByListFilter(jewelRows, jewelListFilter), [jewelRows, jewelListFilter])
+  const filteredCashRows = useMemo(() => filterLoansByListFilter(cashRows, cashListFilter), [cashRows, cashListFilter])
+
+  const emiClosedCount = emiRows.length - activeEmiRows.length
+  const jewelClosedCount = jewelRows.length - activeJewelRows.length
+  const cashClosedCount = cashRows.length - activeCashRows.length
+  const allClosedCount = allLoans.length - activeLoans.length
+
   const metrics = useMemo(() => {
-    const totalPrincipal = Math.round(allLoans.reduce((sum, loan) => sum + loan.principal, 0))
-    const totalPaid = Math.round(allLoans.reduce((sum, loan) => sum + loan.paid, 0))
+    const totalPrincipal = Math.round(activeLoans.reduce((sum, loan) => sum + loan.principal, 0))
+    const totalPaid = Math.round(activeLoans.reduce((sum, loan) => sum + loan.paid, 0))
     const totalInterest = Math.round(
-      emiRows.reduce((sum, loan) => sum + loan.interest, 0) +
-      jewelRows.reduce((sum, loan) => sum + loan.interest, 0),
+      activeEmiRows.reduce((sum, loan) => sum + loan.interest, 0) +
+      activeJewelRows.reduce((sum, loan) => sum + loan.interest, 0),
     )
-    const totalOutstanding = Math.round(allLoans.reduce((sum, loan) => sum + loan.outstanding, 0))
+    const totalOutstanding = Math.round(activeLoans.reduce((sum, loan) => sum + loan.outstanding, 0))
     return {
       totalPrincipal,
       totalInterest,
       totalLoanAmount: totalPrincipal + totalInterest,
       totalPaid,
       totalOutstanding,
-      loanCount: allLoans.length,
-      emiCount: emiRows.length,
-      jewelCount: jewelRows.length,
-      cashCount: cashRows.length,
+      loanCount: activeLoans.length,
+      emiCount: activeEmiRows.length,
+      jewelCount: activeJewelRows.length,
+      cashCount: activeCashRows.length,
     }
-  }, [allLoans, emiRows, jewelRows, cashRows])
+  }, [activeLoans, activeEmiRows, activeJewelRows, activeCashRows])
 
   const emiMetrics = useMemo(() => {
-    const ongoingLoans = emiRows.filter(l => l.status === 'Ongoing')
-    const totalLoanCount = emiRows.length
-    const totalOutstanding = Math.round(ongoingLoans.reduce((s, l) => {
+    const totalLoanCount = activeEmiRows.length
+    const totalOutstanding = Math.round(activeEmiRows.reduce((s, l) => {
       const totalPayable = l.emi_amount * l.tenure_months
       const totalPaid = l.emi_amount * l.paid_emis
       return s + (totalPayable - totalPaid)
     }, 0))
-    const totalLoanValue = Math.round(emiRows.reduce((s, l) => s + (l.emi_amount * l.tenure_months), 0))
-    const totalMonthlyEmis = Math.round(ongoingLoans.reduce((s, l) => s + l.emi_amount, 0))
+    const totalLoanValue = Math.round(activeEmiRows.reduce((s, l) => s + (l.emi_amount * l.tenure_months), 0))
+    const totalMonthlyEmis = Math.round(activeEmiRows.reduce((s, l) => s + l.emi_amount, 0))
     return { totalLoanCount, totalOutstanding, totalLoanValue, totalMonthlyEmis }
-  }, [emiRows])
+  }, [activeEmiRows])
 
   const filteredHistory = history
 
   const jewelMetrics = useMemo(() => {
-    const totalPrincipal = Math.round(jewelRows.reduce((sum, loan) => sum + loan.principal, 0))
-    const totalInterest = Math.round(jewelRows.reduce((sum, loan) => sum + loan.interest, 0))
-    const totalPaid = Math.round(jewelRows.reduce((sum, loan) => sum + loan.paid, 0))
-    const totalOutstanding = Math.round(jewelRows.reduce((sum, loan) => sum + loan.outstanding, 0))
+    const totalPrincipal = Math.round(activeJewelRows.reduce((sum, loan) => sum + loan.principal, 0))
+    const totalInterest = Math.round(activeJewelRows.reduce((sum, loan) => sum + loan.interest, 0))
+    const totalPaid = Math.round(activeJewelRows.reduce((sum, loan) => sum + loan.paid, 0))
+    const totalOutstanding = Math.round(activeJewelRows.reduce((sum, loan) => sum + loan.outstanding, 0))
     return {
       totalPrincipal,
       totalInterest,
       totalPaid,
       totalOutstanding,
-      count: jewelRows.length,
+      count: activeJewelRows.length,
     }
-  }, [jewelRows])
+  }, [activeJewelRows])
 
   function setEmiField<K extends keyof EmiFormState>(k: K, v: EmiFormState[K]) {
     setEmiForm(f => ({ ...f, [k]: v }))
@@ -484,6 +581,7 @@ export default function Loans() {
       tenure_months: String(loan.tenure_months),
       emi_amount: String(loan.emi_amount),
       paid_emis: String(loan.paid_emis),
+      status: normalizeLoanStatus(loan.status),
     })
     setEmiManuallyEdited(true)
     setEmiDeleteConfirm(false)
@@ -506,6 +604,7 @@ export default function Loans() {
       rate: String(loan.rate),
       start_date: formatDateForInput(loan.startDate),
       end_date: formatDateForInput(loan.endDate),
+      status: normalizeLoanStatus(loan.status),
     })
     setJewelModalOpen(true)
     setJewelDeleteConfirm(false)
@@ -530,7 +629,7 @@ export default function Loans() {
       start_date: jewelForm.start_date,
       end_date: jewelForm.end_date,
       paid_amount: 0,
-      status: 'Ongoing',
+      status: jewelForm.status,
     }
     try {
       if (jewelEditItem) await api.updateJewelLoan({ ...payload, id: jewelEditItem.id })
@@ -573,6 +672,7 @@ export default function Loans() {
       person_name: loan.name,
       amount_received: String(loan.principal),
       start_date: formatDateForInput(loan.startDate),
+      status: normalizeLoanStatus(loan.status),
     })
     setCashModalOpen(true)
     setCashDeleteConfirm(false)
@@ -593,6 +693,7 @@ export default function Loans() {
       person_name: cashForm.person_name.trim(),
       amount_received: parseFloat(cashForm.amount_received),
       start_date: cashForm.start_date,
+      status: cashForm.status,
     }
     try {
       if (cashEditItem) await api.updateCashLoan({ ...payload, id: cashEditItem.id })
@@ -623,9 +724,9 @@ export default function Loans() {
   }
 
   function openRepayment() {
-    const activeLoans = repayType === 'jewel' ? jewelRows : cashLoans
+    const repayLoans = repayType === 'jewel' ? activeJewelRows : activeCashRows
     setRepayForm({
-      loan_id: activeLoans[0]?.id ?? '',
+      loan_id: repayLoans[0]?.id ?? '',
       date: new Date().toISOString().split('T')[0],
       amount: '',
       note: '',
@@ -734,7 +835,7 @@ export default function Loans() {
       tenure_months: parseFloat(emiForm.tenure_months),
       emi_amount: parseFloat(emiForm.emi_amount),
       paid_emis: parseFloat(emiForm.paid_emis) || 0,
-      status: 'Ongoing',
+      status: emiForm.status,
     }
     try {
       if (emiEditItem) await api.updateEmi({ ...payload, id: emiEditItem.id })
@@ -825,7 +926,7 @@ export default function Loans() {
           <SectionBlock
             title="Loans Dashboard"
             icon={<Layers3 size={14} />}
-            right={<SectionChip tone="muted">{metrics.loanCount} loans</SectionChip>}
+            right={<SectionChip tone="muted">{formatLoanCountChip(metrics.loanCount, allClosedCount)}</SectionChip>}
           >
             <KpiGrid>
               <KpiCard label="Total Outstanding" value={<span className="kpi-card-v--red">{fmt(metrics.totalOutstanding)}</span>} tone="red" icon={<ArrowUpRight size={14} />} full />
@@ -835,7 +936,7 @@ export default function Loans() {
               <KpiCard label="Total Paid" value={fmt(metrics.totalPaid)} tone="green" icon={<ArrowDownLeft size={14} />} />
               <KpiCard label="EMI Loans" value={emiMetrics.totalLoanCount} tone="muted" icon={<CreditCard size={14} />} />
               <KpiCard label="Jewel Loans" value={jewelMetrics.count} tone="muted" icon={<Landmark size={14} />} />
-              <KpiCard label="Cash Loans" value={cashLoans.length} tone="muted" icon={<Banknote size={14} />} />
+              <KpiCard label="Cash Loans" value={metrics.cashCount} tone="muted" icon={<Banknote size={14} />} />
             </KpiGrid>
           </SectionBlock>
         )}
@@ -845,13 +946,13 @@ export default function Loans() {
             <SectionBlock
               title="Metrics"
               icon={<BarChart3 size={14} />}
-              right={<SectionChip tone="muted">{emiMetrics.totalLoanCount} loans</SectionChip>}
+              right={<SectionChip tone="muted">{formatLoanCountChip(emiMetrics.totalLoanCount, emiClosedCount)}</SectionChip>}
             >
               <KpiGrid>
                 <KpiCard label="Loan Value" value={fmt(emiMetrics.totalLoanValue)} tone="navy" icon={<CreditCard size={14} />} />
-                <KpiCard label="Principal" value={fmt(emiRows.reduce((sum, loan) => sum + loan.principal, 0))} tone="navy" icon={<CreditCard size={14} />} />
-                <KpiCard label="Interest" value={fmt(emiRows.reduce((sum, loan) => sum + loan.interest, 0))} tone="amber" icon={<Landmark size={14} />} />
-                <KpiCard label="Paid" value={fmt(emiRows.reduce((sum, loan) => sum + (loan.emi_amount * loan.paid_emis), 0))} tone="muted" icon={<Banknote size={14} />} />
+                <KpiCard label="Principal" value={fmt(activeEmiRows.reduce((sum, loan) => sum + loan.principal, 0))} tone="navy" icon={<CreditCard size={14} />} />
+                <KpiCard label="Interest" value={fmt(activeEmiRows.reduce((sum, loan) => sum + loan.interest, 0))} tone="amber" icon={<Landmark size={14} />} />
+                <KpiCard label="Paid" value={fmt(activeEmiRows.reduce((sum, loan) => sum + (loan.emi_amount * loan.paid_emis), 0))} tone="muted" icon={<Banknote size={14} />} />
                 <KpiCard label="Outstanding" value={<span className="kpi-card-v--red">{fmt(emiMetrics.totalOutstanding)}</span>} tone="red" icon={<ArrowUpRight size={14} />} />
                 <KpiCard label="Monthly EMIs" value={fmt(emiMetrics.totalMonthlyEmis)} tone="green" icon={<ArrowDownLeft size={14} />} />
               </KpiGrid>
@@ -860,13 +961,20 @@ export default function Loans() {
             <SectionBlock
               title="EMI Loans"
               icon={<CreditCard size={14} />}
-              right={<SectionChip tone="muted">{emiMetrics.totalLoanCount} loans</SectionChip>}
+              right={<SectionChip tone="muted">{formatLoanCountChip(emiMetrics.totalLoanCount, emiClosedCount)}</SectionChip>}
             >
-              {emiRows.length === 0 ? (
-                <p style={{ color: 'var(--muted)', padding: '0.5rem 0', fontSize: 14 }}>No EMI loans yet.</p>
+              <LoanListFilterBar
+                value={emiListFilter}
+                onChange={setEmiListFilter}
+                activeCount={activeEmiRows.length}
+                closedCount={emiClosedCount}
+                totalCount={emiRows.length}
+              />
+              {filteredEmiRows.length === 0 ? (
+                <p style={{ color: 'var(--muted)', padding: '0.5rem 0', fontSize: 14 }}>No EMI loans match this filter.</p>
               ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 8 }}>
-                  {emiRows.map(loan => {
+                  {filteredEmiRows.map(loan => {
                     const totalPayable = loan.emi_amount * loan.tenure_months
                     const outstanding = totalPayable - loan.emi_amount * loan.paid_emis
                     const paid = loan.emi_amount * loan.paid_emis
@@ -890,6 +998,7 @@ export default function Loans() {
                             <div className="ui-kit-holding-card-subtitle">{loan.bank}</div>
                           </div>
                           <div className="ui-kit-holding-card-head-right">
+                            {loan.status === 'Closed' ? <SectionChip tone="muted">Closed</SectionChip> : null}
                             <div className="ui-kit-holding-icon ui-kit-holding-icon--bg ui-tone-red">
                               <CreditCard size={14} />
                             </div>
@@ -978,7 +1087,7 @@ export default function Loans() {
             <SectionBlock
               title="Metrics"
               icon={<Landmark size={14} />}
-              right={<SectionChip tone="muted">{jewelMetrics.count} loans</SectionChip>}
+              right={<SectionChip tone="muted">{formatLoanCountChip(jewelMetrics.count, jewelClosedCount)}</SectionChip>}
             >
               <KpiGrid>
                 <KpiCard label="Principal" value={fmt(jewelMetrics.totalPrincipal)} tone="navy" icon={<CreditCard size={14} />} />
@@ -991,13 +1100,20 @@ export default function Loans() {
             <SectionBlock
               title="Jewel Loans"
               icon={<Landmark size={14} />}
-              right={<SectionChip tone="muted">{jewelMetrics.count} loans</SectionChip>}
+              right={<SectionChip tone="muted">{formatLoanCountChip(jewelMetrics.count, jewelClosedCount)}</SectionChip>}
             >
-              {jewelRows.length === 0 ? (
-                <p style={{ color: 'var(--muted)', padding: '0.5rem 0', fontSize: 14 }}>No loans yet.</p>
+              <LoanListFilterBar
+                value={jewelListFilter}
+                onChange={setJewelListFilter}
+                activeCount={activeJewelRows.length}
+                closedCount={jewelClosedCount}
+                totalCount={jewelRows.length}
+              />
+              {filteredJewelRows.length === 0 ? (
+                <p style={{ color: 'var(--muted)', padding: '0.5rem 0', fontSize: 14 }}>No loans match this filter.</p>
               ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 8 }}>
-                  {jewelRows.map(loan => {
+                  {filteredJewelRows.map(loan => {
                     const jewelLoan = loan as Extract<CombinedLoan, { kind: 'Jewel' }>
                     const totalPayable = jewelLoan.principal + jewelLoan.interest
                     return (
@@ -1019,6 +1135,7 @@ export default function Loans() {
                             <div className="ui-kit-holding-card-subtitle">{jewelLoan.bank}</div>
                           </div>
                           <div className="ui-kit-holding-card-head-right">
+                            {jewelLoan.status === 'Closed' ? <SectionChip tone="muted">Closed</SectionChip> : null}
                             <div className="ui-kit-holding-icon ui-kit-holding-icon--bg ui-tone-amber">
                               <Landmark size={14} />
                             </div>
@@ -1075,26 +1192,33 @@ export default function Loans() {
             <SectionBlock
               title="Metrics"
               icon={<Banknote size={14} />}
-              right={<SectionChip tone="muted">{cashLoans.length} loans</SectionChip>}
+              right={<SectionChip tone="muted">{formatLoanCountChip(activeCashRows.length, cashClosedCount)}</SectionChip>}
             >
               <KpiGrid>
-                <KpiCard label="Principal" value={fmt(cashLoans.reduce((sum, loan) => sum + loan.principal, 0))} tone="navy" icon={<Banknote size={14} />} />
-                <KpiCard label="Paid" value={fmt(cashLoans.reduce((sum, loan) => sum + loan.paid, 0))} tone="green" icon={<ArrowDownLeft size={14} />} />
-                <KpiCard label="Outstanding" value={<span className="kpi-card-v--red">{fmt(cashLoans.reduce((sum, loan) => sum + loan.outstanding, 0))}</span>} tone="red" icon={<ArrowUpRight size={14} />} />
-                <KpiCard label="Loans" value={cashLoans.length} tone="muted" icon={<CreditCard size={14} />} />
+                <KpiCard label="Principal" value={fmt(activeCashRows.reduce((sum, loan) => sum + loan.principal, 0))} tone="navy" icon={<Banknote size={14} />} />
+                <KpiCard label="Paid" value={fmt(activeCashRows.reduce((sum, loan) => sum + loan.paid, 0))} tone="green" icon={<ArrowDownLeft size={14} />} />
+                <KpiCard label="Outstanding" value={<span className="kpi-card-v--red">{fmt(activeCashRows.reduce((sum, loan) => sum + loan.outstanding, 0))}</span>} tone="red" icon={<ArrowUpRight size={14} />} />
+                <KpiCard label="Loans" value={activeCashRows.length} tone="muted" icon={<CreditCard size={14} />} />
               </KpiGrid>
             </SectionBlock>
 
             <SectionBlock
               title="Cash Loans"
               icon={<Banknote size={14} />}
-              right={<SectionChip tone="muted">{cashLoans.length} loans</SectionChip>}
+              right={<SectionChip tone="muted">{formatLoanCountChip(activeCashRows.length, cashClosedCount)}</SectionChip>}
             >
-              {cashLoans.length === 0 ? (
-                <p style={{ color: 'var(--muted)', padding: '0.5rem 0', fontSize: 14 }}>No loans yet.</p>
+              <LoanListFilterBar
+                value={cashListFilter}
+                onChange={setCashListFilter}
+                activeCount={activeCashRows.length}
+                closedCount={cashClosedCount}
+                totalCount={cashRows.length}
+              />
+              {filteredCashRows.length === 0 ? (
+                <p style={{ color: 'var(--muted)', padding: '0.5rem 0', fontSize: 14 }}>No loans match this filter.</p>
               ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 8 }}>
-                  {cashLoans.map(loan => {
+                  {filteredCashRows.map(loan => {
                     const cashLoan = loan as Extract<CombinedLoan, { kind: 'Cash' }>
                     return (
                       <div
@@ -1115,6 +1239,7 @@ export default function Loans() {
                             <div className="ui-kit-holding-card-subtitle">Cash Loan</div>
                           </div>
                           <div className="ui-kit-holding-card-head-right">
+                            {cashLoan.status === 'Closed' ? <SectionChip tone="muted">Closed</SectionChip> : null}
                             <div className="ui-kit-holding-icon ui-kit-holding-icon--bg ui-tone-green">
                               <Banknote size={14} />
                             </div>
@@ -1217,6 +1342,9 @@ export default function Loans() {
             <FormField label="Paid EMIs">
               <input className="form-inp" type="number" min="0" step="1" placeholder="0" value={emiForm.paid_emis} onChange={e => setEmiField('paid_emis', e.target.value)} />
             </FormField>
+            {emiEditItem ? (
+              <LoanStatusField value={emiForm.status} onChange={status => setEmiField('status', status)} />
+            ) : null}
           </div>
         </ModalShell>
       )}
@@ -1247,6 +1375,9 @@ export default function Loans() {
             <FormField label="Rate"><input className="form-inp" type="number" value={jewelForm.rate} onChange={e => setJewelForm(f => ({ ...f, rate: e.target.value }))} /></FormField>
             <FormField label="Start Date"><input className="form-inp" type="date" value={jewelForm.start_date} onChange={e => setJewelForm(f => ({ ...f, start_date: e.target.value }))} /></FormField>
             <FormField label="End Date"><input className="form-inp" type="date" value={jewelForm.end_date} onChange={e => setJewelForm(f => ({ ...f, end_date: e.target.value }))} /></FormField>
+            {jewelEditItem ? (
+              <LoanStatusField value={jewelForm.status} onChange={status => setJewelForm(f => ({ ...f, status }))} />
+            ) : null}
           </div>
         </ModalShell>
       )}
@@ -1274,6 +1405,9 @@ export default function Loans() {
             <FormField label="Person Name"><input className="form-inp" value={cashForm.person_name} onChange={e => setCashForm(f => ({ ...f, person_name: e.target.value }))} /></FormField>
             <FormField label="Amount Received"><input className="form-inp" type="number" value={cashForm.amount_received} onChange={e => setCashForm(f => ({ ...f, amount_received: e.target.value }))} /></FormField>
             <FormField label="Start Date"><input className="form-inp" type="date" value={cashForm.start_date} onChange={e => setCashForm(f => ({ ...f, start_date: e.target.value }))} /></FormField>
+            {cashEditItem ? (
+              <LoanStatusField value={cashForm.status} onChange={status => setCashForm(f => ({ ...f, status }))} />
+            ) : null}
           </div>
         </ModalShell>
       )}
@@ -1306,7 +1440,7 @@ export default function Loans() {
                   onChange={e => {
                     const nextType = e.target.value === 'cash' ? 'cash' : 'jewel'
                     setRepayType(nextType)
-                    const nextLoans = nextType === 'jewel' ? jewelRows : cashLoans
+                    const nextLoans = nextType === 'jewel' ? activeJewelRows : activeCashRows
                     setRepayForm(f => ({ ...f, loan_id: nextLoans[0]?.id ?? '' }))
                   }}
                 >
@@ -1323,7 +1457,10 @@ export default function Loans() {
                 disabled={Boolean(repayEditItem)}
               >
                 <option value="">Select loan</option>
-                {(repayType === 'jewel' ? jewelRows : cashLoans).map(loan => (
+                {(repayEditItem
+                  ? (repayType === 'jewel' ? jewelRows : cashRows)
+                  : (repayType === 'jewel' ? activeJewelRows : activeCashRows)
+                ).map(loan => (
                   <option key={loan.id} value={loan.id}>{loan.name}</option>
                 ))}
               </select>
