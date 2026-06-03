@@ -213,7 +213,15 @@ export function VaultBankingPage() {
     ['MPIN', detail?.mpin],
   ].filter(([, value]) => String(value || '').trim().length > 0) as Array<[string, string]>
 
-  const copyableLabels = new Set(['Username', 'Password', 'Transaction Password', 'Profile Password', 'MPIN'])
+  const copyableLabels = new Set([
+    'Account No.',
+    'IFSC',
+    'Username',
+    'Password',
+    'Transaction Password',
+    'Profile Password',
+    'MPIN',
+  ])
 
   return (
     <div className="ui-kit-page-shell" style={{ paddingTop: 0 }}>

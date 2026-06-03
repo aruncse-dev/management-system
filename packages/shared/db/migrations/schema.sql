@@ -148,7 +148,8 @@ CREATE TABLE "cash_loans" (
 	"person_name" text NOT NULL,
 	"amount_received" numeric(12, 2) NOT NULL,
 	"start_date" date NOT NULL,
-	"paid_amount" numeric(12, 2) DEFAULT '0' NOT NULL
+	"paid_amount" numeric(12, 2) DEFAULT '0' NOT NULL,
+	"status" text DEFAULT 'Ongoing' NOT NULL
 );
 
 CREATE TABLE "emi_loans" (

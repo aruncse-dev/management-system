@@ -43,6 +43,7 @@ export const cashLoans = pgTable('cash_loans', {
   amountReceived: numeric('amount_received', { precision: 12, scale: 2 }).notNull(),
   startDate: date('start_date').notNull(),
   paidAmount: numeric('paid_amount', { precision: 12, scale: 2 }).default('0').notNull(),
+  status: text('status').default('Ongoing').notNull(),
 })
 
 export const cashLoanRepayments = pgTable('cash_loan_repayments', {

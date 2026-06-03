@@ -189,6 +189,7 @@ export interface RawCashLoanRow {
   amount_received: number | string;
   start_date: string;
   paid_amount: number | string;
+  status?: string;
 }
 
 export interface RawCashLoanHistoryRow {

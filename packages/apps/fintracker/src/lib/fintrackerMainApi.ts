@@ -592,7 +592,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
               start_date: String(r.startDate),
               end_date: r.endDate ? String(r.endDate) : '',
               paid_amount: r.paidAmount,
-              status: r.status ?? '',
+              status: r.status || 'Ongoing',
             })),
           )
         }
@@ -606,6 +606,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
               amount_received: r.amountReceived,
               start_date: String(r.startDate),
               paid_amount: r.paidAmount,
+              status: r.status || 'Ongoing',
             })),
           )
         }
@@ -623,7 +624,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
               tenure_months: r.tenureMonths,
               emi_amount: r.emiAmount,
               paid_emis: r.paidEmis,
-              status: r.status ?? '',
+              status: r.status || 'Ongoing',
             })),
           )
         }
@@ -1119,6 +1120,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
             amountReceived: String(num(body.amount_received as string | number)),
             startDate: String(body.start_date ?? new Date().toISOString().slice(0, 10)),
             paidAmount: String(num(body.paid_amount as string | number)),
+            status: typeof body.status === 'string' ? body.status : 'Ongoing',
           })
           return ok(res, id, traceId)
         }
@@ -1132,6 +1134,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
               amountReceived: body.amount_received !== undefined ? String(num(body.amount_received as string | number)) : undefined,
               startDate: typeof body.start_date === 'string' ? body.start_date : undefined,
               paidAmount: body.paid_amount !== undefined ? String(num(body.paid_amount as string | number)) : undefined,
+              status: typeof body.status === 'string' ? body.status : undefined,
             })
             .where(and(whereOrgFilter(cashLoans, budgetScope), eq(cashLoans.id, id)))
           return ok(res, true, traceId)
