@@ -12,7 +12,6 @@ export interface Transaction {
   notes: string;
   /** When `t === 'Transfer'`, destination side (`m` is source). Legacy rows may omit this and use `notes` `→…` only. */
   transferTo?: string;
-  transferToId?: string;
   _k?: number;
 }
 
@@ -66,5 +65,4 @@ export interface TransactionForm {
   mId?: string;
   notes: string;
   toAcct?: string;
-  toAcctId?: string;
 }

@@ -76,9 +76,7 @@ CREATE TABLE "transactions" (
 	"category_id" text,
 	"type" text NOT NULL,
 	"mode" text,
-	"payment_source_id" text,
 	"transfer_to" text,
-	"transfer_to_id" text,
 	"notes" text,
 	"month_year" text NOT NULL
 );
