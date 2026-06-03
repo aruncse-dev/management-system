@@ -54,12 +54,14 @@ Examples:
 
 ## Tags / releases
 
-Pushing tags directly to `main` is allowed:
+Release tags use **UTC calendar dates**: `vYYYYMMDD` (e.g. `v20260604`). One tag per day; package.json semver (`pnpm release:bump`) is separate from the git tag.
 
 ```bash
-git tag v1.4.0
-git push origin v1.4.0
+# On main after merge (optional: pnpm release:bump patch for app package versions)
+pnpm release:tag --push
 ```
+
+GitHub Actions (`.github/workflows/release.yml`) publishes the release when the date tag is pushed.
 
 ---
 

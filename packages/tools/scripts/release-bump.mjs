@@ -50,4 +50,4 @@ for (const p of PKG_PATHS) {
   console.log(`  updated ${p.replace(root + '/', '')}`)
 }
 
-console.log('\nNext: commit the version bump, merge to main, then: pnpm release:tag [--push]')
+console.log('\nNext: commit the version bump on main, then: pnpm release:tag [--push]  (creates vYYYYMMDD tag)')

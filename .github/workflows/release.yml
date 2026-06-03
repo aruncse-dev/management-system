@@ -1,11 +1,11 @@
-# Publishes a GitHub Release when a semver tag vX.Y.Z is pushed.
-# Create the tag from main after merging: pnpm release:tag --push
+# Publishes a GitHub Release when a date tag vYYYYMMDD is pushed.
+# From main after merge: pnpm release:tag --push
 name: Release
 
 on:
   push:
     tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v20[0-9][0-9][0-9][0-9][0-9][0-9]'
 
 permissions:
   contents: write
