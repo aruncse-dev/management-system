@@ -449,7 +449,10 @@ export type LoanOutstanding = {
   id: string
   name: string
   kind: 'emi' | 'jewel' | 'cash'
+  /** Total still payable to term — principal plus all future contracted interest. */
   outstanding: number
+  /** Principal only. This is the basis every payoff/amortization figure uses. */
+  principalOutstanding: number
   annualRate: number
   monthlyPayment: number
 }

@@ -160,6 +160,12 @@ export type PortfolioSyncResult = {
   count: number
   syncedAt: string
   providers: string[]
+  /**
+   * Providers that answered with no holdings at all. The wipe is refused in
+   * that case (see `syncStockHoldings`), so these are reported rather than
+   * counted as a clean sync of zero.
+   */
+  emptyProviders?: string[]
 }
 
 export type PortfolioSyncAllResult = {
@@ -281,6 +287,7 @@ export async function syncOrgStocksFromIntegrations(orgId: string): Promise<Port
   let total = 0
   let lastSynced = new Date()
   const syncedProviders: string[] = []
+  const emptyProviders: string[] = []
 
   for (const entry of enabled) {
     if (!entry.actions.syncStocks) continue
@@ -291,10 +298,11 @@ export async function syncOrgStocksFromIntegrations(orgId: string): Promise<Port
 
     try {
       const rows = await fetchStockRowsForProvider(orgId, entry.slug, provider)
-      const { count, syncedAt } = await syncStockHoldings(db, orgId, entry.slug, rows)
+      const { count, syncedAt, skippedEmpty } = await syncStockHoldings(db, orgId, entry.slug, rows)
       total += count
       lastSynced = syncedAt
-      syncedProviders.push(entry.slug)
+      if (skippedEmpty) emptyProviders.push(entry.slug)
+      else syncedProviders.push(entry.slug)
       await markOrgIntegrationSync(orgId, entry.slug)
     } catch (e) {
       const { status, msg } = integrationHttpError(e)
@@ -308,7 +316,12 @@ export async function syncOrgStocksFromIntegrations(orgId: string): Promise<Port
     }
   }
 
-  return { count: total, syncedAt: lastSynced.toISOString(), providers: syncedProviders }
+  return {
+    count: total,
+    syncedAt: lastSynced.toISOString(),
+    providers: syncedProviders,
+    emptyProviders,
+  }
 }
 
 export async function syncOrgMutualFundsFromIntegrations(orgId: string): Promise<PortfolioSyncResult> {
@@ -317,6 +330,7 @@ export async function syncOrgMutualFundsFromIntegrations(orgId: string): Promise
   let total = 0
   let lastSynced = new Date()
   const syncedProviders: string[] = []
+  const emptyProviders: string[] = []
 
   for (const entry of enabled) {
     if (!entry.actions.syncMutualFunds) continue
@@ -327,10 +341,16 @@ export async function syncOrgMutualFundsFromIntegrations(orgId: string): Promise
 
     try {
       const rows = await fetchMutualFundRowsForProvider(orgId, entry.slug, provider)
-      const { count, syncedAt } = await syncMutualFundHoldings(db, orgId, entry.slug, rows)
+      const { count, syncedAt, skippedEmpty } = await syncMutualFundHoldings(
+        db,
+        orgId,
+        entry.slug,
+        rows,
+      )
       total += count
       lastSynced = syncedAt
-      syncedProviders.push(entry.slug)
+      if (skippedEmpty) emptyProviders.push(entry.slug)
+      else syncedProviders.push(entry.slug)
       await markOrgIntegrationSync(orgId, entry.slug)
     } catch (e) {
       const { status, msg } = integrationHttpError(e)
@@ -344,7 +364,12 @@ export async function syncOrgMutualFundsFromIntegrations(orgId: string): Promise
     }
   }
 
-  return { count: total, syncedAt: lastSynced.toISOString(), providers: syncedProviders }
+  return {
+    count: total,
+    syncedAt: lastSynced.toISOString(),
+    providers: syncedProviders,
+    emptyProviders,
+  }
 }
 
 /** Sync stocks + mutual funds from every enabled integration with holdings endpoints. */
