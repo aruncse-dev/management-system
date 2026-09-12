@@ -12,6 +12,10 @@ export interface Transaction {
   notes: string;
   /** When `t === 'Transfer'`, destination side (`m` is source). Legacy rows may omit this and use `notes` `→…` only. */
   transferTo?: string;
+  /** Module this row is mirrored into (`emi_loan`, `jewel_loan`, `cash_loan`, …). */
+  refKind?: string;
+  /** Target row id for `refKind`. May dangle — the target can be deleted. */
+  refId?: string;
   _k?: number;
 }
 
@@ -65,4 +69,6 @@ export interface TransactionForm {
   mId?: string;
   notes: string;
   toAcct?: string;
+  /** Selected link as `kind:id`; empty string means unlinked. */
+  ref?: string;
 }

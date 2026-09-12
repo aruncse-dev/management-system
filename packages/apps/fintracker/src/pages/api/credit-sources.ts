@@ -5,6 +5,7 @@ import type { FtSessionData } from '@fintracker-vault/auth'
 import { paymentSources, getDb } from '@fintracker-vault/db'
 import { dbApiErrorMessage } from '../../lib/dbApiErrorMessage'
 import { getSessionOptions } from '../../lib/session'
+import { cascadePaymentSourceRename, countPaymentSourceReferences, paymentSourceNameTaken } from '../../lib/paymentSourceReferences'
 
 type ApiOk<T> = { ok: true; data: T }
 type ApiErr = { ok: false; error: string }
@@ -58,6 +59,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!CATEGORY.has(sourceType)) return fail(res, 400, 'Invalid category')
     const description = body.description != null ? String(body.description) : null
     const sortOrder = typeof body.sortOrder === 'number' ? body.sortOrder : Number(body.sortOrder) || 0
+    if (await paymentSourceNameTaken(db, orgId, name, '')) {
+      return fail(res, 409, `Another payment source is already called “${name}”. Transactions match their source by name, so two with the same name cannot be told apart.`)
+    }
     const id = crypto.randomUUID()
     await db.insert(paymentSources).values({
       id,
@@ -76,12 +80,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const body = typeof req.body === 'object' && req.body ? (req.body as Record<string, unknown>) : {}
     const id = typeof body.id === 'string' ? body.id : ''
     if (!id) return fail(res, 400, 'Missing id')
+    const [prev] = await db
+      .select()
+      .from(paymentSources)
+      .where(
+        and(
+          eq(paymentSources.id, id),
+          orgId ? eq(paymentSources.orgId, orgId) : isNull(paymentSources.orgId),
+          inArray(paymentSources.sourceType, ['credit_card', 'informal'])
+        ),
+      )
+      .limit(1)
+    if (!prev) return fail(res, 404, 'Not found')
     const name = String(body.name ?? '').trim()
     if (!name) return fail(res, 400, 'Name required')
     const sourceType = String(body.category ?? '')
     if (!CATEGORY.has(sourceType)) return fail(res, 400, 'Invalid category')
     const description = body.description != null ? String(body.description) : null
     const sortOrder = typeof body.sortOrder === 'number' ? body.sortOrder : Number(body.sortOrder) || 0
+    if (await paymentSourceNameTaken(db, orgId, name, id)) {
+      return fail(res, 409, `Another payment source is already called “${name}”. Transactions match their source by name, so two with the same name cannot be told apart.`)
+    }
     await db
       .update(paymentSources)
       .set({
@@ -98,12 +117,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           inArray(paymentSources.sourceType, ['credit_card', 'informal'])
         ),
       )
-    return ok(res, { id })
+    // Transactions name their source rather than pointing at its id, so the
+    // rename has to be carried through or every existing row unlinks.
+    const moved = await cascadePaymentSourceRename(db, orgId, prev.name, name)
+    return ok(res, { id, renamedRows: moved })
   }
 
   if (req.method === 'DELETE') {
     const id = typeof req.query.id === 'string' ? req.query.id : ''
     if (!id) return fail(res, 400, 'Missing id')
+    const [existing] = await db
+      .select()
+      .from(paymentSources)
+      .where(
+        and(
+          eq(paymentSources.id, id),
+          orgId ? eq(paymentSources.orgId, orgId) : isNull(paymentSources.orgId),
+          inArray(paymentSources.sourceType, ['credit_card', 'informal'])
+        ),
+      )
+      .limit(1)
+    if (!existing) return fail(res, 404, 'Not found')
+    // Nothing points back at a credit source, so deleting one used to strand its
+    // history silently. Refuse and say what is in the way.
+    const refs = await countPaymentSourceReferences(db, orgId, existing.name)
+    if (refs > 0) {
+      return fail(
+        res,
+        409,
+        `“${existing.name}” is used by ${refs} ${refs === 1 ? 'entry' : 'entries'}. Mark it inactive instead, or move those entries first.`,
+      )
+    }
     await db
       .delete(paymentSources)
       .where(

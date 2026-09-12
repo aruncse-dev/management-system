@@ -39,7 +39,8 @@ export type MenuCatalogSeedRow = {
  */
 export const MENU_CATALOG_SEED: MenuCatalogSeedRow[] = [
   // FinTracker
-  { id: 'dashboard', slug: 'dashboard', label: 'Monthly Expenses', icon: 'CalendarDays', path: '/monthly?tab=dash', sectionId: 'overview', sortOrder: 0, appSlugs: ['fintracker'] },
+  { id: 'overview', slug: 'overview', label: 'Overview', icon: 'Scale', path: '/overview', sectionId: 'overview', sortOrder: 0, appSlugs: ['fintracker'] },
+  { id: 'dashboard', slug: 'dashboard', label: 'Monthly Expenses', icon: 'CalendarDays', path: '/monthly?tab=dash', sectionId: 'overview', sortOrder: 1, appSlugs: ['fintracker'] },
   { id: 'budget', slug: 'budget', label: 'Budget', icon: 'Wallet', path: '/monthly?tab=bud', sectionId: 'monthly', sortOrder: 0, appSlugs: ['fintracker'] },
   { id: 'transactions', slug: 'transactions', label: 'Transactions', icon: 'List', path: '/monthly?tab=txns', sectionId: 'monthly', sortOrder: 1, appSlugs: ['fintracker'] },
   { id: 'credits', slug: 'credits', label: 'Credits', icon: 'CreditCard', path: '/monthly?tab=cc', sectionId: 'monthly', sortOrder: 2, appSlugs: ['fintracker'] },

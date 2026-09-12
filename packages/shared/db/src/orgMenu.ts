@@ -46,6 +46,28 @@ export async function setOrgEnabledMenuIds(
     .where(eq(organizations.id, orgId))
 }
 
+
+/**
+ * Menus that ride along with another enabled menu, so they need no separate
+ * `enabled_menus` entry.
+ *
+ * `overview` is the portfolio-wide companion to `dashboard` (Monthly Expenses):
+ * it reads the same finance data, so any org that tracks monthly expenses
+ * should see it without an extra admin toggle.
+ */
+const MENU_COMPANIONS: Record<string, string[]> = {
+  dashboard: ['overview'],
+}
+
+/** Expand an org's enabled set with any companion menus it implies. */
+function withCompanions(enabled: Set<string>): Set<string> {
+  const out = new Set(enabled)
+  for (const id of enabled) {
+    for (const companion of MENU_COMPANIONS[id] ?? []) out.add(companion)
+  }
+  return out
+}
+
 export type ResolvedMenuItem = {
   id: string
   slug: string
@@ -60,9 +82,10 @@ export type ResolvedMenuItem = {
 /** Get enabled menus for an org and app (from static data + org config). */
 export async function getEnabledOrgMenu(orgId: string, appSlug: string): Promise<ResolvedMenuItem[]> {
   const menuConfig = await getOrgMenuConfig(orgId)
-  const enabledMenuIds = new Set(menuConfig[appSlug] ?? [])
+  const configured = new Set(menuConfig[appSlug] ?? [])
 
-  if (enabledMenuIds.size === 0) return []
+  if (configured.size === 0) return []
+  const enabledMenuIds = withCompanions(configured)
 
   const appMenus = STATIC_MENUS[appSlug as AppSlug]
   if (!appMenus) return []

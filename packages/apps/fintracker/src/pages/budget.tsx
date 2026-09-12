@@ -1,16 +1,23 @@
 import { useState, useMemo } from 'react'
 import { Pencil, Trash2, X as XIcon, AlertTriangle, Package } from 'lucide-react'
 import { useStore } from '../store'
-import { budgetAppliesToLabelMonth } from '../expenseCycle'
+import { budgetAppliesToLabelMonth, budgetMonthRange } from '../expenseCycle'
 import { catMap, budgetSummary, monthYearApiKey } from '../utils'
 import { useMoneyFormatting } from '../hooks/useFormatMoney'
 import { BUDGET_GLOBAL_MONTH_KEY, MNS } from '../config'
 import { api } from '../api'
 import { BudgetMonthRangeFields } from '../components/BudgetMonthRangeFields'
 import { CatIcon } from '../ui'
-import { KpiCard, KpiGrid, SectionBlock, UiCard } from '../ui'
+import { InfoCallout, KpiCard, KpiGrid, SearchField, SectionBlock, SectionChip, UiCard } from '../ui'
 
 interface Props { showStatus: (msg: string) => void; onCategoryClick: (cat: string) => void }
+
+/** `2026-06` → `Jun 2026`. The raw key is a storage detail, not a label. */
+function monthKeyLabel(key: string): string {
+  const [y, m] = key.split('-')
+  const idx = Number(m) - 1
+  return MNS[idx] ? `${MNS[idx]} ${y}` : key
+}
 
 type ModalMode = 'add' | 'edit' | 'delete' | null
 interface ModalState { mode: ModalMode; id: string; cat: string; val: string; startMonth: string | null; endMonth: string | null }
@@ -20,16 +27,48 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
   const { format: fmt, currency, zeroPlaceholder } = useMoneyFormatting()
   const { budget, rows, month, year } = state
   const cm = catMap(rows, budget)
-  const { totalBudget, totalSpent, ovCount, totalOver } = budgetSummary(budget, cm)
   const viewMonthKey = monthYearApiKey(month, year)
   const listed = budget.filter(
     e => e.name.trim() && budgetAppliesToLabelMonth(e, viewMonthKey),
   )
+  // Summarise the rows actually on screen. This used to total the *unfiltered*
+  // `budget`, so the KPI counted budgets that do not apply to the displayed
+  // month — disagreeing both with the rows beneath it and with the dashboard,
+  // which has always filtered.
+  const { totalBudget, totalSpent, ovCount, totalOver } = budgetSummary(listed, cm)
   const [modal, setModal] = useState<ModalState>({ mode: null, id: '', cat: '', val: '', startMonth: null, endMonth: null })
   const [saving, setSaving] = useState(false)
   const [catSheet, setCatSheet] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const remaining = totalBudget - totalSpent
+
+  const filtered = useMemo(
+    () => listed.filter(e => e.name.toLowerCase().includes(search.toLowerCase())),
+    [listed, search],
+  )
+  /**
+   * Two groups, not one list of 38. The top of the page should be the lines that
+   * need a decision; everything healthy sorts below it.
+   */
+  const GROUPS = useMemo(() => {
+    const needs = filtered
+      .filter(e => (cm[e.name] || 0) > e.amount || e.amount <= 0)
+      .sort((a, b) => ((cm[b.name] || 0) - b.amount) - ((cm[a.name] || 0) - a.amount))
+    const ok = filtered
+      .filter(e => !needs.includes(e))
+      .sort((a, b) => (cm[b.name] || 0) - (cm[a.name] || 0))
+    return [
+      { key: 'needs', title: 'Needs attention', icon: <AlertTriangle size={14} />, rows: needs },
+      { key: 'ok', title: 'On track', icon: <Package size={14} />, rows: ok },
+    ]
+  }, [filtered, cm])
+
+  /** Same name budgeted twice in one cycle inflates the total silently. */
+  const duplicateNames = useMemo(() => {
+    const seen = new Map<string, number>()
+    for (const e of listed) seen.set(e.name, (seen.get(e.name) || 0) + 1)
+    return [...seen.entries()].filter(([, n]) => n > 1).map(([n]) => n)
+  }, [listed])
 
   const monthOptions = useMemo(() => {
     const now = new Date(parseInt(year, 10), MNS.indexOf(month as any))
@@ -111,40 +150,50 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
         </KpiGrid>
       </SectionBlock>
 
-      {/* Search */}
-      <div style={{position:'relative'}}>
-        <input
-          className="form-inp"
-          style={{paddingRight:32,fontSize:14}}
-          placeholder="Search categories..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
-        {search && (
-          <button className="icon-btn" style={{position:'absolute',right:6,top:'50%',transform:'translateY(-50%)'}}
-            onClick={() => setSearch('')}><XIcon size={14} /></button>
-        )}
-      </div>
+      <SearchField
+        value={search}
+        placeholder="Search categories"
+        onChange={setSearch}
+        onClear={() => setSearch('')}
+      />
 
-      <SectionBlock title="Categories" icon={<AlertTriangle size={14} />}>
+      {duplicateNames.length ? (
+        <InfoCallout title="Duplicate budget lines" tone="amber">
+          {duplicateNames.join(', ')} {duplicateNames.length === 1 ? 'has' : 'have'} more than one
+          active line this cycle. Spend counts once but the budget counts every line, so the total
+          above is higher than intended.
+        </InfoCallout>
+      ) : null}
+
+      {GROUPS.map(({ key, title, icon, rows: groupRows }) => groupRows.length ? (
+      <SectionBlock
+        key={key}
+        title={title}
+        icon={icon}
+        right={<SectionChip>{groupRows.length}</SectionChip>}
+      >
         <div className="budget-list">
-        {listed.filter(e => e.name.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>(cm[b.name]||0)-(cm[a.name]||0)).map(({ id, name: cat, amount: budg, monthYear: budMy, startMonth, endMonth }) => {
+        {groupRows.map(({ id, name: cat, amount: budg, monthYear: budMy, startMonth, endMonth }) => {
           const spent = cm[cat] || 0
           const over = spent > budg
           const rowRemaining = budg - spent
           const pct = budg > 0 ? (spent / budg) * 100 : 0
           const status = over ? 'OVER' : pct >= 90 ? 'CRITICAL' : pct >= 75 ? 'NEAR' : 'OK'
           const badgeClass = over ? 'budget-badge over' : pct >= 90 ? 'budget-badge critical' : pct >= 75 ? 'budget-badge near' : 'budget-badge ok'
-          let dateRangeBadge = null
-          if (startMonth && endMonth && startMonth === endMonth) {
-            dateRangeBadge = `${startMonth}`
-          } else if (startMonth && !endMonth) {
-            dateRangeBadge = `From ${startMonth}`
-          } else if (!startMonth && endMonth) {
-            dateRangeBadge = `Until ${endMonth}`
-          } else if (startMonth && endMonth) {
-            dateRangeBadge = `${startMonth} to ${endMonth}`
-          }
+          // Read through `budgetMonthRange` so a legacy `monthYear`-only row
+          // gets a badge too, and label the months rather than printing the raw
+          // `2026-06` key at the user.
+          const range = budgetMonthRange({ monthYear: budMy, startMonth: startMonth ?? null, endMonth: endMonth ?? null })
+          const dateRangeBadge =
+            range.start && range.end && range.start === range.end
+              ? monthKeyLabel(range.start)
+              : range.start && !range.end
+                ? `From ${monthKeyLabel(range.start)}`
+                : !range.start && range.end
+                  ? `Until ${monthKeyLabel(range.end)}`
+                  : range.start && range.end
+                    ? `${monthKeyLabel(range.start)} – ${monthKeyLabel(range.end)}`
+                    : null
           return (
             <UiCard
               key={id}
@@ -180,10 +229,12 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
             </UiCard>
           )
         })}
-        {!listed.length && <div className="lb">No budget categories. Click "+ Add".</div>}
-        {listed.length > 0 && !listed.filter(e => e.name.toLowerCase().includes(search.toLowerCase())).length && <div className="lb">No matching categories.</div>}
         </div>
       </SectionBlock>
+      ) : null)}
+
+      {!listed.length && <div className="lb">No budget categories. Click "+ Add".</div>}
+      {listed.length > 0 && !filtered.length && <div className="lb">No matching categories.</div>}
 
       {/* Modal */}
       <div className={`modal-bg ${modal.mode ? 'open' : ''}`} onClick={closeModal}>

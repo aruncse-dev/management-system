@@ -12,6 +12,28 @@ export function stripTrailingSlash(p: string): string {
   return p
 }
 
+/** Re-issue the cookie at most once a day so the 7-day window follows activity. */
+const SESSION_SLIDE_AFTER_MS = 24 * 60 * 60 * 1000
+
+/**
+ * Extend a live session on use.
+ *
+ * The cookie has a fixed 7-day `maxAge` and nothing ever re-issued it, so a
+ * daily user was still signed out every seventh day. Saving on each request
+ * would rewrite the cookie on every asset fetch, so we only re-save once the
+ * stamp is a day old.
+ */
+async function slideSession(session: FtSessionData & { save: () => Promise<void> }): Promise<void> {
+  const last = typeof session.authedAt === 'number' ? session.authedAt : 0
+  if (Date.now() - last < SESSION_SLIDE_AFTER_MS) return
+  session.authedAt = Date.now()
+  try {
+    await session.save()
+  } catch {
+    // A failed refresh must never break the request; the old cookie still works.
+  }
+}
+
 export function defaultIsPublicPath(pathname: string): boolean {
   if (pathname === '/') return true
   if (pathname.startsWith('/api/auth/')) return true
@@ -128,16 +150,22 @@ export function createFtMiddleware(options: CreateFtMiddlewareOptions) {
       if (!session.email) {
         return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
       }
+      await slideSession(session)
       return res
     }
 
     if (!session.email) {
       const url = request.nextUrl.clone()
       url.pathname = '/'
-      url.search = ''
+      // Keep where they were headed so an expiry doesn't also lose their place.
+      url.search =
+        pathnameRaw && pathnameRaw !== '/'
+          ? `?next=${encodeURIComponent(pathnameRaw + request.nextUrl.search)}`
+          : ''
       return NextResponse.redirect(url)
     }
 
+    await slideSession(session)
     return res
   }
 }

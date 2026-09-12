@@ -189,7 +189,19 @@ export function acctFlows(
   return result
 }
 
-export function currentMonthYear() {
+/**
+ * The cycle label that "today" falls in.
+ *
+ * The anchor day was hard-coded to 19 here while the real value lives in the
+ * org's prefs, so an org on any other anchor got a nav that opened on the wrong
+ * cycle and a summary computed for it. Callers with prefs to hand should pass
+ * the anchor; the default preserves the previous behaviour for those that
+ * cannot (the store initialises before settings have loaded).
+ *
+ * In `regular` mode there is no anchor at all — the label is just the calendar
+ * month — which is why `anchorDay` is optional rather than required.
+ */
+export function currentMonthYear(prefs?: { expenseCycle: { mode: string; anchorDay: number } }) {
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
   const now = new Date()
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -201,7 +213,13 @@ export function currentMonthYear() {
   const day = Number(parts.find(p => p.type === 'day')!.value)
   const month = Number(parts.find(p => p.type === 'month')!.value) - 1
   const year = Number(parts.find(p => p.type === 'year')!.value)
-  const cycleDay = 19
+  // In `regular` mode the label *is* the calendar month, so nothing rolls over.
+  if (prefs && prefs.expenseCycle.mode !== 'custom') return { month: MNS[month], year: String(year) }
+  // 29-31 cannot be an anchor: the cycle would build dates like 2026-02-31,
+  // which Postgres rejects outright.
+  const cycleDay = prefs
+    ? Math.min(28, Math.max(2, Math.floor(prefs.expenseCycle.anchorDay)))
+    : 19
   let mi = month
   let yr = year
   if (day >= cycleDay) {

@@ -5,7 +5,7 @@ import { CalendarDays, Users } from 'lucide-react'
 import { AppAuthGate, SimpleAppNav, type SimpleAppNavSection } from '@fintracker-vault/ui'
 import { getClientAuthEnv } from '../clientAuthEnv'
 import { StaffWorkspaceProvider } from '../StaffWorkspaceContext'
-import '../ui-kit/ui-kit.css'
+import '@fintracker-vault/ui/styles/ui-kit'
 import '../styles/globals.css'
 
 const STAFF_PAGE_TITLES: Record<string, string> = {

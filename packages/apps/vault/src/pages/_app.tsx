@@ -13,7 +13,7 @@ import {
 import { AppAuthGate, SimpleAppNav, type SimpleAppNavSection } from '@fintracker-vault/ui'
 import { StoreProvider } from '../store'
 import { getClientAuthEnv } from '../clientAuthEnv'
-import '../ui-kit/ui-kit.css'
+import '@fintracker-vault/ui/styles/ui-kit'
 import '../styles/globals.css'
 
 const VAULT_PAGE_TITLES: Record<string, string> = {

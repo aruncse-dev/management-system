@@ -20,7 +20,7 @@ button, input, select, textarea {
   --navy: #1e5cc7; --navy-lt: #eaf1ff; --navy-dark: #1e5cc7;
   --green: #166534; --green-lt: #F0FDF4; --gm: #22C55E;
   --red: var(--rm); --red-lt: #FEF2F2; --rm: #EF4444;
-  --amber: var(--rm); --amber-lt: var(--red-lt);
+  --amber: #D97706; --amber-lt: #FFFBEB;
   --other: #6B7280; --other-lt: #F3F4F6;
   --teal: #98ACD8; --teal-dk: #3B65C0;
   --r: 12px; --sh: 0 1px 6px rgba(62,113,202,.09), 0 1px 3px rgba(62,113,202,.06);
@@ -175,7 +175,7 @@ button, input, select, textarea {
 
 /* KPI */
 .kpis { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; margin-bottom: 14px; }
-.kpi-card { --kpi-accent: var(--navy); background: var(--card); border: 1px solid var(--border); border-left-width: 3px; border-radius: var(--r); padding: 10px 14px; box-shadow: var(--sh); border-left-color: var(--kpi-accent); }
+.kpi-card { --kpi-accent: var(--navy); background: var(--card); border: 1px solid var(--border); border-left-width: 1px; border-radius: var(--r); padding: 10px 14px; box-shadow: var(--sh); border-left-color: var(--border); }
 .monthly-subpage .kpi-card,
 .dashboard-page .kpi-card {
   border-radius: 16px;
@@ -212,7 +212,7 @@ button, input, select, textarea {
 .kpi-card-v--amber  { color: #F59E0B; }
 
 /* HERO */
-.hero { background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--gm); border-radius: var(--r); padding: 16px 18px; margin-bottom: 14px; }
+.hero { background: var(--card); border: 1px solid var(--border); border-radius: var(--r); padding: 16px 18px; margin-bottom: 14px; }
 .hero-l { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
 .hero-a { font-size: 24px; font-weight: 700; letter-spacing: -1px; }
 .hero-s { font-size: 13px; color: var(--muted); margin-top: 4px; }
@@ -224,7 +224,6 @@ button, input, select, textarea {
   overflow: hidden;
   padding: 16px;
   border: 1px solid var(--border);
-  border-left: 4px solid var(--navy);
   border-radius: 16px;
   background: var(--card);
   box-shadow: var(--sh);
@@ -292,8 +291,8 @@ button, input, select, textarea {
   padding: 11px 14px;
   border-radius: 16px;
   border: 1px solid var(--border);
-  border-left-width: 3px;
-  border-left-color: var(--ui-accent);
+  border-left-width: 1px;
+  border-left-color: var(--border);
   background: var(--card);
   box-shadow: var(--sh);
 }
@@ -339,8 +338,8 @@ button, input, select, textarea {
   padding: 12px 14px;
   border-radius: 16px;
   border: 1px solid var(--border);
-  border-left-width: 3px;
-  border-left-color: var(--ui-accent);
+  border-left-width: 1px;
+  border-left-color: var(--border);
   background: var(--card);
   box-shadow: var(--sh);
 }
@@ -427,17 +426,6 @@ button, input, select, textarea {
   font-size: 12px;
   color: var(--muted);
 }
-.ui-kit-section {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin: 0;
-}
-.ui-kit-section-block {
-  display: grid;
-  gap: 0;
-}
 .ui-kit-section-body {
   min-width: 0;
 }
@@ -467,16 +455,12 @@ button, input, select, textarea {
 .savings-page .ui-kit-section-block:first-of-type {
   margin-top: 0;
 }
-.savings-page .savings-page-metrics .dash-grid > .ui-kit-kpi--full {
-  grid-column: 1 / -1;
-}
 .monthly-subpage .kpis,
 .monthly-subpage .cc-g,
 .monthly-subpage .cr-g3,
 .monthly-subpage .budget-list,
 .monthly-subpage .acct-g2,
-.monthly-subpage .txn-cards,
-.monthly-subpage .dash-account-grid {
+.monthly-subpage .txn-cards {
   margin-bottom: 0 !important;
 }
 .monthly-subpage .kpis {
@@ -486,100 +470,11 @@ button, input, select, textarea {
 .monthly-subpage .ui-kit-section-block + .ui-kit-section-block {
   margin-top: 0;
 }
-.ui-kit-section-title {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: .6px;
-}
-.ui-kit-section-subtitle {
-  margin-top: 4px;
-  font-size: 12px;
-  color: var(--muted);
-}
-.ui-kit-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  box-shadow: var(--sh);
-}
-.ui-kit-card-hd {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-}
-.ui-kit-card-title {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0.3px;
-}
-.ui-kit-card-subtitle {
-  margin-top: 4px;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.45;
-}
-.ui-kit-card-body {
-  padding: 0 14px 12px;
-}
-.ui-kit-kpi {
-  padding: 10px 14px;
-}
-.ui-kit-kpi--full { grid-column: span 2; }
-.ui-kit-kpi-sub {
-  margin-top: 4px;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.45;
-}
-.ui-kit-field {
-  display: grid;
-  gap: 6px;
-}
-.ui-kit-field-hint {
-  color: var(--muted);
-  font-size: 12px;
-}
-.ui-kit-chart-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-.ui-kit-chart-grid--side {
-  grid-template-columns: 1.2fr 1fr 1fr;
-}
-.ui-kit-mini-chart {
-  min-width: 0;
-  padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: var(--bg);
-  overflow: hidden;
-}
-.ui-kit-mini-chart--donut {
-  padding: 8px;
-}
-.ui-kit-svg-chart {
-  width: 100%;
-  height: auto;
-  display: block;
-}
 .ui-kit-tabbar {
   display: flex;
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--r);
   overflow: hidden;
 }
 .ui-kit-tab {
@@ -599,12 +494,6 @@ button, input, select, textarea {
   background: var(--navy-lt);
   color: var(--navy);
 }
-.modal-shell {
-  width: min(720px, 100%);
-  background: var(--navy);
-  border-radius: 18px 18px 0 0;
-  overflow: hidden;
-}
 .modal-subtitle {
   margin-top: 4px;
   color: var(--muted);
@@ -615,17 +504,7 @@ button, input, select, textarea {
 }
 .ui-two-col { display: grid; grid-template-columns: 1fr; gap: 10px; }
 @media (max-width: 640px) {
-  .ui-kit-chart-grid {
-    grid-template-columns: 1fr;
-  }
-  .ui-kit-chart-grid--side {
-    grid-template-columns: 1fr;
-  }
-  .ui-kit-mini-chart {
-    padding: 8px;
-  }
-  .settings-status-grid,
-  .dash-account-grid {
+  .settings-status-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -640,12 +519,12 @@ button, input, select, textarea {
 }
 .ui-mini-card {
   padding: 12px;
-  border-radius: 14px;
+  border-radius: var(--r);
   border: 1px solid var(--border);
   background: var(--bg);
 }
-.ui-mini-card-green { background: var(--green-lt); border-left: 4px solid var(--gm); }
-.ui-mini-card-red { background: var(--red-lt); border-left: 4px solid var(--red); }
+.ui-mini-card-green { background: var(--green-lt); }
+.ui-mini-card-red { background: var(--red-lt); }
 .ui-mini-title {
   font-size: 11px;
   font-weight: 700;
@@ -667,15 +546,16 @@ button, input, select, textarea {
   flex-shrink: 0;
 }
 
-.dashboard-page { display: flex; flex-direction: column; gap: 12px; }
+/* SectionBlock emits its own 8px above and below; a gap here would
+   stack on top of that and push sections 28px apart. */
+.dashboard-page { display: flex; flex-direction: column; gap: 0; }
 .dashboard-page .kpi-card-l {
   font-size: 10px;
   letter-spacing: .08em;
 }
 .dashboard-page .kpi-card-v,
 .dashboard-page .kpi-card-v-soft,
-.dashboard-page .ui-kit-balance-value,
-.dashboard-page .dash-budget-figure {
+.dashboard-page .ui-kit-balance-value {
   font-size: 18px;
   font-weight: 600;
   letter-spacing: -.03em;
@@ -684,154 +564,6 @@ button, input, select, textarea {
 .dashboard-page .ui-kit-balance-flow-item strong {
   font-size: 13px;
 }
-.dashboard-page .dash-flow-label {
-  font-size: 12px;
-}
-.dashboard-page .dash-flow-sub {
-  font-size: 11px;
-}
-.dashboard-page .dash-flow-value {
-  font-size: 18px;
-  font-weight: 700;
-}
-.dashboard-page .dash-flow-note {
-  font-size: 12px;
-  font-weight: 600;
-}
-.dash-hero {
-  position: relative;
-  overflow: hidden;
-  padding: 16px;
-  border-left: 4px solid var(--navy);
-  background: var(--card);
-}
-.dash-hero-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 14px;
-}
-.dash-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--navy);
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .08em;
-}
-.dash-title {
-  margin-top: 6px;
-  font-size: 26px;
-  font-weight: 800;
-  letter-spacing: -.04em;
-  color: var(--text);
-}
-.dash-subtitle {
-  margin-top: 6px;
-  max-width: 44ch;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.5;
-}
-.dash-hero-kicker {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: rgba(255,255,255,.85);
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 700;
-  flex-shrink: 0;
-}
-.dash-net {
-  position: relative;
-  z-index: 1;
-  border-radius: 16px;
-  padding: 14px 16px;
-  border: 1px solid var(--border);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.6);
-}
-.dash-net-positive { background: var(--green-lt); border-left: 4px solid var(--gm); }
-.dash-net-negative { background: var(--red-lt); border-left: 4px solid var(--red); }
-.dash-net-label {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  color: var(--muted);
-}
-.dash-net-value {
-  margin-top: 5px;
-  font-size: 30px;
-  font-weight: 800;
-  letter-spacing: -.05em;
-}
-.dash-net-hint {
-  margin-top: 4px;
-  font-size: 13px;
-  color: var(--muted);
-}
-.dash-hero-stats {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: 14px;
-}
-.dash-chip {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  padding: 10px 12px;
-  border-radius: 14px;
-  border: 1px solid var(--border);
-  background: rgba(255,255,255,.8);
-  box-shadow: 0 1px 3px rgba(15,28,63,.05);
-}
-.dash-chip span {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  color: var(--muted);
-}
-.dash-chip strong {
-  font-size: 16px;
-  font-weight: 800;
-  letter-spacing: -.03em;
-  color: var(--text);
-}
-.dash-alert { padding: 14px; border-left: 4px solid #F59E0B; background: var(--amber-lt); }
-.dash-alert-head {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  color: #B45309;
-}
-.dash-alert-title {
-  font-size: 14px;
-  font-weight: 800;
-  color: #92400E;
-}
-.dash-alert-sub {
-  margin-top: 2px;
-  font-size: 12px;
-  color: #A16207;
-}
-.dash-alert-tags,
-.dash-tag-wrap {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.dash-alert-tags { margin-top: 10px; }
 .dash-tag {
   display: inline-flex;
   align-items: center;
@@ -843,289 +575,12 @@ button, input, select, textarea {
   font-size: 11px;
   font-weight: 700;
 }
-.dash-tag-danger {
-  background: rgba(239,68,68,.1);
-  color: var(--red);
-}
 .dash-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.dash-metric-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.dash-kpi-card {
-  padding: 10px 13px;
-}
-.dash-kpi-label {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  color: var(--muted);
-}
-.dash-kpi-value {
-  margin-top: 6px;
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: -.04em;
-  color: var(--text);
-}
-.dash-kpi-hint {
-  margin-top: 3px;
-  font-size: 12px;
-  color: var(--muted);
-}
-.dash-secondary-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
-.dash-overview {
-  display: grid;
-  gap: 12px;
-}
-.dash-net-inner-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
 .ui-kit-card--clickable { cursor: pointer; }
-.dash-overview-card {
-  padding: 12px 14px;
-}
-.dash-overview-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-.dash-overview-label,
-.dash-credit-summary-label,
-.dash-budget-figure {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: .08em;
-}
-.dash-overview-value,
-.dash-credit-summary-value {
-  margin-top: 4px;
-  font-size: 30px;
-  font-weight: 800;
-  letter-spacing: -.05em;
-}
-.dash-overview-flow {
-  padding: 12px 14px;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: var(--bg);
-}
-.dash-flow-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-}
-.dash-overview-flag {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  font-size: 11px;
-  font-weight: 800;
-  white-space: nowrap;
-}
-.dash-overview-flag.positive {
-  background: var(--green-lt);
-  color: var(--gm);
-}
-.dash-overview-flag.negative {
-  background: var(--red-lt);
-  color: var(--rm);
-}
-.dash-flow-label {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text);
-}
-.dash-flow-sub {
-  margin-top: 3px;
-  font-size: 12px;
-  color: var(--muted);
-}
-.dash-flow-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  font-size: 11px;
-  font-weight: 800;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-.dash-flow-badge.positive {
-  background: var(--green-lt);
-  color: var(--gm);
-}
-.dash-flow-badge.negative {
-  background: var(--red-lt);
-  color: var(--rm);
-}
-.dash-flow-value {
-  margin-top: 10px;
-  font-size: 24px;
-  font-weight: 800;
-  letter-spacing: -.04em;
-}
-.dash-flow-value.positive { color: var(--gm); }
-.dash-flow-value.negative { color: var(--rm); }
-.dash-net-balance {
-  font-size: 28px;
-  line-height: 1.05;
-}
-.dash-net-cashflow-value {
-  font-size: 18px;
-  line-height: 1.05;
-}
-.dash-flow-note {
-  margin-top: 6px;
-  font-size: 13px;
-  font-weight: 700;
-}
-.dash-flow-note.positive { color: var(--gm); }
-.dash-flow-note.negative { color: var(--rm); }
-.dash-flow-chips {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: 10px;
-}
-.dash-flow-chip {
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: var(--card);
-  display: grid;
-  gap: 3px;
-}
-.dash-flow-chip-lbl {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  color: var(--muted);
-}
-.dash-flow-chip-val {
-  font-size: 14px;
-  font-weight: 800;
-  letter-spacing: -.03em;
-  color: var(--text);
-}
-.dash-credit-summary {
-  margin-bottom: 12px;
-}
-.dash-credit-summary-card {
-  display: grid;
-  gap: 12px;
-}
-.dash-credit-overall-card,
-.dash-credit-breakdown-card {
-  padding: 10px 13px;
-}
-.dash-credit-overall-btn {
-  width: 100%;
-  display: block;
-  text-align: left;
-  cursor: pointer;
-  appearance: none;
-  -webkit-appearance: none;
-}
-.dash-credit-summary-sub {
-  margin-top: 4px;
-  font-size: 12px;
-  color: var(--muted);
-}
-.dash-credit-out-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-.dash-credit-out-card {
-  padding: 10px 13px;
-}
-.dash-flat-card {
-  border-left-width: 0;
-  border-left-color: transparent;
-}
-.dash-overspent-card,
-.dash-cashflow-card,
-.dash-budget-card {
-  border-left-width: 0;
-  border-left-color: transparent;
-}
-.dash-account-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.dash-account-card {
-  padding: 10px 13px;
-}
-.dash-account-name {
-  font-size: 12px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: .04em;
-  color: var(--muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.dash-account-value {
-  margin-top: 8px;
-  font-size: 17px;
-  font-weight: 800;
-  letter-spacing: -.03em;
-}
-.dash-budget-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 2px;
-}
-.dash-budget-figure {
-  color: var(--text);
-}
-.dash-budget-state {
-  font-size: 13px;
-  font-weight: 700;
-  margin-top: 6px;
-}
-.dash-budget-state.ok { color: var(--gm); }
-.dash-budget-state.over { color: var(--rm); }
-.dash-budget-bar {
-  height: 10px;
-  border-radius: 999px;
-}
-.dash-budget-card {
-  display: grid;
-  gap: 8px;
-  padding: 6px 2px 2px;
-}
 .dash-overflow-list {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-}
-.dash-tag-button {
-  border: 1px solid transparent;
-  cursor: pointer;
-  text-align: left;
-}
-.dash-tag-button:hover {
-  border-color: rgba(239,68,68,.22);
-}
-.dash-overspent-card,
-.dash-cashflow-card {
-  display: grid;
-  gap: 8px;
-}
-.dash-overspent-card {
-  padding: 6px 2px 2px;
 }
 .ui-modal-cat {
   font-size: 18px;
@@ -1245,9 +700,19 @@ tr:last-child td { border-bottom: none; }
   flex-shrink: 0;
 }
 
-/* MODAL */
+/* MODAL
+   Fintracker's modals are bottom sheets, not centred dialogs — hence
+   `align-items: flex-end` and no padding. The shared kit centres them, so this
+   geometry is a deliberate app-level override, and `.modal-shell` below has to
+   be re-rounded to match it. */
 .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 200; align-items: flex-end; justify-content: center; padding: 0; overflow-y: auto; }
 .modal-bg.open { display: flex; }
+.modal-shell {
+  width: min(720px, 100%);
+  background: var(--navy);
+  border-radius: 22px 22px 0 0;
+  overflow: hidden;
+}
 .modal {
   background: var(--navy);
   border-radius: 22px 22px 0 0;
@@ -1392,7 +857,7 @@ tr:last-child td { border-bottom: none; }
 .settings-card-sub { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.45; }
 .settings-section { display: flex; flex-direction: column; gap: 8px; }
 .settings-items-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
-.settings-item-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 10px 11px; box-shadow: 0 1px 3px rgba(15,28,63,.04); }
+.settings-item-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--r); padding: 10px 11px; box-shadow: 0 1px 3px rgba(15,28,63,.04); }
 .settings-item-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
 .settings-row-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
 .settings-item-value { display: flex; gap: 6px; align-items: center; }
@@ -1722,12 +1187,6 @@ tr:last-child td { border-bottom: none; }
   .ui-metric-value { font-size: 22px; }
   .ui-two-col { grid-template-columns: 1.15fr .85fr; }
   .dash-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .dash-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .dash-secondary-grid { grid-template-columns: 1.15fr .85fr; }
-  .dash-account-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .dash-credit-out-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .dash-title { font-size: 30px; }
-  .dash-net-value, .dash-total-balance { font-size: 34px; }
   .settings-page-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .settings-hero, .settings-alert, .settings-page-grid > .settings-card:last-child { grid-column: 1 / -1; }
   .settings-items-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1735,13 +1194,7 @@ tr:last-child td { border-bottom: none; }
 @media (max-width: 640px) {
   .ui-hero-top { flex-direction: column; }
   .ui-hero-right { align-self: flex-start; }
-  .dash-hero-top { flex-direction: column; }
-  .dash-hero-kicker { align-self: flex-start; }
-  .dash-account-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .dash-credit-out-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .dash-secondary-grid { grid-template-columns: 1fr; }
   .dash-overview-top,
-  .dash-budget-top { flex-direction: column; }
   .dash-overflow-list { justify-content: flex-start; }
 }
 @media (max-width: 640px) {
@@ -1981,7 +1434,7 @@ tr:last-child td { border-bottom: none; }
 .cc-g .card,
 .cr-g3 .card {
   padding: 12px 13px;
-  border-radius: 14px;
+  border-radius: var(--r);
 }
 .cc-n { margin-bottom: 4px; }
 .cc-a { letter-spacing: -.02em; }
@@ -2109,9 +1562,9 @@ tr:last-child td { border-bottom: none; }
 .ai-panel.open { display: flex; }
 .ai-hd { background: var(--navy-dark); padding: 13px 16px; border-radius: 18px 18px 0 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .ai-msgs { flex: 1; overflow-y: auto; padding: 13px 14px; display: flex; flex-direction: column; gap: 9px; -webkit-overflow-scrolling: touch; }
-.ai-msg { max-width: 88%; padding: 10px 13px; border-radius: 14px; font-size: 13px; line-height: 1.55; }
-.ai-msg.u { align-self: flex-end; background: var(--navy); color: #fff; border-radius: 14px 14px 3px 14px; }
-.ai-msg.a { align-self: flex-start; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 14px 14px 14px 3px; }
+.ai-msg { max-width: 88%; padding: 10px 13px; border-radius: var(--r); font-size: 13px; line-height: 1.55; }
+.ai-msg.u { align-self: flex-end; background: var(--navy); color: #fff; border-radius: var(--r) 14px 3px 14px; }
+.ai-msg.a { align-self: flex-start; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: var(--r) 14px 14px 3px; }
 .ai-foot { padding: 10px 12px; border-top: 1px solid var(--border); display: flex; gap: 8px; align-items: center; }
 .ai-inp { flex: 1; padding: 10px 14px; border: 1px solid var(--border); border-radius: 22px; font-family: inherit; font-size: 14px; outline: none; background: var(--bg); }
 
@@ -2290,3 +1743,251 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
     max-width: none;
   }
 }
+
+/* ============================================================
+   FinTracker-only styles, moved here when the four vendored
+   copies of ui-kit.css were replaced by the shared stylesheet
+   (@fintracker-vault/ui/styles/ui-kit). Anything below styles
+   markup that exists only in this app — it must not go back
+   into the shared kit.
+   ============================================================ */
+/* Suggestion cards on the dashboard. */
+.dash-suggestions {
+  display: grid;
+  gap: 8px;
+}
+.dash-suggestion {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-left-width: 1px;
+}
+.dash-suggestion[data-tone='green'] { border-color: var(--gm); }
+.dash-suggestion[data-tone='amber'] { border-color: var(--amber); }
+.dash-suggestion[data-tone='red']   { border-color: var(--rm); }
+.dash-suggestion[data-tone='navy']  { border-color: var(--navy); }
+.dash-suggestion__title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+.dash-suggestion__detail {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+/* ---------------------------------------------------------------------------
+   Monthly Expenses dashboard.
+   Every number uses tabular figures and sits in a fixed grid column so values
+   line up vertically down the card instead of drifting with digit width.
+   --------------------------------------------------------------------------- */
+
+/* --- Spending hero --- */
+/* Where you should be today, if spending evenly across the cycle. */
+
+/* --- Income / Spend / Net --- */
+
+/* --- Categories --- */
+.dash-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 9px;
+  border: none;
+  border-top: 1px solid var(--border);
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--navy);
+  cursor: pointer;
+}
+
+/* Repeat-from-last-month picker (RepeatSheet.tsx). */
+.repeat-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 6px;
+}
+.repeat-search {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+.repeat-search .form-inp {
+  flex: 1;
+}
+.repeat-list {
+  display: grid;
+  gap: 6px;
+  max-height: 46vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.repeat-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--card);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.repeat-row.is-selected {
+  border-color: var(--navy);
+  background: var(--navy-lt);
+}
+.repeat-check {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  border: 1.5px solid var(--border);
+  background: var(--card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff;
+}
+.repeat-row.is-selected .repeat-check {
+  background: var(--navy);
+  border-color: var(--navy);
+}
+.repeat-body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.repeat-desc {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.repeat-meta {
+  font-size: 11px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.repeat-amt {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--rm);
+  flex-shrink: 0;
+}
+.repeat-amt.is-income {
+  color: var(--green);
+}
+.repeat-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.repeat-error {
+  margin-top: 10px;
+  padding: 9px 11px;
+  border-radius: var(--r);
+  background: var(--red-lt);
+  color: var(--rm);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Transactions header: Repeat action beside the count chip. */
+.txn-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.txn-head-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Progress bar inside a HoldingCard's chips slot (dashboard categories). */
+.dash-cat-bar {
+  width: 100%;
+}
+/* --- Account balances / Credit sources sheet -------------------------------
+   Scoped to this one sheet on purpose: every other modal keeps the white body
+   it has always had. Here the body is a list of cards rather than a form, and
+   white cards on a white ground had no edge — so it uses the page ground and
+   the cards read exactly as they do on a page. */
+.dash-source-sheet .modal-body {
+  background: #F0F5FF;
+}
+/* The base holding card is `border: none` plus a shadow, so setting only
+   `border-color` did nothing — it needs the shorthand. On the sheet's light
+   ground these want the same blue outline the cards on a page carry. */
+.dash-source-sheet .ui-kit-holding-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+}
+.dash-source-sheet .ui-kit-holding-card:hover {
+  border-color: var(--navy);
+}
+/* The total sits on white like the cards under it. The default P&L block is a
+   translucent green/red wash, which went muddy against the light ground — the
+   figure itself carries the tone instead. */
+.dash-source-sheet .ui-kit-holding-pnl,
+.dash-source-sheet .ui-kit-holding-pnl.ui-tone-green,
+.dash-source-sheet .ui-kit-holding-pnl.ui-tone-red {
+  background: var(--card);
+  border: 1px solid var(--border);
+}
+
+/* Both cash-flow donuts stay on one row at every width — they are meant to be
+   compared, and stacking them puts a scroll between the two halves of the
+   comparison. `minmax(0, …)` lets the columns shrink below the donut's natural
+   width instead of forcing an overflow. */
+.dash-chart-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  align-items: start;
+}
+.dash-chart-row .chart-donut-surface {
+  max-width: 100%;
+  height: auto;
+}
+/* The card's own padding is the only thing between two donuts on a phone. */
+@media (max-width: 400px) {
+  .dash-chart-row { gap: 6px; }
+  .dash-chart-row .ui-kit-card-body { padding-left: 8px; padding-right: 8px; }
+}
+
+/* Sits under each cash-flow donut, carrying what the removed `Net` KPI card's
+   subtitle used to say. */
+.dash-net-note {
+  margin: 2px 0 0;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+.dash-net-note.ui-tone-green { color: var(--gm); }
+.dash-net-note.ui-tone-red { color: var(--rm); }
+.dash-net-note.ui-tone-muted { color: var(--muted); }

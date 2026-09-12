@@ -323,6 +323,12 @@ export async function markOrgIntegrationSync(
   orgId: string,
   providerSlug: string,
   error?: string,
+  /**
+   * The provider rejected the token (401). Expire it now rather than leaving a
+   * future `token_expires_at`, which made Settings read "Connected" while every
+   * sync failed.
+   */
+  expireToken = false,
 ): Promise<void> {
   const db = getDb()
   const existing = await getOrgIntegrationRow(orgId, providerSlug)
@@ -333,6 +339,7 @@ export async function markOrgIntegrationSync(
       lastSyncAt: error ? existing.lastSyncAt : new Date(),
       lastError: error ?? null,
       status: error ? 'error' : existing.status,
+      ...(expireToken ? { tokenExpiresAt: new Date() } : {}),
       updatedAt: new Date(),
     })
     .where(eq(orgIntegrations.id, existing.id))

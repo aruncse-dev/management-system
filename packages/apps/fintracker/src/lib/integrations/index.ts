@@ -298,7 +298,7 @@ export async function syncOrgStocksFromIntegrations(orgId: string): Promise<Port
       await markOrgIntegrationSync(orgId, entry.slug)
     } catch (e) {
       const { status, msg } = integrationHttpError(e)
-      await markOrgIntegrationSync(orgId, entry.slug, msg)
+      await markOrgIntegrationSync(orgId, entry.slug, msg, status === 401)
       if (status === 401) {
         throw Object.assign(new Error('TOKEN_EXPIRED'), { code: 'TOKEN_EXPIRED' })
       }
@@ -334,7 +334,7 @@ export async function syncOrgMutualFundsFromIntegrations(orgId: string): Promise
       await markOrgIntegrationSync(orgId, entry.slug)
     } catch (e) {
       const { status, msg } = integrationHttpError(e)
-      await markOrgIntegrationSync(orgId, entry.slug, msg)
+      await markOrgIntegrationSync(orgId, entry.slug, msg, status === 401)
       if (status === 401) {
         throw Object.assign(new Error('TOKEN_EXPIRED'), { code: 'TOKEN_EXPIRED' })
       }

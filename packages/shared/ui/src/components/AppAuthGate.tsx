@@ -103,21 +103,57 @@ export default function AppAuthGate({ appKind, googleClientId, children }: AppAu
   const [authed, setAuthed] = useState(false)
   const [sessionLoading, setSessionLoading] = useState(true)
   const [oauthScriptError, setOauthScriptError] = useState<string | null>(null)
+  /** The session check never completed — a network problem, not a signed-out user. */
+  const [sessionUnreachable, setSessionUnreachable] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
-    fetch('/api/auth/session', { credentials: 'same-origin' })
-      .then(r => {
-        if (!r.ok) throw new Error(`session ${r.status}`)
-        return r.json() as Promise<{ authed?: boolean }>
-      })
-      .then((d: { authed?: boolean }) => {
-        setAuthed(Boolean(d.authed))
-      })
-      .catch(() => {
-        setAuthed(false)
-      })
-      .finally(() => setSessionLoading(false))
-  }, [])
+    let cancelled = false
+
+    /**
+     * Only the server may end a session.
+     *
+     * This used to treat *any* failure as signed-out, so a single flaky request
+     * — a phone waking up, a cold start, a navigation that aborted the fetch —
+     * showed the Google screen while a perfectly valid cookie sat in the
+     * browser. Signing in again "worked", which made it look like the session
+     * kept expiring. A transient failure now retries once and then leaves the
+     * previous state alone; only an explicit 401 signs the user out.
+     */
+    const readSession = async (): Promise<boolean | null> => {
+      const r = await fetch('/api/auth/session', { credentials: 'same-origin' })
+      if (r.status === 401) return false
+      if (!r.ok) throw new Error(`session ${r.status}`)
+      const d = (await r.json()) as { authed?: boolean }
+      return Boolean(d.authed)
+    }
+
+    void (async () => {
+      let result: boolean | null = null
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          result = await readSession()
+          break
+        } catch {
+          if (attempt === 0) await new Promise(res => setTimeout(res, 600))
+        }
+      }
+      if (cancelled) return
+      if (result === null) {
+        // Never got an answer. Say so — showing the sign-in card here would
+        // claim the session ended when we simply could not ask.
+        setSessionUnreachable(true)
+      } else {
+        setSessionUnreachable(false)
+        setAuthed(result)
+      }
+      setSessionLoading(false)
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [reloadKey])
 
   const handleUnlock = () => {
     setOauthScriptError(null)
@@ -150,7 +186,42 @@ export default function AppAuthGate({ appKind, googleClientId, children }: AppAu
     </div>
   )
 
-  const inner = !authed ? (
+  const unreachableUi = (
+    <div
+      className="login-auth-card"
+      style={{
+        minHeight: '100dvh',
+        display: 'grid',
+        placeItems: 'center',
+        padding: 24,
+        textAlign: 'center',
+        color: 'var(--text, #0f172a)',
+      }}
+    >
+      <div style={{ display: 'grid', gap: 10, maxWidth: 320 }}>
+        <div style={{ fontWeight: 700 }}>Can&apos;t reach the server</div>
+        <div style={{ fontSize: 13, color: 'var(--muted, #64748b)', lineHeight: 1.5 }}>
+          You are probably still signed in — we just couldn&apos;t check. Check your
+          connection and try again.
+        </div>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => {
+            setSessionUnreachable(false)
+            setSessionLoading(true)
+            setReloadKey(k => k + 1)
+          }}
+        >
+          Retry
+        </button>
+      </div>
+    </div>
+  )
+
+  const inner = sessionUnreachable ? (
+    unreachableUi
+  ) : !authed ? (
     <LoginScreen
       onUnlock={handleUnlock}
       appKind={appKind}

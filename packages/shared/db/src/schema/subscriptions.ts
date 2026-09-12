@@ -17,3 +17,18 @@ export const subscriptions = pgTable('subscriptions', {
   notes: text('notes'),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 })
+
+/**
+ * Charges actually taken for a subscription — mirrors the loan repayment tables.
+ *
+ * A charge posted from a linked transaction gets the derived id `txn:<txnId>`,
+ * so the register entry and the charge stay one fact rather than two.
+ */
+export const subscriptionCharges = pgTable('subscription_charges', {
+  id: text('id').primaryKey(),
+  orgId: text('org_id'),
+  subscriptionId: text('subscription_id').notNull(),
+  date: date('date').notNull(),
+  amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
+  note: text('note'),
+})

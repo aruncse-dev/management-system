@@ -1,0 +1,30 @@
+{
+  "name": "@fintracker-vault/mcp",
+  "version": "1.0.0",
+  "description": "Read-only MCP server exposing fintracker data for analysis",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "fintracker-mcp": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsup",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@fintracker-vault/db": "workspace:*",
+    "@fintracker-vault/utils": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "drizzle-orm": "^0.44.2",
+    "pg": "^8.21.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.2.0",
+    "tsup": "^8.0.0",
+    "@types/node": "^20.0.0"
+  }
+}

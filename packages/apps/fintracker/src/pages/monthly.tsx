@@ -3,30 +3,47 @@ import { ChevronLeft, ChevronRight, X as XIcon } from 'lucide-react'
 import { useRouter } from 'next/router'
 import { useStore } from '../store'
 import { api } from '../api'
+import type { Transaction } from '../types'
 import { BottomNav, TransactionModal } from '../ui'
 import Dashboard from './dashboard'
 import Transactions from './transactions'
 import Budget from './budget'
-import Credits from './credits'
-import Accounts from './accounts'
 import { MNS } from '../config'
 import { BudgetMonthRangeFields } from '../components/BudgetMonthRangeFields'
+import RepeatSheet from '../components/RepeatSheet'
 import { expenseCategoriesWithBudget, incomeCategoriesWithBudget, monthYearApiKey } from '../utils'
 import { useFintrackerModes } from '../context/FintrackerModesContext'
 import { cycleSubtitle } from '../expenseCycle'
 import { useMoneyFormatting } from '../hooks/useFormatMoney'
+import { useTransactionRefOptions } from '../hooks/useTransactionRefOptions'
 
-type TabId = 'dash' | 'txns' | 'bud' | 'cc' | 'acct'
+type TabId = 'dash' | 'txns' | 'bud'
 
-const TAB_Q: Record<TabId, string> = { dash: 'dash', txns: 'txns', bud: 'bud', cc: 'cc', acct: 'acct' }
+const TAB_Q: Record<TabId, string> = { dash: 'dash', txns: 'txns', bud: 'bud' }
+
+/**
+ * A copy of `row` for the add form: no id, dated today.
+ *
+ * `Transaction.date` is `DD-MMM-YY`, not ISO — writing ISO here made the modal's
+ * parser fail and silently fall back to today, which looked right by accident.
+ */
+function duplicateOf(row: Transaction): Transaction {
+  const d = new Date()
+  const today = `${String(d.getDate()).padStart(2, '0')}-${MNS[d.getMonth()]}-${String(d.getFullYear()).slice(2)}`
+  return { ...row, id: '', date: today }
+}
 
 export default function Monthly() {
   const router = useRouter()
   const { state, dispatch } = useStore()
   const money = useMoneyFormatting()
   const { paymentModeOptions, transferTargetOptions } = useFintrackerModes()
+  const refOptions = useTransactionRefOptions()
   const [tab, setTab] = useState<TabId>('dash')
   const [modalOpen, setModalOpen] = useState(false)
+  /** Forces TransactionModal to remount; duplicated rows all share id ''. */
+  const [modalNonce, setModalNonce] = useState(0)
+  const [repeatOpen, setRepeatOpen] = useState(false)
   const [editRow, setEditRow] = useState<typeof state.rows[0] | null>(null)
   const [snackbar, setSnackbar] = useState<{ msg: string; variant: 'success' | 'error' | 'info' } | null>(null)
   const snackbarTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -57,7 +74,9 @@ export default function Monthly() {
     if (!router.isReady || router.pathname !== '/monthly') return
     const q = router.query.tab
     const raw = typeof q === 'string' ? q : Array.isArray(q) ? q[0] : undefined
-    const fromQuery: Record<string, TabId> = { dash: 'dash', txns: 'txns', bud: 'bud', cc: 'cc', acct: 'acct' }
+    // `cc` and `acct` were the Credits and Accounts tabs; both now live in the
+    // dashboard's Sources section, so old links land there rather than 404.
+    const fromQuery: Record<string, TabId> = { dash: 'dash', txns: 'txns', bud: 'bud', cc: 'dash', acct: 'dash' }
     if (raw && fromQuery[raw]) {
       setTab(fromQuery[raw])
       return
@@ -182,20 +201,20 @@ export default function Monthly() {
       <BottomNav tab={tab} onTab={goTab} />
 
       <main>
-        {tab === 'dash' && <Dashboard />}
+        {tab === 'dash' && (
+          <Dashboard
+            onCategoryClick={cat => { dispatch({ type: 'SET_CAT_FILTER', payload: cat }); goTab('txns') }}
+            onGoTab={goTab}
+          />
+        )}
         {tab === 'txns' && (
           <Transactions
-            onEdit={r => { setEditRow(r); setModalOpen(true) }}
-            onDuplicate={r => {
-              const today = new Date().toISOString().split('T')[0]
-              setEditRow({ ...r, id: '', date: today })
-              setModalOpen(true)
-            }}
+            onEdit={r => { setEditRow(r); setModalOpen(true); setModalNonce(n => n + 1) }}
+            onRepeat={() => setRepeatOpen(true)}
+            onDuplicate={r => { setEditRow(duplicateOf(r)); setModalOpen(true); setModalNonce(n => n + 1) }}
           />
         )}
         {tab === 'bud'  && <Budget showStatus={showStatus} onCategoryClick={cat => { dispatch({ type:'SET_CAT_FILTER', payload:cat }); goTab('txns') }} />}
-        {tab === 'cc'   && <Credits />}
-        {tab === 'acct' && <Accounts showStatus={showStatus} />}
       </main>
 
       {/* FAB */}
@@ -207,6 +226,7 @@ export default function Monthly() {
           }
           setEditRow(null)
           setModalOpen(true)
+          setModalNonce(n => n + 1)
         }}
         style={{ position:'fixed', bottom:24, right:20, width:52, height:52, borderRadius:'50%', background:'var(--navy-dark)', color:'#fff', fontSize:24, border:'none', boxShadow:'0 4px 16px rgba(0,0,0,.2)', cursor:'pointer', zIndex:100, display:'flex', alignItems:'center', justifyContent:'center' }}
         title={tab === 'bud' ? 'Add budget' : 'Add transaction'}
@@ -255,9 +275,21 @@ export default function Monthly() {
         </div>
       )}
 
+      {repeatOpen && (
+        <RepeatSheet
+          month={state.month}
+          year={state.year}
+          onClose={() => setRepeatOpen(false)}
+          onCopied={async (count) => {
+            await loadMonth(state.month, state.year, true)
+            showStatus(`✓ Copied ${count} transaction${count === 1 ? '' : 's'}`)
+          }}
+        />
+      )}
+
       {modalOpen && (
         <TransactionModal
-          key={`${editRow?.id ?? 'new'}-${paymentModeOptions.join('|')}--${transferTargetOptions.join('|')}`}
+          key={`${editRow?.id || 'new'}-${modalNonce}-${paymentModeOptions.join('|')}--${transferTargetOptions.join('|')}`}
           row={editRow}
           month={state.month} year={state.year}
           api={api}
@@ -267,7 +299,12 @@ export default function Monthly() {
           incomeCategoryOptions={incomeCategoryOptions}
           amountLabel={`Amount (${money.currency})`}
           amountPlaceholder={money.zeroPlaceholder}
+          refOptions={refOptions}
           onClose={() => setModalOpen(false)}
+          onDuplicate={r => {
+            setEditRow(duplicateOf(r))
+            setModalNonce(n => n + 1)
+          }}
           onSaved={async () => {
             setModalOpen(false)
             await loadMonth(state.month, state.year, true)

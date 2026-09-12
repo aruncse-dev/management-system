@@ -1,5 +1,5 @@
-import { useEffect, type ReactNode } from 'react'
-import { ExternalLink, Loader2, Copy } from 'lucide-react'
+import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { ExternalLink, Link2, Loader2, Copy } from 'lucide-react'
 import type { UiTone } from './uiTone'
 import { UiCard } from './UiCard'
 
@@ -345,12 +345,19 @@ export function ModalShell({
   onClose,
   children,
   footer,
+  className = '',
 }: {
   title: string
   onClose: () => void
   children: ReactNode
   footer?: ReactNode
+  /** Extra class on the shell, for per-sheet styling. Modals share one look by
+      default — reach for this only when one sheet genuinely differs. */
+  className?: string
 }) {
+  const titleId = useId()
+  const shellRef = useRef<HTMLDivElement | null>(null)
+
   useEffect(() => {
     const body = document.body
     const html = document.documentElement
@@ -364,14 +371,41 @@ export function ModalShell({
     }
   }, [])
 
+  // Escape closes, and focus moves into the dialog and back to whatever opened
+  // it. Without this the sheet was mouse-only and left focus stranded on the
+  // page behind it.
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null
+    shellRef.current?.focus()
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        onClose()
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      if (opener && document.contains(opener)) opener.focus()
+    }
+  }, [onClose])
+
   return (
-    <div className="modal-bg open">
-      <div className="modal-shell" onClick={e => e.stopPropagation()}>
+    <div className="modal-bg open" onClick={onClose}>
+      <div
+        ref={shellRef}
+        className={`modal-shell${className ? ` ${className}` : ''}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        onClick={e => e.stopPropagation()}
+      >
         <div className="modal-hd">
           <div>
-            <div className="modal-title">{title}</div>
+            <div className="modal-title" id={titleId}>{title}</div>
           </div>
-          <button type="button" className="modal-close" onClick={onClose}>×</button>
+          <button type="button" className="modal-close" aria-label="Close" onClick={onClose}>×</button>
         </div>
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-foot">{footer}</div>}
@@ -704,6 +738,9 @@ export function TransactionCard({
   icon,
   onClick,
   onDuplicate,
+  refHref,
+  refLabel,
+  onRefOpen,
   className = '',
   amountLabel = 'Amount',
   typeLabel = 'Type',
@@ -711,6 +748,8 @@ export function TransactionCard({
   linkUrl,
   compact = false,
   asStatic = false,
+  variant = 'grid',
+  meta,
 }: {
   title: ReactNode
   /** Omitted from layout when `compact` is true. */
@@ -722,6 +761,21 @@ export function TransactionCard({
   onClick?: () => void
   /** Callback when duplicate button is clicked. */
   onDuplicate?: (e: React.MouseEvent) => void
+  /**
+   * Where this row's linked module row lives. Renders a jump button beside the
+   * duplicate button. Omit for rows that are not linked.
+   */
+  refHref?: string
+  /** Accessible name for the jump button, e.g. "Open in EMI loans". */
+  refLabel?: string
+  /**
+   * Client-side navigation for the jump button. When given, the anchor keeps its
+   * `href` (so middle-click and "open in new tab" still work) but a plain click
+   * is handled here instead — a bare `href` in a Next app costs a full document
+   * reload. The host owns routing, so this is a callback rather than `next/link`;
+   * this package deliberately has no Next dependency.
+   */
+  onRefOpen?: () => void
   className?: string
   /** Column header above `amount` (default: Amount). */
   amountLabel?: string
@@ -733,11 +787,47 @@ export function TransactionCard({
   linkUrl?: string
   /** Name + icon only (no stats grid). For accounts / credits lists. */
   compact?: boolean
+  /**
+   * `grid` (default) keeps the three labelled stats — right when the labels
+   * vary and carry meaning (Vault's DOB / Relation, Staff's Gender / Basis).
+   *
+   * `row` is the dense single-line form for long lists where the labels would
+   * be identical on every row, e.g. a month of transactions. Amount, type and
+   * date collapse into one line: the sign and tone carry type, `meta` carries
+   * the detail, and the caller groups by date with its own headers.
+   */
+  variant?: 'grid' | 'row'
+  /** Second line in the `row` variant, e.g. "Groceries · HDFC Bank". */
+  meta?: ReactNode
   /** When true, render a non-interactive div (e.g. profile summary). */
   asStatic?: boolean
 }) {
   const trimmedLink = linkUrl?.trim() ?? ''
   const hasLink = trimmedLink.length > 0
+
+  if (variant === 'row') {
+    const rowBody = (
+      <>
+        <span className={`ui-kit-txn-row-icon ui-tone-${tone}`}>{icon}</span>
+        <span className="ui-kit-txn-row-body">
+          <span className="ui-kit-txn-row-title">{title}</span>
+          {meta ? <span className="ui-kit-txn-row-meta">{meta}</span> : null}
+        </span>
+        {amount !== undefined ? (
+          <span className={`ui-kit-txn-row-amount ui-tone-${tone}`}>{amount}</span>
+        ) : null}
+      </>
+    )
+    const rowClass = `ui-kit-txn-row${className ? ` ${className}` : ''}`.trim()
+    if (asStatic || !onClick) {
+      return <div className={rowClass}>{rowBody}</div>
+    }
+    return (
+      <button type="button" className={`${rowClass} ui-kit-txn-row--btn`} onClick={onClick}>
+        {rowBody}
+      </button>
+    )
+  }
 
   const btnClass = `ui-kit-holding-card ui-kit-holding-card--accent-${tone} ui-kit-holding-card--btn txn-entry-card${hasLink ? ' ui-kit-holding-card--stacked' : ''}${compact ? ' txn-entry-card--compact' : ''}${className ? ` ${className}` : ''}`.trim()
 
@@ -756,6 +846,26 @@ export function TransactionCard({
           </div>
         </div>
         <div className="ui-kit-holding-card-head-right">
+          {refHref && (
+            // A linked row can be opened where it was mirrored to. `stopPropagation`
+            // keeps the card's own onClick (edit) from firing underneath it.
+            <a
+              className="ui-kit-txn-reflink"
+              href={refHref}
+              aria-label={refLabel || 'Open linked entry'}
+              title={refLabel || 'Open linked entry'}
+              onClick={e => {
+                e.stopPropagation()
+                // Let modified clicks (new tab / new window) fall through to the
+                // browser; route the plain one client-side.
+                if (!onRefOpen || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+                e.preventDefault()
+                onRefOpen()
+              }}
+            >
+              <Link2 size={15} />
+            </a>
+          )}
           {onDuplicate && (
             <button
               type="button"
@@ -849,6 +959,7 @@ export { SettingsSectionCard, type SettingField } from './SettingsSectionCard'
 export { default as CatIcon } from './CatIcon'
 export * from './FinanceUI'
 export * from './RightLegendDonut'
+export * from './MiniBarChart'
 export { default as BottomNav } from './BottomNav'
 export { default as ErrorScreen } from './ErrorScreen'
 export {
@@ -865,8 +976,9 @@ export {
   type SimpleAppNavItem,
   type SimpleAppNavSection,
 } from './SimpleAppNav'
-export { default as TransactionModal, type TransactionModalApi } from './TransactionModal'
+export { default as TransactionModal, type TransactionModalApi, type TransactionRefOption } from './TransactionModal'
 export { CategoryCombobox } from './CategoryCombobox'
+export { RefCombobox } from './RefCombobox'
 export {
   default as AppAuthGate,
   type AppAuthGateProps,

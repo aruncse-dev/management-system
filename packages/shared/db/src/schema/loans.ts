@@ -54,3 +54,18 @@ export const cashLoanRepayments = pgTable('cash_loan_repayments', {
   amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
   note: text('note'),
 })
+
+/**
+ * EMI repayments — mirrors jewelLoanRepayments / cashLoanRepayments.
+ *
+ * `emiLoans.paidEmis` remains for backward compatibility but is now derived
+ * from these rows rather than being the source of truth.
+ */
+export const emiLoanRepayments = pgTable('emi_loan_repayments', {
+  id: text('id').primaryKey(),
+  orgId: text('org_id'),
+  loanId: text('loan_id').notNull(),
+  date: date('date').notNull(),
+  amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
+  note: text('note'),
+})

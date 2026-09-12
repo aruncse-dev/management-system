@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "moduleResolution": "bundler",
+    "module": "ESNext",
+    "lib": ["ES2022", "DOM"],
+    "noEmit": true,
+    "paths": {
+      "@fintracker-vault/db": ["packages/shared/db/src"],
+      "@fintracker-vault/db/*": ["packages/shared/db/src/*"],
+      "@fintracker-vault/utils": ["packages/shared/utils/src"],
+      "@fintracker-vault/utils/*": ["packages/shared/utils/src/*"],
+      "@fintracker-vault/config": ["packages/shared/config/src"],
+      "@fintracker-vault/config/*": ["packages/shared/config/src/*"],
+      "@fintracker-vault/types": ["packages/shared/types/src"],
+      "@fintracker-vault/types/*": ["packages/shared/types/src/*"]
+    }
+  },
+  "include": ["src"],
+  "exclude": ["dist", "node_modules"]
+}

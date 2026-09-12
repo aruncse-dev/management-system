@@ -15,9 +15,9 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 6px 12px;
+  padding: 5px 10px;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
   border: 1px solid var(--border);
   background: var(--card);
@@ -104,13 +104,17 @@
   padding: 0 14px 12px;
   overflow: hidden;
 }
+/* With no header there is nothing above to supply the top padding. */
+.ui-kit-card > .ui-kit-card-body:first-child {
+  padding-top: 12px;
+}
 .ui-kit-summary-metric {
   display: grid;
   justify-items: center;
   gap: 8px;
   padding: 10px 12px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--r);
   background: var(--card);
   text-align: center;
 }
@@ -151,17 +155,18 @@
   width: 100%;
 }
 .ui-kit-kpi {
-  padding: 10px 14px;
-  border-left: 3px solid var(--navy);
+  padding: 11px 13px;
 }
 .ui-kit-kpi[role="button"] {
   cursor: pointer;
 }
-.ui-kit-kpi--accent-green {
-  border-left: 5px solid var(--gm);
+/* Accent tone colours the value, not the card edge. A 5px stripe on a 2-up
+   grid ate the tile's left padding and pushed the label off the column grid. */
+.ui-kit-kpi--accent-green .kpi-card-v {
+  color: var(--gm);
 }
-.ui-kit-kpi--accent-red {
-  border-left: 5px solid var(--rm);
+.ui-kit-kpi--accent-red .kpi-card-v {
+  color: var(--rm);
 }
 .ui-kit-kpi--full { grid-column: 1 / -1; }
 .ui-kit-kpi-hd {
@@ -204,13 +209,15 @@
 .ui-kit-kpi .kpi-card-v {
   margin-top: 0;
   color: var(--text);
-  text-align: center;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
 }
 .ui-kit-kpi-sub {
-  margin-top: 6px;
-  font-size: 12px;
+  margin-top: 4px;
+  font-size: 11.5px;
   color: var(--muted);
-  text-align: center;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
 }
 .ui-kit-holding-card {
   display: grid;
@@ -226,17 +233,13 @@
 .ui-kit-holding-card--btn {
   cursor: pointer;
 }
-.ui-kit-holding-card--accent-green {
-  border-left: 5px solid var(--gm);
-}
-.ui-kit-holding-card--accent-red {
-  border-left: 5px solid var(--rm);
-}
-.ui-kit-holding-card--accent-amber {
-  border-left: 5px solid #D97706;
-}
+/* Accent tone lives in the icon chip and the coloured stat, never a stripe.
+   These modifiers are kept as no-op hooks so callers need not change. */
+.ui-kit-holding-card--accent-green,
+.ui-kit-holding-card--accent-red,
+.ui-kit-holding-card--accent-amber,
 .ui-kit-holding-card--accent-navy {
-  border-left: 5px solid var(--navy);
+  border-left: 0;
 }
 .ui-kit-holding-icon--bg.ui-tone-muted {
   background: rgba(107, 114, 128, 0.12);
@@ -295,7 +298,6 @@
 }
 .stock-entry-card {
   border: 1px solid var(--border);
-  border-left: 1px solid var(--border);
 }
 .ui-kit-holding-card-head {
   display: flex;
@@ -453,6 +455,8 @@
   font-size: 14px;
   font-weight: 900;
 }
+.ui-kit-holding-pnl-value.ui-tone-green { color: var(--gm); }
+.ui-kit-holding-pnl-value.ui-tone-red { color: var(--rm); }
 .ui-kit-holding-chips {
   display: flex;
   flex-wrap: wrap;
@@ -494,7 +498,7 @@
   display: grid;
   gap: 5px;
   padding: 10px 12px;
-  border-radius: 14px;
+  border-radius: var(--r);
   background: rgba(255,255,255,.92);
 }
 .ui-kit-holding-modal-pnl.ui-tone-green {
@@ -556,12 +560,23 @@
   color: #d97706;
   border-color: rgba(245, 158, 11, .22);
 }
+/* One scrolling line, not a wrapping block. A dozen filters wrapped to three
+   rows and ate the top of the list; the hand-rolled `.pills` row this replaced
+   scrolled horizontally, and on a phone that is the right behaviour. */
 .ui-kit-filter-row {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.ui-kit-filter-row::-webkit-scrollbar {
+  display: none;
 }
 .ui-kit-filter-pill {
+  flex: 0 0 auto;
+  white-space: nowrap;
   border: 1px solid var(--border);
   background: var(--card);
   color: var(--muted);
@@ -614,7 +629,7 @@
   padding-left: 36px;
   padding-right: 34px;
   font-size: 14px;
-  border-radius: 14px;
+  border-radius: var(--r);
 }
 .ui-kit-search-prefix {
   position: absolute;
@@ -686,9 +701,8 @@
   gap: 8px;
   padding: 12px 14px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--r);
   background: var(--card);
-  border-left: 4px solid var(--ui-txn-accent);
   box-shadow: var(--sh);
 }
 .ui-kit-txn-btn {
@@ -967,7 +981,7 @@
   min-width: 0;
   padding: 10px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--r);
   background: var(--bg);
   overflow: hidden;
 }
@@ -1085,7 +1099,7 @@
   gap: 8px;
 }
 .ui-kit-page-shell {
-  padding: 0 10px 80px;
+  padding: 0;
 }
 .ui-kit-internal-tabs {
   display: inline-flex;
@@ -1118,7 +1132,7 @@
 }
 .ui-kit-callout {
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--r);
   padding: 12px 14px;
   background: rgba(255,255,255,.84);
   display: grid;
@@ -1215,6 +1229,112 @@
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
+/* --- Link ("ref") picker ---------------------------------------------------
+   Same visual language as the category combobox it sits beside; the extra part
+   is the type badge, because a row's name alone does not say which module it
+   belongs to. */
+.ui-kit-ref-combo {
+  position: relative;
+}
+.ui-kit-ref-combo-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ui-kit-ref-combo-field .form-inp {
+  flex: 1;
+  min-width: 0;
+}
+/* Jump-to-linked-entry button on a transaction card, beside Duplicate. */
+.ui-kit-txn-reflink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  margin-right: 4px;
+  border-radius: 8px;
+  color: var(--navy);
+  text-decoration: none;
+}
+.ui-kit-txn-reflink:hover {
+  background: var(--navy-lt);
+}
+.ui-kit-ref-selected {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+}
+.ui-kit-ref-kind {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--navy-lt);
+  color: var(--navy);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.ui-kit-ref-clear {
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--rm);
+  cursor: pointer;
+}
+.ui-kit-ref-list {
+  margin-top: 8px;
+  max-height: min(40vh, 220px);
+  overflow-y: auto;
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+.ui-kit-ref-opt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 14px;
+  font-size: 14px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.ui-kit-ref-opt:last-child { border-bottom: none; }
+.ui-kit-ref-opt.is-active { background: var(--navy-lt); }
+.ui-kit-ref-opt.is-selected { background: rgba(30, 92, 199, .08); }
+.ui-kit-ref-opt-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ui-kit-ref-empty {
+  padding: 12px 14px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.ui-kit-sheet-empty {
+  margin: 0;
+  padding: 20px 12px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}
 .modal-foot {
   padding: 12px 16px 14px;
   border-top: 0;
@@ -1277,4 +1397,145 @@
     order: 0;
     justify-content: flex-end;
   }
+}
+
+
+/* Mini bar chart — paired series for short trends (see MiniBarChart.tsx). */
+.mini-bar-chart {
+  display: grid;
+  gap: 6px;
+}
+.mini-bar-chart__labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: .2px;
+}
+.mini-bar-chart__labels span {
+  flex: 1;
+  text-align: center;
+}
+.mini-bar-chart__legend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.mini-bar-chart__legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.mini-bar-chart__peak {
+  margin-left: auto;
+  opacity: .75;
+}
+
+
+/* ============================================================
+   Dense transaction row — TransactionCard variant="row".
+   For lists where every row would repeat the same three column
+   labels. Type is carried by tone and the amount's sign; date is
+   carried by the caller's day headers.
+   ============================================================ */
+.ui-kit-txn-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  box-shadow: var(--sh);
+  text-align: left;
+  font-family: inherit;
+}
+.ui-kit-txn-row--btn {
+  cursor: pointer;
+}
+.ui-kit-txn-row--btn:active {
+  background: var(--navy-lt);
+}
+.ui-kit-txn-row-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--muted);
+  background: var(--navy-lt);
+}
+.ui-kit-txn-row-icon.ui-tone-green { background: rgba(34, 197, 94, .14); }
+.ui-kit-txn-row-icon.ui-tone-red   { background: rgba(239, 68, 68, .12); }
+.ui-kit-txn-row-icon.ui-tone-amber { background: rgba(217, 119, 6, .13); }
+.ui-kit-txn-row-body {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+.ui-kit-txn-row-title,
+.ui-kit-txn-row-meta {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ui-kit-txn-row-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+.ui-kit-txn-row-meta {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.ui-kit-txn-row-amount {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.ui-kit-txn-row-amount.ui-tone-green { color: var(--gm); }
+.ui-kit-txn-row-amount.ui-tone-red   { color: var(--rm); }
+.ui-kit-txn-row-amount.ui-tone-amber { color: var(--amber); }
+
+/* Day grouping header for a row list: label left, signed day total right. */
+.ui-kit-txn-daybar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 2px 4px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+.ui-kit-txn-daybar strong {
+  color: var(--text);
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Donut side-legend value + percentage. The wrapper had no styles at all, so the
+   two spans ran together as "₹2,75,20068%". Gold never hit it because it passes
+   showPct={false}. */
+.chart-donut-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
 }

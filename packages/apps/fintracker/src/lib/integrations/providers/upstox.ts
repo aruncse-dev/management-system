@@ -67,14 +67,29 @@ export async function exchangeUpstoxCode(opts: {
       : undefined
 
   const expiresIn = Number(json.expires_in)
-  const expiresAt = new Date()
-  if (Number.isFinite(expiresIn) && expiresIn > 0) {
-    expiresAt.setSeconds(expiresAt.getSeconds() + expiresIn)
-  } else {
-    expiresAt.setHours(expiresAt.getHours() + 24)
-  }
+  const expiresAt =
+    Number.isFinite(expiresIn) && expiresIn > 0
+      ? new Date(Date.now() + expiresIn * 1000)
+      : nextUpstoxTokenCutoff()
 
   return { accessToken, expiresAt, refreshToken }
+}
+
+/**
+ * Upstox access tokens die at a fixed wall-clock time — ~03:30 IST — not N
+ * hours after issue, and the token response carries no `expires_in`.
+ *
+ * The old fallback added 24 hours, so a token minted at 10:00 was recorded as
+ * good until 10:00 next day while Upstox had already killed it overnight:
+ * Settings showed "Connected" with a future expiry while every sync 401'd.
+ */
+export function nextUpstoxTokenCutoff(now: Date = new Date()): Date {
+  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000
+  const ist = new Date(now.getTime() + IST_OFFSET_MS)
+  const cutoffIst = new Date(ist)
+  cutoffIst.setUTCHours(3, 30, 0, 0)
+  if (cutoffIst <= ist) cutoffIst.setUTCDate(cutoffIst.getUTCDate() + 1)
+  return new Date(cutoffIst.getTime() - IST_OFFSET_MS)
 }
 
 /** Upstox does not document refresh_token grant; use when provider adds refresh support. */

@@ -21,7 +21,7 @@ export type FintrackerModesContextValue = {
   creditCardNames: string[]
   informalCreditNames: string[]
   paymentModeOptions: string[]
-  /** Transfer “to” dropdown — same as payment modes so any account or credit can receive a transfer. */
+  /** Transfer “to” dropdown: payment modes plus savings accounts, so a savings deposit is expressible. */
   transferTargetOptions: string[]
 }
 
@@ -117,6 +117,26 @@ export function FintrackerModesProvider({ children }: { children: ReactNode }) {
     return out
   }, [monthlyAccountNames, creditCardNames, informalCreditNames])
 
+  /**
+   * Transfer destinations: payment sources **plus** savings accounts.
+   *
+   * These used to be the same list, which excluded `used_for = 'savings'` — so
+   * an RD contribution or a move into a savings pot was not even expressible as
+   * a transfer. Money left the source account and arrived nowhere, and the
+   * dashboard simply lost it.
+   */
+  const transferTargetOptions = useMemo(() => {
+    const seen = new Set<string>()
+    const out: string[] = []
+    for (const n of [...paymentModeOptions, ...savingsAccountNames]) {
+      if (!seen.has(n)) {
+        seen.add(n)
+        out.push(n)
+      }
+    }
+    return out
+  }, [paymentModeOptions, savingsAccountNames])
+
   const value = useMemo(
     (): FintrackerModesContextValue => ({
       loading,
@@ -128,7 +148,7 @@ export function FintrackerModesProvider({ children }: { children: ReactNode }) {
       creditCardNames,
       informalCreditNames,
       paymentModeOptions,
-      transferTargetOptions: paymentModeOptions,
+      transferTargetOptions,
     }),
     [
       loading,
@@ -140,6 +160,7 @@ export function FintrackerModesProvider({ children }: { children: ReactNode }) {
       creditCardNames,
       informalCreditNames,
       paymentModeOptions,
+      transferTargetOptions,
     ],
   )
 
