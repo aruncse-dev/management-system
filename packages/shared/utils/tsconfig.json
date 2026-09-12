@@ -3,7 +3,17 @@
   "compilerOptions": {
     "declaration": true,
     "declarationMap": true,
-    "outDir": "./dist"
+    "outDir": "./dist",
+    /**
+     * Without these two, the repo-root `paths` pull `@fintracker-vault/types`
+     * and `@fintracker-vault/config` *sources* into the program, tsc infers a
+     * rootDir of `packages/shared/`, and the emit lands at
+     * `dist/utils/src/index.js` — not the `dist/index.js` this package's
+     * `main`/`exports` promise. Resolving those two through node_modules (they
+     * publish correct `dist` output of their own) keeps the emit flat.
+     */
+    "rootDir": "./src",
+    "paths": {}
   },
   "include": ["src"],
   "exclude": ["dist"]
