@@ -233,10 +233,22 @@ server.tool(
     if (!loans.length) return text('No open loans.')
     const lines = loans.map(
       (l) =>
-        `${l.name}  [${l.kind}]  outstanding ${inr(l.outstanding)}  rate ${l.annualRate}%  monthly ${inr(l.monthlyPayment)}`,
+        `${l.name}  [${l.kind}]  principal ${inr(l.principalOutstanding)}  total payable ${inr(
+          l.outstanding,
+        )}  rate ${l.annualRate}%  monthly ${inr(l.monthlyPayment)}`,
     )
-    const total = loans.reduce((s, l) => s + l.outstanding, 0)
-    return text([...lines, '', `Total outstanding: ${inr(total)}`].join('\n'))
+    const totalPrincipal = loans.reduce((s, l) => s + l.principalOutstanding, 0)
+    const totalPayable = loans.reduce((s, l) => s + l.outstanding, 0)
+    return text(
+      [
+        ...lines,
+        '',
+        `Total principal outstanding: ${inr(totalPrincipal)}`,
+        `Total payable if every loan runs to term: ${inr(totalPayable)} (includes ${inr(
+          totalPayable - totalPrincipal,
+        )} of future interest)`,
+      ].join('\n'),
+    )
   },
 )
 
@@ -270,17 +282,19 @@ server.tool(
     const fmtPlan = (plan: typeof avalanche) =>
       plan.map(
         (p) =>
-          `  ${p.order}. ${p.name} [${p.kind}] rate ${p.annualRate}% outstanding ${inr(p.outstanding)} — closes in ${
+          `  ${p.order}. ${p.name} [${p.kind}] rate ${p.annualRate}% principal ${inr(
+            p.principalOutstanding,
+          )} — closes in ${
             Number.isFinite(p.closesInMonths) ? `${p.closesInMonths} months` : 'never at this payment'
           }`,
       )
 
-    const totalOutstanding = loans.reduce((s, l) => s + l.outstanding, 0)
+    const totalOutstanding = loans.reduce((s, l) => s + l.principalOutstanding, 0)
     const contractual = loans.reduce((s, l) => s + l.monthlyPayment, 0)
 
     return text(
       [
-        `Total outstanding: ${inr(totalOutstanding)} across ${loans.length} loans`,
+        `Total principal outstanding: ${inr(totalOutstanding)} across ${loans.length} loans`,
         `Derived monthly surplus: ${inr(income.surplus)}${extraPerMonth ? ` (+${inr(extraPerMonth)} extra = ${inr(surplus)})` : ''}`,
         `Contractual payments already committed: ${inr(contractual)}/month`,
         '',
@@ -303,7 +317,7 @@ server.tool(
         '',
         'Single-loan sensitivity (months to clear at contractual payment alone):',
         ...loans.map((l) => {
-          const m = monthsToPayoff(l.outstanding, l.monthlyPayment, l.annualRate)
+          const m = monthsToPayoff(l.principalOutstanding, l.monthlyPayment, l.annualRate)
           return `  ${l.name}: ${Number.isFinite(m) ? `${m} months` : 'never — no scheduled payment'}`
         }),
       ].join('\n'),

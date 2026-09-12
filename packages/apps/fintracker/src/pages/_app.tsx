@@ -58,7 +58,6 @@ const PAGE_TITLES: Record<ModuleId, string> = {
   mutualfunds: 'Mutual Funds',
   loans: 'All Loans',
   settings: 'Settings',
-  components: 'UI Kit',
 }
 
 export default function App({ Component, pageProps }: AppProps) {
@@ -106,7 +105,6 @@ export default function App({ Component, pageProps }: AppProps) {
     if (p === '/mutualfunds') return 'mutualfunds'
     if (p === '/loans') return 'loans'
     if (p === '/settings') return 'settings'
-    if (p === '/components') return 'components'
     return null
   }, [router.pathname, router.query.tab])
 
@@ -133,7 +131,6 @@ export default function App({ Component, pageProps }: AppProps) {
         mutualfunds: '/mutualfunds',
         loans: '/loans',
         settings: '/settings',
-        components: '/components',
       }
       const target = pathByModule[id] || '/monthly?tab=dash'
       try {

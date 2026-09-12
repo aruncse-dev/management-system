@@ -96,19 +96,23 @@ erDiagram
 - **Owner:** fintracker
 
 ### `lending`
-- **Columns:** org_id, name, amount, rate, months, start_date, transaction_id (FK)
+- **Columns:** id, org_id, sheet_slug, date, name, amount, type, description
+- **`sheet_slug`** selects the book: `lending` (default) or `vijaya-amma`. Same table, same page (`/lending?sheet=…`), filtered by this column.
+- **`type`** is `LEND` or `REPAY` (`RECEIVED` is accepted on input and stored as `REPAY`).
 - **Owner:** fintracker
 
 ### Gold module (fintracker)
-- **`gold_items`** — item (ring, necklace, etc.), weight, purity, purchase_price
-- **`gold_history`** — price tracking per item
-- **`gold_resources`** — reference data (purity rates, etc.)
+- **`gold_items`** — id, org_id, name, weight_g, person_id, location_id
+- **`gold_history`** — id, org_id, date, type (`IN`/`OUT`), name, weight_g, note — a movement log, not price tracking
+- **`gold_resources`** — id, org_id, type (`person`/`location`), name, skip
 - **Owner:** fintracker
 
 ### Loans module (fintracker)
 - **`cash_loans`** + **`cash_loan_repayments`** — cash loan tracking + repayment log
 - **`emi_loans`** + **`emi_loan_repayments`** — EMI loan tracking + repayment log
 - **`jewel_loans`** + **`jewel_loan_repayments`** — jewelry-backed loan tracking + repayment log
+- `loan_id` on every repayment table is plain `text` with **no foreign key**, so deleting a loan orphans its repayments.
+- `emi_loans.paid_emis` is an **opening count** (instalments paid before row-level tracking), not the whole figure — the repayment rows are everything since. Both are added.
 - **Owner:** fintracker
 
 ### `subscriptions`
@@ -116,8 +120,9 @@ erDiagram
 - **Owner:** fintracker
 
 ### Portfolio (fintracker)
-- **`mutual_funds`** — org_id, scheme_code, folio_no, quantity, avg_price, last_price, last_price_date, pledged_quantity
-- **`stocks`** — org_id, symbol, quantity, avg_price, last_price, last_price_date
+- **`mutual_funds`** — id, org_id, provider_slug, holding_key, fund_name, folio_no, instrument_key, units, avg_price, last_price, last_price_date, purchased, current_value, profit_loss, pledged_quantity, scheme_code, synced_at
+- **`stocks`** — id, org_id, provider_slug, symbol, company, isin, qty, avg_price, last_price, pnl, day_change_pct, synced_at
+- Both are a **snapshot mirror of the broker** (Upstox only today), replaced on each sync. There is no trade/lot ledger, so there is no realized P&L and a sold position simply stops appearing.
 - **`gold_items`** — (see gold module)
 - **Owner:** fintracker
 

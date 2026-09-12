@@ -13,7 +13,6 @@ const LOWERCASE_ROUTES = new Set([
   '/investments',
   '/loans',
   '/settings',
-  '/components',
   '/mutualfunds',
   '/stocks',
   '/savingspage',

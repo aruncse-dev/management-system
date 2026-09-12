@@ -119,7 +119,21 @@ export type LoanOutstanding = {
   id: string
   name: string
   kind: 'emi' | 'jewel' | 'cash'
+  /**
+   * Total still payable if the loan runs to term — principal PLUS all future
+   * contracted interest. This is the "how much more money leaves my pocket"
+   * figure the Loans page and net worth show.
+   *
+   * Never feed this to anything that applies `annualRate`: the interest is
+   * already baked in, so doing so counts it twice.
+   */
   outstanding: number
+  /**
+   * Principal still owed, with future interest stripped out. This is the
+   * balance that actually accrues `annualRate`, so it is what every payoff
+   * and amortization projection must be built from.
+   */
+  principalOutstanding: number
   annualRate: number
   monthlyPayment: number
 }
@@ -134,6 +148,13 @@ export type LoanOutstanding = {
  *  - Jewel: principal × (1 + rate/100) − repayments. `rate` is applied flat,
  *           with no time dimension, exactly as the page does today.
  *  - Cash:  principal − repayments. Interest-free.
+ *
+ * `principalOutstanding` is the same debt with future interest removed. Payoff
+ * math re-applies `annualRate` itself, so handing it `outstanding` charges
+ * interest on interest — every projection then came out too slow and too
+ * expensive. The two figures are deliberately both returned rather than one
+ * being derived at each call site, because which one is correct depends
+ * entirely on whether the caller applies a rate.
  */
 export async function getLoanOutstanding(
   db: Db,
@@ -146,11 +167,14 @@ export async function getLoanOutstanding(
     db.select().from(jewelLoans).where(scopeOf(jewelLoans, orgId)),
     db.select().from(cashLoans).where(scopeOf(cashLoans, orgId)),
     // An empty list is valid: the loan then shows only its opening count.
-    db
-      .select()
-      .from(emiLoanRepayments)
-      .where(scopeOf(emiLoanRepayments, orgId))
-      .catch(() => [] as { loanId: string; amount: string | null }[]),
+    //
+    // This read used to swallow every error into an empty list, from a time the
+    // table might not have existed. It does now — but the swallow also turned a
+    // permission or connection failure into "no repayments recorded", which
+    // understates what has been paid and so overstates every outstanding
+    // balance and payoff projection built on it. A missing table should fail
+    // loudly rather than quietly produce wrong money.
+    db.select().from(emiLoanRepayments).where(scopeOf(emiLoanRepayments, orgId)),
     db.select().from(jewelLoanRepayments).where(scopeOf(jewelLoanRepayments, orgId)),
     db.select().from(cashLoanRepayments).where(scopeOf(cashLoanRepayments, orgId)),
   ])
@@ -181,12 +205,23 @@ export async function getLoanOutstanding(
     const paid = emi * (r.paidEmis ?? 0) + (emiPaid.get(r.id) ?? 0)
     const outstanding = emi * r.tenureMonths - paid
     if (outstanding <= 0) continue
+    const annualRate = num(r.rate)
+    // Principal balance = present value of the instalments still to run. The
+    // instalment count is derived from the rupees paid (not `paidEmis` alone)
+    // so part-payments shorten the schedule instead of being ignored.
+    const monthlyRate = annualRate / 12 / 100
+    const instalmentsLeft = emi > 0 ? Math.max(r.tenureMonths - paid / emi, 0) : 0
+    const principalOutstanding =
+      monthlyRate > 0 && instalmentsLeft > 0
+        ? (emi * (1 - Math.pow(1 + monthlyRate, -instalmentsLeft))) / monthlyRate
+        : outstanding
     out.push({
       id: r.id,
       name: r.name,
       kind: 'emi',
       outstanding,
-      annualRate: num(r.rate),
+      principalOutstanding: Math.min(principalOutstanding, outstanding),
+      annualRate,
       monthlyPayment: emi,
     })
   }
@@ -194,13 +229,17 @@ export async function getLoanOutstanding(
   for (const r of jewelRows) {
     if (!isOpen(r.status)) continue
     const principal = num(r.principal)
-    const outstanding = principal * (1 + num(r.rate) / 100) - (jewelPaid.get(r.id) ?? 0)
+    const repaid = jewelPaid.get(r.id) ?? 0
+    const outstanding = principal * (1 + num(r.rate) / 100) - repaid
     if (outstanding <= 0) continue
     out.push({
       id: r.id,
       name: r.name,
       kind: 'jewel',
       outstanding,
+      // Repayments are treated as principal-first, so the interest-bearing
+      // balance falls as they land.
+      principalOutstanding: Math.min(Math.max(principal - repaid, 0), outstanding),
       annualRate: num(r.rate),
       monthlyPayment: 0,
     })
@@ -215,6 +254,8 @@ export async function getLoanOutstanding(
       name: r.personName,
       kind: 'cash',
       outstanding,
+      // Interest-free, so the two bases are the same figure.
+      principalOutstanding: outstanding,
       annualRate: 0,
       monthlyPayment: 0,
     })

@@ -71,8 +71,16 @@ git commit -m "feat(db): add account_type and institution to savings"
 - Individual `.sql` migration files are the audit trail — keep them, never delete
 - Write idempotent SQL (`ADD COLUMN IF NOT EXISTS`, `DROP COLUMN IF EXISTS`) so files can be re-run safely
 - Update the Drizzle TS schema **in the same commit** as the migration file
-- `schema.sql` is a reference snapshot only — never auto-generated or synced
+- `packages/shared/db/migrations/schema.sql` is generated from the Drizzle TS schema by `pnpm --filter @fintracker-vault/db run export-schema` — never hand-edit it. It reflects the TS schema, not the live database, so anything the TS schema omits (indexes, for one) will be missing from it.
 - All migrations are manual — apply directly to Neon, no automation
+
+> **Known drift — indexes.** The live database has ~61 indexes; the Drizzle TS
+> schema under `src/schema/` declares **none**. They were created by hand-run
+> `.sql` and never described in TypeScript, so `export-schema` cannot emit them
+> and a database provisioned from `drizzle:push` or `migrations/schema.sql`
+> comes up with primary keys only. Check `pg_indexes` against the target before
+> treating either file as complete, and add `index()` declarations to the TS
+> schema when you next touch a table.
 
 ---
 

@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 import {
   CalendarDays,
   Gem,
-  LayoutGrid,
   Layers3,
   LogOut,
   PiggyBank,
@@ -31,7 +30,6 @@ export type ModuleId =
   | 'mutualfunds'
   | 'loans'
   | 'settings'
-  | 'components'
 
 export type AppNavArea = 'finance' | 'vault'
 
@@ -49,14 +47,9 @@ export type NavDynamicMenuSection = {
 
 /** Shown in drawer footer; omit from org-driven sections to avoid duplicates. */
 function isFooterOnlyMenuItem(m: NavDynamicMenuItem): boolean {
-  if (m.id === 'settings' || m.id === 'components') return true
+  if (m.id === 'settings') return true
   const p = m.path.trim()
-  return (
-    p === '/settings' ||
-    p.startsWith('/settings?') ||
-    p === '/components' ||
-    p.startsWith('/components?')
-  )
+  return p === '/settings' || p.startsWith('/settings?')
 }
 
 function pathDrawerActive(currentAsPath: string, itemPath: string) {
@@ -292,17 +285,6 @@ export default function Nav({
                 <Settings size={18} />
                 <span>Settings</span>
               </button>
-              <button
-                type="button"
-                className={`nav-drawer-item${module === 'components' ? ' active' : ''}`}
-                onClick={() => {
-                  onModule('components')
-                  setDrawerOpen(false)
-                }}
-              >
-                <LayoutGrid size={18} />
-                <span>UI Kit</span>
-              </button>
               {onLogout && (
                 <button type="button" className="nav-drawer-item" onClick={() => setLogoutConfirmOpen(true)}>
                   <LogOut size={18} />
@@ -379,17 +361,6 @@ export default function Nav({
               >
                 <Settings size={18} />
                 <span>Settings</span>
-              </button>
-              <button
-                type="button"
-                className={`nav-drawer-item${module === 'components' ? ' active' : ''}`}
-                onClick={() => {
-                  onModule('components')
-                  setDrawerOpen(false)
-                }}
-              >
-                <LayoutGrid size={18} />
-                <span>UI Kit</span>
               </button>
               {onLogout && (
                 <button type="button" className="nav-drawer-item" onClick={() => setLogoutConfirmOpen(true)}>

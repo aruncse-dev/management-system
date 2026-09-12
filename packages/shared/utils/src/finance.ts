@@ -43,7 +43,11 @@ export function monthsToPayoff(
 
   const n =
     -Math.log(1 - (outstanding * monthlyRate) / monthlyPayment) / Math.log(1 + monthlyRate)
-  return Number.isFinite(n) ? Math.ceil(n) : Number.POSITIVE_INFINITY
+  if (!Number.isFinite(n)) return Number.POSITIVE_INFINITY
+  // The balance is itself derived from a log/pow round trip, so a whole number
+  // of instalments lands a hair above the integer. Without the tolerance a loan
+  // with exactly 60 payments left reports 61.
+  return Math.ceil(n - 1e-9)
 }
 
 /** Monthly payment needed to clear `outstanding` in exactly `months`. */
@@ -129,7 +133,17 @@ export type PayoffLoan = {
   id: string
   name: string
   kind: 'emi' | 'jewel' | 'cash'
-  outstanding: number
+  /**
+   * Principal still owed, with future interest EXCLUDED.
+   *
+   * Named for the basis rather than just `outstanding` on purpose: the loan
+   * queries also carry a total-payable figure that already includes contracted
+   * interest, and the functions here re-apply `annualRate` themselves. Passing
+   * the wrong one charges interest twice and is invisible in the output — it
+   * just makes every projection quietly pessimistic. The distinct name makes
+   * that a compile error instead of a silent one.
+   */
+  principalOutstanding: number
   /** Annual %. Cash loans are interest-free (0); jewel rate is flat, see note below. */
   annualRate: number
   /** Contractual monthly payment. 0 for jewel/cash, which have no schedule. */
@@ -156,18 +170,18 @@ export function planPayoff(
   monthlySurplus: number,
   strategy: 'avalanche' | 'snowball',
 ): PayoffStep[] {
-  const active = loans.filter((l) => l.outstanding > 0)
+  const active = loans.filter((l) => l.principalOutstanding > 0)
   const ordered = [...active].sort((a, b) =>
     strategy === 'avalanche'
-      ? b.annualRate - a.annualRate || a.outstanding - b.outstanding
-      : a.outstanding - b.outstanding || b.annualRate - a.annualRate,
+      ? b.annualRate - a.annualRate || a.principalOutstanding - b.principalOutstanding
+      : a.principalOutstanding - b.principalOutstanding || b.annualRate - a.annualRate,
   )
 
   let pool = Math.max(monthlySurplus, 0) + ordered.reduce((s, l) => s + l.monthlyPayment, 0)
   let elapsed = 0
 
   return ordered.map((loan, i) => {
-    const months = monthsToPayoff(loan.outstanding, pool, loan.annualRate)
+    const months = monthsToPayoff(loan.principalOutstanding, pool, loan.annualRate)
     if (Number.isFinite(months)) elapsed += months
     // This loan's own payment stays in the pool for the next target.
     return { ...loan, order: i + 1, closesInMonths: Number.isFinite(months) ? elapsed : months }
@@ -184,8 +198,11 @@ export function closeAllWithin(
   monthlySurplus: number,
 ): { requiredMonthly: number; availableMonthly: number; shortfall: number; feasible: boolean } {
   const requiredMonthly = loans
-    .filter((l) => l.outstanding > 0)
-    .reduce((sum, l) => sum + requiredPaymentForMonths(l.outstanding, l.annualRate, months), 0)
+    .filter((l) => l.principalOutstanding > 0)
+    .reduce(
+      (sum, l) => sum + requiredPaymentForMonths(l.principalOutstanding, l.annualRate, months),
+      0,
+    )
   const availableMonthly =
     Math.max(monthlySurplus, 0) + loans.reduce((s, l) => s + l.monthlyPayment, 0)
   const shortfall = Math.max(requiredMonthly - availableMonthly, 0)

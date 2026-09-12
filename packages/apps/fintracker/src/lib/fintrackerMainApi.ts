@@ -28,6 +28,7 @@ import {
   transactions,
   getIntegrationProviderBySlug,
   integrationHasCredentials,
+  resolveIntegrationProviderCredentials,
   listOrgsForUserEmail,
   users,
   getIncomeExpenseTrend,
@@ -284,6 +285,54 @@ function goldWeight(v: unknown): string | null {
 function reqText(v: unknown): string | null {
   const s = typeof v === 'string' ? v.trim() : ''
   return s ? s : null
+}
+
+/** Largest value `numeric(12,2)` can hold: 12 digits total, 2 after the point. */
+const MAX_MONEY = 9_999_999_999.99
+
+/**
+ * A money amount as a storable string, or null when unusable.
+ *
+ * Same reasoning as `goldWeight`: `num()` turns unparseable input into 0 and
+ * lets negatives through, so "abc" booked a ₹0 row and a negative booked a debt
+ * that ran the wrong way — both silently, since nothing downstream re-checks.
+ */
+function moneyAmount(v: unknown): string | null {
+  if (typeof v === 'boolean' || v === null || v === undefined) return null
+  const n = typeof v === 'number' ? v : parseFloat(String(v))
+  if (!Number.isFinite(n) || n <= 0 || n > MAX_MONEY) return null
+  return String(Math.round(n * 100) / 100)
+}
+
+/**
+ * Strict `yyyy-mm-dd`, or null.
+ *
+ * `date` columns reject anything else with a driver error that surfaces as a
+ * bare 500, so the shape is checked before it reaches Postgres. Distinct from
+ * the imported `isoDate`, which converts the legacy `dd-MMM-yy` display format.
+ */
+function strictIsoDate(v: unknown): string | null {
+  const s = typeof v === 'string' ? v.trim() : ''
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null
+  return Number.isNaN(new Date(`${s}T00:00:00Z`).getTime()) ? null : s
+}
+
+/**
+ * Canonical stored lending types.
+ *
+ * The column held both `REPAY` and `RECEIVED` for the same concept because the
+ * write path accepted any string at all. `REPAY` is what the page and the
+ * transaction mirror already send, so it wins; `RECEIVED` is still accepted on
+ * input and folded into it. Anything else is rejected rather than stored —
+ * previously an unrecognised type produced a row the page drops on parse,
+ * leaving it in the database, counted nowhere and impossible to delete from
+ * the UI.
+ */
+function lendingType(v: unknown): 'LEND' | 'REPAY' | null {
+  const s = typeof v === 'string' ? v.trim().toUpperCase() : ''
+  if (s === 'LEND') return 'LEND'
+  if (s === 'REPAY' || s === 'RECEIVED') return 'REPAY'
+  return null
 }
 
 function readOpeningBal(settings: unknown): Record<string, number> {
@@ -845,6 +894,19 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
               res,
               400,
               'Integration API key and secret are missing. Set them in Admin → Integrations or via INTEGRATION_<SLUG>_CLIENT_ID / _CLIENT_SECRET env.',
+              traceId,
+            )
+          }
+          // `integrationHasCredentials` only proves the encrypted column is
+          // non-empty; it cannot tell whether the value decrypts. Without
+          // FIELD_ENCRYPTION_KEY the secret silently resolves to '' and this
+          // used to surface as "not enabled for this organization", sending
+          // you to check org config that was already correct.
+          if (!(await resolveIntegrationProviderCredentials(row))) {
+            return fail(
+              res,
+              500,
+              'Integration secret could not be decrypted. Set FIELD_ENCRYPTION_KEY (32+ chars) to the same value used when the secret was saved, or re-enter the secret in Admin → Integrations. See ai/docs/sensitive-field-encryption.md.',
               traceId,
             )
           }
@@ -1452,17 +1514,26 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
       if (mod === 'lending') {
         const book = normalizeLendingSheetSlug(body.sheetName ?? body.sheet)
         if (action === 'addEntry') {
+          const name = reqText(body.name)
+          if (!name) return fail(res, 400, 'Person name is required', traceId)
+          const amount = moneyAmount(body.amount)
+          if (!amount) return fail(res, 400, 'Amount must be a number greater than 0', traceId)
+          const type = lendingType(body.type ?? 'LEND')
+          if (!type) return fail(res, 400, 'Type must be LEND or RECEIVED', traceId)
+          const dateStr =
+            body.date === undefined ? new Date().toISOString().slice(0, 10) : strictIsoDate(body.date)
+          if (!dateStr) return fail(res, 400, 'Date must be yyyy-mm-dd', traceId)
+
           const id = crypto.randomUUID()
-          const dateStr = typeof body.date === 'string' ? body.date : new Date().toISOString().slice(0, 10)
           await db.insert(lending).values({
             id,
             orgId: scopeOrgId,
             sheetSlug: book,
             date: dateStr,
-            name: String(body.name ?? ''),
-            amount: String(num(body.amount as string | number)),
-            type: String(body.type ?? 'LEND'),
-            description: typeof body.description === 'string' ? body.description : null,
+            name,
+            amount,
+            type,
+            description: reqText(body.description),
           })
           return ok(res, id, traceId)
         }
@@ -1470,24 +1541,52 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
           if (transactionIdFromMirrorId(id)) return fail(res, 409, MIRROR_READONLY_MESSAGE, traceId)
-          await db
+
+          // Each field is optional, but a field that IS supplied must be valid —
+          // otherwise a bad value silently became `undefined` and the update
+          // reported success having changed nothing.
+          const patch: Partial<typeof lending.$inferInsert> = {}
+          if (body.date !== undefined) {
+            const d = strictIsoDate(body.date)
+            if (!d) return fail(res, 400, 'Date must be yyyy-mm-dd', traceId)
+            patch.date = d
+          }
+          if (body.name !== undefined) {
+            const n = reqText(body.name)
+            if (!n) return fail(res, 400, 'Person name is required', traceId)
+            patch.name = n
+          }
+          if (body.amount !== undefined) {
+            const a = moneyAmount(body.amount)
+            if (!a) return fail(res, 400, 'Amount must be a number greater than 0', traceId)
+            patch.amount = a
+          }
+          if (body.type !== undefined) {
+            const t = lendingType(body.type)
+            if (!t) return fail(res, 400, 'Type must be LEND or RECEIVED', traceId)
+            patch.type = t
+          }
+          // `null` clears the note; previously only '' worked and `null` was a no-op.
+          if (body.description !== undefined) patch.description = reqText(body.description)
+
+          if (Object.keys(patch).length === 0) return ok(res, true, traceId)
+
+          const updated = await db
             .update(lending)
-            .set({
-              date: typeof body.date === 'string' ? body.date : undefined,
-              name: typeof body.name === 'string' ? body.name : undefined,
-              amount: body.amount !== undefined ? String(num(body.amount as string | number)) : undefined,
-              type: typeof body.type === 'string' ? body.type : undefined,
-              description: typeof body.description === 'string' ? body.description : undefined,
-            })
+            .set(patch)
             .where(and(whereOrgFilter(lending, budgetScope), eq(lending.id, id), eq(lending.sheetSlug, book)))
+            .returning({ id: lending.id })
+          if (!updated.length) return fail(res, 404, 'Lending entry not found', traceId)
           return ok(res, true, traceId)
         }
         if (action === 'deleteEntry') {
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
-          await db
+          const removed = await db
             .delete(lending)
             .where(and(whereOrgFilter(lending, budgetScope), eq(lending.id, id), eq(lending.sheetSlug, book)))
+            .returning({ id: lending.id })
+          if (!removed.length) return fail(res, 404, 'Lending entry not found', traceId)
           // Deleting a mirrored row unlinks the transaction that made it.
           // Without this the row returns on that transaction's next save.
           await unlinkMirrorSource(db, budgetScope, id)
