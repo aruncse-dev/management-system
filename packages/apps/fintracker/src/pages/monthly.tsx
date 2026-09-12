@@ -301,10 +301,6 @@ export default function Monthly() {
           amountPlaceholder={money.zeroPlaceholder}
           refOptions={refOptions}
           onClose={() => setModalOpen(false)}
-          onDuplicate={r => {
-            setEditRow(duplicateOf(r))
-            setModalNonce(n => n + 1)
-          }}
           onSaved={async () => {
             setModalOpen(false)
             await loadMonth(state.month, state.year, true)

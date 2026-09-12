@@ -2,6 +2,7 @@ import { useState, useEffect, useLayoutEffect, useCallback, useMemo, memo } from
 import { useRouter } from 'next/router'
 import { Search, LayoutDashboard, Handshake, ArrowDownLeft, BarChart3, Shield, User, ArrowUpRight, Plus } from 'lucide-react'
 import { api, RawLendingRow } from '../api'
+import { isMirroredRow, MIRRORED_ROW_NOTE } from '../lib/mirroredRows'
 import { LENDING_SHEET_SLUG_VIJAYA, normalizeLendingSheetSlug } from '../lib/lendingSheetSlug'
 import { useFormatMoney, useMoneyFormatting } from '../hooks/useFormatMoney'
 import { CategoryCombobox, FormField, HoldingCard, KpiCard, KpiGrid, LoadingState, SearchField, SectionBlock, SectionChip } from '../ui'
@@ -240,6 +241,9 @@ export default function Lending({ sheetSlug: sheetSlugProp, onTabChange }: Lendi
     setModalOpen(true)
   }
 
+  /** The open entry came from a transaction: the register owns every field. */
+  const editIsMirrored = Boolean(editEntry && isMirroredRow(editEntry.id))
+
   function closeModal() {
     setModalOpen(false)
     setEditEntry(null)
@@ -468,15 +472,20 @@ export default function Lending({ sheetSlug: sheetSlugProp, onTabChange }: Lendi
             </div>
             <div className="modal-body">
               <div className="ui-stack">
+                {editIsMirrored && (
+                  <p className="ui-kit-callout ui-tone-amber" role="note">
+                    {MIRRORED_ROW_NOTE}
+                  </p>
+                )}
                 <FormField label="Type">
-                  <select className="form-sel" value={form.type} onChange={e => set('type', e.target.value as LendType)}>
+                  <select className="form-sel" disabled={editIsMirrored} value={form.type} onChange={e => set('type', e.target.value as LendType)}>
                     <option value="LEND">Given</option>
                     <option value="RECEIVED">Received</option>
                   </select>
                 </FormField>
                 <FormField label={form.type === 'RECEIVED' ? 'From Person' : 'To Person'}>
                   {form.type === 'RECEIVED' ? (
-                    <select className="form-sel" value={form.name} onChange={e => set('name', e.target.value)}>
+                    <select className="form-sel" disabled={editIsMirrored} value={form.name} onChange={e => set('name', e.target.value)}>
                       <option value="">Select person</option>
                       {people.map(p => (
                         <option key={p.name} value={p.name}>{p.name}</option>
@@ -495,13 +504,13 @@ export default function Lending({ sheetSlug: sheetSlugProp, onTabChange }: Lendi
                   )}
                 </FormField>
                 <FormField label={`Amount (${currency})`}>
-                  <input className="form-inp" type="number" min="0" step="1" placeholder={zeroPlaceholder} value={form.amount} onChange={e => set('amount', e.target.value)} />
+                  <input className="form-inp" disabled={editIsMirrored} type="number" min="0" step="1" placeholder={zeroPlaceholder} value={form.amount} onChange={e => set('amount', e.target.value)} />
                 </FormField>
                 <FormField label="Date">
-                  <input className="form-inp" type="date" value={form.date} onChange={e => set('date', e.target.value)} />
+                  <input className="form-inp" disabled={editIsMirrored} type="date" value={form.date} onChange={e => set('date', e.target.value)} />
                 </FormField>
                 <FormField label="Description">
-                  <input className="form-inp" type="text" placeholder="Optional" value={form.description} onChange={e => set('description', e.target.value)} />
+                  <input className="form-inp" disabled={editIsMirrored} type="text" placeholder="Optional" value={form.description} onChange={e => set('description', e.target.value)} />
                 </FormField>
               </div>
             </div>
@@ -513,11 +522,15 @@ export default function Lending({ sheetSlug: sheetSlugProp, onTabChange }: Lendi
               )}
               <div className="modal-foot-l" />
               <button type="button" className="btn btn-sm btn-cancel" onClick={closeModal} disabled={saving}>
-                Cancel
+                {editIsMirrored ? 'Close' : 'Cancel'}
               </button>
-              <button type="button" className="btn btn-sm btn-green" onClick={save} disabled={saving}>
-                {saving ? 'Saving...' : editEntry ? 'Save' : 'Add'}
-              </button>
+              {/* Nothing here to save: the transaction owns every field. Delete
+                  stays live — it unlinks the pair and keeps the transaction. */}
+              {!editIsMirrored && (
+                <button type="button" className="btn btn-sm btn-green" onClick={save} disabled={saving}>
+                  {saving ? 'Saving...' : editEntry ? 'Save' : 'Add'}
+                </button>
+              )}
             </div>
           </div>
         </div>

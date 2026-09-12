@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
 import { Banknote, BarChart3, CreditCard, Landmark, Clock, Layers3, ArrowDownLeft, ArrowUpRight, Plus } from 'lucide-react'
 import { api, RawCashLoanHistoryRow, RawCashLoanRow, RawEmiLoanHistoryRow, RawEmiRow, RawJewelLoanHistoryRow, RawJewelLoanRow } from '../api'
+import { isMirroredRow, MIRRORED_ROW_BADGE, MIRRORED_ROW_NOTE } from '../lib/mirroredRows'
 import { useFormatMoney } from '../hooks/useFormatMoney'
 import { FilterChips, FormField, HoldingCard, KpiCard, KpiGrid, LoadingState, ModalActions, ModalShell, SectionBlock, SectionChip } from '../ui'
 
@@ -341,14 +342,6 @@ function buildCashLoansWithHistory(rows: RawCashLoanRow[], history: RawCashLoanH
   })
 }
 
-/**
- * Repayments the server mirrored from a linked transaction carry a derived id,
- * which is what makes the pair addressable without a foreign key.
- */
-function isFromTransaction(id: string): boolean {
-  return String(id).startsWith('txn:')
-}
-
 function buildHistory(
   jewelHistory: RawJewelLoanHistoryRow[],
   cashHistory: RawCashLoanHistoryRow[],
@@ -362,13 +355,13 @@ function buildHistory(
       source: 'EMI',
       kind: 'Payment',
       title: 'Repayment',
-      subtitle: isFromTransaction(raw.id) ? 'From transaction' : String(raw.note ?? '').trim() || 'EMI Loan',
+      subtitle: isMirroredRow(raw.id) ? MIRRORED_ROW_BADGE : String(raw.note ?? '').trim() || 'EMI Loan',
       date: String(raw.date ?? ''),
       amount: parseNumber(raw.amount),
       tone: 'green',
       sourceLoanId: raw.loan_id,
       sourcePaymentId: raw.id,
-      fromTransaction: isFromTransaction(raw.id),
+      fromTransaction: isMirroredRow(raw.id),
     })
   })
 
@@ -378,13 +371,13 @@ function buildHistory(
       source: 'Jewel',
       kind: 'Payment',
       title: `Repayment`,
-      subtitle: isFromTransaction(raw.id) ? 'From transaction' : String(raw.note ?? '').trim() || 'Jewel Loan',
+      subtitle: isMirroredRow(raw.id) ? MIRRORED_ROW_BADGE : String(raw.note ?? '').trim() || 'Jewel Loan',
       date: String(raw.date ?? ''),
       amount: parseNumber(raw.amount),
       tone: 'green',
       sourceLoanId: raw.loan_id,
       sourcePaymentId: raw.id,
-      fromTransaction: isFromTransaction(raw.id),
+      fromTransaction: isMirroredRow(raw.id),
     })
   })
 
@@ -394,13 +387,13 @@ function buildHistory(
       source: 'Cash',
       kind: 'Payment',
       title: 'Repayment',
-      subtitle: isFromTransaction(raw.id) ? 'From transaction' : String(raw.note ?? '').trim() || 'Cash Loan',
+      subtitle: isMirroredRow(raw.id) ? MIRRORED_ROW_BADGE : String(raw.note ?? '').trim() || 'Cash Loan',
       date: String(raw.date ?? ''),
       amount: parseNumber(raw.amount),
       tone: 'green',
       sourceLoanId: raw.loan_id,
       sourcePaymentId: raw.id,
-      fromTransaction: isFromTransaction(raw.id),
+      fromTransaction: isMirroredRow(raw.id),
     })
   })
 
@@ -851,10 +844,10 @@ export default function Loans() {
   }
 
   function openHistoryEdit(row: CombinedHistoryRow) {
-    if (row.fromTransaction) {
-      setError('This repayment came from a transaction — edit it in Monthly → Transactions.')
-      return
-    }
+    // A mirrored row opens like any other. Its amount and date belong to the
+    // transaction so those fields are locked, but Delete stays live — that is
+    // the one action that means something here, and it unlinks rather than
+    // destroying the transaction.
     if (row.kind === 'Payment' && row.sourcePaymentId) {
       setRepayType(row.source === 'Cash' ? 'cash' : row.source === 'EMI' ? 'emi' : 'jewel')
       setRepayEditItem(row)
@@ -868,6 +861,9 @@ export default function Loans() {
       setRepayModalOpen(true)
     }
   }
+
+  /** The open repayment belongs to a transaction: every field is read-only. */
+  const repayIsMirrored = Boolean(repayEditItem?.fromTransaction)
 
   function closeRepayment() {
     setRepayModalOpen(false)
@@ -1558,7 +1554,10 @@ export default function Loans() {
           footer={
             <ModalActions
               primaryLabel={repaySaving ? 'Saving…' : repayEditItem ? 'Save' : 'Add'}
-              secondaryLabel="Cancel"
+              secondaryLabel={repayIsMirrored ? 'Close' : 'Cancel'}
+              // Every field belongs to the transaction, so there is nothing here
+              // to save. Delete stays — it unlinks the pair.
+              hidePrimary={repayIsMirrored}
               onPrimary={saveRepayment}
               onSecondary={closeRepayment}
               leading={repayEditItem ? (
@@ -1571,6 +1570,11 @@ export default function Loans() {
           }
         >
           <div style={{ display: 'grid', gap: 8 }}>
+            {repayIsMirrored && (
+              <p className="ui-kit-callout ui-tone-amber" role="note">
+                {MIRRORED_ROW_NOTE}
+              </p>
+            )}
             {activeTab === 'history' && !repayEditItem && (
               <FormField label="Loan Type">
                 <select
@@ -1622,13 +1626,13 @@ export default function Loans() {
               </select>
             </FormField>
             <FormField label="Date">
-              <input className="form-inp" type="date" value={repayForm.date} onChange={e => setRepayForm(f => ({ ...f, date: e.target.value }))} />
+              <input className="form-inp" type="date" value={repayForm.date} disabled={repayIsMirrored} onChange={e => setRepayForm(f => ({ ...f, date: e.target.value }))} />
             </FormField>
             <FormField label="Amount">
-              <input className="form-inp" type="number" value={repayForm.amount} onChange={e => setRepayForm(f => ({ ...f, amount: e.target.value }))} />
+              <input className="form-inp" type="number" value={repayForm.amount} disabled={repayIsMirrored} onChange={e => setRepayForm(f => ({ ...f, amount: e.target.value }))} />
             </FormField>
             <FormField label="Note">
-              <input className="form-inp" type="text" value={repayForm.note} onChange={e => setRepayForm(f => ({ ...f, note: e.target.value }))} />
+              <input className="form-inp" type="text" value={repayForm.note} disabled={repayIsMirrored} onChange={e => setRepayForm(f => ({ ...f, note: e.target.value }))} />
             </FormField>
           </div>
         </ModalShell>

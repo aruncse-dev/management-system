@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useLayoutEffect, type FormEvent } from 'react';
+import { useState, useEffect, useCallback, useLayoutEffect, useMemo, type FormEvent } from 'react';
 import { useRouter } from 'next/router';
 import {
   Loader2,
@@ -10,9 +10,6 @@ import {
   CreditCard,
   Plus,
   Users,
-  Banknote,
-  Landmark,
-  PiggyBank,
   CalendarRange,
   Coins,
   DollarSign,
@@ -24,6 +21,7 @@ import {
 } from 'lucide-react';
 import {
   api,
+  type AccountKind,
   type AccountRow,
   type AccountUsedFor,
   type CreditSourceCategory,
@@ -31,7 +29,8 @@ import {
   type GoldResource,
   type ProfileData,
 } from '../api';
-import { THEME_COLORS } from '../config';
+import { ACCOUNT_KINDS, accountKindMeta, THEME_COLORS } from '../config';
+import { AccountKindPills, kindsPresent } from '../components/AccountKindPills';
 import {
   LoadingState,
   SectionBlock,
@@ -91,15 +90,6 @@ type ValidateLiveArg = boolean | { forceInvalidate?: boolean; background?: boole
 /** Same shell as `TransactionCard` lists on Accounts / Credits (holding row + txn border). */
 const GENERAL_SETTINGS_PANEL =
   'ui-kit-holding-card ui-kit-holding-card--accent-navy txn-entry-card' as const
-
-/** Account row icon from name (case-insensitive); credits use fixed icons. */
-function accountNameIcon(name: string) {
-  const s = name.toLowerCase()
-  if (s.includes('cash')) return <Banknote size={14} aria-hidden />
-  if (s.includes('bank')) return <Landmark size={14} aria-hidden />
-  if (s.includes('wallet')) return <Wallet size={14} aria-hidden />
-  return <PiggyBank size={14} aria-hidden />
-}
 
 export default function Settings() {
   const router = useRouter();
@@ -176,6 +166,9 @@ export default function Settings() {
   const [acctName, setAcctName] = useState('');
   const [acctDesc, setAcctDesc] = useState('');
   const [acctUsed, setAcctUsed] = useState<AccountUsedFor>('both');
+  const [acctKind, setAcctKind] = useState<AccountKind>('savings_bank');
+  // Blank means the account is still open; closing is reversible by clearing it.
+  const [acctClosedOn, setAcctClosedOn] = useState('');
   // Recurring-deposit terms. Held as strings so an empty box means "not an RD"
   // rather than 0, which would read as a real instalment.
   const [acctRdInstalment, setAcctRdInstalment] = useState('');
@@ -184,6 +177,12 @@ export default function Settings() {
   const [acctRdStart, setAcctRdStart] = useState('');
   const [acctRdMaturity, setAcctRdMaturity] = useState('');
   const [acctBusy, setAcctBusy] = useState(false);
+  /** `''` shows every kind. */
+  const [acctKindFilter, setAcctKindFilter] = useState('');
+  const visibleAccounts = useMemo(
+    () => (acctKindFilter ? dbAccounts.filter((a) => (a.accountKind || 'savings_bank') === acctKindFilter) : dbAccounts),
+    [dbAccounts, acctKindFilter],
+  );
 
   const [crId, setCrId] = useState<string | undefined>();
   const [crName, setCrName] = useState('');
@@ -460,6 +459,8 @@ export default function Settings() {
     setAcctName('');
     setAcctDesc('');
     setAcctUsed('both');
+    setAcctKind('savings_bank');
+    setAcctClosedOn('');
     setAcctRdInstalment('');
     setAcctRdDay('');
     setAcctRdMonths('');
@@ -490,6 +491,8 @@ export default function Settings() {
     setAcctName(a.name);
     setAcctDesc(a.description ?? '');
     setAcctUsed((a.usedFor as AccountUsedFor) || 'both');
+    setAcctKind((a.accountKind as AccountKind) || 'savings_bank');
+    setAcctClosedOn(a.closedOn ?? '');
     setAcctRdInstalment(a.rdInstalment != null ? String(a.rdInstalment) : '');
     setAcctRdDay(a.rdDay != null ? String(a.rdDay) : '');
     setAcctRdMonths(a.rdMonths != null ? String(a.rdMonths) : '');
@@ -510,6 +513,8 @@ export default function Settings() {
           name: acctName.trim(),
           description: acctDesc.trim() || null,
           usedFor: acctUsed,
+          accountKind: acctKind,
+          closedOn: acctClosedOn.trim() || null,
           rdInstalment: acctRdInstalment.trim() || null,
           rdDay: acctRdDay.trim() || null,
           rdMonths: acctRdMonths.trim() || null,
@@ -1033,17 +1038,29 @@ export default function Settings() {
                   No accounts yet. Use + above to add one.
                 </p>
               ) : (
-                <div className="txn-cards">
-                  {dbAccounts.map((a) => (
-                    <TransactionCard
-                      key={a.id}
-                      compact
-                      title={a.name}
-                      tone="navy"
-                      icon={accountNameIcon(a.name)}
-                      onClick={() => startEditAccount(a)}
-                    />
-                  ))}
+                <div className="ui-stack">
+                  <AccountKindPills
+                    kinds={kindsPresent(dbAccounts)}
+                    active={acctKindFilter}
+                    onChange={setAcctKindFilter}
+                  />
+                  <div className="txn-cards">
+                    {visibleAccounts.map((a) => {
+                      const meta = accountKindMeta(a.accountKind);
+                      return (
+                        <TransactionCard
+                          key={a.id}
+                          compact
+                          // A closed account stays in the list — it holds history,
+                          // and hiding it is what `is_active` already does badly.
+                          title={a.closedOn ? `${a.name} · closed` : a.name}
+                          tone={a.closedOn ? 'muted' : 'navy'}
+                          icon={<meta.icon size={14} aria-hidden />}
+                          onClick={() => startEditAccount(a)}
+                        />
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </SectionBlock>
@@ -1299,6 +1316,23 @@ export default function Settings() {
                       <FormField label="Description">
                         <input className="form-inp" value={acctDesc} onChange={(e) => setAcctDesc(e.target.value)} />
                       </FormField>
+                      <FormField label="Type">
+                        {/* Chips rather than a select: five short options that read
+                            faster side by side, and they match the account/credit
+                            switch at the top of this same modal. */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                          {ACCOUNT_KINDS.map((k) => (
+                            <button
+                              key={k.value}
+                              type="button"
+                              className={`ui-kit-btn ui-kit-btn-inline${acctKind === k.value ? ' ui-kit-btn--solid' : ' ui-kit-btn--soft'}`}
+                              onClick={() => setAcctKind(k.value)}
+                            >
+                              <k.icon size={13} aria-hidden /> {k.label}
+                            </button>
+                          ))}
+                        </div>
+                      </FormField>
                       <FormField label="Used for">
                         <select
                           className="form-sel"
@@ -1310,7 +1344,18 @@ export default function Settings() {
                           <option value="both">Both</option>
                         </select>
                       </FormField>
-                      {acctUsed === 'savings' && (
+                      <FormField label="Closed on (leave blank if still open)">
+                        {/* Closing keeps the account and its balance on the Savings
+                            page; it only stops new money being sent there. Clearing
+                            the box reopens it. */}
+                        <input
+                          className="form-inp"
+                          type="date"
+                          value={acctClosedOn}
+                          onChange={(e) => setAcctClosedOn(e.target.value)}
+                        />
+                      </FormField>
+                      {(acctUsed === 'savings' || acctKind === 'rd') && (
                         <>
                           <FormField label="RD instalment (leave blank if not an RD)">
                             <input

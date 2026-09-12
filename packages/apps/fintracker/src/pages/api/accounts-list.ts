@@ -19,6 +19,8 @@ function fail(res: NextApiResponse, status: number, error: string) {
 }
 
 const USED_FOR = new Set(['savings', 'monthly', 'both'])
+/** Mirrors ACCOUNT_KINDS in the app's config; the server is the authority. */
+const ACCOUNT_KIND = new Set(['savings_bank', 'rd', 'fd', 'cash', 'other'])
 
 function serializeAccount(row: typeof paymentSources.$inferSelect) {
   return {
@@ -26,8 +28,10 @@ function serializeAccount(row: typeof paymentSources.$inferSelect) {
     name: row.name,
     description: row.description ?? null,
     usedFor: row.usedFor,
+    accountKind: row.accountKind ?? 'savings_bank',
     orgId: row.orgId ?? null,
     isActive: row.isActive ?? true,
+    closedOn: row.closedOn ? String(row.closedOn) : null,
     sortOrder: row.sortOrder ?? 0,
     // An account is a recurring deposit exactly when it has an instalment.
     rdInstalment: row.rdInstalment != null ? Number(row.rdInstalment) : null,
@@ -36,6 +40,20 @@ function serializeAccount(row: typeof paymentSources.$inferSelect) {
     rdStartDate: row.rdStartDate ? String(row.rdStartDate) : null,
     rdMaturityAmount: row.rdMaturityAmount != null ? Number(row.rdMaturityAmount) : null,
   }
+}
+
+/**
+ * Kind and closure date, validated together.
+ *
+ * A blank `closedOn` reopens the account rather than being ignored — closing is
+ * reversible, and the only way to say "open again" from the form is to clear
+ * the box.
+ */
+function readKindFields(body: Record<string, unknown>): { accountKind: string; closedOn: string | null } | null {
+  const kind = body.accountKind === undefined ? 'savings_bank' : String(body.accountKind)
+  if (!ACCOUNT_KIND.has(kind)) return null
+  const raw = typeof body.closedOn === 'string' ? body.closedOn.trim() : ''
+  return { accountKind: kind, closedOn: raw || null }
 }
 
 /** RD terms are optional and only meaningful together; a blank clears the field. */
@@ -86,6 +104,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!name) return fail(res, 400, 'Name required')
       const usedFor = String(body.usedFor ?? 'both')
       if (!USED_FOR.has(usedFor)) return fail(res, 400, 'Invalid usedFor')
+      const kind = readKindFields(body)
+      if (!kind) return fail(res, 400, 'Invalid accountKind')
       const description = body.description != null ? String(body.description) : null
       const sortOrder = typeof body.sortOrder === 'number' ? body.sortOrder : Number(body.sortOrder) || 0
       if (await paymentSourceNameTaken(db, orgId, name, '')) {
@@ -99,6 +119,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         description: description || null,
         sourceType: 'account',
         usedFor,
+        ...kind,
         isActive: body.isActive === false ? false : true,
         sortOrder,
         ...readRdFields(body),
@@ -126,6 +147,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!name) return fail(res, 400, 'Name required')
       const usedFor = String(body.usedFor ?? 'both')
       if (!USED_FOR.has(usedFor)) return fail(res, 400, 'Invalid usedFor')
+      const kind = readKindFields(body)
+      if (!kind) return fail(res, 400, 'Invalid accountKind')
       const description = body.description != null ? String(body.description) : null
       const sortOrder = typeof body.sortOrder === 'number' ? body.sortOrder : Number(body.sortOrder) || 0
       if (await paymentSourceNameTaken(db, orgId, name, id)) {
@@ -137,6 +160,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           name,
           description: description || null,
           usedFor,
+          ...kind,
           isActive: body.isActive === false ? false : true,
           sortOrder,
           ...readRdFields(body),

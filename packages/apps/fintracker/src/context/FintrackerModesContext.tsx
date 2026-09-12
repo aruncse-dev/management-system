@@ -29,7 +29,9 @@ const FintrackerModesContext = createContext<FintrackerModesContextValue | null>
 
 function sortedActiveAccountNames(rows: AccountRow[], used: (u: string) => boolean): string[] {
   return rows
-    .filter(a => a.isActive !== false && used(a.usedFor))
+    // A closed account keeps its history and its balance, but nothing new should
+    // be sent there — so it leaves the pickers while staying on the page.
+    .filter(a => a.isActive !== false && !a.closedOn && used(a.usedFor))
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name))
     .map(a => a.name)
 }

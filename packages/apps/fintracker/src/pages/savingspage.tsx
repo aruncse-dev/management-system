@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Plus, LayoutDashboard, List, BarChart3, Wallet, Search, TrendingUp, AlertTriangle, ArrowUpRight, ArrowDownRight, Repeat2, ArrowLeftRight } from 'lucide-react'
+import { Plus, LayoutDashboard, List, BarChart3, Wallet, Search, ArrowUpRight, ArrowDownRight, Repeat2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { api, RawSavingsRow, type AccountRow } from '../api'
-import { CATEGORIES, THEME_COLORS } from '../config'
+import { CATEGORIES, THEME_COLORS, accountKindMeta } from '../config'
+import { AccountKindPills, AccountKindTotals, kindsPresent, totalByKind } from '../components/AccountKindPills'
 import { mergeCategoriesWithBudgetNames } from '../utils'
+import { isMirroredRow, MIRRORED_ROW_BADGE, MIRRORED_ROW_NOTE } from '../lib/mirroredRows'
 import { useMoneyFormatting } from '../hooks/useFormatMoney'
 import { useStore } from '../store'
 import { BalanceRow, CategoryCombobox, CatIcon, FormField, KpiCard, KpiGrid, LoadingState, SearchField, SectionBlock, SectionChip, Spacer, TransactionCard } from '../ui'
@@ -13,6 +15,10 @@ type SavingsTab = 'dashboard' | 'transactions'
 type SavingsAccount = {
   id: string
   name: string
+  /** `savings_bank` | `rd` | `fd` | `cash` | `other` — grouping only. */
+  kind: string
+  /** `YYYY-MM-DD` once closed; null while open. */
+  closedOn: string | null
   /** Recurring-deposit terms; present only when this account is an RD. */
   rd?: { instalment: number; day: number | null; months: number | null; startDate: string | null; maturityAmount: number | null }
 }
@@ -50,6 +56,33 @@ interface SavingsFormState {
 
 function todayISO() {
   return new Date().toISOString().split('T')[0]
+}
+
+/**
+ * `YYYY-MM` for a stored entry date.
+ *
+ * Goes through `toDateInput` rather than slicing directly: legacy rows carry
+ * `DD-MMM-YY`, and slicing one of those would bucket it under the year.
+ */
+function monthKeyOf(dateStr: string): string {
+  return toDateInput(dateStr).slice(0, 7)
+}
+
+function currentMonthKey(): string {
+  return todayISO().slice(0, 7)
+}
+
+/** `2026-09` → `Sep 2026`. */
+function monthKeyLabel(key: string): string {
+  const [y, m] = key.split('-').map(Number)
+  if (!y || !m) return key
+  return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
+}
+
+function shiftMonthKey(key: string, by: 1 | -1): string {
+  const [y, m] = key.split('-').map(Number)
+  const d = new Date(y, (m - 1) + by, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
 /** A maturity two years out only needs the month, not the day. */
@@ -90,6 +123,8 @@ function accountsFromRows(rows: AccountRow[]): SavingsAccount[] {
     .map(a => ({
       id: a.id,
       name: a.name,
+      kind: a.accountKind || 'savings_bank',
+      closedOn: a.closedOn ?? null,
       rd:
         a.rdInstalment != null && a.rdInstalment > 0
           ? {
@@ -104,18 +139,43 @@ function accountsFromRows(rows: AccountRow[]): SavingsAccount[] {
 }
 
 function accountsFromLegacyNames(names: readonly string[]): SavingsAccount[] {
-  return names.map(n => ({ id: n, name: n }))
+  return names.map(n => ({ id: n, name: n, kind: 'savings_bank', closedOn: null }))
 }
 
 function makeEmptyForm(accounts: readonly SavingsAccount[]): SavingsFormState {
+  // A closed account still renders its history, but new money must not land in
+  // one — so the form seeds from the open accounts only.
+  const open = accounts.filter(a => !a.closedOn)
   return {
     date: todayISO(),
-    account: accounts[0]?.id ?? '',
+    account: open[0]?.id ?? accounts[0]?.id ?? '',
     amount: '',
     desc: '',
     type: 'Income',
-    toAccount: accounts[1]?.id ?? accounts[0]?.id ?? '',
+    toAccount: open[1]?.id ?? open[0]?.id ?? accounts[0]?.id ?? '',
     category: 'Others',
+  }
+}
+
+/**
+ * A copy of `entry` for the add form: no id, dated today.
+ *
+ * Same rule as the Transactions duplicate (`monthly.tsx`), and simpler here
+ * because savings dates are already ISO — there is no `DD-MMM-YY` round trip to
+ * get wrong. Everything else carries over, including the account and category.
+ */
+function duplicateOf(entry: SavingsEntry, accounts: readonly SavingsAccount[]): SavingsFormState {
+  return {
+    date: todayISO(),
+    account: entry.account,
+    amount: String(entry.amount),
+    desc: entry.desc,
+    type: entry.type,
+    // Same fallback as the edit form: a non-transfer carries no destination, so
+    // seed a real one rather than '' — otherwise switching the copy to Transfer
+    // posts a blank target and the server rejects it.
+    toAccount: entry.toAccount ?? accounts.find(a => !a.closedOn && a.id !== entry.account)?.id ?? '',
+    category: entry.category ?? 'Others',
   }
 }
 
@@ -214,6 +274,10 @@ export default function SavingsPage({
   const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState<SavingsTab>('dashboard')
   const [typeFilter, setTypeFilter] = useState<string>('All')
+  /** The month both tabs are looking at. Balances stay lifetime; flows are monthly. */
+  const [monthKey, setMonthKey] = useState<string>(currentMonthKey)
+  /** `''` shows every account kind. */
+  const [kindFilter, setKindFilter] = useState('')
   const [search, setSearch] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [editEntry, setEditEntry] = useState<SavingsEntry | null>(null)
@@ -269,32 +333,84 @@ export default function SavingsPage({
   }, [loadData])
 
   const balances = useMemo(() => computeBalances(entries, accounts), [accounts, entries])
-  const totalBalance = useMemo(() => accounts.reduce((s, a) => s + (balances[a.id] || 0), 0), [accounts, balances])
   /**
+   * Spendable money, which is what the page is asked for first.
+   *
+   * Open accounts only. A closed account can still carry a residual — a few
+   * rupees of interest credited after the FD was drawn — and calling that
+   * "available" would be a lie. It is not hidden either: the Closed group below
+   * shows the same figure, so the two still add up to the ledger total.
+   */
+  const availableBalance = useMemo(
+    () => accounts.filter(a => !a.closedOn).reduce((s, a) => s + (balances[a.id] || 0), 0),
+    [accounts, balances],
+  )
+
+  /** Entries dated inside the selected month, whatever the search box says. */
+  const monthEntries = useMemo(
+    () => entries.filter(e => monthKeyOf(e.date) === monthKey),
+    [entries, monthKey],
+  )
+
+
+  /**
+   * In and out for the selected month.
+   *
    * Transfers move money between two savings accounts, so at ledger level they
    * are neither income nor expense — they net to zero. Counting them in both
-   * totals (as this did) inflated each side by the full transfer volume while
-   * Total Balance, computed from the same rows, stayed correct: the three
-   * figures could not be reconciled against each other.
+   * totals (as this once did) inflated each side by the full transfer volume
+   * while the balance, computed from the same rows, stayed correct: the figures
+   * could not be reconciled against each other.
    *
    * Per-account income/expense in `accountSummary` is a different question and
    * still counts a transfer once on each side, which is right there.
    */
-  const totalIncome = useMemo(() => entries.filter(e => e.type === 'Income').reduce((s, e) => s + e.amount, 0), [entries])
-  const totalExpenses = useMemo(() => entries.filter(e => e.type === 'Expense').reduce((s, e) => s + e.amount, 0), [entries])
-  const totalTransfers = useMemo(() => entries.filter(e => e.type === 'Transfer').reduce((s, e) => s + e.amount, 0), [entries])
+  const monthIn = useMemo(() => monthEntries.filter(e => e.type === 'Income').reduce((s, e) => s + e.amount, 0), [monthEntries])
+  const monthOut = useMemo(() => monthEntries.filter(e => e.type === 'Expense').reduce((s, e) => s + e.amount, 0), [monthEntries])
 
   const accountSummary = useMemo(
-    () => accounts.map(({ id, name }) => {
+    () => accounts.map(({ id, name, kind, closedOn }) => {
       const accountEntries = entries.filter(e => e.account === id)
       const transferOut = accountEntries.filter(e => e.type === 'Transfer').reduce((s, e) => s + e.amount, 0)
       const transferIn = entries.filter(e => e.type === 'Transfer' && e.toAccount === id).reduce((s, e) => s + e.amount, 0)
       const income = accountEntries.filter(e => e.type === 'Income').reduce((s, e) => s + e.amount, 0) + transferIn
       const expense = accountEntries.filter(e => e.type === 'Expense').reduce((s, e) => s + e.amount, 0) + transferOut
-      return { id, name, balance: balances[id] || 0, income, expense }
+      return { id, name, kind, closedOn, balance: balances[id] || 0, income, expense }
     }),
     [accounts, balances, entries],
   )
+
+  /** Open accounts, narrowed by the kind chips. Closed ones get their own group. */
+  const openAccounts = useMemo(
+    () => accountSummary.filter(a => !a.closedOn && (!kindFilter || a.kind === kindFilter)),
+    [accountSummary, kindFilter],
+  )
+  const closedAccounts = useMemo(
+    () => accountSummary.filter(a => a.closedOn && (!kindFilter || a.kind === kindFilter)),
+    [accountSummary, kindFilter],
+  )
+  const kindTotals = useMemo(
+    () => totalByKind(accountSummary.map(a => ({ accountKind: a.kind, balance: a.balance }))),
+    [accountSummary],
+  )
+
+  const presentKinds = useMemo(
+    () => kindsPresent(accountSummary.map(a => ({ accountKind: a.kind }))),
+    [accountSummary],
+  )
+
+  /**
+   * Accounts the form may write to.
+   *
+   * Open ones, plus the account the entry being edited already sits on — an old
+   * row on a since-closed account must stay editable, and dropping it from the
+   * list would silently move the entry somewhere else on the next save.
+   */
+  const formAccounts = useMemo(
+    () => accounts.filter(a => !a.closedOn || a.id === editEntry?.account || a.id === editEntry?.toAccount),
+    [accounts, editEntry],
+  )
+
 
   /**
    * How far each recurring deposit has got.
@@ -326,12 +442,28 @@ export default function SavingsPage({
         }),
     [accounts, entries],
   )
+  /** A closed RD has nothing left to track, so it drops out of the progress list. */
+  const openRdProgress = useMemo(() => {
+    const closed = new Set(accounts.filter(a => a.closedOn).map(a => a.id))
+    return rdProgress.filter(r => !closed.has(r.id))
+  }, [accounts, rdProgress])
+
+  /**
+   * Searching escapes the month.
+   *
+   * The list is scoped to the selected month so it stops growing without bound,
+   * but a search that could only ever look inside one month would be close to
+   * useless — you search precisely because you do not know when something was.
+   * So a non-empty query spans the whole ledger, and the header says so.
+   */
+  const searchingAllMonths = search.trim().length > 0
 
   const filteredEntries = useMemo(() => {
-    return entries
+    const scope = searchingAllMonths ? entries : monthEntries
+    const q = search.trim().toLowerCase()
+    return scope
       .filter(e => typeFilter === 'All' || e.type === typeFilter)
       .filter(e => {
-        const q = search.toLowerCase()
         return !q
           || e.desc.toLowerCase().includes(q)
           || e.accountName.toLowerCase().includes(q)
@@ -340,7 +472,10 @@ export default function SavingsPage({
           || (e.category?.toLowerCase().includes(q) ?? false)
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-  }, [entries, typeFilter, search])
+  }, [entries, monthEntries, searchingAllMonths, typeFilter, search])
+
+  /** The open entry came from a transaction: the register owns every field. */
+  const editIsMirrored = Boolean(editEntry && isMirroredRow(editEntry.id))
 
   function resetModal() {
     setEditEntry(null)
@@ -360,6 +495,15 @@ export default function SavingsPage({
     resetModal()
     setError('')
     setDelConfirm(false)
+    setModalOpen(true)
+  }
+
+  /** Same as add, but prefilled from an existing entry and dated today. */
+  function openDuplicate(e: SavingsEntry) {
+    setEditEntry(null)
+    setError('')
+    setDelConfirm(false)
+    setForm(duplicateOf(e, accounts))
     setModalOpen(true)
   }
 
@@ -472,24 +616,77 @@ export default function SavingsPage({
         {activeTab === 'dashboard' && (
           <>
             <SectionBlock title={`${title} Metrics`} icon={<BarChart3 size={14} />} right={loading ? <LoadingState variant="inline" /> : null}>
-              <div className="savings-page-metrics">
+              <div className="savings-page-metrics ui-stack">
+                {/* Balances only. In and Out are month figures and now live on
+                    the Entries tab beside the month switcher that drives them —
+                    here they showed a month you could not change. */}
                 <KpiGrid>
-                  <KpiCard full label="Total Balance" value={signedFmt(totalBalance)} tone="navy" icon={<Wallet size={14} />} />
-                  <KpiCard label="Total Income" value={fmt(totalIncome)} tone="green" icon={<TrendingUp size={14} />} />
-                  <KpiCard label="Total Expenses" value={fmt(totalExpenses)} tone="red" icon={<AlertTriangle size={14} />} />
-                  {totalTransfers > 0 && (
-                    <KpiCard full label="Moved between accounts" value={fmt(totalTransfers)} tone="amber" icon={<ArrowLeftRight size={14} />} />
-                  )}
+                  <KpiCard full label="Available" value={signedFmt(availableBalance)} tone="navy" icon={<Wallet size={14} />} />
                 </KpiGrid>
+                <AccountKindTotals totals={kindTotals} formatValue={fmt} onSelect={setKindFilter} />
               </div>
             </SectionBlock>
 
-            {rdProgress.length > 0 && (
+            <SectionBlock title="Accounts" icon={<Wallet size={14} />}>
+              <div className="ui-stack">
+                <AccountKindPills kinds={presentKinds} active={kindFilter} onChange={setKindFilter} />
+                {openAccounts.map(({ id, name, kind, balance, income, expense }) => {
+                  const meta = accountKindMeta(kind)
+                  return (
+                    <BalanceRow
+                      key={id}
+                      title={name}
+                      subtitle={meta.label}
+                      icon={<meta.icon size={14} aria-hidden />}
+                      iconTone={balance < 0 ? 'red' : 'navy'}
+                      value={signedFmt(balance)}
+                      valueTone={balance < 0 ? 'red' : undefined}
+                      income={fmt(income)}
+                      expense={fmt(expense)}
+                      incomeIcon={<ArrowDownRight size={11} strokeWidth={2.4} />}
+                      expenseIcon={<ArrowUpRight size={11} strokeWidth={2.4} />}
+                    />
+                  )
+                })}
+                {openAccounts.length === 0 && (
+                  <p style={{ color: 'var(--muted)', fontSize: 14, margin: 0 }}>No open accounts of this type.</p>
+                )}
+              </div>
+            </SectionBlock>
+
+            {/* Closed accounts keep their history and whatever is left in them.
+                They sit apart from Available rather than being hidden, so the two
+                groups still add up to the ledger total. */}
+            {closedAccounts.length > 0 && (
+              <>
+                <Spacer size={6} />
+                <SectionBlock title="Closed" icon={<Wallet size={14} />} right={<SectionChip>{closedAccounts.length}</SectionChip>}>
+                  <div className="ui-stack">
+                    {closedAccounts.map(({ id, name, kind, closedOn, balance }) => {
+                      const meta = accountKindMeta(kind)
+                      return (
+                        <BalanceRow
+                          key={id}
+                          title={name}
+                          subtitle={`${meta.label} · closed ${monthYearLabel(closedOn as string)}`}
+                          icon={<meta.icon size={14} aria-hidden />}
+                          iconTone="muted"
+                          value={signedFmt(balance)}
+                          valueTone="muted"
+                        />
+                      )
+                    })}
+                  </div>
+                </SectionBlock>
+              </>
+            )}
+
+            {openRdProgress.length > 0 && (
               <>
                 <Spacer size={6} />
                 <SectionBlock title="Recurring deposits" icon={<Repeat2 size={14} />}>
                   <div className="ui-stack">
-                    {rdProgress.map(rd => (
+                    {openRdProgress.map(rd => (
                       <BalanceRow
                         key={rd.id}
                         title={rd.name}
@@ -507,27 +704,40 @@ export default function SavingsPage({
             )}
 
             <Spacer size={6} />
-            <SectionBlock title="Accounts" icon={<Wallet size={14} />}>
-              <div className="ui-stack">
-                {accountSummary.map(({ id, name, balance, income, expense }) => (
-                  <div key={id}>
-                    <BalanceRow
-                      title={name}
-                      value={signedFmt(balance)}
-                      income={fmt(income)}
-                      expense={fmt(expense)}
-                      incomeIcon={<ArrowDownRight size={11} strokeWidth={2.4} />}
-                      expenseIcon={<ArrowUpRight size={11} strokeWidth={2.4} />}
-                    />
-                  </div>
-                ))}
-              </div>
-            </SectionBlock>
           </>
         )}
 
         {activeTab === 'transactions' && (
-          <SectionBlock title="Entries" icon={<LayoutDashboard size={14} />} right={<SectionChip>{filteredEntries.length}</SectionChip>}>
+          <>
+            {/* Month stepper and the month's two figures on one line.
+                These were a pill, then a pair of KPI tiles, then a section
+                header that repeated the month a third time — some 600px before
+                the first entry on a phone. The figures are context for the list,
+                not headline metrics, so they read at label size. */}
+            <div className="savings-month-bar">
+              <button type="button" className="nav-arrow" onClick={() => setMonthKey(k => shiftMonthKey(k, -1))} aria-label="Previous month">
+                <ChevronLeft size={16} />
+              </button>
+              <span className="savings-month-bar-label">{monthKeyLabel(monthKey)}</span>
+              <button type="button" className="nav-arrow" onClick={() => setMonthKey(k => shiftMonthKey(k, 1))} aria-label="Next month">
+                <ChevronRight size={16} />
+              </button>
+              <span className="savings-month-flows">
+                <span className="ui-tone-green">
+                  <ArrowDownRight size={13} strokeWidth={2.4} />{fmt(monthIn)}
+                </span>
+                <span className="ui-tone-red">
+                  <ArrowUpRight size={13} strokeWidth={2.4} />{fmt(monthOut)}
+                </span>
+              </span>
+            </div>
+            <Spacer size={8} />
+          <SectionBlock
+            title="Entries"
+            icon={<LayoutDashboard size={14} />}
+            subtitle={searchingAllMonths ? 'Searching every month' : undefined}
+            right={<SectionChip>{filteredEntries.length}</SectionChip>}
+          >
             <SearchField
               value={search}
               placeholder="Search desc, account, type..."
@@ -551,7 +761,9 @@ export default function SavingsPage({
             {loading && <LoadingState variant="section" />}
 
             {!loading && filteredEntries.length === 0 && (
-              <p style={{ color: 'var(--muted)', padding: '0.25rem 0', fontSize: 14 }}>No entries to display.</p>
+              <p style={{ color: 'var(--muted)', padding: '0.25rem 0', fontSize: 14 }}>
+                {searchingAllMonths ? 'No entries match that search.' : `No entries in ${monthKeyLabel(monthKey)}.`}
+              </p>
             )}
 
             {!loading && filteredEntries.length > 0 && (
@@ -565,6 +777,7 @@ export default function SavingsPage({
                   } else {
                     titleText = e.desc || e.accountName
                   }
+                  if (isMirroredRow(e.id)) titleText = `${titleText} · ${MIRRORED_ROW_BADGE}`
                   const txnIcon =
                     e.type === 'Income'
                       ? <ArrowDownRight size={14} />
@@ -583,12 +796,17 @@ export default function SavingsPage({
                       tone={typeTone(e.type)}
                       icon={txnIcon}
                       onClick={() => openEdit(e)}
+                      onDuplicate={ev => {
+                        ev.stopPropagation()
+                        openDuplicate(e)
+                      }}
                     />
                   )
                 })}
               </div>
             )}
           </SectionBlock>
+          </>
         )}
 
         {error && (
@@ -624,29 +842,34 @@ export default function SavingsPage({
 
             <div className="modal-body">
               <div className="ui-stack">
+                {editIsMirrored && (
+                  <p className="ui-kit-callout ui-tone-amber" role="note">
+                    {MIRRORED_ROW_NOTE}
+                  </p>
+                )}
                 <FormField label="Date">
-                  <input className="form-inp" type="date" value={form.date} onChange={e => setField('date', e.target.value)} />
+                  <input className="form-inp" disabled={editIsMirrored} type="date" value={form.date} onChange={e => setField('date', e.target.value)} />
                 </FormField>
                 <FormField label="Account">
-                  <select className="form-sel" value={form.account} onChange={e => {
+                  <select className="form-sel" disabled={editIsMirrored} value={form.account} onChange={e => {
                     const newAccount = e.target.value
                     setField('account', newAccount)
                     if (form.toAccount === newAccount) {
-                      const newToAcct = accounts.find(a => a.id !== newAccount)
+                      const newToAcct = formAccounts.find(a => a.id !== newAccount)
                       if (newToAcct) setField('toAccount', newToAcct.id)
                     }
                   }}>
-                    {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    {formAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                   </select>
                 </FormField>
                 <FormField label="Amount">
-                  <input className="form-inp" type="number" min="0" step="1" placeholder={zeroPlaceholder} value={form.amount} onChange={e => setField('amount', e.target.value)} />
+                  <input className="form-inp" disabled={editIsMirrored} type="number" min="0" step="1" placeholder={zeroPlaceholder} value={form.amount} onChange={e => setField('amount', e.target.value)} />
                 </FormField>
                 <FormField label="Description">
-                  <input className="form-inp" type="text" placeholder="Add note" value={form.desc} onChange={e => setField('desc', e.target.value)} />
+                  <input className="form-inp" disabled={editIsMirrored} type="text" placeholder="Add note" value={form.desc} onChange={e => setField('desc', e.target.value)} />
                 </FormField>
                 <FormField label="Type">
-                  <select className="form-sel" value={form.type} onChange={e => setField('type', e.target.value as SavingsType)}>
+                  <select className="form-sel" disabled={editIsMirrored} value={form.type} onChange={e => setField('type', e.target.value as SavingsType)}>
                     <option value="Income">Income</option>
                     <option value="Expense">Expense</option>
                     <option value="Transfer">Transfer</option>
@@ -659,8 +882,8 @@ export default function SavingsPage({
                 )}
                 {form.type === 'Transfer' && (
                   <FormField label="To Account">
-                    <select className="form-sel" value={form.toAccount} onChange={e => setField('toAccount', e.target.value)}>
-                      {accounts.filter(a => a.id !== form.account).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    <select className="form-sel" disabled={editIsMirrored} value={form.toAccount} onChange={e => setField('toAccount', e.target.value)}>
+                      {formAccounts.filter(a => a.id !== form.account).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                     </select>
                   </FormField>
                 )}
@@ -675,11 +898,15 @@ export default function SavingsPage({
               )}
               <div className="modal-foot-l" />
               <button type="button" className="btn btn-sm btn-cancel" onClick={closeModal} disabled={saving || deleting}>
-                Cancel
+                {editIsMirrored ? 'Close' : 'Cancel'}
               </button>
-              <button type="button" className="btn btn-sm btn-green" onClick={save} disabled={saving || deleting}>
-                {saving ? 'Saving...' : editEntry ? 'Save' : 'Add'}
-              </button>
+              {/* Nothing here to save: the transaction owns every field. Delete
+                  stays live — it unlinks the pair and keeps the transaction. */}
+              {!editIsMirrored && (
+                <button type="button" className="btn btn-sm btn-green" onClick={save} disabled={saving || deleting}>
+                  {saving ? 'Saving...' : editEntry ? 'Save' : 'Add'}
+                </button>
+              )}
             </div>
           </div>
         </div>

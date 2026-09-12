@@ -83,11 +83,12 @@ erDiagram
 - **Owner:** fintracker
 
 ### `payment_sources`
-- **Columns:** org_id, name, source_type, used_for, is_active, sort_order
+- **Columns:** org_id, name, description, source_type (`account`/`credit_card`/`informal`), used_for (`savings`/`monthly`/`both`), account_kind (`savings_bank`/`rd`/`fd`/`cash`/`other`), is_active, closed_on (null = open), sort_order, rd_instalment, rd_day, rd_months, rd_start_date, rd_maturity_amount
+- **Notes:** `account_kind` and `closed_on` are read only for `source_type = 'account'`. An account is an RD when `rd_instalment` is set; maturity date is derived (`rd_start_date` + `rd_months`), never stored.
 - **Owner:** fintracker
 
 ### `transactions`
-- **Columns:** org_id, date, description, amount, category, type, mode (payment label), transfer_to, month_year
+- **Columns:** org_id, date, description, amount, category, type, mode (payment label), transfer_to, month_year, ref_kind + ref_id (soft link to a loan / savings account / lending person / subscription, mirrored into that module's own ledger)
 - **Owner:** fintracker
 
 ### `savings`

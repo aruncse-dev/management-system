@@ -444,7 +444,10 @@ button, input, select, textarea {
   padding: 0 10px 28px;
 }
 .ui-kit-page-shell > .pg.savings-page {
-  padding: 0 10px 96px;
+  /* Top padding lives here rather than on the first child: the Transactions tab
+     now opens with a plain month bar and the Dashboard with a section block, and
+     only the latter was ever given breathing room. */
+  padding: 10px 10px 96px;
 }
 .monthly-subpage {
   padding-top: 0;
@@ -512,8 +515,55 @@ button, input, select, textarea {
 .savings-page .ui-stack { gap: 8px; }
 .savings-page .txn-cards { gap: 8px; }
 .savings-page .bottom-nav { top: 0; }
+/* Month stepper plus the month's in/out, on one line above the Entries list.
+   Deliberately card-height, not hero-height: this is context for the list
+   below it, and as stacked KPI tiles it pushed the first entry off screen. */
+.savings-month-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--card);
+  box-shadow: var(--sh);
+}
+.savings-month-bar-label {
+  min-width: 92px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+}
+/* Pushed right on a wide row; wraps under the stepper when there is no room. */
+.savings-month-flows {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 800;
+}
+.savings-month-flows > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.savings-month-flows .ui-tone-green { color: var(--gm); }
+.savings-month-flows .ui-tone-red { color: var(--rm); }
+/* `.nav-arrow` is built for the dark navy header — white on a translucent white
+   wash. On this light row that reads as nothing, so all three need flipping. */
+.savings-month-bar .nav-arrow {
+  width: 26px;
+  height: 26px;
+  color: var(--navy);
+  background: var(--navy-lt);
+  border: 1px solid transparent;
+}
+
 .savings-page.pg {
-  padding: 0 0 96px;
+  padding: 10px 0 96px;
   display: grid;
   gap: 0;
 }
@@ -1507,55 +1557,6 @@ tr:last-child td { border-bottom: none; }
 .budget-badge.near { background: rgba(245,158,11,.12); color: #B45309; }
 .budget-badge.critical { background: rgba(239,68,68,.12); color: var(--rm); }
 .budget-badge.over { background: rgba(239,68,68,.14); color: var(--red); }
-
-/* ACCOUNT CARDS */
-.acct-section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin: 2px 0 12px;
-}
-.acct-section-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 11px;
-  font-weight: 800;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: .7px;
-}
-.acct-g2 { display: grid; grid-template-columns: 1fr; gap: 10px; }
-.acct-section-head--graph { margin-top: 14px; }
-.acct-graph {
-  display: grid;
-  gap: 10px;
-}
-.acct-graph-row {
-  display: grid;
-  grid-template-columns: minmax(72px, 1fr) minmax(0, 2.2fr) auto;
-  gap: 10px;
-  align-items: center;
-}
-.acct-graph-row--acct {
-  padding: 9px 0;
-}
-.acct-graph-track {
-  height: 8px;
-  border-radius: 999px;
-  overflow: hidden;
-  background: #edf2ff;
-}
-.acct-graph-fill {
-  height: 100%;
-  border-radius: inherit;
-}
-.acct-graph-value {
-  font-size: 14px;
-  font-weight: 800;
-  white-space: nowrap;
-}
 
 /* AI */
 .ai-panel { display: none; position: fixed; bottom: 60px; left: 0; right: 0; z-index: 140; flex-direction: column; max-height: 72vh; background: var(--card); border-radius: 18px 18px 0 0; box-shadow: 0 -4px 28px rgba(30,27,75,.2); border-top: 2px solid var(--border); }
