@@ -440,6 +440,7 @@ export function ModalActions({
   leading,
   primaryPrefix,
   disabled = false,
+  hidePrimary = false,
 }: {
   primaryLabel: string
   secondaryLabel?: string
@@ -449,6 +450,8 @@ export function ModalActions({
   leading?: ReactNode
   primaryPrefix?: ReactNode
   disabled?: boolean
+  /** Drop the confirm button for a read-only dialog that still needs Close and a leading action. */
+  hidePrimary?: boolean
 }) {
   return (
     <div className="ui-kit-modal-actions">
@@ -457,15 +460,17 @@ export function ModalActions({
         <button type="button" className="ui-kit-btn ui-kit-btn--soft" onClick={onSecondary} disabled={disabled}>
           {secondaryLabel}
         </button>
-        <button
-          type="button"
-          className={`ui-kit-btn ui-kit-btn--solid${destructive ? ' btn-red' : ''}`}
-          onClick={onPrimary}
-          disabled={disabled}
-        >
-          {primaryPrefix}
-          {primaryLabel}
-        </button>
+        {!hidePrimary && (
+          <button
+            type="button"
+            className={`ui-kit-btn ui-kit-btn--solid${destructive ? ' btn-red' : ''}`}
+            onClick={onPrimary}
+            disabled={disabled}
+          >
+            {primaryPrefix}
+            {primaryLabel}
+          </button>
+        )}
       </div>
     </div>
   )
@@ -484,6 +489,10 @@ export function BalanceRow({
   expenseLabel = 'Expense',
   incomeTone = 'green',
   expenseTone = 'red',
+  icon,
+  iconTone = 'navy',
+  valueTone,
+  onClick,
 }: {
   title?: string
   value: ReactNode
@@ -497,11 +506,18 @@ export function BalanceRow({
   expenseLabel?: string
   incomeTone?: 'green' | 'red'
   expenseTone?: 'green' | 'red'
+  /** Leading chip, e.g. the account-kind icon. Sits left of the title. */
+  icon?: ReactNode
+  iconTone?: Extract<UiTone, 'green' | 'red' | 'amber' | 'navy' | 'muted'>
+  /** Colours the headline figure — for an overdrawn balance. */
+  valueTone?: Extract<UiTone, 'green' | 'red' | 'amber' | 'navy' | 'muted'>
+  onClick?: () => void
 }) {
-  return (
-    <div className="ui-kit-card ui-kit-balance-card">
-      {(title || subtitle || left) && (
+  const body = (
+    <>
+      {(title || subtitle || left || icon) && (
         <div className="ui-kit-balance-header">
+          {icon ? <span className={`ui-kit-balance-icon ui-tone-${iconTone}`}>{icon}</span> : null}
           <div className="ui-kit-balance-main">
             <div className="ui-kit-balance-title-row">
               {title ? <div className="ui-kit-balance-title">{title}</div> : <div />}
@@ -509,10 +525,12 @@ export function BalanceRow({
             </div>
             {subtitle && <div className="ui-kit-balance-subtitle">{subtitle}</div>}
           </div>
-          <div className="ui-kit-balance-value">{value}</div>
+          <div className={`ui-kit-balance-value${valueTone ? ` ui-tone-${valueTone}` : ''}`}>{value}</div>
         </div>
       )}
-      {!title && !subtitle && !left && <div className="ui-kit-balance-value">{value}</div>}
+      {!title && !subtitle && !left && !icon && (
+        <div className={`ui-kit-balance-value${valueTone ? ` ui-tone-${valueTone}` : ''}`}>{value}</div>
+      )}
       {(income !== undefined || expense !== undefined) && (
         <div className="ui-kit-balance-flow-row">
           {income !== undefined && (
@@ -535,7 +553,14 @@ export function BalanceRow({
           )}
         </div>
       )}
-    </div>
+    </>
+  )
+
+  if (!onClick) return <div className="ui-kit-card ui-kit-balance-card">{body}</div>
+  return (
+    <button type="button" className="ui-kit-card ui-kit-balance-card ui-kit-balance-card--btn" onClick={onClick}>
+      {body}
+    </button>
   )
 }
 

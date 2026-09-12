@@ -41,12 +41,6 @@ interface Props {
   year: string
   onClose: () => void
   onSaved: () => void
-  /**
-   * Duplicate this row. Rendered beside Delete when editing — the transaction
-   * list used to carry a per-row duplicate button 8px from the row's own tap
-   * target, which fired on mis-taps.
-   */
-  onDuplicate?: (row: Transaction) => void
   showStatus: (msg: string) => void
   api: TransactionModalApi
   /** Accounts + credit sources allowed as transaction `mode` (payment source). */
@@ -153,7 +147,6 @@ export default function TransactionModal({
   year,
   onClose,
   onSaved,
-  onDuplicate,
   showStatus,
   api,
   paymentModeOptions,
@@ -385,15 +378,6 @@ export default function TransactionModal({
             {isEdit && (
               <button type="button" className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={del} disabled={deleting}>
                 {deleting ? 'Deleting…' : delConfirm ? 'Confirm delete?' : 'Delete'}
-              </button>
-            )}
-            {isEdit && onDuplicate && row && (
-              <button
-                type="button"
-                className="ui-kit-btn ui-kit-btn--soft"
-                onClick={() => onDuplicate(row)}
-              >
-                Duplicate
               </button>
             )}
           </div>

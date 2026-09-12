@@ -585,11 +585,14 @@
   font-size: 12px;
   font-weight: 700;
 }
+/* Solid, not a wash: the selected filter has to be obvious at a glance down a
+   scrolling row, and the pale version read as barely-distinguishable from the
+   rest. Applies to every filter row in the app, which is the point. */
 .ui-kit-filter-pill.active,
 .ui-kit-filter-pill--active {
-  background: var(--navy-lt);
-  color: var(--navy);
-  border-color: transparent;
+  background: var(--navy);
+  color: #fff;
+  border-color: var(--navy);
 }
 .ui-kit-filter-chips {
   display: flex;
@@ -836,10 +839,38 @@
 }
 .ui-kit-balance-header {
   display: flex;
-  align-items: flex-start;
+  /* Centred, not top-aligned: the row now has a leading icon chip to line up with. */
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
 }
+.ui-kit-balance-card--btn {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+/* Leading chip, e.g. the account-kind icon — the row had no icon slot at all,
+   so every account looked alike down a column. */
+.ui-kit-balance-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  color: var(--muted);
+  background: var(--navy-lt);
+}
+.ui-kit-balance-icon.ui-tone-green { background: rgba(34, 197, 94, .12); color: var(--gm); }
+.ui-kit-balance-icon.ui-tone-red { background: rgba(239, 68, 68, .12); color: var(--rm); }
+.ui-kit-balance-icon.ui-tone-amber { background: rgba(245, 158, 11, .12); color: #B45309; }
+.ui-kit-balance-icon.ui-tone-muted { background: rgba(107, 114, 128, .12); color: var(--other); }
+.ui-kit-balance-value.ui-tone-red { color: var(--rm); }
+.ui-kit-balance-value.ui-tone-green { color: var(--gm); }
+.ui-kit-balance-value.ui-tone-muted { color: var(--muted); }
 .ui-kit-balance-main {
   display: grid;
   gap: 2px;
@@ -1137,6 +1168,17 @@
   background: rgba(255,255,255,.84);
   display: grid;
   gap: 4px;
+}
+/* Warning variant, for a callout used as a single paragraph rather than the
+   title/body pair above — hence the explicit type styling and margin reset. */
+.ui-kit-callout.ui-tone-amber {
+  margin: 0;
+  background: rgba(245, 158, 11, .10);
+  border-color: rgba(245, 158, 11, .35);
+  color: #B45309;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
 }
 .ui-kit-callout-title {
   color: var(--text);
@@ -1539,3 +1581,4 @@
   gap: 8px;
   min-width: 0;
 }
+

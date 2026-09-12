@@ -47,7 +47,22 @@ export const paymentSources = pgTable('payment_sources', {
   sourceType: text('source_type').notNull(),
   /** `savings` | `monthly` | `both` — which surfaces list this (primarily for accounts) */
   usedFor: text('used_for').notNull().default('both'),
+  /**
+   * `savings_bank` | `rd` | `fd` | `cash` | `other` — what kind of account this
+   * is, for grouping and filtering. Read only for `sourceType = 'account'`;
+   * credit sources share the table and take the default without meaning it.
+   *
+   * Deliberately does not drive behaviour: RD mechanics still key off
+   * `rdInstalment`, so this stays a label and cannot silently change a total.
+   */
+  accountKind: text('account_kind').notNull().default('savings_bank'),
   isActive: boolean('is_active').default(true),
+  /**
+   * When the account was closed; null while it is open. A matured FD keeps its
+   * history and its balance — `isActive = false` would hide both — it just
+   * stops being offered as a destination for new money.
+   */
+  closedOn: date('closed_on'),
   sortOrder: integer('sort_order').default(0),
   /**
    * Recurring-deposit terms. An account is an RD exactly when `rdInstalment` is

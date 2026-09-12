@@ -32,6 +32,7 @@ import {
   users,
   getIncomeExpenseTrend,
   getDerivedMonthlyIncome,
+  getAccountBalances,
   getNetWorth,
   getCommittedMonthlyOutflow,
   getLoanOutstanding,
@@ -291,6 +292,14 @@ type LoanRefKind = (typeof LOAN_REF_KINDS)[number]
 const SAVINGS_REF_KIND = 'savings'
 
 /**
+ * Derived-id prefix marking a module row the register created.
+ *
+ * The pair is addressable from either side through this alone — there is no
+ * foreign key and no join table.
+ */
+export const MIRROR_ID_PREFIX = 'txn:'
+
+/**
  * Lending has no per-person table — a lending row *is* one event — so the ref
  * names the book and the person instead of an existing row: `<sheetSlug>|<name>`.
  * That keeps typo-forked balances out (the name comes from a list, never typed)
@@ -323,6 +332,51 @@ function readRefFromBody(body: Record<string, unknown>): { refKind: string | nul
   const idRaw = typeof body.refId === 'string' ? body.refId.trim() : ''
   if (!kindRaw || !idRaw) return { refKind: null, refId: null }
   return { refKind: kindRaw, refId: idRaw }
+}
+
+/**
+ * Refusal text for editing a row the register owns.
+ *
+ * Amount and date on a mirrored row come from its transaction, so an edit made
+ * here is overwritten the next time that transaction is saved. Deleting is
+ * allowed — that unlinks the pair — but editing in place is not.
+ */
+const MIRROR_READONLY_MESSAGE =
+  'This entry was created from a transaction. Edit it in Monthly → Transactions, or delete it here to unlink the two.'
+
+/** The transaction id inside a mirrored row's derived id, or null if not mirrored. */
+export function transactionIdFromMirrorId(id: unknown): string | null {
+  const s = String(id ?? '')
+  return s.startsWith(MIRROR_ID_PREFIX) ? s.slice(MIRROR_ID_PREFIX.length) : null
+}
+
+/**
+ * Unlink the transaction that produced a mirrored row.
+ *
+ * Called when a mirrored row is deleted from the module page it appears on.
+ * Clearing `ref_kind`/`ref_id` is the part that makes the deletion stick: the
+ * mirror is derived state, so while the transaction still points here, the next
+ * save of that transaction re-creates the row and the deletion silently undoes
+ * itself.
+ *
+ * The transaction itself is deliberately kept. The money did leave the account
+ * — that is a fact about the register — the user is only saying it should stop
+ * feeding this module. Deleting spend from a screen that is not the register
+ * would be far too easy to do by accident.
+ *
+ * A no-op for an id that is not a mirror, so callers can pass any row id.
+ */
+async function unlinkMirrorSource(
+  db: ReturnType<typeof getDb>,
+  scope: BudgetScope,
+  rowId: unknown,
+): Promise<void> {
+  const txnId = transactionIdFromMirrorId(rowId)
+  if (!txnId) return
+  await db
+    .update(transactions)
+    .set({ refKind: null, refId: null })
+    .where(and(whereOrgFilter(transactions, scope), eq(transactions.id, txnId)))
 }
 
 /**
@@ -465,7 +519,7 @@ async function syncTransactionMirror(
   if (!prev && !next && !prevSavings && !nextSavings && !prevLending && !nextLending && !prevSub && !nextSub)
     return
 
-  const pairedId = `txn:${opts.txnId}`
+  const pairedId = `${MIRROR_ID_PREFIX}${opts.txnId}`
 
   if (prevLending) {
     await db.delete(lending).where(and(whereOrgFilter(lending, scope), eq(lending.id, pairedId)))
@@ -1157,13 +1211,16 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         const usdToInr = num(blob.usdToInr) || 83
 
         const orgId = scopeOrgId
-        const [trend, income, netWorth, committed, loans, budgetRows] = await Promise.all([
+        const [trend, income, netWorth, committed, loans, budgetRows, accounts] = await Promise.all([
           getIncomeExpenseTrend(db, orgId, ranges),
           getDerivedMonthlyIncome(db, orgId, ranges.slice(0, -1)),
           getNetWorth(db, orgId, { goldRatePerGram: goldRate }),
           getCommittedMonthlyOutflow(db, orgId, { usdToInr }),
           getLoanOutstanding(db, orgId),
           loadMergedBudgetForMonth(db, budgetScope, currentRange.key),
+          // Opening balances live in this settings blob keyed by account name,
+          // not in a table, so the query takes them from here.
+          getAccountBalances(db, orgId, { openingBal: readOpeningBal(settingsBlob) }),
         ])
 
         const thisCycle = trend[trend.length - 1] ?? { income: 0, expense: 0, savings: 0, net: 0, key: currentRange.key }
@@ -1267,6 +1324,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
             netWorth,
             committed,
             budget: { total: totalBudget, spent: spentThisCycle },
+            accounts,
             loans,
             payoff,
             twelveMonth,
@@ -1375,6 +1433,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         if (action === 'updateEntry') {
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
+          if (transactionIdFromMirrorId(id)) return fail(res, 409, MIRROR_READONLY_MESSAGE, traceId)
           await db
             .update(lending)
             .set({
@@ -1393,6 +1452,9 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
           await db
             .delete(lending)
             .where(and(whereOrgFilter(lending, budgetScope), eq(lending.id, id), eq(lending.sheetSlug, book)))
+          // Deleting a mirrored row unlinks the transaction that made it.
+          // Without this the row returns on that transaction's next save.
+          await unlinkMirrorSource(db, budgetScope, id)
           return ok(res, true, traceId)
         }
       }
@@ -1432,6 +1494,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
 
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
+          if (transactionIdFromMirrorId(id)) return fail(res, 409, MIRROR_READONLY_MESSAGE, traceId)
           await db
             .update(savings)
             .set({
@@ -1455,6 +1518,9 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
           await db.delete(savings).where(and(whereOrgFilter(savings, budgetScope), eq(savings.id, id)))
+          // Deleting a mirrored row unlinks the transaction that made it.
+          // Without this the row returns on that transaction's next save.
+          await unlinkMirrorSource(db, budgetScope, id)
           return ok(res, true, traceId)
         }
       }
@@ -1694,6 +1760,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         if (action === 'updateHistory' && typ === 'jewel') {
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
+          if (transactionIdFromMirrorId(id)) return fail(res, 409, MIRROR_READONLY_MESSAGE, traceId)
           await db
             .update(jewelLoanRepayments)
             .set({
@@ -1709,6 +1776,9 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
           await db.delete(jewelLoanRepayments).where(and(whereOrgFilter(jewelLoanRepayments, budgetScope), eq(jewelLoanRepayments.id, id)))
+          // Deleting a mirrored row unlinks the transaction that made it.
+          // Without this the row returns on that transaction's next save.
+          await unlinkMirrorSource(db, budgetScope, id)
           return ok(res, true, traceId)
         }
         if (action === 'addHistory' && typ === 'emi') {
@@ -1726,6 +1796,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         if (action === 'updateHistory' && typ === 'emi') {
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
+          if (transactionIdFromMirrorId(id)) return fail(res, 409, MIRROR_READONLY_MESSAGE, traceId)
           await db
             .update(emiLoanRepayments)
             .set({
@@ -1747,6 +1818,9 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
             .where(and(whereOrgFilter(emiLoanRepayments, budgetScope), eq(emiLoanRepayments.id, id)))
             .limit(1)
           await db.delete(emiLoanRepayments).where(and(whereOrgFilter(emiLoanRepayments, budgetScope), eq(emiLoanRepayments.id, id)))
+          // Deleting a mirrored row unlinks the transaction that made it.
+          // Without this the row returns on that transaction's next save.
+          await unlinkMirrorSource(db, budgetScope, id)
           return ok(res, true, traceId)
         }
         // Cash repayments had no update path, so the UI deleted and re-inserted,
@@ -1754,6 +1828,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         if (action === 'updateHistory' && typ === 'cash') {
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
+          if (transactionIdFromMirrorId(id)) return fail(res, 409, MIRROR_READONLY_MESSAGE, traceId)
           await db
             .update(cashLoanRepayments)
             .set({
@@ -1781,6 +1856,9 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
           await db.delete(cashLoanRepayments).where(and(whereOrgFilter(cashLoanRepayments, budgetScope), eq(cashLoanRepayments.id, id)))
+          // Deleting a mirrored row unlinks the transaction that made it.
+          // Without this the row returns on that transaction's next save.
+          await unlinkMirrorSource(db, budgetScope, id)
           return ok(res, true, traceId)
         }
       }

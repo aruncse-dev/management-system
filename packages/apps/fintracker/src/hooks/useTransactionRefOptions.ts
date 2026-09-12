@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { TransactionRefOption } from '@fintracker-vault/ui'
-import { api } from '../api'
+import { api, type AccountRow } from '../api'
 import {
   LENDING_SHEET_SLUG_DEFAULT,
   LENDING_SHEET_SLUG_VIJAYA,
@@ -41,6 +41,39 @@ function lendingPeople(rows: { name: string }[], slug: string): TransactionRefOp
     })
   }
   return out.sort((a, b) => a.label.localeCompare(b.label))
+}
+
+/**
+ * Savings accounts, as ref options.
+ *
+ * A deposit was only expressible as a `Transfer` whose destination happened to
+ * be a savings account — which works, but leaves no way to book one from an
+ * ordinary `Expense` the way an EMI repayment or a subscription charge is
+ * booked. Offering the account here closes that gap: the server already accepts
+ * `ref_kind = 'savings'` with the account id and mirrors it into the savings
+ * ledger, so nothing on the API side has to change.
+ *
+ * `Transfer` is deliberately not among the types: for a transfer the
+ * destination picker already decides the savings account, and a second control
+ * that silently loses to it would only confuse.
+ *
+ * Accounts marked `both` are excluded for the same reason the transfer-derived
+ * path excludes them — they already show up in the monthly balances, so
+ * mirroring one would count the same money twice.
+ */
+function savingsAccounts(rows: AccountRow[]): TransactionRefOption[] {
+  return rows
+    .filter(a => a.isActive !== false && !a.closedOn && a.usedFor === 'savings')
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name))
+    .map(a => ({
+      kind: 'savings',
+      id: a.id,
+      label: a.name,
+      group: 'Savings accounts',
+      // An RD instalment is fixed, so the amount is known once the account is.
+      amount: Number(a.rdInstalment) || undefined,
+      types: ['Expense'] as const,
+    }))
 }
 
 /**
@@ -92,13 +125,14 @@ export function useTransactionRefOptions(): TransactionRefOption[] {
     let cancelled = false
     void (async () => {
       try {
-        const [emi, jewel, cash, lendingDefault, lendingVijaya, subs] = await Promise.all([
+        const [emi, jewel, cash, lendingDefault, lendingVijaya, subs, accounts] = await Promise.all([
           api.getEmi(),
           api.getJewelLoans(),
           api.getCashLoans(),
           api.getLending(LENDING_SHEET_SLUG_DEFAULT),
           api.getLending(LENDING_SHEET_SLUG_VIJAYA),
           api.getSubscriptionEntries(),
+          api.getAccountsList(),
         ])
         if (cancelled) return
         const ongoing = (s?: string) => (s ?? 'Ongoing') !== 'Closed'
@@ -141,6 +175,7 @@ export function useTransactionRefOptions(): TransactionRefOption[] {
               amount: Number(sub.amount) || undefined,
               types: ['Expense'] as const,
             })),
+          ...savingsAccounts(accounts),
         ])
       } catch {
         // A link is an enhancement, never a blocker: without it the modal simply

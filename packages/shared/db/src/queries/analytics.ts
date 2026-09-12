@@ -15,7 +15,7 @@
  */
 import { and, eq, inArray, isNull } from 'drizzle-orm'
 import type { getDb } from '../neon'
-import { transactions } from '../schema/transactions'
+import { paymentSources, transactions } from '../schema/transactions'
 import { savings } from '../schema/savings'
 import { goldItems, goldResources } from '../schema/gold'
 import { stocks, mutualFunds } from '../schema/portfolio'
@@ -388,4 +388,105 @@ function nextRenewal(startDate: string, endDate: string | null, cycle: string, n
   let due = endDate ? anchor : addCycle(anchor, cycle)
   for (let i = 0; i < 600 && due <= now; i++) due = addCycle(due, cycle)
   return due > now ? due : null
+}
+
+export type AccountBalance = {
+  /** Payment-source name — the key transactions actually match on. */
+  name: string
+  /** `savings_bank` | `rd` | `fd` | `cash` | `other` */
+  kind: string
+  /** `savings` | `monthly` | `both` */
+  usedFor: string
+  closedOn: string | null
+  inflow: number
+  outflow: number
+  /** Opening balance plus every transaction ever recorded against this source. */
+  balance: number
+}
+
+/**
+ * All-time balance per payment account.
+ *
+ * The monthly dashboard derives the same shape client-side from one cycle's
+ * rows (`acctFlows` in the fintracker app). This is the lifetime version, for
+ * pages like `/overview` that never load transactions at all — and it is a
+ * different number by design: all-time ≥ cycle-scoped except on a brand new
+ * book. Each page labels which one it is showing.
+ *
+ * Two quirks of the existing data model that this has to honour rather than fix:
+ *
+ *  - **Transactions name their source** (`transactions.mode`), they do not point
+ *    at `payment_sources.id`. So the fold keys by trimmed lowercase name, and an
+ *    account renamed without the cascade simply stops matching its history.
+ *  - **Opening balances are not a table.** They live in the fintracker settings
+ *    JSON blob, keyed by account name, so the caller passes them in. Keeping
+ *    them out of here is what lets the MCP server import this module without
+ *    pulling app settings along.
+ *
+ * `Transfer` is the only two-sided type: it leaves `mode` and lands on
+ * `transfer_to`. `Savings` is a legacy outflow type, counted as one.
+ */
+export async function getAccountBalances(
+  db: Db,
+  orgId: string | null,
+  opts: { openingBal?: Record<string, number> } = {},
+): Promise<AccountBalance[]> {
+  const [sources, rows] = await Promise.all([
+    db
+      .select({
+        name: paymentSources.name,
+        kind: paymentSources.accountKind,
+        usedFor: paymentSources.usedFor,
+        closedOn: paymentSources.closedOn,
+        isActive: paymentSources.isActive,
+        sortOrder: paymentSources.sortOrder,
+      })
+      .from(paymentSources)
+      .where(and(scopeOf(paymentSources, orgId), eq(paymentSources.sourceType, 'account'))),
+    db
+      .select({
+        mode: transactions.mode,
+        transferTo: transactions.transferTo,
+        type: transactions.type,
+        amount: transactions.amount,
+      })
+      .from(transactions)
+      .where(scopeOf(transactions, orgId)),
+  ])
+
+  const openingBal = opts.openingBal ?? {}
+  const byKey = new Map<string, AccountBalance>()
+  const keyOf = (v: string | null | undefined) => String(v ?? '').trim().toLowerCase()
+
+  for (const s of sources) {
+    if (s.isActive === false) continue
+    byKey.set(keyOf(s.name), {
+      name: s.name,
+      kind: s.kind ?? 'savings_bank',
+      usedFor: s.usedFor,
+      closedOn: s.closedOn ? String(s.closedOn) : null,
+      inflow: 0,
+      outflow: 0,
+      balance: num(openingBal[s.name]),
+    })
+  }
+
+  for (const r of rows) {
+    const amount = num(r.amount)
+    if (!amount) continue
+    const src = byKey.get(keyOf(r.mode))
+    if (src) {
+      if (r.type === 'Income') src.inflow += amount
+      else src.outflow += amount
+    }
+    if (r.type === 'Transfer') {
+      const dest = byKey.get(keyOf(r.transferTo))
+      if (dest) dest.inflow += amount
+    }
+  }
+
+  const out = [...byKey.values()]
+  for (const a of out) a.balance = a.balance + a.inflow - a.outflow
+  // Biggest first: the same order the dashboard's account sheet already uses.
+  return out.sort((a, b) => b.balance - a.balance)
 }

@@ -258,13 +258,20 @@ export interface ProfileData {
 
 export type AccountUsedFor = 'savings' | 'monthly' | 'both';
 
+/** What kind of account this is. Labels and groups; never changes a total. */
+export type AccountKind = 'savings_bank' | 'rd' | 'fd' | 'cash' | 'other';
+
 export interface AccountRow {
   id: string;
   orgId: string | null;
   name: string;
   description: string | null;
   usedFor: string;
+  /** Widened like `usedFor`: the server is the authority on the valid set. */
+  accountKind: string;
   isActive: boolean;
+  /** `YYYY-MM-DD` once closed; null while open. */
+  closedOn?: string | null;
   sortOrder: number;
   /** Recurring deposit: set only when this account is an RD. */
   rdInstalment?: number | null;
@@ -300,6 +307,9 @@ export type AccountPayload = {
   name: string;
   description?: string | null;
   usedFor: AccountUsedFor;
+  accountKind?: AccountKind;
+  /** Empty string clears it (reopens the account); omit to leave unchanged. */
+  closedOn?: string | null;
   isActive?: boolean;
   sortOrder?: number;
   /** Blank or omitted `rdInstalment` clears every other RD field server-side. */
@@ -416,6 +426,22 @@ export interface RawHolding {
   synced: string;
 }
 
+/**
+ * One account's lifetime balance, from the `summary` endpoint.
+ *
+ * Distinct from the monthly dashboard's per-account figures, which `acctFlows`
+ * derives from a single cycle's rows — this one spans the whole book.
+ */
+export type AccountBalanceRow = {
+  name: string
+  kind: string
+  usedFor: string
+  closedOn: string | null
+  inflow: number
+  outflow: number
+  balance: number
+}
+
 export type TrendPoint = { key: string; income: number; expense: number; savings: number; net: number }
 export type SuggestionTone = 'green' | 'amber' | 'red' | 'navy'
 export type Suggestion = { tone: SuggestionTone; title: string; detail: string }
@@ -445,6 +471,8 @@ export type DashboardSummary = {
     upcomingRenewals: { name: string; amount: number; dueDate: string; daysLeft: number }[]
   }
   budget: { total: number; spent: number }
+  /** All-time balance per payment account (opening balance + every transaction). */
+  accounts: AccountBalanceRow[]
   loans: LoanOutstanding[]
   payoff: (LoanOutstanding & { order: number; closesInMonths: number })[]
   twelveMonth: { requiredMonthly: number; availableMonthly: number; shortfall: number; feasible: boolean }

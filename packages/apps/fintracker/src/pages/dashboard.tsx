@@ -16,6 +16,7 @@ import { budgetAppliesToLabelMonth, cycleDateRange } from '../expenseCycle'
 import { useFormatMoney } from '../hooks/useFormatMoney'
 import { useFintrackerModes } from '../context/FintrackerModesContext'
 import {
+  BalanceRow,
   HoldingCard,
   KpiCard,
   KpiGrid,
@@ -28,6 +29,8 @@ import {
   UiCard,
 } from '../ui'
 import { api, type DashboardSummary } from '../api'
+import { accountKindMeta } from '../config'
+import { AccountKindPills, kindsPresent } from '../components/AccountKindPills'
 
 const DAY_MS = 86_400_000
 /**
@@ -81,6 +84,7 @@ export default function Dashboard({ onCategoryClick, onGoTab }: Props) {
   const fmt = useFormatMoney()
   const { rows, budget, month, year, fintracker, openingBal } = state
   const {
+    accounts: dbAccounts,
     monthlyAccountNames,
     paymentModeOptions,
     creditCardNames,
@@ -92,6 +96,8 @@ export default function Dashboard({ onCategoryClick, onGoTab }: Props) {
   /** Which source breakdown is open, if any. Detail lives here rather than in a
       row per source, which made the section seven cards tall. */
   const [sheet, setSheet] = useState<'accounts' | 'credit' | null>(null)
+  /** Account-kind filter inside the accounts sheet; `''` shows every kind. */
+  const [sheetKind, setSheetKind] = useState('')
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
   useEffect(() => {
     let cancelled = false
@@ -207,9 +213,18 @@ export default function Dashboard({ onCategoryClick, onGoTab }: Props) {
   // no amounts. So this section is now the only place per-source figures exist.
   const availableTotal = monthlyAccountNames.reduce((s, n) => s + (flows[n]?.current || 0), 0)
   const creditShare = exp > 0 ? Math.round((creditTotals.charged / exp) * 100) : 0
+  // `flows` is keyed by account NAME (transactions name their source), while the
+  // kind lives on the account row — so the two are joined by name here too.
+  const kindByAccountName = new Map(dbAccounts.map((a) => [a.name, a.accountKind || 'savings_bank']))
   const accountRows = monthlyAccountNames
-    .map((name) => ({ name, ...(flows[name] || { inflow: 0, outflow: 0, current: 0 }) }))
+    .map((name) => ({
+      name,
+      kind: kindByAccountName.get(name) || 'savings_bank',
+      ...(flows[name] || { inflow: 0, outflow: 0, current: 0 }),
+    }))
     .sort((a, b) => b.current - a.current)
+  const accountKindsPresent = kindsPresent(accountRows.map((a) => ({ accountKind: a.kind })))
+  const visibleAccountRows = sheetKind ? accountRows.filter((a) => a.kind === sheetKind) : accountRows
   const sheetIsEmpty =
     sheet === 'accounts' ? accountRows.length === 0 : creditTotals.sources.length === 0
   const sheetTotalTone =
@@ -460,23 +475,30 @@ export default function Dashboard({ onCategoryClick, onGoTab }: Props) {
             </p>
           ) : (
           <ListStack>
+            {sheet === 'accounts' ? (
+              <AccountKindPills kinds={accountKindsPresent} active={sheetKind} onChange={setSheetKind} />
+            ) : null}
             {sheet === 'accounts'
-              ? accountRows.map((a) => (
-                  <HoldingCard
-                    key={a.name}
-                    title={a.name}
-                    compactTitle
-                    icon={<Wallet size={13} />}
-                    iconBackground
-                    accentTone={a.current < 0 ? 'red' : 'green'}
-                    leftLabel="In"
-                    leftValue={fmt(a.inflow)}
-                    centerLabel="Out"
-                    centerValue={fmt(a.outflow)}
-                    rightLabel="Balance"
-                    rightValue={`${a.current < 0 ? '−' : ''}${fmt(Math.abs(a.current))}`}
-                  />
-                ))
+              ? visibleAccountRows.map((a) => {
+                  const meta = accountKindMeta(a.kind)
+                  return (
+                    <BalanceRow
+                      key={a.name}
+                      title={a.name}
+                      subtitle={meta.label}
+                      icon={<meta.icon size={14} aria-hidden />}
+                      iconTone={a.current < 0 ? 'red' : 'navy'}
+                      value={`${a.current < 0 ? '−' : ''}${fmt(Math.abs(a.current))}`}
+                      valueTone={a.current < 0 ? 'red' : undefined}
+                      income={fmt(a.inflow)}
+                      expense={fmt(a.outflow)}
+                      incomeLabel="In"
+                      expenseLabel="Out"
+                      incomeIcon={<ArrowDownRight size={11} strokeWidth={2.4} />}
+                      expenseIcon={<ArrowUpRight size={11} strokeWidth={2.4} />}
+                    />
+                  )
+                })
               : creditTotals.sources.map((c) => (
                   <HoldingCard
                     key={c.name}

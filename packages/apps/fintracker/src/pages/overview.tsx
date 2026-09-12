@@ -12,18 +12,10 @@ import {
   CalendarDays,
 } from 'lucide-react'
 import { useFormatMoney } from '../hooks/useFormatMoney'
-import { MiniBarChart } from '../ui'
 import { BalanceRow, KpiCard, KpiGrid, LoadingState, SectionBlock, UiCard } from '../ui'
 import { api, type DashboardSummary } from '../api'
-import { MNS } from '../config'
-
-/** `2026-07` → `Jul`. Falls back to the raw key so a bad value is visible, not blank. */
-function shortMonthLabel(key: string): string {
-  const m = /^(\d{4})-(\d{2})$/.exec(key)
-  if (!m) return key
-  const i = parseInt(m[2], 10) - 1
-  return MNS[i] ?? key
-}
+import { accountKindMeta } from '../config'
+import { AccountKindPills, AccountKindTotals, kindsPresent, totalByKind } from '../components/AccountKindPills'
 
 /**
  * Whole-portfolio view: net worth, multi-month trend, fixed commitments and
@@ -58,14 +50,38 @@ export default function Overview() {
     }
   }, [])
 
-  const trendPoints = useMemo(
-    () =>
-      (summary?.trend ?? []).map((t) => ({
-        label: shortMonthLabel(t.key),
-        primary: t.income,
-        secondary: t.expense + t.savings,
-      })),
+  /** `''` shows every kind. */
+  const [kindFilter, setKindFilter] = useState('')
+
+  /**
+   * Spendable accounts only.
+   *
+   * Closed ones are not money you can reach, and `used_for = 'savings'` accounts
+   * are excluded for a subtler reason: their money lives in the savings ledger,
+   * not the transaction register, so a balance folded from transactions is a
+   * truthful zero and a misleading one. They are already represented by the
+   * Savings figure in Net Worth below; listing them here at ₹0 beside the
+   * Savings page's real numbers would just look broken.
+   */
+  const openAccounts = useMemo(
+    () => (summary?.accounts ?? []).filter((a) => !a.closedOn && a.usedFor !== 'savings'),
     [summary],
+  )
+  const visibleAccounts = useMemo(
+    () => (kindFilter ? openAccounts.filter((a) => (a.kind || 'savings_bank') === kindFilter) : openAccounts),
+    [openAccounts, kindFilter],
+  )
+  const kindTotals = useMemo(
+    () => totalByKind(openAccounts.map((a) => ({ accountKind: a.kind, balance: a.balance }))),
+    [openAccounts],
+  )
+  const availableTotal = useMemo(
+    () => openAccounts.reduce((sum, a) => sum + a.balance, 0),
+    [openAccounts],
+  )
+  const presentKinds = useMemo(
+    () => kindsPresent(openAccounts.map((a) => ({ accountKind: a.kind }))),
+    [openAccounts],
   )
 
   // Shell and page must be SEPARATE elements: the gutter rule is
@@ -114,6 +130,50 @@ export default function Overview() {
       ) : null}
 
       <SectionBlock
+        title="Available"
+        icon={<Wallet size={14} />}
+        subtitle="Every account, all time — opening balance plus every transaction since"
+      >
+        <div className="ui-stack">
+          <KpiCard
+            full
+            label="Total available"
+            value={`${availableTotal < 0 ? '−' : ''}${fmt(Math.abs(availableTotal))}`}
+            tone={availableTotal >= 0 ? 'green' : 'red'}
+            icon={<Wallet size={14} />}
+            subtitle={`${openAccounts.length} open account${openAccounts.length === 1 ? '' : 's'}`}
+          />
+          <AccountKindTotals totals={kindTotals} formatValue={fmt} onSelect={setKindFilter} />
+          <AccountKindPills kinds={presentKinds} active={kindFilter} onChange={setKindFilter} />
+          {visibleAccounts.map((a) => {
+            const meta = accountKindMeta(a.kind)
+            return (
+              <BalanceRow
+                key={a.name}
+                title={a.name}
+                subtitle={meta.label}
+                icon={<meta.icon size={14} aria-hidden />}
+                iconTone={a.balance < 0 ? 'red' : 'navy'}
+                value={`${a.balance < 0 ? '−' : ''}${fmt(Math.abs(a.balance))}`}
+                valueTone={a.balance < 0 ? 'red' : undefined}
+                income={fmt(a.inflow)}
+                expense={fmt(a.outflow)}
+                incomeLabel="In"
+                expenseLabel="Out"
+                incomeIcon={<ArrowDownRight size={11} strokeWidth={2.4} />}
+                expenseIcon={<ArrowUpRight size={11} strokeWidth={2.4} />}
+              />
+            )
+          })}
+          {visibleAccounts.length === 0 ? (
+            <p style={{ color: 'var(--muted)', fontSize: 14, margin: 0 }}>
+              No accounts to show. Add them in Settings → Accounts.
+            </p>
+          ) : null}
+        </div>
+      </SectionBlock>
+
+      <SectionBlock
         title="Net Worth"
         icon={<Scale size={14} />}
         subtitle="Savings, gold and investments less all loans"
@@ -145,22 +205,6 @@ export default function Overview() {
         </KpiGrid>
       </SectionBlock>
 
-      {trendPoints.length > 1 ? (
-        <SectionBlock
-          title="6-Month Trend"
-          icon={<TrendingUp size={14} />}
-          subtitle={
-            income.sampleMonths > 0
-              ? `Avg income ${fmt(income.avgIncome)} · avg spend ${fmt(income.avgExpense)}`
-              : undefined
-          }
-        >
-          <UiCard>
-            <MiniBarChart points={trendPoints} primaryLabel="Income" secondaryLabel="Spend" />
-          </UiCard>
-        </SectionBlock>
-      ) : null}
-
       <SectionBlock title="Monthly Commitments" icon={<CalendarClock size={14} />}>
         <KpiGrid variant="compact">
           <KpiCard label="Loan EMIs" value={fmt(committed.emi)} tone="muted" icon={<Banknote size={14} />} />
@@ -171,13 +215,6 @@ export default function Overview() {
             tone="muted"
             accentTone={committed.total > income.avgIncome * 0.5 ? 'red' : 'green'}
             icon={<Scale size={14} />}
-          />
-          <KpiCard
-            label="Avg surplus"
-            value={`${income.surplus < 0 ? '−' : ''}${fmt(Math.abs(income.surplus))}`}
-            tone="muted"
-            accentTone={income.surplus >= 0 ? 'green' : 'red'}
-            icon={<Wallet size={14} />}
           />
         </KpiGrid>
         {committed.upcomingRenewals.length ? (

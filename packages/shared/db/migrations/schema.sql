@@ -62,8 +62,15 @@ CREATE TABLE "payment_sources" (
 	"description" text,
 	"source_type" text NOT NULL,
 	"used_for" text DEFAULT 'both' NOT NULL,
+	"account_kind" text DEFAULT 'savings_bank' NOT NULL,
 	"is_active" boolean DEFAULT true,
-	"sort_order" integer DEFAULT 0
+	"closed_on" date,
+	"sort_order" integer DEFAULT 0,
+	"rd_instalment" numeric(12, 2),
+	"rd_day" integer,
+	"rd_months" integer,
+	"rd_start_date" date,
+	"rd_maturity_amount" numeric(12, 2)
 );
 
 CREATE TABLE "transactions" (
@@ -78,7 +85,9 @@ CREATE TABLE "transactions" (
 	"mode" text,
 	"transfer_to" text,
 	"notes" text,
-	"month_year" text NOT NULL
+	"month_year" text NOT NULL,
+	"ref_kind" text,
+	"ref_id" text
 );
 
 CREATE TABLE "savings" (
@@ -150,6 +159,15 @@ CREATE TABLE "cash_loans" (
 	"status" text DEFAULT 'Ongoing' NOT NULL
 );
 
+CREATE TABLE "emi_loan_repayments" (
+	"id" text PRIMARY KEY NOT NULL,
+	"org_id" text,
+	"loan_id" text NOT NULL,
+	"date" date NOT NULL,
+	"amount" numeric(12, 2) NOT NULL,
+	"note" text
+);
+
 CREATE TABLE "emi_loans" (
 	"id" text PRIMARY KEY NOT NULL,
 	"org_id" text,
@@ -184,6 +202,15 @@ CREATE TABLE "jewel_loans" (
 	"end_date" date,
 	"paid_amount" numeric(12, 2) DEFAULT '0' NOT NULL,
 	"status" text DEFAULT 'Ongoing' NOT NULL
+);
+
+CREATE TABLE "subscription_charges" (
+	"id" text PRIMARY KEY NOT NULL,
+	"org_id" text,
+	"subscription_id" text NOT NULL,
+	"date" date NOT NULL,
+	"amount" numeric(12, 2) NOT NULL,
+	"note" text
 );
 
 CREATE TABLE "subscriptions" (
