@@ -161,7 +161,6 @@ export function RightLegendDonut({
           <div className="chart-donut-legend chart-donut-legend--bottom">
             {items.map(item => {
               const pct = total > 0 ? (item.value / total) * 100 : 0
-              const legendText = showPct ? `${pct.toFixed(0)}%` : valueFormatter(item.value)
               return (
                 <div
                   key={item.label}
@@ -170,7 +169,10 @@ export function RightLegendDonut({
                   <div className="chart-donut-dot" style={{ background: item.color }} />
                   <span className="chart-donut-label">{item.label}</span>
                   <span className="chart-donut-value">{valueFormatter(item.value)}</span>
-                  <span className="chart-donut-pct">{legendText}</span>
+                  {/* Only a second, different figure earns a second line. This
+                      used to fall back to the formatted value when `showPct` was
+                      off, printing the same amount twice under every swatch. */}
+                  {showPct && <span className="chart-donut-pct">{`${pct.toFixed(0)}%`}</span>}
                 </div>
               )
             })}

@@ -6,6 +6,7 @@ import { UiCard } from './UiCard'
 export type { UiTone } from './uiTone'
 export { KpiCard, KPI_ICON_SIZE, type KpiCardProps } from './KpiCard'
 export { KpiGrid, type KpiGridVariant } from './KpiGrid'
+export { ProgressBar, type ProgressBarProps } from './ProgressBar'
 
 export function LoadingState({
   label = 'Loading…',
@@ -371,16 +372,27 @@ export function ModalShell({
     }
   }, [])
 
+  // Kept in a ref so the effect below never has to re-run when the caller
+  // passes a fresh closure — which every caller does, since `onClose` is either
+  // an inline arrow or a function declared in the component body.
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
   // Escape closes, and focus moves into the dialog and back to whatever opened
   // it. Without this the sheet was mouse-only and left focus stranded on the
   // page behind it.
+  //
+  // Runs ONCE. It used to depend on `onClose`, so a new closure on every render
+  // re-ran it and `shellRef.focus()` pulled focus off whatever the user was
+  // typing in. On a phone that closes the keyboard — once per keystroke, since
+  // each keystroke re-renders the form.
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null
     shellRef.current?.focus()
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation()
-        onClose()
+        onCloseRef.current()
       }
     }
     document.addEventListener('keydown', onKey)
@@ -388,7 +400,7 @@ export function ModalShell({
       document.removeEventListener('keydown', onKey)
       if (opener && document.contains(opener)) opener.focus()
     }
-  }, [onClose])
+  }, [])
 
   return (
     <div className="modal-bg open" onClick={onClose}>

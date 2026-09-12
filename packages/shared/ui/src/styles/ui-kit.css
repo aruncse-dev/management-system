@@ -124,6 +124,47 @@
   border-radius: 999px;
   display: block;
 }
+/* Completion track — see ProgressBar.tsx. Tone drives the fill only; the track
+   stays neutral so a red (urgent) bar still reads as a bar, not a solid block. */
+.ui-kit-progress {
+  display: grid;
+  gap: 4px;
+}
+.ui-kit-progress-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ui-kit-progress-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.ui-kit-progress-pct {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.ui-kit-progress-track {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(15, 28, 63, .10);
+  overflow: hidden;
+}
+.ui-kit-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--navy);
+  transition: width .25s ease;
+}
+.ui-kit-progress-track.ui-tone-green .ui-kit-progress-fill { background: var(--gm); }
+.ui-kit-progress-track.ui-tone-red .ui-kit-progress-fill { background: var(--rm); }
+.ui-kit-progress-track.ui-tone-amber .ui-kit-progress-fill { background: #D97706; }
+.ui-kit-progress-track.ui-tone-muted .ui-kit-progress-fill { background: var(--muted); }
 .ui-kit-summary-metric-label {
   font-size: 12px;
   font-weight: 700;
@@ -298,6 +339,148 @@
 }
 .stock-entry-card {
   border: 1px solid var(--border);
+}
+/* Repayments grouped by month. The sticky heading keeps the month visible
+   while scrolling a long list, and carries that month's total — the figure the
+   tab is usually opened to find. */
+.repay-month {
+  display: grid;
+  gap: 8px;
+}
+.repay-month + .repay-month {
+  margin-top: 14px;
+}
+.repay-month-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 2px;
+  background: var(--bg);
+}
+.repay-month-label {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .6px;
+}
+.repay-month-total {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.repay-month-count {
+  font-weight: 600;
+  color: var(--muted);
+}
+.repay-month-rows {
+  display: grid;
+  gap: 8px;
+}
+
+/* The pay action sits in the card header next to the type icon. The card
+   itself is the edit target, so this stays a quiet outline pill rather than a
+   filled button competing with it. */
+.loan-card-pay {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Matches the type icon beside it so the header reads as one row of controls. */
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--muted);
+  cursor: pointer;
+  transition: color .15s ease, border-color .15s ease, background .15s ease;
+}
+.loan-card-pay:hover,
+.loan-card-pay:focus-visible {
+  color: var(--navy);
+  border-color: var(--navy);
+  background: var(--navy-lt);
+}
+
+/* Dense dues list: one card, one line per loan. Four columns on a single
+   baseline — type mark, name, countdown, amount — so the eye scans straight
+   down the amounts. The name is the only flexible column, so a long one
+   ellipses instead of wrapping and making rows different heights. */
+.loan-due-list {
+  display: grid;
+}
+.loan-due-item {
+  display: grid;
+  grid-template-columns: 6px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 2px;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.loan-due-item + .loan-due-item {
+  border-top: 1px solid var(--border);
+}
+.loan-due-item:hover .loan-due-name,
+.loan-due-item:focus-visible .loan-due-name {
+  color: var(--navy);
+}
+.loan-due-mark {
+  width: 6px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--muted);
+}
+.loan-due-mark.ui-tone-navy { background: var(--navy); }
+.loan-due-mark.ui-tone-amber { background: #D97706; }
+.loan-due-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.loan-due-when {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.loan-due-when.ui-tone-red { color: var(--rm); }
+.loan-due-when.ui-tone-amber { color: #D97706; }
+.loan-due-amt {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.loans-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 40px 16px;
+  color: var(--muted);
+  text-align: center;
+}
+.loans-empty p {
+  margin: 0;
+  font-size: 13px;
 }
 .ui-kit-holding-card-head {
   display: flex;
@@ -1184,6 +1367,17 @@
   background: rgba(245, 158, 11, .10);
   border-color: rgba(245, 158, 11, .35);
   color: #B45309;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+/* Error variant — same single-paragraph shape as the amber warning above,
+   used for validation and save failures raised inside a modal. */
+.ui-kit-callout.ui-tone-red {
+  margin: 0;
+  background: rgba(239, 68, 68, .10);
+  border-color: rgba(239, 68, 68, .35);
+  color: #B91C1C;
   font-size: 12px;
   font-weight: 600;
   line-height: 1.45;
