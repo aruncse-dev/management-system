@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Banknote, BarChart3, CreditCard, Landmark, Clock, Layers3, ArrowDownLeft, ArrowUpRight, Plus } from 'lucide-react'
+import { Banknote, BarChart3, CalendarClock, CreditCard, HandCoins, Landmark, Clock, Layers3, ArrowDownLeft, ArrowUpRight, Plus } from 'lucide-react'
 import { api, RawCashLoanHistoryRow, RawCashLoanRow, RawEmiLoanHistoryRow, RawEmiRow, RawJewelLoanHistoryRow, RawJewelLoanRow } from '../api'
 import { isMirroredRow, MIRRORED_ROW_BADGE, MIRRORED_ROW_NOTE } from '../lib/mirroredRows'
 import { useFormatMoney } from '../hooks/useFormatMoney'
-import { FilterChips, FormField, HoldingCard, KpiCard, KpiGrid, LoadingState, ModalActions, ModalShell, SectionBlock, SectionChip } from '../ui'
+import { FilterChips, FormField, HoldingCard, KpiCard, KpiGrid, LoadingState, ModalActions, ModalShell, ProgressBar, RightLegendDonut, SectionBlock, SectionChip, Spacer, UiCard } from '../ui'
 
 type LoanSource = 'EMI' | 'Jewel' | 'Cash'
 type LoansTab = 'dashboard' | 'emi' | 'jewel' | 'cash' | 'history'
@@ -41,6 +41,14 @@ type CombinedHistoryRow = {
   kind: 'Loan' | 'Payment'
   title: string
   subtitle: string
+  /**
+   * The stored note, exactly as saved — empty when there isn't one.
+   *
+   * `subtitle` falls back to a type label for display, so the edit form must not
+   * read from it: doing so pre-filled "Jewel Loan" into the note box and saved
+   * that label as if the user had typed it.
+   */
+  note: string
   date: string
   amount: number
   tone: 'navy' | 'green' | 'red' | 'amber'
@@ -147,6 +155,53 @@ function fmtDate(dateStr: string) {
 
 function formatDateForInput(dateStr: string) {
   return normalizeDateForInput(dateStr)
+}
+
+/**
+ * Whole days from today (UTC midnight) to `dateStr`. Negative once past.
+ * NaN for an unparseable or absent date, which callers must skip.
+ */
+function daysUntil(dateStr: string): number {
+  const target = parseDate(dateStr)
+  if (isNaN(target.getTime())) return NaN
+  const now = new Date()
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  return Math.round((target.getTime() - today) / 86_400_000)
+}
+
+/**
+ * Month heading for a repayment group, e.g. "Sep 2026". Built from the parsed
+ * UTC date rather than `new Date(iso)` so a `dd-MMM-yy` row groups correctly.
+ */
+function monthGroupLabel(dateStr: string): string {
+  const d = parseDate(dateStr)
+  if (isNaN(d.getTime())) return 'Undated'
+  const m = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getUTCMonth()]
+  return `${m} ${d.getUTCFullYear()}`
+}
+
+/** Sort key for a month group — `yyyy-mm`, so lexical order is chronological. */
+function monthGroupKey(dateStr: string): string {
+  const d = parseDate(dateStr)
+  if (isNaN(d.getTime())) return '0000-00'
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
+}
+
+/** How far ahead the dashboard's "Due soon" list looks. */
+const DUE_SOON_HORIZON_DAYS = 90
+
+/** Red once inside a month, amber inside a quarter. Overdue is red too. */
+function dueTone(days: number): 'red' | 'amber' | 'muted' {
+  if (days <= 30) return 'red'
+  if (days <= 90) return 'amber'
+  return 'muted'
+}
+
+/** Compact countdown for the dense dues list: "19d", "Today", "3d late". */
+function dueLabelShort(days: number): string {
+  if (days < 0) return `${Math.abs(days)}d late`
+  if (days === 0) return 'Today'
+  return `${days}d`
 }
 
 function addMonths(dateStr: string, months: number): string {
@@ -342,20 +397,31 @@ function buildCashLoansWithHistory(rows: RawCashLoanRow[], history: RawCashLoanH
   })
 }
 
+/**
+ * `loanNames` maps loan id to display name. Without it every row reads
+ * "Repayment", which is unusable once more than one loan of a type exists —
+ * four jewel loans produced four identical-looking entries.
+ */
 function buildHistory(
   jewelHistory: RawJewelLoanHistoryRow[],
   cashHistory: RawCashLoanHistoryRow[],
   emiHistory: RawEmiLoanHistoryRow[] = [],
+  loanNames: Map<string, string> = new Map(),
 ): CombinedHistoryRow[] {
   const rows: CombinedHistoryRow[] = []
+  /** Falls back to the type label when the loan has since been deleted. */
+  const nameFor = (loanId: string, fallback: string) => loanNames.get(loanId) || fallback
+  const noteFor = (raw: { id: string; note?: string | null }) =>
+    isMirroredRow(raw.id) ? MIRRORED_ROW_BADGE : String(raw.note ?? '').trim()
 
   emiHistory.forEach(raw => {
     rows.push({
       id: `emi-pay-${raw.id}`,
       source: 'EMI',
       kind: 'Payment',
-      title: 'Repayment',
-      subtitle: isMirroredRow(raw.id) ? MIRRORED_ROW_BADGE : String(raw.note ?? '').trim() || 'EMI Loan',
+      title: nameFor(raw.loan_id, 'EMI Loan'),
+      subtitle: noteFor(raw) || 'EMI Loan',
+      note: String(raw.note ?? '').trim(),
       date: String(raw.date ?? ''),
       amount: parseNumber(raw.amount),
       tone: 'green',
@@ -370,8 +436,9 @@ function buildHistory(
       id: `jewel-pay-${raw.id}`,
       source: 'Jewel',
       kind: 'Payment',
-      title: `Repayment`,
-      subtitle: isMirroredRow(raw.id) ? MIRRORED_ROW_BADGE : String(raw.note ?? '').trim() || 'Jewel Loan',
+      title: nameFor(raw.loan_id, 'Jewel Loan'),
+      subtitle: noteFor(raw) || 'Jewel Loan',
+      note: String(raw.note ?? '').trim(),
       date: String(raw.date ?? ''),
       amount: parseNumber(raw.amount),
       tone: 'green',
@@ -386,8 +453,9 @@ function buildHistory(
       id: `cash-pay-${raw.id}`,
       source: 'Cash',
       kind: 'Payment',
-      title: 'Repayment',
-      subtitle: isMirroredRow(raw.id) ? MIRRORED_ROW_BADGE : String(raw.note ?? '').trim() || 'Cash Loan',
+      title: nameFor(raw.loan_id, 'Cash Loan'),
+      subtitle: noteFor(raw) || 'Cash Loan',
+      note: String(raw.note ?? '').trim(),
       date: String(raw.date ?? ''),
       amount: parseNumber(raw.amount),
       tone: 'green',
@@ -429,6 +497,44 @@ function LoanListFilterBar({
       }}
     />
   )
+}
+
+/**
+ * The pay action, sitting in the card header beside the type icon.
+ *
+ * The card itself is the edit target, so this stops propagation — a click here
+ * must not also open the edit sheet behind the repayment sheet.
+ */
+function LoanPayButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      className="loan-card-pay"
+      aria-label="Record payment"
+      title="Record payment"
+      onClick={e => {
+        e.stopPropagation()
+        onClick()
+      }}
+    >
+      <HandCoins size={15} />
+    </button>
+  )
+}
+
+/** Repayment progress, shared by all three card types. */
+function LoanCardProgress({
+  paid,
+  total,
+  progressLabel,
+  tone,
+}: {
+  paid: number
+  total: number
+  progressLabel: string
+  tone: 'red' | 'amber' | 'green'
+}) {
+  return <ProgressBar value={paid} max={total} tone={tone} label={progressLabel} showPct />
 }
 
 function LoanStatusField({
@@ -499,9 +605,9 @@ export default function Loans() {
   const [repayForm, setRepayForm] = useState<PaymentFormState>(emptyPaymentForm())
   const [repayType, setRepayType] = useState<'emi' | 'jewel' | 'cash'>('jewel')
   const [repayEditItem, setRepayEditItem] = useState<CombinedHistoryRow | null>(null)
-  const [emiListFilter, setEmiListFilter] = useState<LoanListFilter>('all')
-  const [jewelListFilter, setJewelListFilter] = useState<LoanListFilter>('all')
-  const [cashListFilter, setCashListFilter] = useState<LoanListFilter>('all')
+  const [emiListFilter, setEmiListFilter] = useState<LoanListFilter>('active')
+  const [jewelListFilter, setJewelListFilter] = useState<LoanListFilter>('active')
+  const [cashListFilter, setCashListFilter] = useState<LoanListFilter>('active')
   const fabStyle = {
     position: 'fixed' as const,
     bottom: 24,
@@ -558,9 +664,14 @@ export default function Loans() {
   }, [])
 
   const allLoans = useMemo(() => [...emiLoans, ...jewelLoans, ...cashLoans], [emiLoans, jewelLoans, cashLoans])
+  /** Includes closed loans: a repayment outlives the loan being closed. */
+  const loanNamesById = useMemo(
+    () => new Map(allLoans.map(l => [l.id, l.name])),
+    [allLoans],
+  )
   const history = useMemo(
-    () => buildHistory(jewelHistory, cashHistory, emiHistory),
-    [jewelHistory, cashHistory, emiHistory],
+    () => buildHistory(jewelHistory, cashHistory, emiHistory, loanNamesById),
+    [jewelHistory, cashHistory, emiHistory, loanNamesById],
   )
 
   const emiRows = useMemo(
@@ -613,6 +724,60 @@ export default function Loans() {
     }
   }, [activeLoans, activeEmiRows, activeJewelRows, activeCashRows])
 
+  /**
+   * Upcoming dates across all active loans, soonest first.
+   *
+   * Jewel loans carry a hard maturity date — miss it and the pledged jewellery
+   * is at risk — and that column drove nothing in the UI before this. EMI dates
+   * are derived: the next instalment falls `paid_emis` months after the start,
+   * so the figure moves on its own as repayments are recorded. Cash loans have
+   * no schedule and are deliberately absent.
+   */
+  const dueSoon = useMemo(() => {
+    const items: {
+      id: string
+      name: string
+      kind: LoanSource
+      date: string
+      days: number
+      /** What falls due on that date: the instalment for EMI, the balance for jewel. */
+      amount: number
+    }[] = []
+
+    activeJewelRows.forEach(loan => {
+      const days = daysUntil(loan.endDate)
+      if (!Number.isFinite(days)) return
+      items.push({
+        id: loan.id,
+        name: loan.name,
+        kind: 'Jewel',
+        date: loan.endDate,
+        days,
+        amount: loan.outstanding,
+      })
+    })
+
+    activeEmiRows.forEach(loan => {
+      if (loan.paid_emis >= loan.tenure_months) return
+      const next = addMonths(loan.startDate, loan.paid_emis)
+      const days = daysUntil(next)
+      if (!Number.isFinite(days)) return
+      items.push({
+        id: loan.id,
+        name: loan.name,
+        kind: 'EMI',
+        date: next,
+        days,
+        amount: loan.emi_amount,
+      })
+    })
+
+    // A quarter out is the point where a jewel loan needs planning; past that
+    // the section stops being "soon" and turns into a second copy of the loan
+    // list. Overdue items always stay.
+    return items.filter(i => i.days <= DUE_SOON_HORIZON_DAYS).sort((a, b) => a.days - b.days)
+  }, [activeJewelRows, activeEmiRows, fmt])
+
   const emiMetrics = useMemo(() => {
     const totalLoanCount = activeEmiRows.length
     const totalOutstanding = Math.round(activeEmiRows.reduce((s, l) => {
@@ -624,6 +789,29 @@ export default function Loans() {
   }, [activeEmiRows])
 
   const filteredHistory = history
+
+  /**
+   * Repayments bucketed by month, newest month first.
+   *
+   * `history` is already sorted newest-first, so pushing in order keeps each
+   * month's rows sorted too. The per-month total is the number people actually
+   * want from this tab — "what did I pay in September" — and it was not
+   * available anywhere before.
+   */
+  const historyByMonth = useMemo(() => {
+    const groups = new Map<string, { key: string; label: string; rows: CombinedHistoryRow[]; total: number }>()
+    for (const row of filteredHistory) {
+      const key = monthGroupKey(row.date)
+      let group = groups.get(key)
+      if (!group) {
+        group = { key, label: monthGroupLabel(row.date), rows: [], total: 0 }
+        groups.set(key, group)
+      }
+      group.rows.push(row)
+      group.total += row.amount
+    }
+    return Array.from(groups.values()).sort((a, b) => b.key.localeCompare(a.key))
+  }, [filteredHistory])
 
   const jewelMetrics = useMemo(() => {
     const totalPrincipal = Math.round(activeJewelRows.reduce((sum, loan) => sum + loan.principal, 0))
@@ -638,6 +826,31 @@ export default function Loans() {
       count: activeJewelRows.length,
     }
   }, [activeJewelRows])
+
+  /**
+   * Outstanding split by loan type.
+   *
+   * Summed from the same `activeLoans` rows as `metrics.totalOutstanding`, so
+   * the donut centre and the KPI above it cannot drift apart — that mismatch is
+   * the bug the gold rebuild had to fix.
+   */
+  const outstandingByKind = useMemo(() => {
+    const totals: Record<LoanSource, number> = { EMI: 0, Jewel: 0, Cash: 0 }
+    activeLoans.forEach(loan => {
+      totals[loan.kind] += loan.outstanding
+    })
+    // Deliberately avoids green and red: those carry "paid" and "unpaid" in the
+    // donut beside this one, and reusing them for a loan type read as a verdict
+    // on that type rather than a category colour.
+    const palette: Record<LoanSource, string> = {
+      EMI: '#1e5cc7',
+      Jewel: '#D97706',
+      Cash: '#7C3AED',
+    }
+    return (Object.keys(totals) as LoanSource[])
+      .filter(kind => totals[kind] > 0)
+      .map(kind => ({ label: kind, value: Math.round(totals[kind]), color: palette[kind] }))
+  }, [activeLoans])
 
   function setEmiField<K extends keyof EmiFormState>(k: K, v: EmiFormState[K]) {
     setEmiForm(f => ({ ...f, [k]: v }))
@@ -829,13 +1042,22 @@ export default function Loans() {
     return loan ? String(loan.emi_amount) : ''
   }
 
-  function openRepayment() {
-    const repayLoans = loansForRepayType(repayType)
-    const loanId = repayLoans[0]?.id ?? ''
+  /**
+   * Open the repayment sheet.
+   *
+   * Called with no argument from the Repayments FAB, which keeps its original
+   * behaviour: the current type and whichever loan happens to be first. Called
+   * with a loan from a loan card, which is the common case — paying a specific
+   * loan should not require picking its type and then finding it in a list.
+   */
+  function openRepayment(target?: { type: 'emi' | 'jewel' | 'cash'; loanId: string }) {
+    const type = target?.type ?? repayType
+    const loanId = target?.loanId ?? loansForRepayType(type)[0]?.id ?? ''
+    if (target) setRepayType(type)
     setRepayForm({
       loan_id: loanId,
       date: new Date().toISOString().split('T')[0],
-      amount: defaultRepayAmount(repayType, loanId),
+      amount: defaultRepayAmount(type, loanId),
       note: '',
     })
     setRepayEditItem(null)
@@ -855,7 +1077,7 @@ export default function Loans() {
         loan_id: row.sourceLoanId ?? '',
         date: normalizeDateForInput(row.date),
         amount: String(row.amount),
-        note: row.subtitle,
+        note: row.note,
       })
       setRepayDeleteConfirm(false)
       setRepayModalOpen(true)
@@ -1059,22 +1281,140 @@ export default function Loans() {
       </nav>
       <div className="pg">
         {activeTab === 'dashboard' && (
-          <SectionBlock
-            title="Loans Dashboard"
-            icon={<Layers3 size={14} />}
-            right={<SectionChip tone="muted">{formatLoanCountChip(metrics.loanCount, allClosedCount)}</SectionChip>}
-          >
-            <KpiGrid>
-              <KpiCard label="Total Outstanding" value={<span className="kpi-card-v--red">{fmt(metrics.totalOutstanding)}</span>} tone="red" icon={<ArrowUpRight size={14} />} full />
-              <KpiCard label="Total Loan Amount" value={fmt(metrics.totalLoanAmount)} tone="navy" icon={<CreditCard size={14} />} full />
-              <KpiCard label="Total Principal" value={fmt(metrics.totalPrincipal)} tone="muted" icon={<CreditCard size={14} />} />
-              <KpiCard label="Total Interest" value={fmt(metrics.totalInterest)} tone="amber" icon={<Landmark size={14} />} />
-              <KpiCard label="Total Paid" value={fmt(metrics.totalPaid)} tone="green" icon={<ArrowDownLeft size={14} />} />
-              <KpiCard label="EMI Loans" value={emiMetrics.totalLoanCount} tone="muted" icon={<CreditCard size={14} />} />
-              <KpiCard label="Jewel Loans" value={jewelMetrics.count} tone="muted" icon={<Landmark size={14} />} />
-              <KpiCard label="Cash Loans" value={metrics.cashCount} tone="muted" icon={<Banknote size={14} />} />
-            </KpiGrid>
-          </SectionBlock>
+          allLoans.length === 0 ? (
+            <SectionBlock title="Loans" icon={<Layers3 size={14} />}>
+              <div className="loans-empty">
+                <Layers3 size={32} />
+                <p>No loans yet. Add one from the EMI, Jewel or Cash tab.</p>
+              </div>
+            </SectionBlock>
+          ) : (
+          <>
+            <SectionBlock
+              title="Metrics"
+              icon={<Layers3 size={14} />}
+              right={<SectionChip tone="muted">{formatLoanCountChip(metrics.loanCount, allClosedCount)}</SectionChip>}
+            >
+              <KpiGrid>
+                <KpiCard
+                  label="Total due"
+                  value={fmt(metrics.totalOutstanding)}
+                  tone="red"
+                  accentTone="red"
+                  icon={<ArrowUpRight size={14} />}
+                  subtitle={`Across ${metrics.loanCount} active loan${metrics.loanCount === 1 ? '' : 's'}`}
+                  full
+                />
+                {/* Six equal tiles, paired left/right so each row compares like
+                    with like: commitment, then principal against its interest,
+                    then the whole loan against what has been paid off it.
+                    An even count also keeps the 2-up grid square — the per-type
+                    counts that used to sit here left an orphan on the last row
+                    and repeated what the donut below already shows. */}
+                <KpiCard label="Monthly EMIs" value={fmt(emiMetrics.totalMonthlyEmis)} tone="navy" icon={<CalendarClock size={14} />} />
+                <KpiCard label="Active loans" value={metrics.loanCount} tone="muted" icon={<Layers3 size={14} />} />
+                <KpiCard label="Total principal" value={fmt(metrics.totalPrincipal)} tone="navy" icon={<CreditCard size={14} />} />
+                <KpiCard label="Total interest" value={fmt(metrics.totalInterest)} tone="amber" icon={<Landmark size={14} />} />
+                <KpiCard label="Total loan amount" value={fmt(metrics.totalLoanAmount)} tone="navy" icon={<CreditCard size={14} />} />
+                <KpiCard label="Total paid" value={fmt(metrics.totalPaid)} tone="green" icon={<ArrowDownLeft size={14} />} />
+              </KpiGrid>
+              <Spacer size={10} />
+              <ProgressBar
+                value={metrics.totalPaid}
+                max={metrics.totalLoanAmount}
+                tone="green"
+                label={`${fmt(metrics.totalPaid)} repaid of ${fmt(metrics.totalLoanAmount)}`}
+                showPct
+              />
+            </SectionBlock>
+
+            {dueSoon.length > 0 && (
+              <SectionBlock
+                title="Due soon"
+                icon={<Clock size={14} />}
+                right={<SectionChip tone="muted">{`${dueSoon.length} upcoming`}</SectionChip>}
+              >
+                {/* One card, one line per due. Five separate cards for what is
+                    really a short list pushed the metrics and donuts far below
+                    the fold, and each card repeated the same bank and date
+                    scaffolding. The countdown is the only thing that varies
+                    row to row, so that is what carries the colour. */}
+                <UiCard>
+                  <div className="loan-due-list">
+                    {dueSoon.map(item => (
+                      <button
+                        key={`${item.kind}-${item.id}`}
+                        type="button"
+                        className="loan-due-item"
+                        // The row shows a countdown, not a date. The exact date
+                        // stays one hover away rather than adding a second line.
+                        title={`${item.kind === 'Jewel' ? 'Matures' : 'Next EMI'} ${fmtDate(item.date)}`}
+                        onClick={() => goTab(item.kind === 'Jewel' ? 'jewel' : 'emi')}
+                      >
+                        <span className={`loan-due-mark ui-tone-${item.kind === 'Jewel' ? 'amber' : 'navy'}`} />
+                        <span className="loan-due-name">{item.name}</span>
+                        <span className={`loan-due-when ui-tone-${dueTone(item.days)}`}>
+                          {dueLabelShort(item.days)}
+                        </span>
+                        <span className="loan-due-amt">{fmt(item.amount)}</span>
+                      </button>
+                    ))}
+                  </div>
+                </UiCard>
+              </SectionBlock>
+            )}
+
+            {outstandingByKind.length > 0 && (
+              <SectionBlock
+                title="Breakdown"
+                icon={<BarChart3 size={14} />}
+                subtitle="What is owed, by loan type and against what has been repaid"
+              >
+                {/* Stacked rather than side by side. Two half-width cards left
+                    the taller one ragged — this donut has three legend entries
+                    and the one below has two — and at phone width a compact
+                    donut plus its amounts does not fit in half a column.
+                    Full width puts the legend beside each donut instead, so both
+                    cards stay short and the figures stay readable. */}
+                <div className="ui-stack">
+                  <UiCard title="Due by type">
+                    <RightLegendDonut
+                      items={outstandingByKind}
+                      compact
+                      showPct
+                      showCenter
+                      centerLabel="DUE"
+                      centerValue={fmt(metrics.totalOutstanding)}
+                      valueFormatter={fmt}
+                    />
+                  </UiCard>
+
+                  {/* Paid against still-owed. The two sum to the total loan
+                      amount, so the centre names the share cleared rather than
+                      repeating the "DUE" figure in the donut above it. */}
+                  <UiCard title="Paid vs unpaid">
+                    <RightLegendDonut
+                      items={[
+                        { label: 'Paid', value: metrics.totalPaid, color: '#22C55E' },
+                        { label: 'Unpaid', value: metrics.totalOutstanding, color: '#EF4444' },
+                      ].filter(d => d.value > 0)}
+                      compact
+                      showPct
+                      showCenter
+                      centerLabel="PAID"
+                      centerValue={
+                        metrics.totalLoanAmount > 0
+                          ? `${Math.round((metrics.totalPaid / metrics.totalLoanAmount) * 100)}%`
+                          : '—'
+                      }
+                      valueFormatter={fmt}
+                    />
+                  </UiCard>
+                </div>
+              </SectionBlock>
+            )}
+          </>
+          )
         )}
 
         {activeTab === 'emi' && (
@@ -1134,6 +1474,9 @@ export default function Loans() {
                           </div>
                           <div className="ui-kit-holding-card-head-right">
                             {loan.status === 'Closed' ? <SectionChip tone="muted">Closed</SectionChip> : null}
+                            {loan.status !== 'Closed' && (
+                              <LoanPayButton onClick={() => openRepayment({ type: 'emi', loanId: loan.id })} />
+                            )}
                             <div className="ui-kit-holding-icon ui-kit-holding-icon--bg ui-tone-red">
                               <CreditCard size={14} />
                             </div>
@@ -1172,6 +1515,15 @@ export default function Loans() {
                             <div className="ui-kit-holding-pnl-value">{fmt(outstanding)}</div>
                           </div>
                         </div>
+
+                        {loan.status !== 'Closed' && (
+                          <LoanCardProgress
+                            paid={loan.paid_emis}
+                            total={loan.tenure_months}
+                            progressLabel={`${loan.paid_emis} of ${loan.tenure_months} EMIs paid`}
+                            tone="red"
+                          />
+                        )}
                       </div>
                     )
                   })}
@@ -1192,25 +1544,40 @@ export default function Loans() {
             ) : filteredHistory.length === 0 ? (
               <p style={{ color: 'var(--muted)', padding: '0.5rem 0', fontSize: 14 }}>No repayments yet.</p>
             ) : (
-              <div style={{ display: 'grid', gap: 8 }}>
-                {filteredHistory.map(row => (
-                  <HoldingCard
-                    key={row.id}
-                    title={row.title}
-                    subtitle={row.subtitle}
-                    leftLabel="Amount"
-                    leftValue={fmt(row.amount)}
-                    centerLabel="Type"
-                    centerValue={row.source}
-                    rightLabel="Date"
-                    rightValue={fmtDate(row.date)}
-                    accentTone={row.tone}
-                    icon={row.kind === 'Payment' ? <ArrowDownLeft size={14} /> : <ArrowUpRight size={14} />}
-                    iconPosition="right"
-                    iconBackground
-                    className="stock-entry-card"
-                    onClick={row.kind === 'Payment' ? () => openHistoryEdit(row) : undefined}
-                  />
+              <div className="ui-stack">
+                {historyByMonth.map(group => (
+                  <section key={group.key} className="repay-month">
+                    <header className="repay-month-head">
+                      <span className="repay-month-label">{group.label}</span>
+                      <span className="repay-month-total">
+                        {fmt(group.total)}
+                        <span className="repay-month-count">
+                          {` · ${group.rows.length} payment${group.rows.length === 1 ? '' : 's'}`}
+                        </span>
+                      </span>
+                    </header>
+                    <div className="repay-month-rows">
+                      {group.rows.map(row => (
+                        <HoldingCard
+                          key={row.id}
+                          title={row.title}
+                          subtitle={row.subtitle}
+                          leftLabel="Amount"
+                          leftValue={fmt(row.amount)}
+                          centerLabel="Type"
+                          centerValue={row.source}
+                          rightLabel="Date"
+                          rightValue={fmtDate(row.date)}
+                          accentTone={row.tone}
+                          icon={<ArrowDownLeft size={14} />}
+                          iconPosition="right"
+                          iconBackground
+                          className="stock-entry-card"
+                          onClick={() => openHistoryEdit(row)}
+                        />
+                      ))}
+                    </div>
+                  </section>
                 ))}
               </div>
             )}
@@ -1271,6 +1638,9 @@ export default function Loans() {
                           </div>
                           <div className="ui-kit-holding-card-head-right">
                             {jewelLoan.status === 'Closed' ? <SectionChip tone="muted">Closed</SectionChip> : null}
+                            {jewelLoan.status !== 'Closed' && (
+                              <LoanPayButton onClick={() => openRepayment({ type: 'jewel', loanId: jewelLoan.id })} />
+                            )}
                             <div className="ui-kit-holding-icon ui-kit-holding-icon--bg ui-tone-amber">
                               <Landmark size={14} />
                             </div>
@@ -1313,6 +1683,15 @@ export default function Loans() {
                             <div className="ui-kit-holding-pnl-value">{fmt(jewelLoan.outstanding)}</div>
                           </div>
                         </div>
+
+                        {jewelLoan.status !== 'Closed' && (
+                          <LoanCardProgress
+                            paid={jewelLoan.paid}
+                            total={jewelLoan.principal + jewelLoan.interest}
+                            progressLabel={`${fmt(jewelLoan.paid)} of ${fmt(jewelLoan.principal + jewelLoan.interest)} repaid`}
+                            tone="amber"
+                          />
+                        )}
                       </div>
                     )
                   })}
@@ -1375,6 +1754,9 @@ export default function Loans() {
                           </div>
                           <div className="ui-kit-holding-card-head-right">
                             {cashLoan.status === 'Closed' ? <SectionChip tone="muted">Closed</SectionChip> : null}
+                            {cashLoan.status !== 'Closed' && (
+                              <LoanPayButton onClick={() => openRepayment({ type: 'cash', loanId: cashLoan.id })} />
+                            )}
                             <div className="ui-kit-holding-icon ui-kit-holding-icon--bg ui-tone-green">
                               <Banknote size={14} />
                             </div>
@@ -1402,6 +1784,15 @@ export default function Loans() {
                             <div className="ui-kit-holding-pnl-value">{fmt(cashLoan.outstanding)}</div>
                           </div>
                         </div>
+
+                        {cashLoan.status !== 'Closed' && (
+                          <LoanCardProgress
+                            paid={cashLoan.paid}
+                            total={cashLoan.principal}
+                            progressLabel={`${fmt(cashLoan.paid)} of ${fmt(cashLoan.principal)} repaid`}
+                            tone="green"
+                          />
+                        )}
                       </div>
                     )
                   })}
@@ -1424,7 +1815,7 @@ export default function Loans() {
 
       {activeTab === 'history' && (
         <button
-          onClick={openRepayment}
+          onClick={() => openRepayment()}
           title="Repayment"
           aria-label="Repayment"
           style={{ ...fabStyle, right: 20, background: 'var(--navy-dark)' }}
@@ -1547,7 +1938,10 @@ export default function Loans() {
         </ModalShell>
       )}
 
-      {repayModalOpen && (activeTab === 'jewel' || activeTab === 'cash' || activeTab === 'history') && (
+      {/* `repayModalOpen` alone gates this. The tab list it used to carry named
+          jewel/cash — which had no way to open it — while excluding emi, which
+          now does. Anything that opens the sheet should be able to show it. */}
+      {repayModalOpen && (
         <ModalShell
           title={repayEditItem ? 'Edit Repayment' : 'Add Repayment'}
           onClose={closeRepayment}

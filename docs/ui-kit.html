@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shared UI kit reference</title>
+
+<!--
+  Reference for @fintracker-vault/ui. Open this file directly in a browser —
+  no build, no server.
+
+  The two stylesheets below are the real ones the apps ship, pulled in by
+  relative path. That is deliberate: the examples restyle themselves when the
+  CSS changes, so this page cannot quietly drift out of date the way a page of
+  screenshots would. The markup in each example is what the React component
+  actually emits, so copying a class name from here is safe.
+
+  It replaces the old in-app /components gallery, which shipped to users.
+-->
+<link rel="stylesheet" href="../packages/shared/ui/src/styles/globals.css">
+<link rel="stylesheet" href="../packages/shared/ui/src/styles/ui-kit.css">
+
+<style>
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  .doc-wrap { max-width: 1100px; margin: 0 auto; padding: 24px 16px 80px; }
+  .doc-head { padding: 20px 0 8px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+  .doc-head h1 { margin: 0 0 6px; font-size: 22px; }
+  .doc-head p { margin: 0; color: var(--muted); font-size: 13px; max-width: 70ch; }
+  .doc-toc { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+  .doc-toc a { font-size: 12px; padding: 3px 9px; border: 1px solid var(--border);
+               border-radius: 999px; background: var(--card); color: var(--muted); text-decoration: none; }
+  .doc-toc a:hover { color: var(--text); border-color: var(--navy); }
+  .doc-item { margin: 32px 0; padding: 16px; background: var(--card);
+              border: 1px solid var(--border); border-radius: var(--r); }
+  .doc-item > h2 { margin: 0 0 4px; font-size: 16px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .doc-item > .doc-note { margin: 0 0 14px; color: var(--muted); font-size: 13px; max-width: 78ch; }
+  .doc-demo { padding: 14px; border: 1px dashed var(--border); border-radius: var(--r);
+              background: var(--bg); margin-bottom: 12px; }
+  table.doc-props { width: 100%; border-collapse: collapse; font-size: 12px; }
+  table.doc-props th, table.doc-props td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  table.doc-props th { color: var(--muted); font-weight: 700; }
+  table.doc-props code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+  .doc-req { color: var(--rm); font-weight: 700; }
+  details.doc-code { margin-top: 10px; }
+  details.doc-code summary { cursor: pointer; font-size: 12px; color: var(--muted); }
+  details.doc-code pre { overflow-x: auto; background: #0F1C3F; color: #E6EDFF; padding: 10px 12px;
+                         border-radius: 8px; font-size: 11.5px; line-height: 1.5; }
+  .doc-warn { border-left: 3px solid #D97706; padding: 8px 12px; background: rgba(245,158,11,.08);
+              border-radius: 6px; font-size: 12.5px; margin: 12px 0 0; }
+</style>
+</head>
+<body>
+<div class="doc-wrap">
+
+<header class="doc-head">
+  <h1>Shared UI kit — <code>@fintracker-vault/ui</code></h1>
+  <p>
+    Every component the four apps share, with the markup it emits and the props it takes.
+    Styling comes from the real <code>globals.css</code> and <code>ui-kit.css</code>, so what
+    you see here is what ships. Read <code>ai/skills/ui-patterns.md</code> for the rules about
+    <em>when</em> to use each one.
+  </p>
+  <nav class="doc-toc">
+    <a href="#layout">Layout</a>
+    <a href="#kpi">KPI &amp; metrics</a>
+    <a href="#progress">ProgressBar</a>
+    <a href="#lists">Lists &amp; cards</a>
+    <a href="#inputs">Inputs &amp; filters</a>
+    <a href="#modals">Modals</a>
+    <a href="#feedback">Feedback</a>
+    <a href="#charts">Charts</a>
+    <a href="#buttons">Buttons</a>
+  </nav>
+</header>
+
+<!-- ─────────────────────────── LAYOUT ─────────────────────────── -->
+<h2 id="layout" style="margin-top:28px">Layout</h2>
+
+<section class="doc-item">
+  <h2>SectionBlock</h2>
+  <p class="doc-note">
+    The standard page-section wrapper. Every section on every page uses it — never hand-roll a
+    heading. Titles are sentence case (“Recent transactions”, not “Recent Transactions”).
+  </p>
+  <div class="doc-demo">
+    <section class="ui-kit-section-block">
+      <div class="ui-kit-section">
+        <div class="ui-kit-section-left">
+          <div class="ui-kit-section-title"><span>Recent transactions</span></div>
+          <div class="ui-kit-section-subtitle">Last 30 days</div>
+        </div>
+        <div class="ui-kit-section-right"><span class="ui-kit-section-chip ui-tone-muted">12 items</span></div>
+      </div>
+      <div class="ui-kit-section-body">Section content goes here.</div>
+    </section>
+  </div>
+  <table class="doc-props">
+    <tr><th>Prop</th><th>Type</th><th>Notes</th></tr>
+    <tr><td><code>title</code> <span class="doc-req">*</span></td><td><code>string</code></td><td>Sentence case.</td></tr>
+    <tr><td><code>subtitle</code></td><td><code>string</code></td><td>Small muted line under the title.</td></tr>
+    <tr><td><code>icon</code></td><td><code>ReactNode</code></td><td>Lucide icon at <code>size={14}</code>. Only if semantically meaningful.</td></tr>
+    <tr><td><code>right</code> / <code>rightChip</code></td><td><code>ReactNode</code></td><td>Trailing slot — usually a <code>SectionChip</code> or a button.</td></tr>
+    <tr><td><code>children</code> <span class="doc-req">*</span></td><td><code>ReactNode</code></td><td></td></tr>
+  </table>
+  <details class="doc-code"><summary>Usage</summary><pre>&lt;SectionBlock title="Recent transactions" subtitle="Last 30 days"
+              icon={&lt;List size={14} /&gt;}
+              right={&lt;SectionChip tone="muted"&gt;12 items&lt;/SectionChip&gt;}&gt;
+  {rows}
+&lt;/SectionBlock&gt;</pre></details>
+</section>
+
+<section class="doc-item">
+  <h2>SectionTitle · Spacer · ListStack</h2>
+  <p class="doc-note">
+    <code>SectionTitle</code> is the header <code>SectionBlock</code> renders internally — use it
+    directly only when you need the header without the block. <code>Spacer</code> is vertical
+    space (<code>size</code> in px). <code>ListStack</code> is a simple vertical stack for rows.
+  </p>
+  <div class="doc-demo">
+    <div class="ui-kit-section">
+      <div class="ui-kit-section-left"><div class="ui-kit-section-title"><span>A bare section title</span></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────── KPI ─────────────────────────── -->
+<h2 id="kpi" style="margin-top:28px">KPI &amp; metrics</h2>
+
+<section class="doc-item">
+  <h2>KpiGrid + KpiCard</h2>
+  <p class="doc-note">
+    All dashboard summary figures. Money values must be formatted with <code>useFormatMoney()</code>
+    — never raw numbers. Use the <code>accentTone</code> prop for red/green emphasis rather than
+    wrapping the value in a coloured span.
+  </p>
+  <div class="doc-demo">
+    <div class="dash-grid">
+      <div class="ui-kit-card ui-kit-kpi ui-tone-red ui-kit-kpi--accent-red ui-kit-kpi--full">
+        <div class="ui-kit-kpi-hd"><div class="ui-kit-kpi-head no-icon"><div class="ui-kit-kpi-label">Total outstanding</div></div></div>
+        <div class="kpi-card-v kpi-card-v-soft">₹12,48,320</div>
+      </div>
+      <div class="ui-kit-card ui-kit-kpi ui-tone-navy">
+        <div class="ui-kit-kpi-hd"><div class="ui-kit-kpi-head no-icon"><div class="ui-kit-kpi-label">Monthly EMIs</div></div></div>
+        <div class="kpi-card-v kpi-card-v-soft">₹45,204</div>
+        <div class="ui-kit-kpi-sub">Leaves your account every month</div>
+      </div>
+      <div class="ui-kit-card ui-kit-kpi ui-tone-amber">
+        <div class="ui-kit-kpi-hd"><div class="ui-kit-kpi-head no-icon"><div class="ui-kit-kpi-label">Total interest</div></div></div>
+        <div class="kpi-card-v kpi-card-v-soft">₹5,20,109</div>
+      </div>
+      <div class="ui-kit-card ui-kit-kpi ui-tone-green">
+        <div class="ui-kit-kpi-hd"><div class="ui-kit-kpi-head no-icon"><div class="ui-kit-kpi-label">Total paid</div></div></div>
+        <div class="kpi-card-v kpi-card-v-soft">₹8,11,400</div>
+      </div>
+    </div>
+  </div>
+  <table class="doc-props">
+    <tr><th>Prop</th><th>Type</th><th>Notes</th></tr>
+    <tr><td><code>label</code> <span class="doc-req">*</span></td><td><code>string</code></td><td></td></tr>
+    <tr><td><code>value</code> <span class="doc-req">*</span></td><td><code>ReactNode</code></td><td>Pre-formatted.</td></tr>
+    <tr><td><code>tone</code></td><td><code>navy | green | red | amber | muted</code></td><td>Default <code>navy</code>.</td></tr>
+    <tr><td><code>accentTone</code></td><td><code>green | red</code></td><td>Adds the accent bar.</td></tr>
+    <tr><td><code>subtitle</code></td><td><code>string</code></td><td>Small line under the value.</td></tr>
+    <tr><td><code>icon</code></td><td><code>ReactNode</code></td><td>Lucide at <code>KPI_ICON_SIZE</code> (14).</td></tr>
+    <tr><td><code>full</code></td><td><code>boolean</code></td><td>Spans the whole grid row.</td></tr>
+    <tr><td><code>onClick</code></td><td><code>() =&gt; void</code></td><td>Makes it a real button (Enter/Space handled).</td></tr>
+    <tr><td colspan="3" style="padding-top:10px"><strong>KpiGrid</strong> — <code>variant</code>: <code>dash</code> (2 cols, 12px gap, default) or <code>compact</code> (2 cols, 8px gap).</td></tr>
+  </table>
+</section>
+
+<!-- ─────────────────────────── PROGRESS ─────────────────────────── -->
+<h2 id="progress" style="margin-top:28px">ProgressBar</h2>
+
+<section class="doc-item">
+  <h2>ProgressBar</h2>
+  <p class="doc-note">
+    A single completion track. Pass <code>value</code>/<code>max</code> rather than a percentage,
+    so the component can render both the bar and a “16 of 39” label from one source. Overpayment
+    is real, so <code>value</code> is clamped for the bar while the label keeps your true figures.
+  </p>
+  <div class="doc-demo">
+    <div class="ui-kit-progress">
+      <div class="ui-kit-progress-head">
+        <span class="ui-kit-progress-label">16 of 39 EMIs paid</span>
+        <span class="ui-kit-progress-pct">41%</span>
+      </div>
+      <div class="ui-kit-progress-track ui-tone-red"><span class="ui-kit-progress-fill" style="width:41%"></span></div>
+    </div>
+    <div style="height:12px"></div>
+    <div class="ui-kit-progress">
+      <div class="ui-kit-progress-head"><span class="ui-kit-progress-label">₹1,67,200 of ₹3,24,500 repaid</span><span class="ui-kit-progress-pct">52%</span></div>
+      <div class="ui-kit-progress-track ui-tone-amber"><span class="ui-kit-progress-fill" style="width:52%"></span></div>
+    </div>
+    <div style="height:12px"></div>
+    <div class="ui-kit-progress">
+      <div class="ui-kit-progress-head"><span class="ui-kit-progress-label">Fully repaid</span><span class="ui-kit-progress-pct">100%</span></div>
+      <div class="ui-kit-progress-track ui-tone-green"><span class="ui-kit-progress-fill" style="width:100%"></span></div>
+    </div>
+  </div>
+  <table class="doc-props">
+    <tr><th>Prop</th><th>Type</th><th>Notes</th></tr>
+    <tr><td><code>value</code> <span class="doc-req">*</span></td><td><code>number</code></td><td>Clamped into 0..max for the bar.</td></tr>
+    <tr><td><code>max</code> <span class="doc-req">*</span></td><td><code>number</code></td><td><code>&lt;= 0</code> renders an empty track, never NaN.</td></tr>
+    <tr><td><code>tone</code></td><td><code>UiTone</code></td><td>Colours the fill only; the track stays neutral.</td></tr>
+    <tr><td><code>label</code></td><td><code>string</code></td><td>Also becomes the <code>aria-label</code>.</td></tr>
+    <tr><td><code>showPct</code></td><td><code>boolean</code></td><td>Rounded percentage on the right.</td></tr>
+  </table>
+  <details class="doc-code"><summary>Usage</summary><pre>&lt;ProgressBar value={paidEmis} max={tenureMonths} tone="red"
+             label={`${paidEmis} of ${tenureMonths} EMIs paid`} showPct /&gt;</pre></details>
+</section>
+
+<!-- ─────────────────────────── LISTS ─────────────────────────── -->
+<h2 id="lists" style="margin-top:28px">Lists &amp; cards</h2>
+
+<section class="doc-item">
+  <h2>HoldingCard</h2>
+  <p class="doc-note">
+    The standard detail card for a holding, loan or position. It already supports a stats grid,
+    chips, a P&amp;L strip and a trailing slot — reach for these props before hand-rolling
+    <code>ui-kit-holding-*</code> markup, which is how the loans page ended up with ~180 duplicated lines.
+  </p>
+  <div class="doc-demo">
+    <div class="ui-kit-holding-card ui-kit-holding-card--accent-red stock-entry-card">
+      <div class="ui-kit-holding-card-head">
+        <div>
+          <div class="ui-kit-holding-card-title"><span>Car Loan</span></div>
+          <div class="ui-kit-holding-card-subtitle">Indian Bank</div>
+        </div>
+      </div>
+      <div class="ui-kit-holding-card-grid">
+        <div class="ui-kit-holding-stat"><span>Paid EMIs</span><strong>16/39</strong></div>
+        <div class="ui-kit-holding-stat ui-kit-holding-stat--center"><span>Principal</span><strong>₹10,16,200</strong></div>
+        <div class="ui-kit-holding-stat ui-kit-holding-stat--right"><span>Amount paid</span><strong>₹4,84,932</strong></div>
+      </div>
+      <div class="ui-kit-holding-pnl ui-tone-red">
+        <div class="ui-kit-holding-pnl-row">
+          <div class="ui-kit-holding-pnl-label">Outstanding</div>
+          <div class="ui-kit-holding-pnl-value">₹6,97,268</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <table class="doc-props">
+    <tr><th>Prop</th><th>Type</th><th>Notes</th></tr>
+    <tr><td><code>title</code> <span class="doc-req">*</span></td><td><code>ReactNode</code></td><td></td></tr>
+    <tr><td><code>subtitle</code></td><td><code>ReactNode</code></td><td></td></tr>
+    <tr><td><code>leftLabel</code>/<code>leftValue</code>, <code>centerLabel</code>/<code>centerValue</code>, <code>rightLabel</code>/<code>rightValue</code></td><td><code>ReactNode</code></td><td>The three-column stat row.</td></tr>
+    <tr><td><code>secondaryGrid</code></td><td><code>ReactNode</code></td><td>A second stat row.</td></tr>
+    <tr><td><code>pnlLabel</code>/<code>pnlValue</code></td><td><code>ReactNode</code></td><td>The emphasised bottom strip.</td></tr>
+    <tr><td><code>accentTone</code></td><td><code>UiTone</code></td><td>Left accent colour.</td></tr>
+    <tr><td><code>chips</code>, <code>rightTop</code>, <code>icon</code>, <code>iconPosition</code>, <code>iconBackground</code></td><td>—</td><td>Badges and icon placement.</td></tr>
+    <tr><td><code>onClick</code></td><td><code>() =&gt; void</code></td><td>Makes the whole card activatable.</td></tr>
+  </table>
+</section>
+
+<section class="doc-item">
+  <h2>BalanceRow · TransactionCard</h2>
+  <p class="doc-note">
+    <code>BalanceRow</code> is a title/value row with optional in/out figures — used for accounts,
+    net worth and recurring deposits. <code>TransactionCard</code> is the register row.
+  </p>
+  <div class="doc-demo">
+    <div class="ui-kit-balance-row">
+      <div class="ui-kit-balance-main">
+        <div class="ui-kit-balance-title">HDFC Savings</div>
+        <div class="ui-kit-balance-subtitle">3 of 12 paid · matures Mar 2027</div>
+      </div>
+      <div class="ui-kit-balance-value">₹1,24,500</div>
+    </div>
+  </div>
+  <div class="doc-warn">
+    <strong>Captions default to “In”/“Out”</strong>, not “Income”/“Expense” — they are flow
+    shorthand for a row. Pass <code>incomeLabel</code>/<code>expenseLabel</code> when you mean
+    something else (Overview uses Assets/Liabilities).
+  </div>
+</section>
+
+<!-- ─────────────────────────── INPUTS ─────────────────────────── -->
+<h2 id="inputs" style="margin-top:28px">Inputs &amp; filters</h2>
+
+<section class="doc-item">
+  <h2>FormField</h2>
+  <p class="doc-note">
+    Wraps any input with its label. The label is always <em>above</em> the field — never
+    placeholder-only. Mark required fields with <code>*</code> in the label text.
+  </p>
+  <div class="doc-demo" style="max-width:340px">
+    <label class="ui-kit-field">
+      <span class="form-lbl">Amount *</span>
+      <input class="form-inp" type="number" placeholder="0.00">
+      <span class="ui-kit-field-hint">Whole rupees are fine.</span>
+    </label>
+  </div>
+  <table class="doc-props">
+    <tr><th>Prop</th><th>Type</th><th>Notes</th></tr>
+    <tr><td><code>label</code> <span class="doc-req">*</span></td><td><code>string</code></td><td></td></tr>
+    <tr><td><code>children</code> <span class="doc-req">*</span></td><td><code>ReactNode</code></td><td>Use <code>class="form-inp"</code> on the control.</td></tr>
+    <tr><td><code>hint</code></td><td><code>string</code></td><td>Muted line beneath.</td></tr>
+  </table>
+</section>
+
+<section class="doc-item">
+  <h2>SearchField · FilterChips · FilterPills · SectionChip · Chip</h2>
+  <p class="doc-note">
+    <code>FilterChips</code> takes a flat <code>items: string[]</code> plus the active label —
+    if your filter has ids, map to labels and back at the boundary (see <code>LoanListFilterBar</code>).
+  </p>
+  <div class="doc-demo">
+    <div class="ui-kit-filter-chips">
+      <button class="ui-kit-filter-chip active">Active (7)</button>
+      <button class="ui-kit-filter-chip">All (10)</button>
+      <button class="ui-kit-filter-chip">Closed (3)</button>
+    </div>
+    <div style="height:12px"></div>
+    <span class="ui-kit-section-chip ui-tone-muted">7 active</span>
+    <span class="ui-kit-section-chip ui-tone-red">in 19 days</span>
+    <span class="ui-kit-section-chip ui-tone-amber">in 89 days</span>
+    <span class="ui-kit-section-chip ui-tone-green">Settled</span>
+  </div>
+</section>
+
+<!-- ─────────────────────────── MODALS ─────────────────────────── -->
+<h2 id="modals" style="margin-top:28px">Modals</h2>
+
+<section class="doc-item">
+  <h2>ModalShell + ModalActions</h2>
+  <p class="doc-note">
+    The only sanctioned modal. Backdrop-click closing is <code>ModalShell</code>’s job — do not
+    override it, and never use the browser <code>&lt;dialog&gt;</code> or a custom overlay div.
+    Put the destructive action in <code>ModalActions.leading</code>.
+  </p>
+  <div class="doc-demo">
+    <div class="modal" style="position:static;max-width:100%;box-shadow:none">
+      <div class="modal-hd modal-hd--blue">
+        <span class="modal-title">Add repayment</span>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <label class="ui-kit-field"><span class="form-lbl">Amount *</span><input class="form-inp" type="number" value="30316"></label>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-sm btn-red">Delete</button>
+        <div class="modal-foot-l"></div>
+        <button class="btn btn-sm btn-cancel">Cancel</button>
+        <button class="btn btn-sm btn-green">Add</button>
+      </div>
+    </div>
+  </div>
+  <table class="doc-props">
+    <tr><th>Prop</th><th>Type</th><th>Notes</th></tr>
+    <tr><td colspan="3"><strong>ModalShell</strong>: <code>title</code>, <code>onClose</code>, <code>footer</code>, <code>children</code>.</td></tr>
+    <tr><td colspan="3"><strong>ModalActions</strong>: <code>primaryLabel</code>, <code>secondaryLabel</code> (default “Cancel”), <code>onPrimary</code>, <code>onSecondary</code>, <code>leading</code>, <code>destructive</code>, <code>disabled</code>, <code>hidePrimary</code>.</td></tr>
+  </table>
+  <div class="doc-warn">
+    Put a hidden submit button inside a real <code>&lt;form onSubmit&gt;</code> so Enter submits —
+    see the gold page. Several pages still submit from <code>onPrimary</code> alone, which the
+    UI-patterns skill disallows.
+  </div>
+</section>
+
+<section class="doc-item">
+  <h2>ConfirmDialog</h2>
+  <p class="doc-note">
+    Every destructive action must go through this. The confirmation names the item
+    (“Delete &quot;HDFC Savings&quot;?”), never a bare “Are you sure?”, and the trigger is an
+    outline button — never filled primary.
+  </p>
+  <div class="doc-warn">
+    <strong>Currently used by zero app files.</strong> The loans and lending pages instead arm a
+    boolean and relabel the same button to “Confirm delete?” — two clicks, no item name, no
+    “cannot be undone”. Prefer this component in new code.
+  </div>
+  <details class="doc-code"><summary>Usage</summary><pre>&lt;ConfirmDialog
+  title={`Delete "${item.name}"?`}
+  description="This action cannot be undone."
+  onConfirm={() =&gt; handleDelete(item.id)}
+&gt;
+  &lt;button className="btn-outline-danger"&gt;Delete&lt;/button&gt;
+&lt;/ConfirmDialog&gt;</pre></details>
+</section>
+
+<!-- ─────────────────────────── FEEDBACK ─────────────────────────── -->
+<h2 id="feedback" style="margin-top:28px">Feedback</h2>
+
+<section class="doc-item">
+  <h2>InfoCallout · callout tones · LoadingState · ErrorScreen</h2>
+  <p class="doc-note">
+    <code>InfoCallout</code> is the title + body form. The single-paragraph form
+    (<code>ui-kit-callout ui-tone-amber|red</code>) is for notes and errors inside a modal — a
+    page-level error banner renders <em>behind</em> an open modal, so validation failures need
+    the in-modal form to be visible at all.
+  </p>
+  <div class="doc-demo">
+    <div class="ui-kit-callout ui-tone-amber">This row came from a transaction and is read-only here.</div>
+    <div style="height:10px"></div>
+    <div class="ui-kit-callout ui-tone-red">Amount must be a number greater than 0.</div>
+    <div style="height:10px"></div>
+    <div class="ui-kit-callout">
+      <div class="ui-kit-callout-title">Heads up</div>
+      <div class="ui-kit-callout-body">The title/body form, for longer explanations.</div>
+    </div>
+  </div>
+</section>
+
+<section class="doc-item">
+  <h2>Empty states</h2>
+  <p class="doc-note">
+    Never leave a blank area. A centred Lucide icon plus one short line — see
+    <code>.loans-empty</code> and the gold page’s <code>.gold-empty</code>.
+  </p>
+  <div class="doc-demo">
+    <div class="loans-empty">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m6.08 9.5-3.5 1.6a1 1 0 0 0 0 1.81l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9a1 1 0 0 0 0-1.83l-3.5-1.59"/></svg>
+      <p>No loans yet. Add one from the EMI, Jewel or Cash tab.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────── CHARTS ─────────────────────────── -->
+<h2 id="charts" style="margin-top:28px">Charts</h2>
+
+<section class="doc-item">
+  <h2>RightLegendDonut · MiniBarChart</h2>
+  <p class="doc-note">
+    Both are plain inline SVG — the repo deliberately has no charting library. Colours come from
+    the caller. When you show a centre total, compute it from the same rows as the KPI above it,
+    or the two will disagree.
+  </p>
+  <table class="doc-props">
+    <tr><th>Prop</th><th>Type</th><th>Notes</th></tr>
+    <tr><td><code>items</code> <span class="doc-req">*</span></td><td><code>{ label, value, color }[]</code></td><td>Donut slices.</td></tr>
+    <tr><td><code>compact</code></td><td><code>boolean</code></td><td>118px instead of 150px.</td></tr>
+    <tr><td><code>showCenter</code>, <code>centerLabel</code>, <code>centerValue</code></td><td>—</td><td>The hole content.</td></tr>
+    <tr><td><code>showPct</code>, <code>showLegend</code>, <code>legendPosition</code></td><td>—</td><td><code>'right' | 'bottom'</code>.</td></tr>
+    <tr><td><code>valueFormatter</code></td><td><code>(n) =&gt; string</code></td><td>Defaults to <code>en-IN</code> integers.</td></tr>
+    <tr><td colspan="3" style="padding-top:10px"><strong>MiniBarChart</strong> — <code>points: { label, primary, secondary? }[]</code>, plus <code>primaryLabel</code>, <code>secondaryLabel</code>, colours, <code>height</code>, <code>valueFormatter</code>. Best for 6–12 points.</td></tr>
+  </table>
+</section>
+
+<!-- ─────────────────────────── BUTTONS ─────────────────────────── -->
+<h2 id="buttons" style="margin-top:28px">Buttons &amp; navigation</h2>
+
+<section class="doc-item">
+  <h2>Buttons</h2>
+  <div class="doc-demo">
+    <button class="ui-kit-btn ui-kit-btn--soft">Soft / secondary</button>
+    <button class="ui-kit-btn ui-kit-btn--solid">Solid</button>
+    <button class="btn btn-sm btn-green">Save</button>
+    <button class="btn btn-sm btn-cancel">Cancel</button>
+    <button class="btn btn-sm btn-red">Delete</button>
+  </div>
+  <p class="doc-note" style="margin-top:12px">
+    <strong>FabButton</strong> — one floating action button per page, fixed above the bottom nav,
+    always opens a modal and never navigates. Use the component rather than an inline style object.
+  </p>
+</section>
+
+<section class="doc-item">
+  <h2>Nav · BottomNav · TabBar · InternalTabBar</h2>
+  <p class="doc-note">
+    <code>Nav</code> is the fintracker app shell (drawer + org-driven menu); vault and staff use
+    <code>SimpleAppNav</code>. <code>BottomNav</code> is the shared bottom tab bar — several pages
+    still hand-roll <code>&lt;nav className="bottom-nav"&gt;</code> instead of using it.
+  </p>
+  <div class="doc-demo">
+    <div class="ui-kit-tabbar">
+      <button class="ui-kit-tab active">Overview</button>
+      <button class="ui-kit-tab">History</button>
+      <button class="ui-kit-tab">Details</button>
+    </div>
+  </div>
+</section>
+
+<section class="doc-item">
+  <h2>Admin app — separate system</h2>
+  <p class="doc-note">
+    <code>packages/apps/admin</code> uses its own classes: <code>ui-kit-section</code>,
+    <code>admin-card-list</code>/<code>admin-card-item</code>,
+    <code>.admin-modal-wrap &gt; .modal-shell</code>, and <code>admin-btn</code>/<code>admin-btn-danger</code>.
+    Do not use <code>TransactionCard</code> or <code>KpiCard</code> inside admin pages, and do not
+    introduce new colour tokens there.
+  </p>
+</section>
+
+<footer style="margin-top:40px;padding-top:16px;border-top:1px solid var(--border);color:var(--muted);font-size:12px">
+  Source: <code>packages/shared/ui/src/components/</code> · Styles:
+  <code>packages/shared/ui/src/styles/{globals,ui-kit}.css</code> · Rules:
+  <code>ai/skills/ui-patterns.md</code>
+</footer>
+
+</div>
+</body>
+</html>

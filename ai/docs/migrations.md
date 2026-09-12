@@ -147,7 +147,7 @@ This populates all 28 tables in one shot. Then start making incremental changes 
 - Individual `.sql` migration files are the audit trail — keep them, never delete
 - Write idempotent SQL (`ADD COLUMN IF NOT EXISTS`, `DROP COLUMN IF EXISTS`) so files can be re-run safely
 - Update the Drizzle TS schema **in the same commit** as the migration file
-- `schema.sql` is just a reference snapshot — it's not auto-generated or synced
+- `packages/shared/db/migrations/schema.sql` is generated from the Drizzle TS schema by `export-schema` — never hand-edit it. It reflects the TS schema, not the live database.
 - Never auto-sync the database — all migrations are manual, applied directly to Neon
 
 ---

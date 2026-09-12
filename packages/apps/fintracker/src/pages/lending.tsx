@@ -168,6 +168,8 @@ export default function Lending({ sheetSlug: sheetSlugProp, onTabChange }: Lendi
   const [entries, setEntries] = useState<LendingEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  /** Modal-scoped: the page-level `error` renders behind an open modal. */
+  const [formError, setFormError] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [editEntry, setEditEntry] = useState<LendingEntry | null>(null)
   const [form, setForm] = useState<FormState>(emptyForm())
@@ -231,6 +233,7 @@ export default function Lending({ sheetSlug: sheetSlugProp, onTabChange }: Lendi
     setEditEntry(null)
     setForm(emptyForm())
     setDelConfirm(false)
+    setFormError('')
     setModalOpen(true)
   }
 
@@ -238,6 +241,7 @@ export default function Lending({ sheetSlug: sheetSlugProp, onTabChange }: Lendi
     setEditEntry(e)
     setForm({ type: e.type, name: e.name, amount: String(e.amount), date: toDateInput(e.date), description: e.description })
     setDelConfirm(false)
+    setFormError('')
     setModalOpen(true)
   }
 
@@ -249,15 +253,24 @@ export default function Lending({ sheetSlug: sheetSlugProp, onTabChange }: Lendi
     setEditEntry(null)
     setForm(emptyForm())
     setDelConfirm(false)
+    setFormError('')
     setSaving(false)
   }
 
   async function save() {
-    if (!form.name.trim() || !form.amount) return
+    // These used to `return` silently, so the Add button simply did nothing and
+    // gave no reason. The server enforces the same two rules.
+    if (!form.name.trim()) { setFormError('Enter a person name.'); return }
+    const amount = parseFloat(form.amount)
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setFormError('Enter an amount greater than 0.')
+      return
+    }
+    setFormError('')
     setSaving(true)
     // Convert RECEIVED back to REPAY for API
     const apiType = form.type === 'RECEIVED' ? 'REPAY' : form.type
-    const p = { date: form.date, name: form.name.trim(), amount: parseFloat(form.amount), type: apiType, description: form.description.trim() }
+    const p = { date: form.date, name: form.name.trim(), amount, type: apiType, description: form.description.trim() }
     try {
       if (editEntry) await api.updateLending({ ...p, id: editEntry.id }, safeSheetSlug)
       else await api.addLending(p, safeSheetSlug)
@@ -265,7 +278,7 @@ export default function Lending({ sheetSlug: sheetSlugProp, onTabChange }: Lendi
       setModalOpen(false)
       await loadData()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Save failed')
+      setFormError(e instanceof Error ? e.message : 'Save failed')
     } finally {
       setSaving(false)
     }
@@ -283,7 +296,8 @@ export default function Lending({ sheetSlug: sheetSlugProp, onTabChange }: Lendi
       setModalOpen(false)
       await loadData()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Delete failed')
+      setFormError(e instanceof Error ? e.message : 'Delete failed')
+      setDelConfirm(false)
     } finally {
       setSaving(false)
     }
@@ -512,6 +526,9 @@ export default function Lending({ sheetSlug: sheetSlugProp, onTabChange }: Lendi
                 <FormField label="Description">
                   <input className="form-inp" disabled={editIsMirrored} type="text" placeholder="Optional" value={form.description} onChange={e => set('description', e.target.value)} />
                 </FormField>
+                {formError && (
+                  <p className="ui-kit-callout ui-tone-red" role="alert">{formError}</p>
+                )}
               </div>
             </div>
             <div className="modal-foot">

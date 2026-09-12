@@ -64,7 +64,6 @@ export const MENU_CATALOG_SEED: MenuCatalogSeedRow[] = [
   { id: 'mutualfunds', slug: 'mutualfunds', label: 'Mutual funds', icon: 'PieChart', path: '/mutualfunds', sectionId: 'invest', sortOrder: 3, appSlugs: ['fintracker'] },
   { id: 'subscriptions', slug: 'subscriptions', label: 'Subscriptions', icon: 'Repeat2', path: '/subscriptions', sectionId: 'life', sortOrder: 0, appSlugs: ['fintracker'] },
   { id: 'settings', slug: 'settings', label: 'Settings', icon: 'Settings', path: '/settings', sectionId: 'system', sortOrder: 0, appSlugs: ['fintracker'] },
-  { id: 'components', slug: 'components', label: 'UI kit', icon: 'LayoutGrid', path: '/components', sectionId: 'system', sortOrder: 1, appSlugs: ['fintracker'] },
   // Vault
   { id: 'vault', slug: 'vault', label: 'Banking', icon: 'Landmark', path: '/vault', sectionId: 'vault-core', sortOrder: 0, appSlugs: ['vault'] },
   { id: 'vaultapps', slug: 'vaultapps', label: 'Apps', icon: 'Grid2X2', path: '/vaultapps', sectionId: 'vault-core', sortOrder: 1, appSlugs: ['vault'] },
