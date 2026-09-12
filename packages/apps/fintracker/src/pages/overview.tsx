@@ -158,8 +158,6 @@ export default function Overview() {
                 valueTone={a.balance < 0 ? 'red' : undefined}
                 income={fmt(a.inflow)}
                 expense={fmt(a.outflow)}
-                incomeLabel="In"
-                expenseLabel="Out"
                 incomeIcon={<ArrowDownRight size={11} strokeWidth={2.4} />}
                 expenseIcon={<ArrowUpRight size={11} strokeWidth={2.4} />}
               />

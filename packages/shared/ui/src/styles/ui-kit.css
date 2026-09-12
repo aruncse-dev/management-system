@@ -938,20 +938,28 @@
   text-align: right;
   flex-shrink: 0;
 }
+/* A divided band across the foot of the card, not a pair of floating mini-cards:
+   the two halves share one rule, meet on a single divider and run out to the
+   card's own edges. Negative margins cancel `.ui-kit-balance-card`'s padding,
+   and the inherited radius keeps the bottom corners following the card. */
 .ui-kit-balance-flow-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  width: 100%;
+  gap: 0;
+  margin: 0 -14px -8px;
+  border-top: 1px solid var(--border);
+  border-bottom-left-radius: inherit;
+  border-bottom-right-radius: inherit;
+  overflow: hidden;
 }
 .ui-kit-balance-flow-item {
   display: grid;
   gap: 2px;
   min-width: 0;
-  padding: 8px 10px;
-  border-radius: 12px;
-  background: rgba(255,255,255,.88);
-  border: 1px solid var(--border);
+  padding: 7px 14px 8px;
+}
+.ui-kit-balance-flow-item + .ui-kit-balance-flow-item {
+  border-left: 1px solid var(--border);
 }
 .ui-kit-balance-flow-head {
   display: flex;

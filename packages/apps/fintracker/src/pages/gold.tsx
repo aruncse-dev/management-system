@@ -1,16 +1,17 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
-import { Plus, Loader2, Pencil, LayoutDashboard, List, Clock, BarChart3, Shield, Gem, Package, Users, Home, Building2, Lock, ArrowDownRight, ArrowUpRight } from 'lucide-react';
+import { Plus, SlidersHorizontal, LayoutDashboard, List, Clock, BarChart3, MapPin, Shield, Gem, Package, Users, Home, Building2, ArrowDownRight, ArrowUpRight } from 'lucide-react';
 import { api, RawGoldRow, RawGoldHistoryRow, GoldResource } from '../api';
 import { useFormatMoney } from '../hooks/useFormatMoney';
 import { THEME_COLORS } from '../config';
 import { RightLegendDonut } from '../ui'
-import { FormField, KpiCard, KpiGrid, LoadingState, ListStack, SearchField, SectionBlock, SectionChip } from '../ui';
+import { FormField, HoldingCard, ModalActions, ModalShell, InfoCallout, KpiCard, KpiGrid, LoadingState, ListStack, SearchField, SectionBlock, SectionChip, Spacer, UiCard } from '../ui';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // TYPES & CONSTANTS
 // ──────────────────────────────────────────────────────────────────────────────
 
 type GoldTab = 'dashboard' | 'items' | 'history';
+type GoldGroupBy = 'location' | 'person' | 'none';
 
 interface GoldItem {
   id: string;
@@ -52,6 +53,34 @@ interface GoldHistoryFormState {
 
 const PAVAN_CONVERSION = 1 / 8; // 1 pavan = 8 grams
 
+const UNASSIGNED_LABEL = 'Unassigned';
+/** One short word for the `skip` flag on cards and tiles. The full explanation
+    lives once, on the Settings checkbox — repeating it on every row was noise. */
+const EXCLUDED = 'Excluded';
+/** Neutral grey, deliberately not from THEME_COLORS so a new resource can't collide with it. */
+const UNASSIGNED_COLOR = 'var(--other)';
+
+type Slice = { label: string; value: number; color: string };
+
+/**
+ * Items with no person/location — or pointing at a deleted resource, which
+ * `resourceName` also resolves to '' — land in the `''` bucket. Without this
+ * they count toward the Total Gold KPI but vanish from the donut, so the
+ * donut centre disagrees with the KPI above it. Appended after the sort so
+ * the grey slice stays last instead of jumping position as data changes.
+ */
+function withUnassigned(slices: Slice[], groups: Record<string, GoldItem[]>): Slice[] {
+  const orphan = (groups[''] ?? []).reduce((s, i) => s + i.weight_g, 0);
+  return orphan > 0
+    ? [...slices, { label: UNASSIGNED_LABEL, value: orphan, color: UNASSIGNED_COLOR }]
+    : slices;
+}
+
+/** Grams at 1dp, trailing zeros stripped — `numeric(10,3)` deserves better than Math.round. */
+function grams(n: number): string {
+  return `${Number(n.toFixed(1))}g`;
+}
+
 function resourceMap(resources: GoldResource[]): Map<string, GoldResource> {
   return new Map(resources.map((r) => [r.id, r]))
 }
@@ -65,12 +94,6 @@ function locationSkipped(map: Map<string, GoldResource>, id: string | null): boo
   if (!id) return false
   return map.get(id)?.skip === true
 }
-
-const LOCATION_ICONS: Record<string, React.ReactNode> = {
-  Home: <Home size={12} />,
-  Bank: <Building2 size={12} />,
-  Locker: <Lock size={12} />,
-};
 
 function createEmptyGoldForm(person_id = '', location_id = ''): GoldFormState {
   return {
@@ -153,19 +176,22 @@ function parseHistoryRow(raw: RawGoldHistoryRow): GoldHistoryItem | null {
 const PersonCard = memo(function PersonCard({
   person,
   items,
+  onClick,
 }: {
   person: string;
   items: GoldItem[];
+  onClick: () => void;
 }) {
   const totalGrams = items.reduce((s, i) => s + i.weight_g, 0);
   const totalPavan = items.reduce((s, i) => s + i.pavan, 0);
   return (
     <KpiCard
       label={person}
-      value={`${Math.round(totalGrams)}g`}
-      subtitle={`${totalPavan.toFixed(3)} pavan`}
+      value={grams(totalGrams)}
+      subtitle={`${totalPavan.toFixed(2)} pavan`}
       tone="muted"
       icon={<Users size={14} />}
+      onClick={onClick}
     />
   );
 });
@@ -173,19 +199,24 @@ const PersonCard = memo(function PersonCard({
 const LocationCard = memo(function LocationCard({
   location,
   items,
+  skip,
+  onClick,
 }: {
   location: string;
   items: GoldItem[];
+  skip: boolean;
+  onClick: () => void;
 }) {
   const totalGrams = items.reduce((s, i) => s + i.weight_g, 0);
   const totalPavan = items.reduce((s, i) => s + i.pavan, 0);
   return (
     <KpiCard
       label={location}
-      value={`${Math.round(totalGrams)}g`}
-      subtitle={`${totalPavan.toFixed(3)} pavan`}
+      value={grams(totalGrams)}
+      subtitle={skip ? `${totalPavan.toFixed(2)} pavan · ${EXCLUDED.toLowerCase()}` : `${totalPavan.toFixed(2)} pavan`}
       tone="muted"
-      icon={LOCATION_ICONS[location] ?? <Home size={14} />}
+      icon={skip ? <Building2 size={14} /> : <Home size={14} />}
+      onClick={onClick}
     />
   );
 });
@@ -197,33 +228,27 @@ const ItemCard = memo(function ItemCard({
   item: GoldItem;
   onClick: () => void;
 }) {
-  const accentTone = item.location === 'Bank' ? 'red' : item.location === 'Locker' ? 'green' : 'navy';
-  const icon = LOCATION_ICONS[item.location] ?? <Home size={12} />;
+  // Keyed off `skip` rather than the location's name: locations are user-created
+  // rows, so name matching silently fell back to Home for anything but the
+  // three hardcoded strings — and `skip` is what actually changes valuation.
+  const excluded = item.locationSkip;
   return (
-    <button
-      type="button"
-      className={`ui-kit-holding-card ui-kit-holding-card--accent-${accentTone} ui-kit-holding-card--btn txn-entry-card`}
+    <HoldingCard
+      className="txn-entry-card"
+      title={item.name}
+      subtitle={item.person}
+      icon={excluded ? <Building2 size={12} /> : <Home size={12} />}
+      iconBackground
+      accentTone={excluded ? 'amber' : 'navy'}
+      rightTop={excluded ? <span className="gold-tag">{EXCLUDED}</span> : undefined}
+      leftLabel="Weight"
+      leftValue={grams(item.weight_g)}
+      centerLabel="Location"
+      centerValue={item.location || UNASSIGNED_LABEL}
+      rightLabel="Pavan"
+      rightValue={item.pavan.toFixed(2)}
       onClick={onClick}
-    >
-      <div className="ui-kit-holding-card-head">
-        <div>
-          <div className="ui-kit-holding-card-title"><span>{item.name}</span></div>
-          <div className="ui-kit-holding-card-subtitle">{item.person}</div>
-        </div>
-        <div className="ui-kit-holding-card-head-right">
-          <div className={`ui-kit-holding-icon ui-kit-holding-icon--bg ui-tone-${accentTone}`}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--muted)', flexShrink: 0 }}>
-              {icon}
-            </span>
-          </div>
-        </div>
-      </div>
-      <div className="ui-kit-holding-card-grid">
-        <div className="ui-kit-holding-stat"><span>Weight</span><strong>{Math.round(item.weight_g)}g</strong></div>
-        <div className="ui-kit-holding-stat ui-kit-holding-stat--center"><span>Location</span><strong>{item.location}</strong></div>
-        <div className="ui-kit-holding-stat ui-kit-holding-stat--right"><span>Pavan</span><strong>{item.pavan.toFixed(2)}</strong></div>
-      </div>
-    </button>
+    />
   );
 });
 
@@ -235,32 +260,22 @@ const HistoryCard = memo(function HistoryCard({
   onClick: () => void;
 }) {
   const isIn = item.type === 'IN';
-  const icon = isIn ? <ArrowDownRight size={14} /> : <ArrowUpRight size={14} />;
   return (
-    <button
-      type="button"
-      className={`ui-kit-holding-card ui-kit-holding-card--accent-${isIn ? 'green' : 'red'} ui-kit-holding-card--btn txn-entry-card`}
+    <HoldingCard
+      className="txn-entry-card"
+      title={item.name}
+      subtitle={item.note}
+      icon={isIn ? <ArrowDownRight size={14} /> : <ArrowUpRight size={14} />}
+      iconBackground
+      accentTone={isIn ? 'green' : 'red'}
+      leftLabel="Weight"
+      leftValue={`${isIn ? '+' : '\u2212'}${grams(item.weight_g)}`}
+      centerLabel="Type"
+      centerValue={item.type}
+      rightLabel="Date"
+      rightValue={item.date}
       onClick={onClick}
-    >
-      <div className="ui-kit-holding-card-head">
-        <div>
-          <div className="ui-kit-holding-card-title"><span>{item.name}</span></div>
-          <div className="ui-kit-holding-card-subtitle">{item.note}</div>
-        </div>
-        <div className="ui-kit-holding-card-head-right">
-          <div className={`ui-kit-holding-icon ui-kit-holding-icon--bg ui-tone-${isIn ? 'green' : 'red'}`}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--muted)', flexShrink: 0 }}>
-              {icon}
-            </span>
-          </div>
-        </div>
-      </div>
-      <div className="ui-kit-holding-card-grid">
-        <div className="ui-kit-holding-stat"><span>Weight</span><strong>{isIn ? '+' : '-'}{Math.round(item.weight_g)}g</strong></div>
-        <div className="ui-kit-holding-stat ui-kit-holding-stat--center"><span>Type</span><strong>{item.type}</strong></div>
-        <div className="ui-kit-holding-stat ui-kit-holding-stat--right"><span>Date</span><strong>{item.date}</strong></div>
-      </div>
-    </button>
+    />
   );
 });
 
@@ -277,12 +292,23 @@ export default function Gold() {
   const [items, setItems] = useState<GoldItem[]>([]);
   const [history, setHistory] = useState<GoldHistoryItem[]>([]);
   const [resources, setResources] = useState<GoldResource[]>([]);
-  const [goldRate, setGoldRate] = useState(7500);
+  const [goldRate, setGoldRate] = useState(0);
+  /** Until settings resolve, show '—' rather than a plausible-but-invented value. */
+  const [rateLoaded, setRateLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   // Items filter
   const [itemsSearch, setItemsSearch] = useState('');
+  /** '' = no filter. Matched on resource name, which is what the item rows carry. */
+  const [personFilter, setPersonFilter] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
+  const [groupBy, setGroupBy] = useState<GoldGroupBy>('location');
+  const [filterModalOpen, setFilterModalOpen] = useState(false);
+  /** Sheet edits a draft so Cancel really cancels. */
+  const [draftPerson, setDraftPerson] = useState('');
+  const [draftLocation, setDraftLocation] = useState('');
+  const [draftGroupBy, setDraftGroupBy] = useState<GoldGroupBy>('location');
   const [historySearch, setHistorySearch] = useState('');
 
   // Items modal
@@ -292,6 +318,8 @@ export default function Gold() {
   const [savingItem, setSavingItem] = useState(false);
   const [deletingItem, setDeletingItem] = useState(false);
   const [deleteItemConfirm, setDeleteItemConfirm] = useState(false);
+  /** Modal-scoped: the page-level `error` renders behind an open modal. */
+  const [itemError, setItemError] = useState('');
 
   // History modal
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
@@ -300,9 +328,11 @@ export default function Gold() {
   const [savingHistory, setSavingHistory] = useState(false);
   const [deletingHistory, setDeletingHistory] = useState(false);
   const [deleteHistoryConfirm, setDeleteHistoryConfirm] = useState(false);
+  const [historyError, setHistoryError] = useState('');
 
   const personResources = useMemo(() => resources.filter((r) => r.type === 'person'), [resources]);
   const locationResources = useMemo(() => resources.filter((r) => r.type === 'location'), [resources]);
+  const hasGoldResources = personResources.length > 0 || locationResources.length > 0;
 
   const PERSON_COLORS = useMemo(
     () =>
@@ -335,6 +365,7 @@ export default function Gold() {
     [items],
   );
   const estimatedValue = useMemo(() => personalGrams * goldRate, [personalGrams, goldRate]);
+  const excludedGrams = useMemo(() => totalGrams - personalGrams, [totalGrams, personalGrams]);
 
   const groupedByPerson = useMemo(() => {
     const groups: Record<string, GoldItem[]> = {};
@@ -356,33 +387,48 @@ export default function Gold() {
 
   const personBreakdown = useMemo(
     () =>
-      personResources
-        .map((person) => ({
-          label: person.name,
-          value: groupedByPerson[person.name]?.reduce((s, item) => s + item.weight_g, 0) ?? 0,
-          color: PERSON_COLORS[person.name] ?? THEME_COLORS[0],
-        }))
-        .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label)),
+      withUnassigned(
+        personResources
+          .map((person) => ({
+            label: person.name,
+            value: groupedByPerson[person.name]?.reduce((s, item) => s + item.weight_g, 0) ?? 0,
+            color: PERSON_COLORS[person.name] ?? THEME_COLORS[0],
+          }))
+          .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label)),
+        groupedByPerson,
+      ),
     [groupedByPerson, personResources, PERSON_COLORS],
   );
 
   const locationBreakdown = useMemo(
     () =>
-      locationResources
-        .map((location) => ({
-          label: location.name,
-          value: groupedByLocation[location.name]?.reduce((s, item) => s + item.weight_g, 0) ?? 0,
-          color: LOCATION_COLORS[location.name] ?? THEME_COLORS[0],
-        }))
-        .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label)),
+      withUnassigned(
+        locationResources
+          .map((location) => ({
+            label: location.name,
+            value: groupedByLocation[location.name]?.reduce((s, item) => s + item.weight_g, 0) ?? 0,
+            color: LOCATION_COLORS[location.name] ?? THEME_COLORS[0],
+          }))
+          .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label)),
+        groupedByLocation,
+      ),
     [groupedByLocation, locationResources, LOCATION_COLORS],
   );
 
+  // Both equal `totalGrams` because `withUnassigned` keeps the unbucketed grams.
+  // Drop that and the donut centre silently stops matching the Total Gold KPI.
   const personTotal = useMemo(() => personBreakdown.reduce((s, item) => s + item.value, 0), [personBreakdown]);
   const locationTotal = useMemo(() => locationBreakdown.reduce((s, item) => s + item.value, 0), [locationBreakdown]);
 
+  const matchesFilter = useCallback(
+    (value: string, filter: string) =>
+      !filter || (filter === UNASSIGNED_LABEL ? !value : value === filter),
+    [],
+  );
+
   const filteredItems = useMemo(() => {
     return items
+      .filter(i => matchesFilter(i.person, personFilter) && matchesFilter(i.location, locationFilter))
       .filter(i => {
         const q = itemsSearch.toLowerCase();
         return !q || i.name.toLowerCase().includes(q)
@@ -390,7 +436,85 @@ export default function Gold() {
           || i.location.toLowerCase().includes(q);
       })
       .sort((a, b) => b.weight_g - a.weight_g);
-  }, [items, itemsSearch]);
+  }, [items, itemsSearch, personFilter, locationFilter, matchesFilter]);
+
+  /** Grams shown by the current filter — the list header would otherwise only say how many rows. */
+  const filteredGrams = useMemo(
+    () => filteredItems.reduce((s, i) => s + i.weight_g, 0),
+    [filteredItems],
+  );
+
+  /**
+   * Sections for the items grid. `filteredItems` is already sorted by weight, so
+   * each section inherits that order; sections themselves go heaviest first with
+   * Unassigned pinned last so it never separates two real groups.
+   */
+  const itemSections = useMemo(() => {
+    if (groupBy === 'none') {
+      return [{ key: 'all', label: '', items: filteredItems, grams: filteredGrams }];
+    }
+    const buckets = new Map<string, GoldItem[]>();
+    for (const i of filteredItems) {
+      const key = (groupBy === 'location' ? i.location : i.person) || UNASSIGNED_LABEL;
+      const bucket = buckets.get(key);
+      if (bucket) bucket.push(i);
+      else buckets.set(key, [i]);
+    }
+    return [...buckets.entries()]
+      .map(([label, rows]) => ({
+        key: label,
+        label,
+        items: rows,
+        grams: rows.reduce((sum, i) => sum + i.weight_g, 0),
+      }))
+      .sort((a, b) => {
+        if (a.label === UNASSIGNED_LABEL) return 1;
+        if (b.label === UNASSIGNED_LABEL) return -1;
+        return b.grams - a.grams || a.label.localeCompare(b.label);
+      });
+  }, [filteredItems, filteredGrams, groupBy]);
+
+  const hasUnassignedPerson = useMemo(() => items.some(i => !i.person), [items]);
+  const hasUnassignedLocation = useMemo(() => items.some(i => !i.location), [items]);
+
+  // Only offer a pill for a resource that actually holds items — a filter that
+  // can only ever return nothing is noise.
+  const personFilterOptions = useMemo(() => {
+    const names = personResources.filter(r => groupedByPerson[r.name]?.length).map(r => r.name);
+    return hasUnassignedPerson ? [...names, UNASSIGNED_LABEL] : names;
+  }, [personResources, groupedByPerson, hasUnassignedPerson]);
+
+  const locationFilterOptions = useMemo(() => {
+    const names = locationResources.filter(r => groupedByLocation[r.name]?.length).map(r => r.name);
+    return hasUnassignedLocation ? [...names, UNASSIGNED_LABEL] : names;
+  }, [locationResources, groupedByLocation, hasUnassignedLocation]);
+
+  const filtersActive = Boolean(personFilter || locationFilter);
+  /** Grouping is a view choice, not a filter — it doesn't count toward the badge. */
+  const activeFilterCount = (personFilter ? 1 : 0) + (locationFilter ? 1 : 0);
+  const canFilterItems = locationFilterOptions.length > 1 || personFilterOptions.length > 1;
+
+  const openFilterModal = useCallback(() => {
+    setDraftPerson(personFilter);
+    setDraftLocation(locationFilter);
+    setDraftGroupBy(groupBy);
+    setFilterModalOpen(true);
+  }, [personFilter, locationFilter, groupBy]);
+
+  const applyFilters = useCallback(() => {
+    setPersonFilter(draftPerson);
+    setLocationFilter(draftLocation);
+    setGroupBy(draftGroupBy);
+    setFilterModalOpen(false);
+  }, [draftPerson, draftLocation, draftGroupBy]);
+
+  /** Jump from a dashboard tile straight to the matching list. */
+  const showItemsFor = useCallback((opts: { person?: string; location?: string }) => {
+    setPersonFilter(opts.person ?? '');
+    setLocationFilter(opts.location ?? '');
+    setItemsSearch('');
+    setActiveTab('items');
+  }, []);
 
   const filteredHistory = useMemo(() => {
     return history
@@ -404,16 +528,10 @@ export default function Gold() {
   }, [history, historySearch]);
 
   // Load all data
-  const loadData = useCallback(async (forceRefresh = false) => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      if (forceRefresh) {
-        api.invalidateCache({ action: 'getEntries', params: { module: 'gold' } });
-        api.invalidateCache({ action: 'getHistory', params: { module: 'gold' } });
-        api.invalidateCache({ action: 'getResources', params: { module: 'gold' } });
-        api.invalidateCache({ action: 'get', params: { module: 'settings' } });
-      }
       const [rows, resRows, settings, historyRows] = await Promise.all([
         api.getGold(),
         api.getGoldResources(),
@@ -424,6 +542,7 @@ export default function Gold() {
       const map = resourceMap(resRows)
       setItems(rows.map((r) => parseRow(r, map)).filter((i): i is GoldItem => i !== null));
       setGoldRate(settings.goldRate);
+      setRateLoaded(true);
       setHistory(historyRows.map(parseHistoryRow).filter((h): h is GoldHistoryItem => h !== null));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load');
@@ -469,6 +588,7 @@ export default function Gold() {
     setSavingItem(false);
     setDeletingItem(false);
     setDeleteItemConfirm(false);
+    setItemError('');
   }
 
   function setField<K extends keyof GoldFormState>(k: K, v: GoldFormState[K]) {
@@ -484,15 +604,23 @@ export default function Gold() {
   }
 
   async function saveItem() {
-    if (!form.name.trim() || !form.weight_g) return;
     if (savingItem || deletingItem) return;
+    setItemError('');
+    if (!form.name.trim()) { setItemError('Enter an item name.'); return; }
+    const weight = parseFloat(form.weight_g);
+    if (!Number.isFinite(weight) || weight <= 0) {
+      setItemError('Enter a weight in grams greater than 0.');
+      return;
+    }
     setSavingItem(true);
     setError('');
     const payload = {
       name: form.name.trim(),
       weight_g: parseFloat(form.weight_g),
-      person_id: form.person_id.trim() || undefined,
-      location_id: form.location_id.trim() || undefined,
+      // null, not undefined: the server reads an absent key as "leave unchanged",
+      // so clearing a link back to Unassigned has to be sent explicitly.
+      person_id: form.person_id.trim() || null,
+      location_id: form.location_id.trim() || null,
     };
     try {
       if (editItem) {
@@ -501,9 +629,9 @@ export default function Gold() {
         await api.addGold(payload);
       }
       closeItemModal();
-      await loadData(true);
+      await loadData();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Save failed');
+      setItemError(e instanceof Error ? e.message : 'Save failed');
     } finally {
       setSavingItem(false);
     }
@@ -523,9 +651,10 @@ export default function Gold() {
       await api.deleteGold(deletingId);
       setItems(prev => prev.filter(item => item.id !== deletingId));
       closeItemModal();
-      await loadData(true);
+      await loadData();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Delete failed');
+      setDeleteItemConfirm(false);
+      setItemError(e instanceof Error ? e.message : 'Delete failed');
     } finally {
       setDeletingItem(false);
     }
@@ -543,11 +672,18 @@ export default function Gold() {
     setSavingHistory(false);
     setDeletingHistory(false);
     setDeleteHistoryConfirm(false);
+    setHistoryError('');
   }
 
   async function saveHistory() {
-    if (!historyForm.name.trim() || !historyForm.weight_g) return;
     if (savingHistory || deletingHistory) return;
+    setHistoryError('');
+    if (!historyForm.name.trim()) { setHistoryError('Enter an item name.'); return; }
+    const weight = parseFloat(historyForm.weight_g);
+    if (!Number.isFinite(weight) || weight <= 0) {
+      setHistoryError('Enter a weight in grams greater than 0.');
+      return;
+    }
     setSavingHistory(true);
     setError('');
     const payload = {
@@ -564,9 +700,9 @@ export default function Gold() {
         await api.addGoldHistory(payload);
       }
       closeHistoryModal();
-      await loadData(true);
+      await loadData();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Save failed');
+      setHistoryError(e instanceof Error ? e.message : 'Save failed');
     } finally {
       setSavingHistory(false);
     }
@@ -608,9 +744,10 @@ export default function Gold() {
       await api.deleteGoldHistory(deletingId);
       setHistory(prev => prev.filter(item => item.id !== deletingId));
       closeHistoryModal();
-      await loadData(true);
+      await loadData();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Delete failed');
+      setDeleteHistoryConfirm(false);
+      setHistoryError(e instanceof Error ? e.message : 'Delete failed');
     } finally {
       setDeletingHistory(false);
     }
@@ -659,52 +796,75 @@ export default function Gold() {
               right={loading ? <LoadingState variant="inline" /> : null}
             >
               <KpiGrid>
-                <KpiCard label="Total Gold" value={`${Math.round(totalGrams)}g`} tone="navy" icon={<Gem size={14} />} subtitle={`${Math.round(totalPavan)} pavan`} />
-                <KpiCard label="Estimated Value" value={fmt(estimatedValue)} tone="amber" icon={<Shield size={14} />} subtitle={`${Math.round(personalGrams)}g · ${goldRate} INR/g`} />
+                <KpiCard label="Total gold" value={grams(totalGrams)} tone="navy" icon={<Gem size={14} />} subtitle={`${totalPavan.toFixed(2)} pavan`} />
+                <KpiCard
+                  label="Estimated value"
+                  value={rateLoaded ? fmt(estimatedValue) : '—'}
+                  tone="amber"
+                  icon={<Shield size={14} />}
+                  subtitle={
+                    excludedGrams > 0
+                      ? `${grams(personalGrams)} counted · ${grams(excludedGrams)} excluded · ${goldRate.toLocaleString('en-IN')}/g`
+                      : `${grams(totalGrams)} @ ${goldRate.toLocaleString('en-IN')} INR/g`
+                  }
+                />
                 <KpiCard label="Items" value={totalItems} tone="muted" icon={<Package size={14} />} subtitle="Tracked pieces" />
                 <KpiCard label="People" value={totalPeople} tone="muted" icon={<Users size={14} />} subtitle="Ownership groups" />
               </KpiGrid>
             </SectionBlock>
 
-            <SectionBlock title="By Location" icon={<BarChart3 size={14} />}>
-              <div className="ui-kit-card" style={{ padding: 12 }}>
+            <SectionBlock title="By location" icon={<MapPin size={14} />}>
+              <UiCard>
                 <RightLegendDonut
                   items={locationBreakdown}
                   compact
                   showPct={false}
                   showCenter
                   centerLabel="TOTAL"
-                  centerValue={`${Math.round(locationTotal)}g`}
-                  valueFormatter={value => `${Math.round(value)}g`}
+                  centerValue={grams(locationTotal)}
+                  valueFormatter={grams}
                   showLegend={false}
                 />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 8 }}>
+              </UiCard>
+              <Spacer size={8} />
+              <div className="gold-breakdown-grid">
                 {locationResources.map((r) =>
                   groupedByLocation[r.name] ? (
-                    <LocationCard key={r.id} location={r.name} items={groupedByLocation[r.name]} />
+                    <LocationCard
+                      key={r.id}
+                      location={r.name}
+                      items={groupedByLocation[r.name]}
+                      skip={r.skip}
+                      onClick={() => showItemsFor({ location: r.name })}
+                    />
                   ) : null,
                 )}
               </div>
             </SectionBlock>
 
-            <SectionBlock title="By Person" icon={<BarChart3 size={14} />}>
-              <div className="ui-kit-card" style={{ padding: 12 }}>
+            <SectionBlock title="By person" icon={<Users size={14} />}>
+              <UiCard>
                 <RightLegendDonut
                   items={personBreakdown}
                   compact
                   showPct={false}
                   showCenter
                   centerLabel="TOTAL"
-                  centerValue={`${Math.round(personTotal)}g`}
-                  valueFormatter={value => `${Math.round(value)}g`}
+                  centerValue={grams(personTotal)}
+                  valueFormatter={grams}
                   showLegend={false}
                 />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 8 }}>
+              </UiCard>
+              <Spacer size={8} />
+              <div className="gold-breakdown-grid">
                 {personResources.map((r) =>
                   groupedByPerson[r.name] ? (
-                    <PersonCard key={r.id} person={r.name} items={groupedByPerson[r.name]} />
+                    <PersonCard
+                      key={r.id}
+                      person={r.name}
+                      items={groupedByPerson[r.name]}
+                      onClick={() => showItemsFor({ person: r.name })}
+                    />
                   ) : null,
                 )}
               </div>
@@ -718,78 +878,61 @@ export default function Gold() {
             <SectionBlock
               title="Entries"
               icon={<List size={14} />}
-              right={<SectionChip>{filteredItems.length}</SectionChip>}
+              subtitle={filtersActive || itemsSearch ? `${grams(filteredGrams)} shown` : undefined}
+              right={
+                <div className="gold-section-right">
+                  {canFilterItems && (
+                    <button
+                      type="button"
+                      className="gold-filter-btn"
+                      onClick={openFilterModal}
+                      aria-label={activeFilterCount ? `Filters, ${activeFilterCount} active` : 'Filters'}
+                    >
+                      <SlidersHorizontal size={13} />
+                      Filter
+                      {activeFilterCount > 0 && <span className="gold-filter-count">{activeFilterCount}</span>}
+                    </button>
+                  )}
+                  <SectionChip>{filteredItems.length}</SectionChip>
+                </div>
+              }
             >
               <SearchField value={itemsSearch} placeholder="Search name, person, location…" onChange={setItemsSearch} onClear={() => setItemsSearch('')} />
             </SectionBlock>
 
-            {/* Search bar */}
-            {/* Loading */}
             {loading && <LoadingState variant="section" />}
 
-            {/* Empty state */}
             {!loading && filteredItems.length === 0 && (
-              <p style={{ color: 'var(--muted)', padding: '1rem 0', fontSize: 14 }}>No items to display.</p>
-            )}
-
-            {/* Mobile cards */}
-            {!loading && filteredItems.length > 0 && (
-              <ListStack>
-                {filteredItems.map(i => {
-                  return (
-                    <ItemCard
-                      key={i.id}
-                      item={i}
-                      onClick={() => openEditItem(i)}
-                    />
-                  );
-                })}
-              </ListStack>
-            )}
-
-            {/* Desktop table */}
-            {!loading && filteredItems.length > 0 && (
-              <div className="tw txn-table">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>ID</th>
-                      <th>Name</th>
-                      <th>Weight (g)</th>
-                      <th>Pavan</th>
-                      <th>Person</th>
-                      <th>Location</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredItems.map(i => (
-                      <tr key={i.id}>
-                        <td style={{ color: 'var(--muted)', fontSize: 11 }}>{i.id.slice(0, 8)}</td>
-                        <td>{i.name}</td>
-                        <td style={{ fontWeight: 700 }}>
-                          {Math.round(i.weight_g)}
-                        </td>
-                        <td>
-                          {i.pavan.toFixed(3)}
-                        </td>
-                        <td>{i.person}</td>
-                        <td>{i.location}</td>
-                        <td>
-                          <button
-                            className="icon-btn"
-                            onClick={() => openEditItem(i)}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)' }}
-                          >
-                            <Pencil size={14} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="gold-empty">
+                <Gem size={28} />
+                <p>
+                  {itemsSearch || filtersActive
+                    ? 'No items match those filters.'
+                    : 'No gold items yet. Tap + to add one.'}
+                </p>
               </div>
             )}
+
+            {!loading && filteredItems.length > 0 && (
+              <div className="ui-stack">
+                {itemSections.map(section => (
+                  <div key={section.key}>
+                    {section.label && (
+                      <div className="ui-kit-txn-daybar">
+                        <span>{section.label}</span>
+                        <strong>{grams(section.grams)} · {section.items.length}</strong>
+                      </div>
+                    )}
+                    <ListStack>
+                      {section.items.map(i => (
+                        <ItemCard key={i.id} item={i} onClick={() => openEditItem(i)} />
+                      ))}
+                    </ListStack>
+                  </div>
+                ))}
+              </div>
+            )}
+
           </>
         )}
 
@@ -809,7 +952,10 @@ export default function Gold() {
 
             {/* Empty state */}
             {!loading && filteredHistory.length === 0 && (
-              <p style={{ color: 'var(--muted)', padding: '1rem 0', fontSize: 14 }}>No history entries yet.</p>
+              <div className="gold-empty">
+                <Clock size={28} />
+                <p>{historySearch ? 'No movements match that search.' : 'No movements recorded yet. Tap + to add one.'}</p>
+              </div>
             )}
 
             {/* History cards */}
@@ -831,7 +977,7 @@ export default function Gold() {
 
         {/* Error message */}
         {error && (
-          <p style={{ color: '#EF4444', fontSize: 13, padding: '12px 10px', marginTop: 12 }}>
+          <p style={{ color: THEME_COLORS[5], fontSize: 13, padding: '12px 10px', marginTop: 12 }} role="alert">
             ⚠ {error}
           </p>
         )}
@@ -856,124 +1002,191 @@ export default function Gold() {
             cursor: 'pointer', zIndex: 100,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
-          title={activeTab === 'items' ? 'Add gold item' : 'Add history entry'}
+          title={activeTab === 'items' ? 'Add gold item' : 'Add gold movement'}
+          aria-label={activeTab === 'items' ? 'Add gold item' : 'Add gold movement'}
         >
           <Plus size={22} strokeWidth={2.5} />
         </button>
       )}
 
-      {/* ITEMS MODAL */}
-      {itemsModalOpen && (
-        <div className="modal-bg open" onClick={closeItemModal}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-hd modal-hd--blue">
-              <span className="modal-title">{editItem ? 'Edit Gold Item' : 'Add Gold Item'}</span>
-              <button className="modal-close" onClick={closeItemModal}>×</button>
-            </div>
-            <div className="modal-body">
-              <div className="ui-stack">
-                <FormField label="Item Name">
-                  <input className="form-inp" type="text" placeholder="Necklace, Bangles…" value={form.name} onChange={e => setField('name', e.target.value)} />
-                </FormField>
-                <FormField label="Weight (g)">
-                  <input className="form-inp" type="number" min="0" step="0.01" placeholder="0" value={form.weight_g} onChange={e => setField('weight_g', e.target.value)} />
-                </FormField>
-                <FormField label="Pavan">
-                  <input className="form-inp" type="number" min="0" step="0.001" placeholder="0.000" value={form.pavan} disabled />
-                </FormField>
-                <FormField label="Person">
-                  <select
-                    className="form-sel"
-                    value={form.person_id}
-                    onChange={(e) => setField('person_id', e.target.value)}
+      {/* FILTER SHEET */}
+      {filterModalOpen && (
+        <ModalShell
+          title="Filter items"
+          onClose={() => setFilterModalOpen(false)}
+          footer={
+            <ModalActions
+              primaryLabel="Apply"
+              onPrimary={applyFilters}
+              onSecondary={() => setFilterModalOpen(false)}
+              leading={
+                draftPerson || draftLocation ? (
+                  <button
+                    type="button"
+                    className="ui-kit-btn ui-kit-btn--soft"
+                    onClick={() => { setDraftPerson(''); setDraftLocation(''); }}
                   >
-                    {personResources.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
-                </FormField>
+                    Reset
+                  </button>
+                ) : null
+              }
+            />
+          }
+        >
+          <form onSubmit={e => { e.preventDefault(); applyFilters(); }}>
+            <div className="ui-stack">
+              {locationFilterOptions.length > 1 && (
                 <FormField label="Location">
                   <select
                     className="form-sel"
-                    value={form.location_id}
-                    onChange={(e) => setField('location_id', e.target.value)}
+                    value={draftLocation}
+                    onChange={e => setDraftLocation(e.target.value)}
                   >
-                    {locationResources.map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.name}
-                        {l.skip ? ' (excluded from value)' : ''}
-                      </option>
+                    <option value="">All locations</option>
+                    {locationFilterOptions.map(name => (
+                      <option key={name} value={name}>{name}</option>
                     ))}
                   </select>
                 </FormField>
-              </div>
-            </div>
-            <div className="modal-foot">
-              {editItem && (
-                <button type="button" className="btn btn-sm btn-red" onClick={deleteItem} disabled={savingItem || deletingItem}>
-                  {deletingItem ? 'Deleting...' : deleteItemConfirm ? 'Confirm delete?' : 'Delete'}
-                </button>
               )}
-              <div className="modal-foot-l" />
-              <button type="button" className="btn btn-sm btn-cancel" onClick={closeItemModal} disabled={savingItem || deletingItem}>
-                Cancel
-              </button>
-              <button type="button" className="btn btn-sm btn-green" onClick={saveItem} disabled={savingItem || deletingItem}>
-                {savingItem ? 'Saving...' : editItem ? 'Save' : 'Add'}
-              </button>
+              {personFilterOptions.length > 1 && (
+                <FormField label="Person">
+                  <select
+                    className="form-sel"
+                    value={draftPerson}
+                    onChange={e => setDraftPerson(e.target.value)}
+                  >
+                    <option value="">All people</option>
+                    {personFilterOptions.map(name => (
+                      <option key={name} value={name}>{name}</option>
+                    ))}
+                  </select>
+                </FormField>
+              )}
+              <FormField label="Group by">
+                <select
+                  className="form-sel"
+                  value={draftGroupBy}
+                  onChange={e => setDraftGroupBy(e.target.value as GoldGroupBy)}
+                >
+                  <option value="location">Location</option>
+                  <option value="person">Person</option>
+                  <option value="none">No grouping</option>
+                </select>
+              </FormField>
             </div>
-          </div>
-        </div>
+            <button type="submit" hidden aria-hidden="true" tabIndex={-1} />
+          </form>
+        </ModalShell>
+      )}
+
+      {/* ITEMS MODAL */}
+      {itemsModalOpen && (
+        <ModalShell title={editItem ? 'Edit gold item' : 'Add gold item'} onClose={closeItemModal} footer={
+          <ModalActions
+            primaryLabel={savingItem ? 'Saving…' : editItem ? 'Save' : 'Add'}
+            onPrimary={() => void saveItem()}
+            onSecondary={closeItemModal}
+            disabled={savingItem || deletingItem}
+            leading={editItem ? (
+              <button
+                type="button"
+                className="ui-kit-btn ui-kit-btn--solid btn-red"
+                onClick={() => void deleteItem()}
+                disabled={savingItem || deletingItem}
+              >
+                {deletingItem ? 'Deleting…' : deleteItemConfirm ? `Delete "${editItem.name}"?` : 'Delete'}
+              </button>
+            ) : null}
+          />
+        }>
+          <form onSubmit={e => { e.preventDefault(); void saveItem(); }}>
+            <div className="ui-stack">
+              {itemError ? <p className="gold-modal-error" role="alert">{itemError}</p> : null}
+              {!hasGoldResources ? (
+                <InfoCallout title="No people or locations yet">
+                  Add them in Settings → Gold so items can be assigned an owner and a location.
+                </InfoCallout>
+              ) : null}
+              <FormField label="Item name *">
+                <input className="form-inp" type="text" placeholder="Necklace, Bangles…" value={form.name} onChange={e => setField('name', e.target.value)} />
+              </FormField>
+              <FormField label="Weight (g) *">
+                <input className="form-inp" type="number" min="0" step="0.001" placeholder="0" value={form.weight_g} onChange={e => setField('weight_g', e.target.value)} />
+              </FormField>
+              <FormField label="Pavan">
+                <input className="form-inp" type="number" step="0.001" placeholder="0.000" value={form.pavan} disabled />
+              </FormField>
+              <FormField label="Person">
+                <select className="form-sel" value={form.person_id} onChange={e => setField('person_id', e.target.value)}>
+                  <option value="">{UNASSIGNED_LABEL}</option>
+                  {personResources.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </FormField>
+              <FormField label="Location">
+                <select className="form-sel" value={form.location_id} onChange={e => setField('location_id', e.target.value)}>
+                  <option value="">{UNASSIGNED_LABEL}</option>
+                  {locationResources.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name}{l.skip ? ' (excluded)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </FormField>
+            </div>
+            {/* Lets Enter submit without duplicating the ModalActions button. */}
+            <button type="submit" hidden aria-hidden="true" tabIndex={-1} />
+          </form>
+        </ModalShell>
       )}
 
       {/* HISTORY MODAL */}
       {historyModalOpen && (
-        <div className="modal-bg open" onClick={closeHistoryModal}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-hd modal-hd--blue">
-              <span className="modal-title">{editHistory ? 'Edit Gold Movement' : 'Add Gold Movement'}</span>
-              <button className="modal-close" onClick={closeHistoryModal}>×</button>
-            </div>
-            <div className="modal-body">
-              <div className="ui-stack">
-                <FormField label="Date">
-                  <input className="form-inp" type="date" value={historyForm.date} onChange={e => setHistoryField('date', e.target.value)} />
-                </FormField>
-                <FormField label="Type">
-                  <select className="form-sel" value={historyForm.type} onChange={e => setHistoryField('type', e.target.value as 'IN' | 'OUT')}>
-                    <option value="IN">In</option>
-                    <option value="OUT">Out</option>
-                  </select>
-                </FormField>
-                <FormField label="Item Name">
-                  <input className="form-inp" type="text" placeholder="Gold received from…" value={historyForm.name} onChange={e => setHistoryField('name', e.target.value)} />
-                </FormField>
-                <FormField label="Weight (g)">
-                  <input className="form-inp" type="number" min="0" step="0.01" placeholder="0" value={historyForm.weight_g} onChange={e => setHistoryField('weight_g', e.target.value)} />
-                </FormField>
-                <FormField label="Note">
-                  <input className="form-inp" type="text" placeholder="Wedding gift, resale…" value={historyForm.note} onChange={e => setHistoryField('note', e.target.value)} />
-                </FormField>
-              </div>
-            </div>
-            <div className="modal-foot">
-              {editHistory && (
-                <button type="button" className="btn btn-sm btn-red" onClick={deleteHistory} disabled={savingHistory || deletingHistory}>
-                  {deletingHistory ? 'Deleting...' : deleteHistoryConfirm ? 'Confirm delete?' : 'Delete'}
-                </button>
-              )}
-              <div className="modal-foot-l" />
-              <button type="button" className="btn btn-sm btn-cancel" onClick={closeHistoryModal} disabled={savingHistory || deletingHistory}>
-                Cancel
+        <ModalShell title={editHistory ? 'Edit gold movement' : 'Add gold movement'} onClose={closeHistoryModal} footer={
+          <ModalActions
+            primaryLabel={savingHistory ? 'Saving…' : editHistory ? 'Save' : 'Add'}
+            onPrimary={() => void saveHistory()}
+            onSecondary={closeHistoryModal}
+            disabled={savingHistory || deletingHistory}
+            leading={editHistory ? (
+              <button
+                type="button"
+                className="ui-kit-btn ui-kit-btn--solid btn-red"
+                onClick={() => void deleteHistory()}
+                disabled={savingHistory || deletingHistory}
+              >
+                {deletingHistory ? 'Deleting…' : deleteHistoryConfirm ? `Delete "${editHistory.name}"?` : 'Delete'}
               </button>
-              <button type="button" className="btn btn-sm btn-green" onClick={saveHistory} disabled={savingHistory || deletingHistory}>
-                {savingHistory ? 'Saving...' : editHistory ? 'Save' : 'Add'}
-              </button>
+            ) : null}
+          />
+        }>
+          <form onSubmit={e => { e.preventDefault(); void saveHistory(); }}>
+            <div className="ui-stack">
+              {historyError ? <p className="gold-modal-error" role="alert">{historyError}</p> : null}
+              <FormField label="Date">
+                <input className="form-inp" type="date" value={historyForm.date} onChange={e => setHistoryField('date', e.target.value)} />
+              </FormField>
+              <FormField label="Type">
+                <select className="form-sel" value={historyForm.type} onChange={e => setHistoryField('type', e.target.value as 'IN' | 'OUT')}>
+                  <option value="IN">In</option>
+                  <option value="OUT">Out</option>
+                </select>
+              </FormField>
+              <FormField label="Item name *">
+                <input className="form-inp" type="text" placeholder="Gold received from…" value={historyForm.name} onChange={e => setHistoryField('name', e.target.value)} />
+              </FormField>
+              <FormField label="Weight (g) *">
+                <input className="form-inp" type="number" min="0" step="0.001" placeholder="0" value={historyForm.weight_g} onChange={e => setHistoryField('weight_g', e.target.value)} />
+              </FormField>
+              <FormField label="Note">
+                <input className="form-inp" type="text" placeholder="Wedding gift, resale…" value={historyForm.note} onChange={e => setHistoryField('note', e.target.value)} />
+              </FormField>
             </div>
-          </div>
-        </div>
+            <button type="submit" hidden aria-hidden="true" tabIndex={-1} />
+          </form>
+        </ModalShell>
       )}
     </div>
   );

@@ -46,6 +46,12 @@ import {
   savingsAccountDisplayName,
 } from './savingsAccounts'
 import {
+  countGoldItemsUsingResource,
+  isGoldResourceType,
+  loadGoldResourceLookup,
+  resolveGoldResourceId,
+} from './goldResources'
+import {
   connectionStatusToLegacyToken,
   disconnectOrgIntegration,
   getIntegrationAuthUrl,
@@ -256,6 +262,28 @@ function num(v: string | number | boolean | null | undefined): number {
   if (v === null || v === undefined || typeof v === 'boolean') return 0
   const n = typeof v === 'number' ? v : parseFloat(v)
   return Number.isFinite(n) ? n : 0
+}
+
+/** Largest value `numeric(10,3)` can hold: 10 digits total, 3 after the point. */
+const MAX_GOLD_WEIGHT_G = 9_999_999.999
+
+/**
+ * Gold weights as a storable string, or null when unusable.
+ *
+ * `num()` is too permissive here — it turns unparseable input into 0 and lets
+ * negatives through, both of which silently corrupt gram totals.
+ */
+function goldWeight(v: unknown): string | null {
+  if (typeof v === 'boolean' || v === null || v === undefined) return null
+  const n = typeof v === 'number' ? v : parseFloat(String(v))
+  if (!Number.isFinite(n) || n <= 0 || n > MAX_GOLD_WEIGHT_G) return null
+  return String(Math.round(n * 1000) / 1000)
+}
+
+/** Trimmed non-empty string, or null. */
+function reqText(v: unknown): string | null {
+  const s = typeof v === 'string' ? v.trim() : ''
+  return s ? s : null
 }
 
 function readOpeningBal(settings: unknown): Record<string, number> {
@@ -876,7 +904,11 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
       }
 
       if (mod === 'gold' && action === 'getEntries') {
-        const rows = await db.select().from(goldItems).where(whereOrgFilter(goldItems, budgetScope))
+        const rows = await db
+          .select()
+          .from(goldItems)
+          .where(whereOrgFilter(goldItems, budgetScope))
+          .orderBy(goldItems.name)
         return ok(
           res,
           rows.map((r) => {
@@ -893,7 +925,11 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
       }
 
       if (mod === 'gold' && action === 'getResources') {
-        const typeFilter = typeof req.query.type === 'string' ? req.query.type : undefined
+        const rawType = typeof req.query.type === 'string' ? req.query.type : undefined
+        if (rawType !== undefined && !isGoldResourceType(rawType)) {
+          return fail(res, 400, 'Resource type must be person or location', traceId)
+        }
+        const typeFilter = rawType
         const orgWhere = whereOrgFilter(goldResources, budgetScope)
         const rows = await db
           .select()
@@ -920,7 +956,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
             date: String(r.date),
             type: r.type as 'IN' | 'OUT',
             name: r.name,
-            weight_g: r.weightG,
+            weight_g: num(r.weightG),
             note: r.note ?? undefined,
           })),
         )
@@ -1526,103 +1562,207 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
       }
 
       if (mod === 'gold') {
-        if (action === 'addEntry') {
-          const id = crypto.randomUUID()
-          const wg = num(body.weight_g as string | number)
-          await db.insert(goldItems).values({
-            orgId: scopeOrgId,
-            id,
-            name: String(body.name ?? ''),
-            weightG: String(wg),
-            personId: typeof body.person_id === 'string' ? body.person_id : null,
-            locationId: typeof body.location_id === 'string' ? body.location_id : null,
-          })
-          return ok(res, id, traceId)
-        }
-        if (action === 'updateEntry') {
-          const id = typeof body.id === 'string' ? body.id : ''
-          if (!id) return fail(res, 400, 'Missing id', traceId)
-          await db
-            .update(goldItems)
-            .set({
-              name: typeof body.name === 'string' ? body.name : undefined,
-              weightG: body.weight_g !== undefined ? String(num(body.weight_g as string | number)) : undefined,
-              personId: body.person_id !== undefined ? (typeof body.person_id === 'string' ? body.person_id : null) : undefined,
-              locationId: body.location_id !== undefined ? (typeof body.location_id === 'string' ? body.location_id : null) : undefined,
+        if (action === 'addEntry' || action === 'updateEntry') {
+          const isUpdate = action === 'updateEntry'
+          const id = isUpdate ? (typeof body.id === 'string' ? body.id : '') : crypto.randomUUID()
+          if (isUpdate && !id) return fail(res, 400, 'Missing id', traceId)
+
+          // On update only validate fields actually present: the action is a
+          // partial update, and `null` explicitly clears a link.
+          const nameGiven = !isUpdate || body.name !== undefined
+          const weightGiven = !isUpdate || body.weight_g !== undefined
+
+          let name: string | undefined
+          if (nameGiven) {
+            const parsed = reqText(body.name)
+            if (!parsed) return fail(res, 400, 'Item name is required', traceId)
+            name = parsed
+          }
+
+          let weightG: string | undefined
+          if (weightGiven) {
+            const parsed = goldWeight(body.weight_g)
+            if (!parsed) return fail(res, 400, 'Weight must be a number greater than 0', traceId)
+            weightG = parsed
+          }
+
+          // Resolve person/location against this org's resources. A stale link
+          // stored on the row stays editable — only an incoming value is checked.
+          let personId: string | null | undefined
+          let locationId: string | null | undefined
+          if (body.person_id !== undefined || body.location_id !== undefined) {
+            const lookup = await loadGoldResourceLookup(db, scopeOrgId)
+            if (body.person_id !== undefined) {
+              if (body.person_id === null || body.person_id === '') personId = null
+              else {
+                personId = resolveGoldResourceId(lookup, body.person_id, 'person')
+                if (!personId) return fail(res, 400, 'Invalid person', traceId)
+              }
+            }
+            if (body.location_id !== undefined) {
+              if (body.location_id === null || body.location_id === '') locationId = null
+              else {
+                locationId = resolveGoldResourceId(lookup, body.location_id, 'location')
+                if (!locationId) return fail(res, 400, 'Invalid location', traceId)
+              }
+            }
+          }
+
+          if (!isUpdate) {
+            await db.insert(goldItems).values({
+              orgId: scopeOrgId,
+              id,
+              name: name as string,
+              weightG: weightG as string,
+              personId: personId ?? null,
+              locationId: locationId ?? null,
             })
+            return ok(res, id, traceId)
+          }
+
+          const updated = await db
+            .update(goldItems)
+            .set({ name, weightG, personId, locationId })
             .where(and(whereOrgFilter(goldItems, budgetScope), eq(goldItems.id, id)))
+            .returning({ id: goldItems.id })
+          if (!updated.length) return fail(res, 404, 'Gold item not found', traceId)
           return ok(res, true, traceId)
         }
         if (action === 'deleteEntry') {
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
-          await db.delete(goldItems).where(and(whereOrgFilter(goldItems, budgetScope), eq(goldItems.id, id)))
+          const removed = await db
+            .delete(goldItems)
+            .where(and(whereOrgFilter(goldItems, budgetScope), eq(goldItems.id, id)))
+            .returning({ id: goldItems.id })
+          if (!removed.length) return fail(res, 404, 'Gold item not found', traceId)
           return ok(res, true, traceId)
         }
-        if (action === 'addResource') {
-          const id = crypto.randomUUID()
-          await db.insert(goldResources).values({
-            orgId: scopeOrgId,
-            id,
-            type: String(body.type ?? ''),
-            name: String(body.name ?? ''),
-            skip: body.skip === true,
-          })
-          return ok(res, id, traceId)
-        }
-        if (action === 'updateResource') {
-          const id = typeof body.id === 'string' ? body.id : ''
-          if (!id) return fail(res, 400, 'Missing id', traceId)
-          await db
-            .update(goldResources)
-            .set({
-              type: typeof body.type === 'string' ? body.type : undefined,
-              name: typeof body.name === 'string' ? body.name : undefined,
-              skip: body.skip !== undefined ? body.skip === true : undefined,
+        if (action === 'addResource' || action === 'updateResource') {
+          const isUpdate = action === 'updateResource'
+          const id = isUpdate ? (typeof body.id === 'string' ? body.id : '') : crypto.randomUUID()
+          if (isUpdate && !id) return fail(res, 400, 'Missing id', traceId)
+
+          let type: string | undefined
+          if (!isUpdate || body.type !== undefined) {
+            if (!isGoldResourceType(body.type)) {
+              return fail(res, 400, 'Resource type must be person or location', traceId)
+            }
+            type = body.type
+          }
+
+          let name: string | undefined
+          if (!isUpdate || body.name !== undefined) {
+            const parsed = reqText(body.name)
+            if (!parsed) return fail(res, 400, 'Name is required', traceId)
+            name = parsed
+          }
+
+          if (!isUpdate) {
+            await db.insert(goldResources).values({
+              orgId: scopeOrgId,
+              id,
+              type: type as string,
+              name: name as string,
+              skip: body.skip === true,
             })
+            return ok(res, id, traceId)
+          }
+
+          const updated = await db
+            .update(goldResources)
+            .set({ type, name, skip: body.skip !== undefined ? body.skip === true : undefined })
             .where(and(whereOrgFilter(goldResources, budgetScope), eq(goldResources.id, id)))
+            .returning({ id: goldResources.id })
+          if (!updated.length) return fail(res, 404, 'Resource not found', traceId)
           return ok(res, true, traceId)
         }
         if (action === 'deleteResource') {
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
-          await db.delete(goldResources).where(and(whereOrgFilter(goldResources, budgetScope), eq(goldResources.id, id)))
+          // There is no FK, so deleting a referenced resource would orphan gold
+          // items — they'd keep their grams but vanish from the breakdowns.
+          const inUse = await countGoldItemsUsingResource(db, scopeOrgId, id)
+          if (inUse > 0) {
+            return fail(
+              res,
+              409,
+              `Still used by ${inUse} gold item${inUse === 1 ? '' : 's'}. Reassign them first.`,
+              traceId,
+            )
+          }
+          const removed = await db
+            .delete(goldResources)
+            .where(and(whereOrgFilter(goldResources, budgetScope), eq(goldResources.id, id)))
+            .returning({ id: goldResources.id })
+          if (!removed.length) return fail(res, 404, 'Resource not found', traceId)
           return ok(res, true, traceId)
         }
-        if (action === 'addHistory') {
-          const id = crypto.randomUUID()
-          const dateStr = typeof body.date === 'string' ? body.date : new Date().toISOString().slice(0, 10)
-          await db.insert(goldHistory).values({
-            orgId: scopeOrgId,
-            id,
-            date: dateStr,
-            type: String(body.type ?? 'IN'),
-            name: String(body.name ?? ''),
-            weightG: String(num(body.weight_g as string | number)),
-            note: typeof body.note === 'string' ? body.note : null,
-          })
-          return ok(res, id, traceId)
-        }
-        if (action === 'updateHistory') {
-          const id = typeof body.id === 'string' ? body.id : ''
-          if (!id) return fail(res, 400, 'Missing id', traceId)
-          await db
+        if (action === 'addHistory' || action === 'updateHistory') {
+          const isUpdate = action === 'updateHistory'
+          const id = isUpdate ? (typeof body.id === 'string' ? body.id : '') : crypto.randomUUID()
+          if (isUpdate && !id) return fail(res, 400, 'Missing id', traceId)
+
+          let type: string | undefined
+          if (!isUpdate || body.type !== undefined) {
+            const raw = typeof body.type === 'string' ? body.type.trim().toUpperCase() : 'IN'
+            if (raw !== 'IN' && raw !== 'OUT') {
+              return fail(res, 400, 'Movement type must be IN or OUT', traceId)
+            }
+            type = raw
+          }
+
+          let name: string | undefined
+          if (!isUpdate || body.name !== undefined) {
+            const parsed = reqText(body.name)
+            if (!parsed) return fail(res, 400, 'Item name is required', traceId)
+            name = parsed
+          }
+
+          let weightG: string | undefined
+          if (!isUpdate || body.weight_g !== undefined) {
+            const parsed = goldWeight(body.weight_g)
+            if (!parsed) return fail(res, 400, 'Weight must be a number greater than 0', traceId)
+            weightG = parsed
+          }
+
+          if (!isUpdate) {
+            const dateStr = typeof body.date === 'string' ? body.date : new Date().toISOString().slice(0, 10)
+            await db.insert(goldHistory).values({
+              orgId: scopeOrgId,
+              id,
+              date: dateStr,
+              type: type as string,
+              name: name as string,
+              weightG: weightG as string,
+              note: typeof body.note === 'string' ? body.note : null,
+            })
+            return ok(res, id, traceId)
+          }
+
+          const updated = await db
             .update(goldHistory)
             .set({
               date: typeof body.date === 'string' ? body.date : undefined,
-              type: typeof body.type === 'string' ? body.type : undefined,
-              name: typeof body.name === 'string' ? body.name : undefined,
-              weightG: body.weight_g !== undefined ? String(num(body.weight_g as string | number)) : undefined,
+              type,
+              name,
+              weightG,
               note: typeof body.note === 'string' ? body.note : undefined,
             })
             .where(and(whereOrgFilter(goldHistory, budgetScope), eq(goldHistory.id, id)))
-          return ok(res, { success: true }, traceId)
+            .returning({ id: goldHistory.id })
+          if (!updated.length) return fail(res, 404, 'History entry not found', traceId)
+          return ok(res, true, traceId)
         }
         if (action === 'deleteHistory') {
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
-          await db.delete(goldHistory).where(and(whereOrgFilter(goldHistory, budgetScope), eq(goldHistory.id, id)))
-          return ok(res, { success: true }, traceId)
+          const removed = await db
+            .delete(goldHistory)
+            .where(and(whereOrgFilter(goldHistory, budgetScope), eq(goldHistory.id, id)))
+            .returning({ id: goldHistory.id })
+          if (!removed.length) return fail(res, 404, 'History entry not found', traceId)
+          return ok(res, true, traceId)
         }
       }
 
