@@ -200,6 +200,8 @@ export default function Settings() {
   const [grSkip, setGrSkip] = useState(false);
   const [grBusy, setGrBusy] = useState(false);
   const [grDelConfirm, setGrDelConfirm] = useState(false);
+  /** Modal-scoped so a failed delete (e.g. 409 still-in-use) is readable over the modal. */
+  const [grError, setGrError] = useState('');
 
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [editingKey, setEditingKey] = useState<string | null>(null);
@@ -671,11 +673,16 @@ export default function Settings() {
     setGrName('');
     setGrSkip(false);
     setGrDelConfirm(false);
+    setGrError('');
   }
 
   async function submitGoldResource(e: FormEvent) {
     e.preventDefault();
-    if (!grName.trim()) return;
+    setGrError('');
+    if (!grName.trim()) {
+      setGrError('Name is required.');
+      return;
+    }
     setGrBusy(true);
     setError('');
     try {
@@ -688,7 +695,7 @@ export default function Settings() {
       closeGrModal();
       await loadGoldResources(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Save failed');
+      setGrError(err instanceof Error ? err.message : 'Save failed');
     } finally {
       setGrBusy(false);
     }
@@ -701,12 +708,15 @@ export default function Settings() {
       return;
     }
     setError('');
+    setGrError('');
     try {
       await api.deleteGoldResource(grEditingId);
       closeGrModal();
       await loadGoldResources(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Delete failed');
+      // Reset the two-click confirm: the message explains what to do first.
+      setGrDelConfirm(false);
+      setGrError(err instanceof Error ? err.message : 'Delete failed');
     }
   }
 
@@ -1246,7 +1256,7 @@ export default function Settings() {
                       <TransactionCard
                         key={r.id}
                         compact
-                        title={r.skip ? `${r.name} · excluded from estimate` : r.name}
+                        title={r.skip ? `${r.name} · not counted in value` : r.name}
                         tone={r.skip ? 'red' : 'navy'}
                         icon={<MapPin size={14} />}
                         onClick={() => startEditGoldResource(r)}
@@ -1491,6 +1501,11 @@ export default function Settings() {
             <form onSubmit={submitGoldResource}>
               <div className="modal-body">
                 <div className="ui-stack">
+                  {grError ? (
+                    <p style={{ color: THEME_COLORS[5], fontSize: 13, margin: 0 }} role="alert">
+                      {grError}
+                    </p>
+                  ) : null}
                   {!grEditingId ? (
                     <FormField label="Type">
                       <select
@@ -1513,8 +1528,14 @@ export default function Settings() {
                   {grType === 'location' ? (
                     <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>
                       <input type="checkbox" checked={grSkip} onChange={(e) => setGrSkip(e.target.checked)} />
-                      Exclude from estimated gold value (e.g. bank-held)
+                      Exclude from estimated value
                     </label>
+                  ) : null}
+                  {grType === 'location' ? (
+                    <p style={{ margin: '-4px 0 0', fontSize: 12, color: 'var(--muted)' }}>
+                      For pledged or bank-held gold. It still counts toward Total gold,
+                      just not the Estimated value.
+                    </p>
                   ) : null}
                 </div>
               </div>

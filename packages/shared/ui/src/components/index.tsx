@@ -485,8 +485,12 @@ export function BalanceRow({
   left,
   incomeIcon,
   expenseIcon,
-  incomeLabel = 'Income',
-  expenseLabel = 'Expense',
+  /* 'In'/'Out' rather than 'Income'/'Expense': these captions sit directly under
+     the savings month bar, which reads In/Out, and they are flow shorthand for a
+     row, not the name of a budget line. Callers that mean something else pass
+     their own — overview's Assets/Liabilities, for one. */
+  incomeLabel = 'In',
+  expenseLabel = 'Out',
   incomeTone = 'green',
   expenseTone = 'red',
   icon,

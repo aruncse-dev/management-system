@@ -515,46 +515,98 @@ button, input, select, textarea {
 .savings-page .ui-stack { gap: 8px; }
 .savings-page .txn-cards { gap: 8px; }
 .savings-page .bottom-nav { top: 0; }
-/* Month stepper plus the month's in/out, on one line above the Entries list.
+/* Month stepper over the month's in/out, above the Entries list.
    Deliberately card-height, not hero-height: this is context for the list
    below it, and as stacked KPI tiles it pushed the first entry off screen. */
 .savings-month-bar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px 10px;
-  padding: 7px 10px;
+  display: grid;
   border: 1px solid var(--border);
   border-radius: var(--r);
   background: var(--card);
   box-shadow: var(--sh);
+  overflow: hidden;
+}
+/* Arrows pinned to the two edges, month centred between them. `space-between`
+   centres the label exactly because both arrows are the same 26px box. */
+.savings-month-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
 }
 .savings-month-bar-label {
-  min-width: 92px;
+  flex: 1 1 auto;
+  min-width: 0;
   color: var(--text);
   font-size: 13px;
   font-weight: 800;
   text-align: center;
 }
-/* Pushed right on a wide row; wraps under the stepper when there is no room. */
+/* Half and half, divided. Each figure owns a cell that exists whatever the
+   amount is, so a seven-figure month cannot push the other one anywhere. */
 .savings-month-flows {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-top: 1px solid var(--border);
+}
+.savings-month-flow {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 7px 10px;
+}
+.savings-month-flow + .savings-month-flow {
+  border-left: 1px solid var(--border);
+}
+/* Same shape as an account row's in/out: caption left, tinted round badge
+   right, figure beneath. Mirrors `.ui-kit-balance-flow-*` rather than reusing
+   it, because that class also paints the bordered mini-card these cells get
+   from the bar's own dividers. Keep the two in step. */
+.savings-month-flow-head {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-left: auto;
-  font-size: 13px;
-  font-weight: 800;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
 }
-.savings-month-flows > span {
+.savings-month-flow-label {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.savings-month-flow-icon {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
 }
-.savings-month-flows .ui-tone-green { color: var(--gm); }
-.savings-month-flows .ui-tone-red { color: var(--rm); }
+.savings-month-flow.ui-tone-green .savings-month-flow-icon {
+  color: var(--gm);
+  background: rgba(34, 197, 94, .12);
+}
+.savings-month-flow.ui-tone-red .savings-month-flow-icon {
+  color: var(--rm);
+  background: rgba(239, 68, 68, .12);
+}
+.savings-month-flow-value {
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.savings-month-flow.ui-tone-green .savings-month-flow-value { color: var(--gm); }
+.savings-month-flow.ui-tone-red .savings-month-flow-value { color: var(--rm); }
 /* `.nav-arrow` is built for the dark navy header — white on a translucent white
    wash. On this light row that reads as nothing, so all three need flipping. */
 .savings-month-bar .nav-arrow {
+  flex: 0 0 auto;
   width: 26px;
   height: 26px;
   color: var(--navy);
@@ -1471,12 +1523,6 @@ tr:last-child td { border-bottom: none; }
   border-left-width: 0;
   border-left-color: transparent;
 }
-.gold-page .ui-kit-kpi,
-.gold-page .ui-kit-kpi--accent-green,
-.gold-page .ui-kit-kpi--accent-red {
-  border-left-width: 0;
-  border-left-color: transparent;
-}
 
 /* CC / CR GRIDS */
 .cc-g { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
@@ -1992,3 +2038,88 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
 .dash-net-note.ui-tone-green { color: var(--gm); }
 .dash-net-note.ui-tone-red { color: var(--rm); }
 .dash-net-note.ui-tone-muted { color: var(--muted); }
+
+/* GOLD PAGE */
+.gold-breakdown-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+@media (min-width: 900px) {
+  .gold-breakdown-grid { grid-template-columns: repeat(4, 1fr); }
+}
+.gold-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 40px 16px;
+  color: var(--muted);
+}
+.gold-empty p {
+  margin: 0;
+  font-size: 14px;
+  text-align: center;
+}
+.gold-modal-error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--rm);
+}
+/* Quiet corner marker on cards whose location is excluded from Estimated value.
+   Deliberately not a filled pill — it repeats on many rows, so it has to recede. */
+.gold-tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--amber);
+  background: color-mix(in srgb, var(--amber) 12%, transparent);
+  border-radius: 999px;
+  padding: 2px 7px;
+  white-space: nowrap;
+}
+/* Filter trigger sits beside the count chip in the section header; the controls
+   themselves live in a sheet so they cost no vertical space in the list. */
+.gold-section-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.gold-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .02em;
+  cursor: pointer;
+}
+.gold-filter-btn:hover { color: var(--text); border-color: var(--navy); }
+.gold-filter-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--navy);
+  color: #fff;
+  font-size: 10px;
+  line-height: 1;
+}
+
+/* Dashboard tiles filter the list, so they need to read as pressable. */
+.gold-page .ui-kit-kpi[role='button'] { cursor: pointer; }
+.gold-page .ui-kit-kpi[role='button']:hover { border-color: var(--navy); }
+.gold-page .ui-kit-kpi[role='button']:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: 2px;
+}

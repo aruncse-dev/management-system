@@ -48,6 +48,18 @@ export function KpiCard({
       onClick={onClick}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
+      // role="button" + tabIndex announces this as a button, so it has to
+      // answer Enter and Space like one — otherwise it's a keyboard dead end.
+      onKeyDown={
+        onClick
+          ? e => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                onClick()
+              }
+            }
+          : undefined
+      }
     >
       <div className="ui-kit-kpi-hd">
         <div className={`ui-kit-kpi-head${icon ? ' has-icon' : ' no-icon'}`}>

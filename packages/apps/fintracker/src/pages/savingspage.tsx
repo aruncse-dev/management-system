@@ -709,27 +709,46 @@ export default function SavingsPage({
 
         {activeTab === 'transactions' && (
           <>
-            {/* Month stepper and the month's two figures on one line.
+            {/* Two fixed rows: the stepper with the month centred between
+                edge-pinned arrows, then the month's in and out in a divided
+                half-and-half row beneath it.
                 These were a pill, then a pair of KPI tiles, then a section
                 header that repeated the month a third time — some 600px before
                 the first entry on a phone. The figures are context for the list,
-                not headline metrics, so they read at label size. */}
+                not headline metrics, so they read at label size. Splitting them
+                into their own row means an amount of any length lands in a cell
+                that was always going to be there: nothing reflows, and the month
+                never shifts off centre. */}
             <div className="savings-month-bar">
-              <button type="button" className="nav-arrow" onClick={() => setMonthKey(k => shiftMonthKey(k, -1))} aria-label="Previous month">
-                <ChevronLeft size={16} />
-              </button>
-              <span className="savings-month-bar-label">{monthKeyLabel(monthKey)}</span>
-              <button type="button" className="nav-arrow" onClick={() => setMonthKey(k => shiftMonthKey(k, 1))} aria-label="Next month">
-                <ChevronRight size={16} />
-              </button>
-              <span className="savings-month-flows">
-                <span className="ui-tone-green">
-                  <ArrowDownRight size={13} strokeWidth={2.4} />{fmt(monthIn)}
-                </span>
-                <span className="ui-tone-red">
-                  <ArrowUpRight size={13} strokeWidth={2.4} />{fmt(monthOut)}
-                </span>
-              </span>
+              <div className="savings-month-stepper">
+                <button type="button" className="nav-arrow" onClick={() => setMonthKey(k => shiftMonthKey(k, -1))} aria-label="Previous month">
+                  <ChevronLeft size={16} />
+                </button>
+                <span className="savings-month-bar-label">{monthKeyLabel(monthKey)}</span>
+                <button type="button" className="nav-arrow" onClick={() => setMonthKey(k => shiftMonthKey(k, 1))} aria-label="Next month">
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+              <div className="savings-month-flows">
+                <div className="savings-month-flow ui-tone-green">
+                  <div className="savings-month-flow-head">
+                    <span className="savings-month-flow-label">In</span>
+                    <span className="savings-month-flow-icon">
+                      <ArrowDownRight size={11} strokeWidth={2.4} aria-hidden />
+                    </span>
+                  </div>
+                  <span className="savings-month-flow-value">{fmt(monthIn)}</span>
+                </div>
+                <div className="savings-month-flow ui-tone-red">
+                  <div className="savings-month-flow-head">
+                    <span className="savings-month-flow-label">Out</span>
+                    <span className="savings-month-flow-icon">
+                      <ArrowUpRight size={11} strokeWidth={2.4} aria-hidden />
+                    </span>
+                  </div>
+                  <span className="savings-month-flow-value">{fmt(monthOut)}</span>
+                </div>
+              </div>
             </div>
             <Spacer size={8} />
           <SectionBlock
