@@ -1,18 +1,17 @@
 import type { FintrackerPrefs } from './expenseCycle'
 import type { SupportedCurrency } from '../../../shared/utils/src/formatters'
 
-export interface Transaction {
-  id: string
-  date: string
-  desc: string
-  a: number
-  c: string
-  t: 'Expense' | 'Income' | 'Transfer' | 'Savings'
-  m: string
-  notes: string
-  transferTo?: string
-  _k?: number
-}
+/**
+ * Re-exported, not redeclared.
+ *
+ * This file used to carry its own copy of `Transaction`, which then drifted
+ * behind the shared one — it was missing `refKind`/`refId` (and `cId`/`mId`),
+ * so a linked row read as unlinked anywhere this type was used. The shared
+ * definition is a strict superset with the same required fields, so there is
+ * nothing here worth keeping separate.
+ */
+import type { Transaction } from '@fintracker-vault/types'
+export type { Transaction }
 
 export interface TransactionForm {
   date: string

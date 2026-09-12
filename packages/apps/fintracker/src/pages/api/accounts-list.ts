@@ -5,6 +5,7 @@ import type { FtSessionData } from '@fintracker-vault/auth'
 import { paymentSources, getDb } from '@fintracker-vault/db'
 import { dbApiErrorMessage } from '../../lib/dbApiErrorMessage'
 import { getSessionOptions } from '../../lib/session'
+import { cascadePaymentSourceRename, countPaymentSourceReferences, paymentSourceNameTaken } from '../../lib/paymentSourceReferences'
 
 type ApiOk<T> = { ok: true; data: T }
 type ApiErr = { ok: false; error: string }
@@ -28,6 +29,35 @@ function serializeAccount(row: typeof paymentSources.$inferSelect) {
     orgId: row.orgId ?? null,
     isActive: row.isActive ?? true,
     sortOrder: row.sortOrder ?? 0,
+    // An account is a recurring deposit exactly when it has an instalment.
+    rdInstalment: row.rdInstalment != null ? Number(row.rdInstalment) : null,
+    rdDay: row.rdDay ?? null,
+    rdMonths: row.rdMonths ?? null,
+    rdStartDate: row.rdStartDate ? String(row.rdStartDate) : null,
+    rdMaturityAmount: row.rdMaturityAmount != null ? Number(row.rdMaturityAmount) : null,
+  }
+}
+
+/** RD terms are optional and only meaningful together; a blank clears the field. */
+function readRdFields(body: Record<string, unknown>) {
+  const numOrNull = (v: unknown) => {
+    if (v === null || v === undefined || v === '') return null
+    const n = Number(v)
+    return Number.isFinite(n) && n > 0 ? n : null
+  }
+  const instalment = numOrNull(body.rdInstalment)
+  return {
+    rdInstalment: instalment != null ? String(instalment) : null,
+    rdDay: instalment != null ? numOrNull(body.rdDay) : null,
+    rdMonths: instalment != null ? numOrNull(body.rdMonths) : null,
+    rdStartDate:
+      instalment != null && typeof body.rdStartDate === 'string' && body.rdStartDate.trim()
+        ? body.rdStartDate.trim()
+        : null,
+    rdMaturityAmount:
+      instalment != null && numOrNull(body.rdMaturityAmount) != null
+        ? String(numOrNull(body.rdMaturityAmount))
+        : null,
   }
 }
 
@@ -58,6 +88,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!USED_FOR.has(usedFor)) return fail(res, 400, 'Invalid usedFor')
       const description = body.description != null ? String(body.description) : null
       const sortOrder = typeof body.sortOrder === 'number' ? body.sortOrder : Number(body.sortOrder) || 0
+      if (await paymentSourceNameTaken(db, orgId, name, '')) {
+        return fail(res, 409, `Another payment source is already called “${name}”. Transactions match their source by name, so two with the same name cannot be told apart.`)
+      }
       const id = crypto.randomUUID()
       await db.insert(paymentSources).values({
         id,
@@ -68,6 +101,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         usedFor,
         isActive: body.isActive === false ? false : true,
         sortOrder,
+        ...readRdFields(body),
       })
       return ok(res, { id })
     }
@@ -94,6 +128,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!USED_FOR.has(usedFor)) return fail(res, 400, 'Invalid usedFor')
       const description = body.description != null ? String(body.description) : null
       const sortOrder = typeof body.sortOrder === 'number' ? body.sortOrder : Number(body.sortOrder) || 0
+      if (await paymentSourceNameTaken(db, orgId, name, id)) {
+        return fail(res, 409, `Another payment source is already called “${name}”. Transactions match their source by name, so two with the same name cannot be told apart.`)
+      }
       await db
         .update(paymentSources)
         .set({
@@ -102,6 +139,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           usedFor,
           isActive: body.isActive === false ? false : true,
           sortOrder,
+          ...readRdFields(body),
         })
         .where(
           and(
@@ -110,12 +148,38 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             eq(paymentSources.sourceType, 'account')
           ),
         )
-      return ok(res, { id })
+      // Transactions name their source rather than pointing at its id, so the
+      // rename has to be carried through or every existing row unlinks.
+      const moved = await cascadePaymentSourceRename(db, orgId, prev.name, name)
+      return ok(res, { id, renamedRows: moved })
     }
 
     if (req.method === 'DELETE') {
       const id = typeof req.query.id === 'string' ? req.query.id : ''
       if (!id) return fail(res, 400, 'Missing id')
+      const [existing] = await db
+        .select()
+        .from(paymentSources)
+        .where(
+          and(
+            eq(paymentSources.id, id),
+            orgId ? eq(paymentSources.orgId, orgId) : isNull(paymentSources.orgId),
+            eq(paymentSources.sourceType, 'account')
+          ),
+        )
+        .limit(1)
+      if (!existing) return fail(res, 404, 'Not found')
+      // Nothing points back at a payment source, so deleting one used to strand
+      // its history silently. Refuse instead, and say what is in the way —
+      // deactivating keeps the rows readable.
+      const refs = await countPaymentSourceReferences(db, orgId, existing.name)
+      if (refs > 0) {
+        return fail(
+          res,
+          409,
+          `“${existing.name}” is used by ${refs} ${refs === 1 ? 'entry' : 'entries'}. Mark it inactive instead, or move those entries first.`,
+        )
+      }
       await db
         .delete(paymentSources)
         .where(

@@ -28,6 +28,7 @@
       "types": "./dist/theme/index.d.ts"
     },
     "./styles": "./src/styles/globals.css",
+    "./styles/ui-kit": "./src/styles/ui-kit.css",
     "./styles/admin": "./src/styles/admin.css"
   },
   "scripts": {

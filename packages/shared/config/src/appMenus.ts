@@ -9,7 +9,12 @@ export const APP_LABELS: Record<AppSlug, string> = {
 
 // Fintracker menus — sections and their menu items
 export const FINTRACKER_MENUS: Record<string, { slug: string; label: string }[]> = {
-  Tracking: [{ slug: 'dashboard', label: 'Monthly Expenses' }],
+  Tracking: [
+    // Order matters: `getEnabledOrgMenu` assigns sortOrder by iteration order, and
+    // `/` redirects to the lowest-sorted menu item. Monthly Expenses stays first.
+    { slug: 'dashboard', label: 'Monthly Expenses' },
+    { slug: 'overview', label: 'Overview' },
+  ],
   Assets: [
     { slug: 'savings', label: 'Savings' },
     { slug: 'gold', label: 'Gold' },

@@ -22,7 +22,7 @@ import {
   lendingBookLabel,
   normalizeLendingSheetSlug,
 } from '../lib/lendingSheetSlug'
-import '../ui-kit/ui-kit.css'
+import '@fintracker-vault/ui/styles/ui-kit'
 import '../styles/globals.css'
 
 /** Empty array ⇒ drawer shows only Settings, UI Kit, Logout (no org menu items). */
@@ -43,6 +43,7 @@ function groupNavMenu(menu: CachedProfileMenuRow[] | undefined | null): NavDynam
 }
 
 const PAGE_TITLES: Record<ModuleId, string> = {
+  overview: 'Overview',
   dashboard: 'Dashboard',
   budget: 'Budget',
   transactions: 'Transactions',
@@ -85,6 +86,7 @@ export default function App({ Component, pageProps }: AppProps) {
   const moduleFromPath = useMemo<ModuleId | null>(() => {
     const p = router.pathname.toLowerCase()
     if (p === '/dashboard') return 'dashboard'
+    if (p === '/overview') return 'overview'
     if (p === '/monthly') {
       const t = router.query.tab
       const tab = typeof t === 'string' ? t : Array.isArray(t) ? t[0] : undefined
@@ -113,6 +115,7 @@ export default function App({ Component, pageProps }: AppProps) {
       const sheet =
         id === 'lending' && lendingSheetForUrl !== undefined ? lendingSheetForUrl : lendingSheet
       const pathByModule: Record<ModuleId, string> = {
+        overview: '/overview',
         dashboard: '/monthly?tab=dash',
         budget: '/monthly?tab=bud',
         transactions: '/monthly?tab=txns',

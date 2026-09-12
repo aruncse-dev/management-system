@@ -1,10 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { and, between, desc, eq, isNull, lte, gte, ne, or } from 'drizzle-orm'
+import { and, desc, eq, isNull, lte, gte, ne, or } from 'drizzle-orm'
 import type { FtSessionData } from '@fintracker-vault/auth'
 import type { Transaction } from '../types'
 import { MNS } from '../config'
 import { currentMonthYear, isoDate } from '../utils'
-import { budgetAppliesToLabelMonth, cycleDateRange, parseFintrackerPrefs } from '../expenseCycle'
+import { budgetAppliesToLabelMonth, parseFintrackerPrefs } from '../expenseCycle'
 import {
   getDb,
   budget,
@@ -15,19 +15,29 @@ import {
   goldItems,
   goldResources,
   jewelLoanRepayments,
+  emiLoanRepayments,
   jewelLoans,
   lending,
   mutualFunds,
   organizations,
+  paymentSources,
   savings,
   stocks,
   subscriptions,
+  subscriptionCharges,
   transactions,
   getIntegrationProviderBySlug,
   integrationHasCredentials,
   listOrgsForUserEmail,
   users,
+  getIncomeExpenseTrend,
+  getDerivedMonthlyIncome,
+  getNetWorth,
+  getCommittedMonthlyOutflow,
+  getLoanOutstanding,
+  type CycleRange,
 } from '@fintracker-vault/db'
+import { buildCycleRanges, closeAllWithin, planPayoff } from '@fintracker-vault/utils'
 import { normalizeLendingSheetSlug } from './lendingSheetSlug'
 import {
   loadSavingsAccountLookup,
@@ -259,6 +269,277 @@ function readOpeningBal(settings: unknown): Record<string, number> {
   return out
 }
 
+/**
+ * Optional date field: an empty string is "not set", not a date.
+ *
+ * The forms submit '' for a cleared date, and `typeof '' === 'string'` passed
+ * straight through to a `date` column, which Postgres rejects.
+ */
+function optionalDate(v: unknown): string | null {
+  return typeof v === 'string' && v.trim() ? v.trim() : null
+}
+
+/**
+ * Module kinds a transaction can point at. A transaction carries `ref_kind` +
+ * `ref_id` — a soft reference, not a foreign key — so one entry in the register
+ * can also create the module's own row.
+ */
+const LOAN_REF_KINDS = ['jewel_loan', 'cash_loan', 'emi_loan'] as const
+type LoanRefKind = (typeof LOAN_REF_KINDS)[number]
+
+/** Savings is referenced too, but its target is an account rather than a loan. */
+const SAVINGS_REF_KIND = 'savings'
+
+/**
+ * Lending has no per-person table — a lending row *is* one event — so the ref
+ * names the book and the person instead of an existing row: `<sheetSlug>|<name>`.
+ * That keeps typo-forked balances out (the name comes from a list, never typed)
+ * while staying a plain soft reference.
+ */
+const LENDING_REF_KIND = 'lending'
+const SUBSCRIPTION_REF_KIND = 'subscription'
+
+function parseLendingRef(refId: string): { sheetSlug: string; name: string } | null {
+  const idx = refId.indexOf('|')
+  if (idx <= 0) return null
+  const sheetSlug = refId.slice(0, idx).trim()
+  const name = refId.slice(idx + 1).trim()
+  return sheetSlug && name ? { sheetSlug, name } : null
+}
+
+function isLoanRefKind(k: unknown): k is LoanRefKind {
+  return typeof k === 'string' && (LOAN_REF_KINDS as readonly string[]).includes(k)
+}
+
+/** All three repayment tables share one shape, so one mirror routine covers them. */
+function loanRepaymentTable(kind: LoanRefKind) {
+  if (kind === 'jewel_loan') return jewelLoanRepayments
+  if (kind === 'cash_loan') return cashLoanRepayments
+  return emiLoanRepayments
+}
+
+function readRefFromBody(body: Record<string, unknown>): { refKind: string | null; refId: string | null } {
+  const kindRaw = typeof body.refKind === 'string' ? body.refKind.trim() : ''
+  const idRaw = typeof body.refId === 'string' ? body.refId.trim() : ''
+  if (!kindRaw || !idRaw) return { refKind: null, refId: null }
+  return { refKind: kindRaw, refId: idRaw }
+}
+
+/**
+ * Mirror a referenced transaction into the module's own ledger.
+ *
+ * Covers every referencable module: the three loan types, savings deposits,
+ * lending, and subscription charges. The mirrored row's id is derived from the
+ * transaction id (`txn:<id>`), so the pair is addressable from either side
+ * without a join table or a foreign key — re-running this for the same
+ * transaction updates rather than duplicates, and deleting the transaction can
+ * find its mirror exactly.
+ *
+ * `prevRefKind` is where the mirror used to live: a user can repoint a
+ * transaction from a jewel loan to an EMI loan, and the stale row has to go
+ * with it.
+ *
+ * Direction follows the transaction type — a loan repayment or a subscription
+ * charge is money leaving, lending money out is an Expense and getting it back
+ * is Income — so a link that cannot represent the current type simply does not
+ * mirror rather than writing something false.
+ */
+/**
+ * A transfer whose destination is a savings-only account is a savings deposit.
+ *
+ * The savings ledger and the register were entirely separate: 77 savings rows,
+ * ₹8.5L, and not one matching transaction. Rather than add a second dropdown
+ * for something the user already chose, the existing "Transfer To" picker is
+ * enough — if it names a savings account, the deposit is mirrored.
+ *
+ * Accounts marked `both` are deliberately excluded: those already appear in the
+ * monthly balances, so mirroring them would count the same money twice.
+ */
+async function resolveSavingsTransferTarget(
+  db: ReturnType<typeof getDb>,
+  scope: BudgetScope,
+  typeStr: string,
+  transferTo: string | null,
+): Promise<string | null> {
+  if (typeStr !== 'Transfer' || !transferTo) return null
+  const [src] = await db
+    .select()
+    .from(paymentSources)
+    .where(
+      and(
+        whereOrgFilter(paymentSources, scope),
+        eq(paymentSources.name, transferTo),
+        eq(paymentSources.sourceType, 'account'),
+        eq(paymentSources.usedFor, 'savings'),
+      ),
+    )
+    .limit(1)
+  return src?.id ?? null
+}
+
+/**
+ * The amount a mirrored row should carry.
+ *
+ * A transaction records what actually left the account, which is often rounded
+ * — a ₹30,316 EMI typed as ₹30,300. The module's ledger must not inherit that
+ * rounding: an EMI schedule is contractual, so a rounded copy would leave the
+ * loan permanently ₹16 short and the outstanding figure wrong.
+ *
+ * So wherever the target defines its own scheduled amount, the mirror uses it
+ * and the transaction keeps its own. The rule is the same for every reference
+ * kind; it simply has nothing to apply to where no schedule exists:
+ *
+ *   emi_loan      loan's `emi_amount`      — fixed, no part payment
+ *   subscription  subscription's `amount`  — the plan price
+ *   savings       account's `rd_instalment` when the account is an RD
+ *   jewel/cash    none — repayments genuinely vary, so the transaction wins
+ *   lending       none — every amount is its own
+ */
+async function scheduledAmountFor(
+  db: ReturnType<typeof getDb>,
+  scope: BudgetScope,
+  kind: string,
+  refId: string,
+): Promise<number | null> {
+  if (kind === 'emi_loan') {
+    const [loan] = await db
+      .select({ v: emiLoans.emiAmount })
+      .from(emiLoans)
+      .where(and(whereOrgFilter(emiLoans, scope), eq(emiLoans.id, refId)))
+      .limit(1)
+    const n = Number(loan?.v)
+    return Number.isFinite(n) && n > 0 ? n : null
+  }
+  if (kind === SUBSCRIPTION_REF_KIND) {
+    const [sub] = await db
+      .select({ v: subscriptions.amount })
+      .from(subscriptions)
+      .where(and(whereOrgFilter(subscriptions, scope), eq(subscriptions.id, refId)))
+      .limit(1)
+    const n = Number(sub?.v)
+    return Number.isFinite(n) && n > 0 ? n : null
+  }
+  if (kind === SAVINGS_REF_KIND) {
+    const [acct] = await db
+      .select({ v: paymentSources.rdInstalment })
+      .from(paymentSources)
+      .where(and(whereOrgFilter(paymentSources, scope), eq(paymentSources.id, refId)))
+      .limit(1)
+    const n = Number(acct?.v)
+    return Number.isFinite(n) && n > 0 ? n : null
+  }
+  return null
+}
+
+async function syncTransactionMirror(
+  db: ReturnType<typeof getDb>,
+  scope: BudgetScope,
+  orgId: string | null,
+  opts: {
+    txnId: string
+    prevRefKind: string | null
+    refKind: string | null
+    refId: string | null
+    isoDate: string
+    amount: number
+    note: string
+    type: string
+  },
+): Promise<void> {
+  const prev = isLoanRefKind(opts.prevRefKind) ? opts.prevRefKind : null
+  const next =
+    isLoanRefKind(opts.refKind) && opts.refId && opts.type === 'Expense' && opts.amount > 0
+      ? opts.refKind
+      : null
+  const prevSavings = opts.prevRefKind === SAVINGS_REF_KIND
+  const nextSavings = opts.refKind === SAVINGS_REF_KIND && opts.refId && opts.amount > 0
+  const prevLending = opts.prevRefKind === LENDING_REF_KIND
+  const nextLending =
+    opts.refKind === LENDING_REF_KIND &&
+    opts.refId &&
+    opts.amount > 0 &&
+    (opts.type === 'Expense' || opts.type === 'Income')
+  const prevSub = opts.prevRefKind === SUBSCRIPTION_REF_KIND
+  const nextSub =
+    opts.refKind === SUBSCRIPTION_REF_KIND && opts.refId && opts.amount > 0 && opts.type === 'Expense'
+  if (!prev && !next && !prevSavings && !nextSavings && !prevLending && !nextLending && !prevSub && !nextSub)
+    return
+
+  const pairedId = `txn:${opts.txnId}`
+
+  if (prevLending) {
+    await db.delete(lending).where(and(whereOrgFilter(lending, scope), eq(lending.id, pairedId)))
+  }
+  if (nextLending && opts.refId) {
+    const target = parseLendingRef(opts.refId)
+    if (target) {
+      await db.insert(lending).values({
+        id: pairedId,
+        orgId,
+        sheetSlug: target.sheetSlug,
+        date: opts.isoDate,
+        name: target.name,
+        amount: String(opts.amount),
+        // Money out is a loan given; money in is that loan coming back.
+        type: opts.type === 'Income' ? 'REPAY' : 'LEND',
+        description: opts.note || 'From transaction',
+      })
+    }
+  }
+
+  if (prevSub) {
+    await db
+      .delete(subscriptionCharges)
+      .where(and(whereOrgFilter(subscriptionCharges, scope), eq(subscriptionCharges.id, pairedId)))
+  }
+  if (nextSub && opts.refId) {
+    const scheduled = await scheduledAmountFor(db, scope, SUBSCRIPTION_REF_KIND, opts.refId)
+    await db.insert(subscriptionCharges).values({
+      id: pairedId,
+      orgId,
+      subscriptionId: opts.refId,
+      date: opts.isoDate,
+      amount: String(scheduled ?? opts.amount),
+      note: opts.note || 'From transaction',
+    })
+  }
+
+  if (prevSavings) {
+    await db.delete(savings).where(and(whereOrgFilter(savings, scope), eq(savings.id, pairedId)))
+  }
+  if (nextSavings && opts.refId) {
+    const scheduled = await scheduledAmountFor(db, scope, SAVINGS_REF_KIND, opts.refId)
+    await db.insert(savings).values({
+      id: pairedId,
+      orgId,
+      date: opts.isoDate,
+      account: opts.refId,
+      amount: String(scheduled ?? opts.amount),
+      description: opts.note || 'From transaction',
+      // The savings ledger sees an arrival, whatever the register calls the move.
+      type: 'INCOME',
+      toAccount: null,
+      category: null,
+    })
+  }
+  if (prev) {
+    const table = loanRepaymentTable(prev)
+    await db.delete(table).where(and(whereOrgFilter(table, scope), eq(table.id, pairedId)))
+  }
+
+  if (next && opts.refId) {
+    const scheduled = await scheduledAmountFor(db, scope, next, opts.refId)
+    await db.insert(loanRepaymentTable(next)).values({
+      id: pairedId,
+      orgId,
+      loanId: opts.refId,
+      date: opts.isoDate,
+      amount: String(scheduled ?? opts.amount),
+      note: opts.note || 'From transaction',
+    })
+  }
+}
+
 function readTransferToFromBody(body: Record<string, unknown>, typeStr: string): string | null {
   if (String(typeStr) !== 'Transfer') return null
   const raw =
@@ -283,6 +564,7 @@ function rowFromDb(r: typeof transactions.$inferSelect): Transaction {
     m: r.mode ?? '',
     notes: r.notes ?? '',
     ...(tt ? { transferTo: tt } : {}),
+    ...(r.refKind && r.refId ? { refKind: r.refKind, refId: r.refId } : {}),
   }
 }
 
@@ -399,6 +681,7 @@ async function computeMonths(db: ReturnType<typeof getDb>, scope: BudgetScope) {
   refs.sort((a, b) => monthYearKey(a.month, a.year).localeCompare(monthYearKey(b.month, b.year)))
   return refs
 }
+
 
 function ok<T>(res: NextApiResponse, data: T, traceId?: string) {
   return res.status(200).json({ ok: true as const, data, ...(traceId ? { traceId } : {}) })
@@ -657,6 +940,23 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
             })),
           )
         }
+        if (action === 'getHistory' && typ === 'emi') {
+          const rows = await db
+            .select()
+            .from(emiLoanRepayments)
+            .where(whereOrgFilter(emiLoanRepayments, budgetScope))
+            .orderBy(desc(emiLoanRepayments.date))
+          return ok(
+            res,
+            rows.map((r) => ({
+              id: r.id,
+              loan_id: r.loanId,
+              date: String(r.date),
+              amount: r.amount,
+              note: r.note ?? undefined,
+            })),
+          )
+        }
         if (action === 'getHistory' && typ === 'cash') {
           const rows = await db
             .select()
@@ -676,6 +976,27 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         }
       }
 
+
+      if (mod === 'subscriptions' && action === 'getCharges') {
+        // Newest first: the only question anyone asks of this list is "when was
+        // this last charged, and for how much".
+        const rows = await db
+          .select()
+          .from(subscriptionCharges)
+          .where(whereOrgFilter(subscriptionCharges, budgetScope))
+          .orderBy(desc(subscriptionCharges.date))
+          .catch(() => [])
+        return ok(
+          res,
+          rows.map((r) => ({
+            id: r.id,
+            subscription_id: r.subscriptionId,
+            date: String(r.date),
+            amount: r.amount,
+            note: r.note ?? undefined,
+          })),
+        )
+      }
 
       if (mod === 'subscriptions' && action === 'getEntries') {
         const rows = await db
@@ -758,6 +1079,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
 
       if (action === 'init') {
         const settingsBlob = await loadFintrackerSettingsJson(db, em, budgetScope)
+        const initPrefs = parseFintrackerPrefs(settingsBlob)
         const months = await computeMonths(db, budgetScope)
         const mq = typeof req.query.month === 'string' ? req.query.month : ''
         const yq = typeof req.query.year === 'string' ? req.query.year : ''
@@ -766,15 +1088,15 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
           try {
             budgetMonthKey = monthYearKey(mq, yq)
           } catch {
-            const c = currentMonthYear()
+            const c = currentMonthYear(initPrefs)
             budgetMonthKey = monthYearKey(c.month, c.year)
           }
         } else {
-          const c = currentMonthYear()
+          const c = currentMonthYear(initPrefs)
           budgetMonthKey = monthYearKey(c.month, c.year)
         }
         const bud = await loadMergedBudgetForMonth(db, budgetScope, budgetMonthKey)
-        const fintracker = parseFintrackerPrefs(settingsBlob)
+        const fintracker = initPrefs
         const currency = (settingsBlob && typeof settingsBlob === 'object' && (settingsBlob as Record<string, unknown>).currency) || 'INR'
         const roundOff = (settingsBlob && typeof settingsBlob === 'object' && (settingsBlob as Record<string, unknown>).roundOff !== false) !== false
         return ok(
@@ -795,21 +1117,163 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         const month = typeof req.query.month === 'string' ? req.query.month : ''
         const year = typeof req.query.year === 'string' ? req.query.year : ''
         if (!month || !year) return fail(res, 400, 'month and year are required', traceId)
-        const settingsBlob = await loadFintrackerSettingsJson(db, em, budgetScope)
-        const prefs = parseFintrackerPrefs(settingsBlob)
-        let start: string
-        let end: string
+        // Filter on the stored cycle label, not on a date window recomputed from
+        // the live anchor day.
+        //
+        // Budgets have always been keyed by this label while transactions were
+        // matched by date, so the two halves of the same screen could disagree
+        // about which rows a cycle holds — and changing the anchor re-sliced
+        // every past cycle, losing the states they were filed under. One key for
+        // both ends that: past cycles keep the rows they were filed with, and
+        // only future entries follow a new anchor.
+        let my: string
         try {
-          ;({ start, end } = cycleDateRange(month, year, prefs))
+          my = monthYearKey(month, year)
         } catch {
           return fail(res, 400, 'Invalid month or year', traceId)
         }
         const rows = await db
           .select()
           .from(transactions)
-          .where(and(whereOrgFilter(transactions, budgetScope), between(transactions.date, start, end)))
+          .where(and(whereOrgFilter(transactions, budgetScope), eq(transactions.monthYear, my)))
           .orderBy(desc(transactions.date))
         return ok(res, rows.map(rowFromDb), traceId)
+      }
+
+      if (action === 'summary') {
+        const settingsBlob = await loadFintrackerSettingsJson(db, em, budgetScope)
+        const prefs = parseFintrackerPrefs(settingsBlob)
+        const cur = currentMonthYear(prefs)
+        const month = typeof req.query.month === 'string' && req.query.month ? req.query.month : cur.month
+        const year = typeof req.query.year === 'string' && req.query.year ? req.query.year : cur.year
+        const monthsBack = Math.min(Math.max(parseInt(String(req.query.months ?? '6'), 10) || 6, 2), 24)
+
+        const ranges = buildCycleRanges(month, year, prefs, monthsBack)
+        if (!ranges.length) return fail(res, 400, 'Invalid month or year', traceId)
+        const currentRange = ranges[ranges.length - 1]
+
+        const blob = settingsBlob as Record<string, string | number | boolean | null | undefined>
+        const goldRate = num(blob.goldRate)
+        const usdToInr = num(blob.usdToInr) || 83
+
+        const orgId = scopeOrgId
+        const [trend, income, netWorth, committed, loans, budgetRows] = await Promise.all([
+          getIncomeExpenseTrend(db, orgId, ranges),
+          getDerivedMonthlyIncome(db, orgId, ranges.slice(0, -1)),
+          getNetWorth(db, orgId, { goldRatePerGram: goldRate }),
+          getCommittedMonthlyOutflow(db, orgId, { usdToInr }),
+          getLoanOutstanding(db, orgId),
+          loadMergedBudgetForMonth(db, budgetScope, currentRange.key),
+        ])
+
+        const thisCycle = trend[trend.length - 1] ?? { income: 0, expense: 0, savings: 0, net: 0, key: currentRange.key }
+        const spentThisCycle = thisCycle.expense + thisCycle.savings
+        const totalBudget = budgetRows.reduce((sum, b) => sum + b.amount, 0)
+
+        /** How far through the current cycle we are, 0..1 — the basis for pace warnings. */
+        const startMs = new Date(currentRange.start).getTime()
+        const endMs = new Date(currentRange.end).getTime()
+        const nowMs = Date.now()
+        const cycleProgress = endMs > startMs
+          ? Math.min(Math.max((nowMs - startMs) / (endMs - startMs), 0), 1)
+          : 1
+
+        const surplus = income.surplus
+        const payoff = planPayoff(
+          loans.map(l => ({ ...l })),
+          Math.max(surplus, 0),
+          'avalanche',
+        )
+        const twelveMonth = closeAllWithin(loans, 12, Math.max(surplus, 0))
+
+        const suggestions: { tone: 'green' | 'amber' | 'red' | 'navy'; title: string; detail: string }[] = []
+
+        if (totalBudget > 0 && cycleProgress > 0.15) {
+          const spendRatio = spentThisCycle / totalBudget
+          if (spendRatio > 1) {
+            suggestions.push({
+              tone: 'red',
+              title: 'Over budget',
+              detail: `Spent ${Math.round(spendRatio * 100)}% of budget with ${Math.round((1 - cycleProgress) * 100)}% of the cycle left.`,
+            })
+          } else if (spendRatio > cycleProgress + 0.15) {
+            suggestions.push({
+              tone: 'amber',
+              title: 'Spending ahead of pace',
+              detail: `${Math.round(spendRatio * 100)}% of budget used but only ${Math.round(cycleProgress * 100)}% through the cycle.`,
+            })
+          }
+        }
+
+        if (income.sampleMonths >= 2 && spentThisCycle > income.avgExpense * 1.2 && income.avgExpense > 0) {
+          const over = Math.round(((spentThisCycle / income.avgExpense) - 1) * 100)
+          suggestions.push({
+            tone: 'amber',
+            title: 'Above your usual spend',
+            detail: `This cycle is ${over}% above your ${income.sampleMonths}-month average.`,
+          })
+        }
+
+        const soon = committed.upcomingRenewals.filter(r => r.daysLeft <= 7)
+        if (soon.length) {
+          const sum = soon.reduce((a, r) => a + r.amount, 0)
+          suggestions.push({
+            tone: 'navy',
+            title: `${soon.length} renewal${soon.length > 1 ? 's' : ''} within 7 days`,
+            detail: `${soon.map(r => r.name).join(', ')} — ${Math.round(sum)} total.`,
+          })
+        }
+
+        if (loans.length && surplus > 0) {
+          const first = payoff[0]
+          if (first && Number.isFinite(first.closesInMonths)) {
+            suggestions.push({
+              tone: 'green',
+              title: `Target ${first.name} first`,
+              detail: `Highest rate at ${first.annualRate}%. At your current surplus it closes in about ${first.closesInMonths} months.`,
+            })
+          }
+          if (twelveMonth.feasible) {
+            suggestions.push({
+              tone: 'green',
+              title: 'All loans closable within 12 months',
+              detail: `Needs ${Math.round(twelveMonth.requiredMonthly)}/month; you have about ${Math.round(twelveMonth.availableMonthly)}.`,
+            })
+          } else if (twelveMonth.shortfall > 0) {
+            suggestions.push({
+              tone: 'navy',
+              title: 'A 12-month close needs more room',
+              detail: `Short by about ${Math.round(twelveMonth.shortfall)}/month. Ask the analysis MCP for a payoff plan.`,
+            })
+          }
+        }
+
+        if (surplus < 0 && income.sampleMonths >= 2) {
+          suggestions.push({
+            tone: 'red',
+            title: 'Spending exceeds income',
+            detail: `Averaging ${Math.round(Math.abs(surplus))}/month more than you earn over ${income.sampleMonths} months.`,
+          })
+        }
+
+        return ok(
+          res,
+          {
+            monthKey: currentRange.key,
+            cycle: { start: currentRange.start, end: currentRange.end, progress: cycleProgress },
+            trend,
+            thisCycle,
+            income,
+            netWorth,
+            committed,
+            budget: { total: totalBudget, spent: spentThisCycle },
+            loans,
+            payoff,
+            twelveMonth,
+            suggestions,
+          },
+          traceId,
+        )
       }
 
       return fail(res, 400, `Unknown GET action: ${mod ? `${mod}/` : ''}${action}`, traceId)
@@ -1108,7 +1572,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
             principal: String(num(body.principal as string | number)),
             rate: String(num(body.rate as string | number)),
             startDate: String(body.start_date ?? body.startDate ?? new Date().toISOString().slice(0, 10)),
-            endDate: typeof body.end_date === 'string' ? body.end_date : typeof body.endDate === 'string' ? body.endDate : null,
+            endDate: optionalDate(body.end_date) ?? optionalDate(body.endDate),
             paidAmount: String(num(body.paid_amount as string | number)),
             status: typeof body.status === 'string' ? body.status : 'Ongoing',
           })
@@ -1125,7 +1589,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
               principal: body.principal !== undefined ? String(num(body.principal as string | number)) : undefined,
               rate: body.rate !== undefined ? String(num(body.rate as string | number)) : undefined,
               startDate: typeof body.start_date === 'string' ? body.start_date : undefined,
-              endDate: typeof body.end_date === 'string' ? body.end_date : undefined,
+              endDate: body.end_date !== undefined ? optionalDate(body.end_date) : undefined,
               paidAmount: body.paid_amount !== undefined ? String(num(body.paid_amount as string | number)) : undefined,
               status: typeof body.status === 'string' ? body.status : undefined,
             })
@@ -1247,6 +1711,60 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
           await db.delete(jewelLoanRepayments).where(and(whereOrgFilter(jewelLoanRepayments, budgetScope), eq(jewelLoanRepayments.id, id)))
           return ok(res, true, traceId)
         }
+        if (action === 'addHistory' && typ === 'emi') {
+          const id = crypto.randomUUID()
+          await db.insert(emiLoanRepayments).values({
+            orgId: scopeOrgId,
+            id,
+            loanId: String(body.loan_id ?? ''),
+            date: String(body.date ?? new Date().toISOString().slice(0, 10)),
+            amount: String(num(body.amount as string | number)),
+            note: typeof body.note === 'string' ? body.note : null,
+          })
+          return ok(res, id, traceId)
+        }
+        if (action === 'updateHistory' && typ === 'emi') {
+          const id = typeof body.id === 'string' ? body.id : ''
+          if (!id) return fail(res, 400, 'Missing id', traceId)
+          await db
+            .update(emiLoanRepayments)
+            .set({
+              loanId: typeof body.loan_id === 'string' ? body.loan_id : undefined,
+              date: typeof body.date === 'string' ? body.date : undefined,
+              amount: body.amount !== undefined ? String(num(body.amount as string | number)) : undefined,
+              note: typeof body.note === 'string' ? body.note : undefined,
+            })
+            .where(and(whereOrgFilter(emiLoanRepayments, budgetScope), eq(emiLoanRepayments.id, id)))
+          return ok(res, true, traceId)
+        }
+        if (action === 'deleteHistory' && typ === 'emi') {
+          const id = typeof body.id === 'string' ? body.id : ''
+          if (!id) return fail(res, 400, 'Missing id', traceId)
+          // Read the loan before deleting; afterwards there is nothing to point at.
+          const [gone] = await db
+            .select()
+            .from(emiLoanRepayments)
+            .where(and(whereOrgFilter(emiLoanRepayments, budgetScope), eq(emiLoanRepayments.id, id)))
+            .limit(1)
+          await db.delete(emiLoanRepayments).where(and(whereOrgFilter(emiLoanRepayments, budgetScope), eq(emiLoanRepayments.id, id)))
+          return ok(res, true, traceId)
+        }
+        // Cash repayments had no update path, so the UI deleted and re-inserted,
+        // churning the row id on every edit.
+        if (action === 'updateHistory' && typ === 'cash') {
+          const id = typeof body.id === 'string' ? body.id : ''
+          if (!id) return fail(res, 400, 'Missing id', traceId)
+          await db
+            .update(cashLoanRepayments)
+            .set({
+              loanId: typeof body.loan_id === 'string' ? body.loan_id : undefined,
+              date: typeof body.date === 'string' ? body.date : undefined,
+              amount: body.amount !== undefined ? String(num(body.amount as string | number)) : undefined,
+              note: typeof body.note === 'string' ? body.note : undefined,
+            })
+            .where(and(whereOrgFilter(cashLoanRepayments, budgetScope), eq(cashLoanRepayments.id, id)))
+          return ok(res, true, traceId)
+        }
         if (action === 'addHistory' && typ === 'cash') {
           const id = crypto.randomUUID()
           await db.insert(cashLoanRepayments).values({
@@ -1279,7 +1797,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
             currency: typeof body.currency === 'string' ? body.currency : 'INR',
             billingCycle: String(body.billing_cycle ?? 'monthly'),
             startDate: String(body.start_date ?? new Date().toISOString().slice(0, 10)),
-            endDate: typeof body.end_date === 'string' ? body.end_date : null,
+            endDate: optionalDate(body.end_date),
             autopay: Boolean(body.autopay),
             status: typeof body.status === 'string' ? body.status : 'active',
             paymentMethod: typeof body.payment_method === 'string' ? body.payment_method : null,
@@ -1300,7 +1818,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
               currency: typeof body.currency === 'string' ? body.currency : undefined,
               billingCycle: typeof body.billing_cycle === 'string' ? body.billing_cycle : undefined,
               startDate: typeof body.start_date === 'string' ? body.start_date : undefined,
-              endDate: typeof body.end_date === 'string' ? body.end_date : undefined,
+              endDate: body.end_date !== undefined ? optionalDate(body.end_date) : undefined,
               autopay: body.autopay !== undefined ? Boolean(body.autopay) : undefined,
               status: typeof body.status === 'string' ? body.status : undefined,
               paymentMethod: typeof body.payment_method === 'string' ? body.payment_method : undefined,
@@ -1455,18 +1973,39 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         if (!iso) return fail(res, 400, 'Invalid date', traceId)
         const typeStr = String(body.t ?? 'Expense')
         const xferTo = readTransferToFromBody(body, typeStr)
+        const posted = readRefFromBody(body)
+        // A savings deposit is derived from the transfer destination, not typed:
+        // the user already picked the account in "Transfer To".
+        const savingsTarget = await resolveSavingsTransferTarget(db, budgetScope, typeStr, xferTo)
+        const refKind = savingsTarget ? 'savings' : posted.refKind
+        const refId = savingsTarget ?? posted.refId
+        const amt = num(body.a as string | number)
+        const desc = String(body.desc ?? '')
         await db.insert(transactions).values({
           id,
           orgId: scopeOrgId,
           date: iso,
-          description: String(body.desc ?? ''),
-          amount: String(num(body.a as string | number)),
+          description: desc,
+          amount: String(amt),
           category: String(body.c ?? ''),
           type: typeStr,
           mode: String(body.m ?? ''),
           transferTo: xferTo,
           notes: typeof body.notes === 'string' ? body.notes : '',
           monthYear: my,
+          refKind,
+          refId,
+        })
+        // The transaction is already saved; a failed mirror must not lose it.
+        await syncTransactionMirror(db, budgetScope, scopeOrgId, {
+          txnId: id,
+          prevRefKind: null,
+          refKind,
+          refId,
+          isoDate: iso,
+          amount: amt,
+          note: desc,
+          type: typeStr,
         })
         return ok(res, id, traceId)
       }
@@ -1482,27 +2021,69 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         if (!iso) return fail(res, 400, 'Invalid date', traceId)
         const typeStr = String(body.t ?? 'Expense')
         const xferTo = readTransferToFromBody(body, typeStr)
+        const posted = readRefFromBody(body)
+        const savingsTarget = await resolveSavingsTransferTarget(db, budgetScope, typeStr, xferTo)
+        const refKind = savingsTarget ? 'savings' : posted.refKind
+        const refId = savingsTarget ?? posted.refId
+        const amt = num(body.a as string | number)
+        const desc = String(body.desc ?? '')
+        // Read the old ref before overwriting it: repointing a transaction has to
+        // remove the mirror from wherever it used to be.
+        const [before] = await db
+          .select({ refKind: transactions.refKind })
+          .from(transactions)
+          .where(and(whereOrgFilter(transactions, budgetScope), eq(transactions.id, id)))
+          .limit(1)
         await db
           .update(transactions)
           .set({
             date: iso,
-            description: String(body.desc ?? ''),
-            amount: String(num(body.a as string | number)),
+            description: desc,
+            amount: String(amt),
             category: String(body.c ?? ''),
             type: typeStr,
             mode: String(body.m ?? ''),
             transferTo: xferTo,
             notes: typeof body.notes === 'string' ? body.notes : '',
             monthYear: my,
+            refKind,
+            refId,
           })
           .where(and(whereOrgFilter(transactions, budgetScope), eq(transactions.id, id)))
+        await syncTransactionMirror(db, budgetScope, scopeOrgId, {
+          txnId: id,
+          prevRefKind: before?.refKind ?? null,
+          refKind,
+          refId,
+          isoDate: iso,
+          amount: amt,
+          note: desc,
+          type: typeStr,
+        })
         return ok(res, true, traceId)
       }
 
       if (action === 'deleteRow') {
         const id = typeof body.id === 'string' ? body.id : ''
         if (!id) return fail(res, 400, 'Missing id', traceId)
+        const [before] = await db
+          .select({ refKind: transactions.refKind })
+          .from(transactions)
+          .where(and(whereOrgFilter(transactions, budgetScope), eq(transactions.id, id)))
+          .limit(1)
         await db.delete(transactions).where(and(whereOrgFilter(transactions, budgetScope), eq(transactions.id, id)))
+        // Deleting the register entry retires its mirror too — the mirror only
+        // ever existed because this transaction created it.
+        await syncTransactionMirror(db, budgetScope, scopeOrgId, {
+          txnId: id,
+          prevRefKind: before?.refKind ?? null,
+          refKind: null,
+          refId: null,
+          isoDate: '',
+          amount: 0,
+          note: '',
+          type: '',
+        })
         return ok(res, true, traceId)
       }
 

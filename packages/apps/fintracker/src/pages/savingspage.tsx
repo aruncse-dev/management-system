@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Plus, LayoutDashboard, List, BarChart3, Wallet, Search, TrendingUp, AlertTriangle, ArrowUpRight, ArrowDownRight, Repeat2 } from 'lucide-react'
+import { Plus, LayoutDashboard, List, BarChart3, Wallet, Search, TrendingUp, AlertTriangle, ArrowUpRight, ArrowDownRight, Repeat2, ArrowLeftRight } from 'lucide-react'
 import { api, RawSavingsRow, type AccountRow } from '../api'
 import { CATEGORIES, THEME_COLORS } from '../config'
 import { mergeCategoriesWithBudgetNames } from '../utils'
@@ -10,7 +10,12 @@ import { BalanceRow, CategoryCombobox, CatIcon, FormField, KpiCard, KpiGrid, Loa
 type SavingsType = 'Income' | 'Expense' | 'Transfer'
 type SavingsTab = 'dashboard' | 'transactions'
 
-type SavingsAccount = { id: string; name: string }
+type SavingsAccount = {
+  id: string
+  name: string
+  /** Recurring-deposit terms; present only when this account is an RD. */
+  rd?: { instalment: number; day: number | null; months: number | null; startDate: string | null; maturityAmount: number | null }
+}
 
 export interface SavingsPageConfig {
   sheetName: string
@@ -47,6 +52,13 @@ function todayISO() {
   return new Date().toISOString().split('T')[0]
 }
 
+/** A maturity two years out only needs the month, not the day. */
+function monthYearLabel(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso
+  return d.toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
+}
+
 function toDateInput(dateStr: string): string {
   const clean = String(dateStr ?? '').trim().split('T')[0]
   const ymd = clean.match(/^(\d{4})-(\d{2})-(\d{2})$/)
@@ -75,7 +87,20 @@ function accountsFromRows(rows: AccountRow[]): SavingsAccount[] {
   return rows
     .filter(a => a.isActive !== false && (a.usedFor === 'savings' || a.usedFor === 'both'))
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name))
-    .map(a => ({ id: a.id, name: a.name }))
+    .map(a => ({
+      id: a.id,
+      name: a.name,
+      rd:
+        a.rdInstalment != null && a.rdInstalment > 0
+          ? {
+              instalment: a.rdInstalment,
+              day: a.rdDay ?? null,
+              months: a.rdMonths ?? null,
+              startDate: a.rdStartDate ?? null,
+              maturityAmount: a.rdMaturityAmount ?? null,
+            }
+          : undefined,
+    }))
 }
 
 function accountsFromLegacyNames(names: readonly string[]): SavingsAccount[] {
@@ -245,8 +270,19 @@ export default function SavingsPage({
 
   const balances = useMemo(() => computeBalances(entries, accounts), [accounts, entries])
   const totalBalance = useMemo(() => accounts.reduce((s, a) => s + (balances[a.id] || 0), 0), [accounts, balances])
-  const totalIncome = useMemo(() => entries.filter(e => e.type === 'Income' || e.type === 'Transfer').reduce((s, e) => s + e.amount, 0), [entries])
-  const totalExpenses = useMemo(() => entries.filter(e => e.type === 'Expense' || e.type === 'Transfer').reduce((s, e) => s + e.amount, 0), [entries])
+  /**
+   * Transfers move money between two savings accounts, so at ledger level they
+   * are neither income nor expense — they net to zero. Counting them in both
+   * totals (as this did) inflated each side by the full transfer volume while
+   * Total Balance, computed from the same rows, stayed correct: the three
+   * figures could not be reconciled against each other.
+   *
+   * Per-account income/expense in `accountSummary` is a different question and
+   * still counts a transfer once on each side, which is right there.
+   */
+  const totalIncome = useMemo(() => entries.filter(e => e.type === 'Income').reduce((s, e) => s + e.amount, 0), [entries])
+  const totalExpenses = useMemo(() => entries.filter(e => e.type === 'Expense').reduce((s, e) => s + e.amount, 0), [entries])
+  const totalTransfers = useMemo(() => entries.filter(e => e.type === 'Transfer').reduce((s, e) => s + e.amount, 0), [entries])
 
   const accountSummary = useMemo(
     () => accounts.map(({ id, name }) => {
@@ -258,6 +294,37 @@ export default function SavingsPage({
       return { id, name, balance: balances[id] || 0, income, expense }
     }),
     [accounts, balances, entries],
+  )
+
+  /**
+   * How far each recurring deposit has got.
+   *
+   * Progress is counted from money actually deposited rather than from a
+   * schedule, so a missed month shows as a missed month instead of the app
+   * assuming the instalment happened. Contributions arrive as Income (a direct
+   * deposit) or as a Transfer into the account.
+   */
+  const rdProgress = useMemo(
+    () =>
+      accounts
+        .filter((a): a is SavingsAccount & { rd: NonNullable<SavingsAccount['rd']> } => Boolean(a.rd))
+        .map(a => {
+          const paid = entries
+            .filter(e => (e.type === 'Income' && e.account === a.id) || (e.type === 'Transfer' && e.toAccount === a.id))
+            .reduce((sum, e) => sum + e.amount, 0)
+          const done = Math.floor(paid / a.rd.instalment)
+          const total = a.rd.months ?? 0
+          const maturity =
+            a.rd.startDate && a.rd.months
+              ? (() => {
+                  const d = new Date(a.rd.startDate)
+                  d.setMonth(d.getMonth() + (a.rd.months as number))
+                  return d.toISOString().split('T')[0]
+                })()
+              : null
+          return { id: a.id, name: a.name, paid, done, total, maturity, instalment: a.rd.instalment }
+        }),
+    [accounts, entries],
   )
 
   const filteredEntries = useMemo(() => {
@@ -410,9 +477,34 @@ export default function SavingsPage({
                   <KpiCard full label="Total Balance" value={signedFmt(totalBalance)} tone="navy" icon={<Wallet size={14} />} />
                   <KpiCard label="Total Income" value={fmt(totalIncome)} tone="green" icon={<TrendingUp size={14} />} />
                   <KpiCard label="Total Expenses" value={fmt(totalExpenses)} tone="red" icon={<AlertTriangle size={14} />} />
+                  {totalTransfers > 0 && (
+                    <KpiCard full label="Moved between accounts" value={fmt(totalTransfers)} tone="amber" icon={<ArrowLeftRight size={14} />} />
+                  )}
                 </KpiGrid>
               </div>
             </SectionBlock>
+
+            {rdProgress.length > 0 && (
+              <>
+                <Spacer size={6} />
+                <SectionBlock title="Recurring deposits" icon={<Repeat2 size={14} />}>
+                  <div className="ui-stack">
+                    {rdProgress.map(rd => (
+                      <BalanceRow
+                        key={rd.id}
+                        title={rd.name}
+                        subtitle={
+                          rd.total
+                            ? `${rd.done} of ${rd.total} paid${rd.maturity ? ` · matures ${monthYearLabel(rd.maturity)}` : ''}`
+                            : `${rd.done} paid · ${fmt(rd.instalment)} a month`
+                        }
+                        value={fmt(rd.paid)}
+                      />
+                    ))}
+                  </div>
+                </SectionBlock>
+              </>
+            )}
 
             <Spacer size={6} />
             <SectionBlock title="Accounts" icon={<Wallet size={14} />}>

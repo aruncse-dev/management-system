@@ -9,7 +9,7 @@ import {
 import { LayoutGrid, Plug, UserCog, Users } from 'lucide-react'
 import { getClientAuthEnv } from '../clientAuthEnv'
 import '@fintracker-vault/ui/styles'
-import '../ui-kit/ui-kit.css'
+import '@fintracker-vault/ui/styles/ui-kit'
 import '@fintracker-vault/ui/styles/admin'
 
 export default function App({ Component, pageProps }: AppProps) {

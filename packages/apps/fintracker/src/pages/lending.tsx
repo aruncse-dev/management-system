@@ -4,7 +4,7 @@ import { Search, LayoutDashboard, Handshake, ArrowDownLeft, BarChart3, Shield, U
 import { api, RawLendingRow } from '../api'
 import { LENDING_SHEET_SLUG_VIJAYA, normalizeLendingSheetSlug } from '../lib/lendingSheetSlug'
 import { useFormatMoney, useMoneyFormatting } from '../hooks/useFormatMoney'
-import { FormField, HoldingCard, KpiCard, KpiGrid, LoadingState, SearchField, SectionBlock, SectionChip } from '../ui'
+import { CategoryCombobox, FormField, HoldingCard, KpiCard, KpiGrid, LoadingState, SearchField, SectionBlock, SectionChip } from '../ui'
 
 type LendType = 'LEND' | 'RECEIVED'
 type LendTab = 'dashboard' | 'lended' | 'received'
@@ -483,7 +483,15 @@ export default function Lending({ sheetSlug: sheetSlugProp, onTabChange }: Lendi
                       ))}
                     </select>
                   ) : (
-                    <input className="form-inp" type="text" placeholder="Who?" value={form.name} onChange={e => set('name', e.target.value)} />
+                    // A free-text box forked a balance on every typo — the same
+                    // person became two, each with half the money. This suggests
+                    // everyone already in the book while still accepting a name
+                    // that genuinely is new.
+                    <CategoryCombobox
+                      value={form.name}
+                      options={people.map(p => p.name)}
+                      onChange={v => set('name', v)}
+                    />
                   )}
                 </FormField>
                 <FormField label={`Amount (${currency})`}>

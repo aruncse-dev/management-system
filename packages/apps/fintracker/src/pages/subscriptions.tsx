@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Check, Plus, Repeat2, Search, BarChart3, Bell, DollarSign, IndianRupee, Landmark } from 'lucide-react'
-import { api, type RawSubscriptionRow, type RawVaultAppRow, type GoldSettings } from '../api'
+import { api, type RawSubscriptionChargeRow, type RawSubscriptionRow, type RawVaultAppRow, type GoldSettings } from '../api'
 import { CatIcon, FormField, LoadingState, ModalActions, ModalShell, SearchField, SectionBlock, SectionChip, Spacer, KpiCard, KpiGrid } from '../ui'
 import { mergeCategoriesWithBudgetNames } from '../utils'
 import { useMoneyFormatting } from '../hooks/useFormatMoney'
@@ -191,17 +191,35 @@ export default function SubscriptionsPage() {
   const [saving, setSaving] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [toast, setToast] = useState('')
+  const [charges, setCharges] = useState<RawSubscriptionChargeRow[]>([])
+
+  /**
+   * Most recent charge per subscription.
+   *
+   * Until now a renewal left no trace here at all — it was typed into the
+   * register and this page kept showing the same start date forever, so there
+   * was no way to tell a live subscription from one that quietly stopped
+   * charging. Rows arrive newest-first, so the first hit per id wins.
+   */
+  const lastChargeBySub = useMemo(() => {
+    const map = new Map<string, RawSubscriptionChargeRow>()
+    for (const c of charges) if (!map.has(c.subscription_id)) map.set(c.subscription_id, c)
+    return map
+  }, [charges])
 
   const load = async () => {
     setLoading(true)
     setError('')
     try {
-      const [subscriptionRows, appRows, settings] = await Promise.all([
+      const [subscriptionRows, appRows, settings, chargeRows] = await Promise.all([
         api.getSubscriptionEntries(),
         api.getApps().catch(() => [] as RawVaultAppRow[]),
         api.getSettings().catch(() => ({} as GoldSettings)),
+        // Charges are new; an older database simply has none.
+        api.getSubscriptionCharges().catch(() => [] as RawSubscriptionChargeRow[]),
       ])
       setRows(subscriptionRows.map(normalizeRow))
+      setCharges(chargeRows)
       setApps(appRows)
       setUsdToInr(settings.usdToInr || 85)
     } catch (e) {
@@ -537,6 +555,11 @@ export default function SubscriptionsPage() {
                         </div>
                         {linkedApp ? (
                           <div className="ui-kit-holding-card-subtitle">{linkedApp.app_name}</div>
+                        ) : null}
+                        {lastChargeBySub.get(row.id) ? (
+                          <div className="ui-kit-holding-card-subtitle">
+                            Last charged {lastChargeBySub.get(row.id)?.date}
+                          </div>
                         ) : null}
                       </div>
                       <div className="ui-kit-holding-card-head-right">

@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/router'
 import { Banknote, BarChart3, CreditCard, Landmark, Clock, Layers3, ArrowDownLeft, ArrowUpRight, Plus } from 'lucide-react'
-import { api, RawCashLoanHistoryRow, RawCashLoanRow, RawEmiRow, RawJewelLoanHistoryRow, RawJewelLoanRow } from '../api'
+import { api, RawCashLoanHistoryRow, RawCashLoanRow, RawEmiLoanHistoryRow, RawEmiRow, RawJewelLoanHistoryRow, RawJewelLoanRow } from '../api'
 import { useFormatMoney } from '../hooks/useFormatMoney'
 import { FilterChips, FormField, HoldingCard, KpiCard, KpiGrid, LoadingState, ModalActions, ModalShell, SectionBlock, SectionChip } from '../ui'
 
@@ -44,6 +45,12 @@ type CombinedHistoryRow = {
   tone: 'navy' | 'green' | 'red' | 'amber'
   sourceLoanId?: string
   sourcePaymentId?: string
+  /**
+   * Mirrored from a transaction rather than entered here. Editing it on this tab
+   * would silently disagree with the register entry that created it, so the edit
+   * has to happen on the transaction.
+   */
+  fromTransaction?: boolean
 }
 
 interface EmiFormState {
@@ -184,7 +191,9 @@ function emptyJewelForm(): JewelFormState {
     principal: '',
     rate: '',
     start_date: new Date().toISOString().split('T')[0],
-    end_date: new Date().toISOString().split('T')[0],
+    // A loan taken today does not end today. Left blank rather than defaulted
+    // to a date that is always wrong and easy to save by accident.
+    end_date: '',
     status: 'Ongoing',
   }
 }
@@ -207,16 +216,39 @@ function emptyPaymentForm(): PaymentFormState {
   }
 }
 
-function buildEmiLoans(rows: RawEmiRow[]): CombinedLoan[] {
+/**
+ * EMI progress from repayment rows, falling back to the legacy `paid_emis`
+ * counter when a loan has no rows yet.
+ *
+ * `paid_emis` was the only record of progress: a number you hand-incremented,
+ * with no date and no amount, so nothing could be reconciled against the
+ * matching transaction. It now means the *opening* count — instalments paid
+ * before repayments were recorded individually — and is added to the rows
+ * rather than replaced by them, so no history had to be invented and the
+ * opening figure stays editable by hand.
+ */
+function buildEmiLoans(rows: RawEmiRow[], history: RawEmiLoanHistoryRow[] = []): CombinedLoan[] {
+  const paidByLoanId = new Map<string, number>()
+  const countByLoanId = new Map<string, number>()
+  history.forEach(h => {
+    paidByLoanId.set(h.loan_id, (paidByLoanId.get(h.loan_id) || 0) + parseNumber(h.amount))
+    countByLoanId.set(h.loan_id, (countByLoanId.get(h.loan_id) || 0) + 1)
+  })
   return rows.map(raw => {
     const principal = parseNumber(raw.principal)
     const rate = parseNumber(raw.rate)
     const tenure_months = parseNumber(raw.tenure_months)
     const emi_amount = parseNumber(raw.emi_amount)
-    const paidEmis = parseNumber(raw.paid_emis)
     const totalPayable = Math.round(emi_amount * tenure_months)
     const interest = Math.max(totalPayable - principal, 0)
-    const paid = Math.round(emi_amount * paidEmis)
+    // `paid_emis` is the opening count (instalments paid before repayments were
+    // recorded row by row); the rows are everything paid since. The count is the
+    // two added, never re-derived from the amount — deriving it would round a
+    // real payment away and, worse, let a recompute overwrite the opening count.
+    const openingEmis = parseNumber(raw.paid_emis)
+    const sinceRows = countByLoanId.get(raw.id) ?? 0
+    const paid = Math.round(emi_amount * openingEmis + (paidByLoanId.get(raw.id) ?? 0))
+    const paidEmis = openingEmis + sinceRows
     return {
       kind: 'EMI' as const,
       id: raw.id,
@@ -309,11 +341,36 @@ function buildCashLoansWithHistory(rows: RawCashLoanRow[], history: RawCashLoanH
   })
 }
 
+/**
+ * Repayments the server mirrored from a linked transaction carry a derived id,
+ * which is what makes the pair addressable without a foreign key.
+ */
+function isFromTransaction(id: string): boolean {
+  return String(id).startsWith('txn:')
+}
+
 function buildHistory(
   jewelHistory: RawJewelLoanHistoryRow[],
   cashHistory: RawCashLoanHistoryRow[],
+  emiHistory: RawEmiLoanHistoryRow[] = [],
 ): CombinedHistoryRow[] {
   const rows: CombinedHistoryRow[] = []
+
+  emiHistory.forEach(raw => {
+    rows.push({
+      id: `emi-pay-${raw.id}`,
+      source: 'EMI',
+      kind: 'Payment',
+      title: 'Repayment',
+      subtitle: isFromTransaction(raw.id) ? 'From transaction' : String(raw.note ?? '').trim() || 'EMI Loan',
+      date: String(raw.date ?? ''),
+      amount: parseNumber(raw.amount),
+      tone: 'green',
+      sourceLoanId: raw.loan_id,
+      sourcePaymentId: raw.id,
+      fromTransaction: isFromTransaction(raw.id),
+    })
+  })
 
   jewelHistory.forEach(raw => {
     rows.push({
@@ -321,12 +378,13 @@ function buildHistory(
       source: 'Jewel',
       kind: 'Payment',
       title: `Repayment`,
-      subtitle: String(raw.note ?? '').trim() || 'Jewel Loan',
+      subtitle: isFromTransaction(raw.id) ? 'From transaction' : String(raw.note ?? '').trim() || 'Jewel Loan',
       date: String(raw.date ?? ''),
       amount: parseNumber(raw.amount),
       tone: 'green',
       sourceLoanId: raw.loan_id,
       sourcePaymentId: raw.id,
+      fromTransaction: isFromTransaction(raw.id),
     })
   })
 
@@ -336,12 +394,13 @@ function buildHistory(
       source: 'Cash',
       kind: 'Payment',
       title: 'Repayment',
-      subtitle: String(raw.note ?? '').trim() || 'Cash Loan',
+      subtitle: isFromTransaction(raw.id) ? 'From transaction' : String(raw.note ?? '').trim() || 'Cash Loan',
       date: String(raw.date ?? ''),
       amount: parseNumber(raw.amount),
       tone: 'green',
       sourceLoanId: raw.loan_id,
       sourcePaymentId: raw.id,
+      fromTransaction: isFromTransaction(raw.id),
     })
   })
 
@@ -396,10 +455,34 @@ function LoanStatusField({
   )
 }
 
+const LOANS_TABS: readonly LoansTab[] = ['dashboard', 'emi', 'jewel', 'cash', 'history']
+
+function isLoansTab(v: unknown): v is LoansTab {
+  return typeof v === 'string' && (LOANS_TABS as readonly string[]).includes(v)
+}
+
 export default function Loans() {
+  const router = useRouter()
   const fmt = useFormatMoney()
   const [activeTab, setActiveTab] = useState<LoansTab>('dashboard')
   const [loading, setLoading] = useState(true)
+  /**
+   * Tabs are URL-backed, like Monthly's. They used to be local state only, so
+   * `/loans?tab=emi` silently landed on the dashboard — which made a deep link
+   * from a linked transaction useless — and a reload lost the open tab.
+   */
+  const goTab = useCallback(
+    (id: LoansTab) => {
+      setActiveTab(id)
+      void router.replace({ pathname: '/loans', query: { tab: id } }, undefined, { shallow: true })
+    },
+    [router],
+  )
+  useEffect(() => {
+    if (!router.isReady) return
+    const raw = Array.isArray(router.query.tab) ? router.query.tab[0] : router.query.tab
+    if (isLoansTab(raw)) setActiveTab(raw)
+  }, [router.isReady, router.query.tab])
   const [error, setError] = useState('')
   const [emiModalOpen, setEmiModalOpen] = useState(false)
   const [emiEditItem, setEmiEditItem] = useState<CombinedLoan | null>(null)
@@ -421,7 +504,7 @@ export default function Loans() {
   const [repaySaving, setRepaySaving] = useState(false)
   const [repayDeleteConfirm, setRepayDeleteConfirm] = useState(false)
   const [repayForm, setRepayForm] = useState<PaymentFormState>(emptyPaymentForm())
-  const [repayType, setRepayType] = useState<'jewel' | 'cash'>('jewel')
+  const [repayType, setRepayType] = useState<'emi' | 'jewel' | 'cash'>('jewel')
   const [repayEditItem, setRepayEditItem] = useState<CombinedHistoryRow | null>(null)
   const [emiListFilter, setEmiListFilter] = useState<LoanListFilter>('all')
   const [jewelListFilter, setJewelListFilter] = useState<LoanListFilter>('all')
@@ -445,6 +528,7 @@ export default function Loans() {
   const [emiLoans, setEmiLoans] = useState<CombinedLoan[]>([])
   const [jewelLoans, setJewelLoans] = useState<CombinedLoan[]>([])
   const [cashLoans, setCashLoans] = useState<CombinedLoan[]>([])
+  const [emiHistory, setEmiHistory] = useState<RawEmiLoanHistoryRow[]>([])
   const [jewelHistory, setJewelHistory] = useState<RawJewelLoanHistoryRow[]>([])
   const [cashHistory, setCashHistory] = useState<RawCashLoanHistoryRow[]>([])
 
@@ -452,15 +536,19 @@ export default function Loans() {
     setLoading(true)
     setError('')
     try {
-      const [emiRows, jewelRows, jewelPayments, cashRows, cashPayments] = await Promise.all([
+      const [emiRows, emiPayments, jewelRows, jewelPayments, cashRows, cashPayments] = await Promise.all([
         api.getEmi(),
+        // An empty list is a valid state, not an error: a loan with no recorded
+        // repayments still shows its opening count.
+        api.getEmiHistory().catch(() => [] as RawEmiLoanHistoryRow[]),
         api.getJewelLoans(),
         api.getJewelLoanHistory(),
         api.getCashLoans(),
         api.getCashLoanHistory(),
       ])
 
-      setEmiLoans(buildEmiLoans(emiRows))
+      setEmiLoans(buildEmiLoans(emiRows, emiPayments))
+      setEmiHistory(emiPayments)
       setJewelLoans(buildJewelLoansWithHistory(jewelRows, jewelPayments))
       setCashLoans(buildCashLoansWithHistory(cashRows, cashPayments))
       setJewelHistory(jewelPayments)
@@ -477,7 +565,10 @@ export default function Loans() {
   }, [])
 
   const allLoans = useMemo(() => [...emiLoans, ...jewelLoans, ...cashLoans], [emiLoans, jewelLoans, cashLoans])
-  const history = useMemo(() => buildHistory(jewelHistory, cashHistory), [jewelHistory, cashHistory])
+  const history = useMemo(
+    () => buildHistory(jewelHistory, cashHistory, emiHistory),
+    [jewelHistory, cashHistory, emiHistory],
+  )
 
   const emiRows = useMemo(
     () => emiLoans.filter((loan): loan is Extract<CombinedLoan, { kind: 'EMI' }> => loan.kind === 'EMI'),
@@ -532,9 +623,7 @@ export default function Loans() {
   const emiMetrics = useMemo(() => {
     const totalLoanCount = activeEmiRows.length
     const totalOutstanding = Math.round(activeEmiRows.reduce((s, l) => {
-      const totalPayable = l.emi_amount * l.tenure_months
-      const totalPaid = l.emi_amount * l.paid_emis
-      return s + (totalPayable - totalPaid)
+      return s + l.outstanding
     }, 0))
     const totalLoanValue = Math.round(activeEmiRows.reduce((s, l) => s + (l.emi_amount * l.tenure_months), 0))
     const totalMonthlyEmis = Math.round(activeEmiRows.reduce((s, l) => s + l.emi_amount, 0))
@@ -580,6 +669,8 @@ export default function Loans() {
       start_date: formatDateForInput(loan.startDate),
       tenure_months: String(loan.tenure_months),
       emi_amount: String(loan.emi_amount),
+      // The whole count, which is the number anyone actually thinks in. What is
+      // stored is this minus the recorded repayments; see `saveEmi`.
       paid_emis: String(loan.paid_emis),
       status: normalizeLoanStatus(loan.status),
     })
@@ -628,12 +719,18 @@ export default function Loans() {
       rate: parseFloat(jewelForm.rate) || 0,
       start_date: jewelForm.start_date,
       end_date: jewelForm.end_date,
-      paid_amount: 0,
       status: jewelForm.status,
     }
     try {
-      if (jewelEditItem) await api.updateJewelLoan({ ...payload, id: jewelEditItem.id })
-      else await api.addJewelLoan(payload)
+      if (jewelEditItem) {
+        // Never send paid_amount on an edit. It used to be hard-coded to 0 here,
+        // so editing a loan's name silently wiped the repayment total: Ramya JL
+        // read ₹17,100 against ₹1,67,200 of actual repayment rows. What has been
+        // paid is the sum of jewel_loan_repayments, not a field on the loan.
+        await api.updateJewelLoan({ ...payload, id: jewelEditItem.id })
+      } else {
+        await api.addJewelLoan({ ...payload, paid_amount: 0 })
+      }
       api.invalidateCache({ action: 'getEntries', params: { module: 'loans', type: 'jewel' } })
       closeJewelModal()
       await loadData()
@@ -723,12 +820,29 @@ export default function Loans() {
     }
   }
 
+  /** Active loans of the selected type — the only ones you can pay towards. */
+  function loansForRepayType(t: 'emi' | 'jewel' | 'cash') {
+    return t === 'emi' ? activeEmiRows : t === 'jewel' ? activeJewelRows : activeCashRows
+  }
+
+  /**
+   * An EMI is a fixed instalment — there is no part payment — so the amount is
+   * known once the loan is chosen. Jewel and cash repayments vary, so they stay
+   * blank and must be typed.
+   */
+  function defaultRepayAmount(t: 'emi' | 'jewel' | 'cash', loanId: string): string {
+    if (t !== 'emi') return ''
+    const loan = activeEmiRows.find(l => l.id === loanId)
+    return loan ? String(loan.emi_amount) : ''
+  }
+
   function openRepayment() {
-    const repayLoans = repayType === 'jewel' ? activeJewelRows : activeCashRows
+    const repayLoans = loansForRepayType(repayType)
+    const loanId = repayLoans[0]?.id ?? ''
     setRepayForm({
-      loan_id: repayLoans[0]?.id ?? '',
+      loan_id: loanId,
       date: new Date().toISOString().split('T')[0],
-      amount: '',
+      amount: defaultRepayAmount(repayType, loanId),
       note: '',
     })
     setRepayEditItem(null)
@@ -737,8 +851,12 @@ export default function Loans() {
   }
 
   function openHistoryEdit(row: CombinedHistoryRow) {
+    if (row.fromTransaction) {
+      setError('This repayment came from a transaction — edit it in Monthly → Transactions.')
+      return
+    }
     if (row.kind === 'Payment' && row.sourcePaymentId) {
-      setRepayType(row.source === 'Cash' ? 'cash' : 'jewel')
+      setRepayType(row.source === 'Cash' ? 'cash' : row.source === 'EMI' ? 'emi' : 'jewel')
       setRepayEditItem(row)
       setRepayForm({
         loan_id: row.sourceLoanId ?? '',
@@ -768,15 +886,20 @@ export default function Loans() {
       amount: parseFloat(repayForm.amount),
       note: repayForm.note.trim(),
     }
+    // One shape for all three loan types. Cash edits used to delete and re-add,
+    // which churned the row id and briefly lost the payment if the add failed.
+    const writers = {
+      emi: { add: api.addEmiHistory, update: api.updateEmiHistory },
+      jewel: { add: api.addJewelLoanHistory, update: api.updateJewelLoanHistory },
+      cash: { add: api.addCashLoanHistory, update: api.updateCashLoanHistory },
+    } as const
     try {
+      const w = writers[repayType]
       if (repayEditItem?.sourcePaymentId) {
-        if (repayType === 'jewel') await api.updateJewelLoanHistory({ ...payload, id: repayEditItem.sourcePaymentId })
-        else {
-          await api.deleteCashLoanHistory(repayEditItem.sourcePaymentId)
-          await api.addCashLoanHistory(payload)
-        }
-      } else if (repayType === 'jewel') await api.addJewelLoanHistory(payload)
-      else await api.addCashLoanHistory(payload)
+        await w.update({ ...payload, id: repayEditItem.sourcePaymentId })
+      } else {
+        await w.add(payload)
+      }
       api.invalidateCache({ action: 'getHistory', params: { module: 'loans', type: repayType } })
       setRepayEditItem(null)
       closeRepayment()
@@ -794,8 +917,12 @@ export default function Loans() {
     }
     setRepaySaving(true)
     try {
-      if (repayType === 'cash') await api.deleteCashLoanHistory(repayEditItem.sourcePaymentId)
-      else await api.deleteJewelLoanHistory(repayEditItem.sourcePaymentId)
+      const remove = {
+        emi: api.deleteEmiHistory,
+        jewel: api.deleteJewelLoanHistory,
+        cash: api.deleteCashLoanHistory,
+      } as const
+      await remove[repayType](repayEditItem.sourcePaymentId)
       api.invalidateCache({ action: 'getHistory', params: { module: 'loans', type: repayType } })
       closeRepayment()
       await loadData()
@@ -823,6 +950,12 @@ export default function Loans() {
     }
   }, [emiForm.principal, emiForm.rate, emiForm.tenure_months, emiManuallyEdited])
 
+  /** Repayments recorded as rows for a loan; the rest of its count is stored. */
+  function recordedEmiCount(loanId: string | undefined): number {
+    if (!loanId) return 0
+    return emiHistory.filter(h => h.loan_id === loanId).length
+  }
+
   async function saveEmi() {
     if (!emiForm.name.trim() || !emiForm.bank.trim() || !emiForm.principal || !emiForm.tenure_months || !emiForm.emi_amount) return
     setEmiSaving(true)
@@ -834,7 +967,14 @@ export default function Loans() {
       start_date: emiForm.start_date,
       tenure_months: parseFloat(emiForm.tenure_months),
       emi_amount: parseFloat(emiForm.emi_amount),
-      paid_emis: parseFloat(emiForm.paid_emis) || 0,
+      // `emi_loans.paid_emis` stores only the instalments that have no repayment
+      // row of their own — the ones paid before this app recorded them, which
+      // for the Personal Loan is 44 of 48 and exists nowhere else.
+      //
+      // The form asks for the whole count instead, because that is the number
+      // you know; subtracting what is already recorded keeps the two from being
+      // counted twice. There is no second figure to maintain.
+      paid_emis: Math.max(0, (parseFloat(emiForm.paid_emis) || 0) - recordedEmiCount(emiEditItem?.id)),
       status: emiForm.status,
     }
     try {
@@ -871,23 +1011,23 @@ export default function Loans() {
     return (
       <div className="ui-kit-page-shell loans-page">
         <nav className="bottom-nav">
-          <button type="button" className={`bottom-nav-item${activeTab === 'dashboard' ? ' active' : ''}`} onClick={() => setActiveTab('dashboard')}>
+          <button type="button" className={`bottom-nav-item${activeTab === 'dashboard' ? ' active' : ''}`} onClick={() => goTab('dashboard')}>
             <span className="bottom-nav-icon"><BarChart3 size={19} /></span>
             <span>Dashboard</span>
           </button>
-          <button type="button" className={`bottom-nav-item${activeTab === 'emi' ? ' active' : ''}`} onClick={() => setActiveTab('emi')}>
+          <button type="button" className={`bottom-nav-item${activeTab === 'emi' ? ' active' : ''}`} onClick={() => goTab('emi')}>
             <span className="bottom-nav-icon"><CreditCard size={19} /></span>
             <span>EMI Loans</span>
           </button>
-          <button type="button" className={`bottom-nav-item${activeTab === 'jewel' ? ' active' : ''}`} onClick={() => setActiveTab('jewel')}>
+          <button type="button" className={`bottom-nav-item${activeTab === 'jewel' ? ' active' : ''}`} onClick={() => goTab('jewel')}>
             <span className="bottom-nav-icon"><Landmark size={19} /></span>
             <span>Jewel Loans</span>
           </button>
-          <button type="button" className={`bottom-nav-item${activeTab === 'cash' ? ' active' : ''}`} onClick={() => setActiveTab('cash')}>
+          <button type="button" className={`bottom-nav-item${activeTab === 'cash' ? ' active' : ''}`} onClick={() => goTab('cash')}>
             <span className="bottom-nav-icon"><Banknote size={19} /></span>
             <span>Cash Loans</span>
           </button>
-          <button type="button" className={`bottom-nav-item${activeTab === 'history' ? ' active' : ''}`} onClick={() => setActiveTab('history')}>
+          <button type="button" className={`bottom-nav-item${activeTab === 'history' ? ' active' : ''}`} onClick={() => goTab('history')}>
             <span className="bottom-nav-icon"><Clock size={19} /></span>
             <span>Repayments</span>
           </button>
@@ -900,23 +1040,23 @@ export default function Loans() {
   return (
     <div className="ui-kit-page-shell loans-page">
       <nav className="bottom-nav">
-        <button type="button" className={`bottom-nav-item${activeTab === 'dashboard' ? ' active' : ''}`} onClick={() => setActiveTab('dashboard')}>
+        <button type="button" className={`bottom-nav-item${activeTab === 'dashboard' ? ' active' : ''}`} onClick={() => goTab('dashboard')}>
           <span className="bottom-nav-icon"><BarChart3 size={19} /></span>
           <span>Dashboard</span>
         </button>
-        <button type="button" className={`bottom-nav-item${activeTab === 'emi' ? ' active' : ''}`} onClick={() => setActiveTab('emi')}>
+        <button type="button" className={`bottom-nav-item${activeTab === 'emi' ? ' active' : ''}`} onClick={() => goTab('emi')}>
           <span className="bottom-nav-icon"><CreditCard size={19} /></span>
           <span>EMI Loans</span>
         </button>
-        <button type="button" className={`bottom-nav-item${activeTab === 'jewel' ? ' active' : ''}`} onClick={() => setActiveTab('jewel')}>
+        <button type="button" className={`bottom-nav-item${activeTab === 'jewel' ? ' active' : ''}`} onClick={() => goTab('jewel')}>
           <span className="bottom-nav-icon"><Landmark size={19} /></span>
           <span>Jewel Loans</span>
         </button>
-        <button type="button" className={`bottom-nav-item${activeTab === 'cash' ? ' active' : ''}`} onClick={() => setActiveTab('cash')}>
+        <button type="button" className={`bottom-nav-item${activeTab === 'cash' ? ' active' : ''}`} onClick={() => goTab('cash')}>
           <span className="bottom-nav-icon"><Banknote size={19} /></span>
           <span>Cash Loans</span>
         </button>
-        <button type="button" className={`bottom-nav-item${activeTab === 'history' ? ' active' : ''}`} onClick={() => setActiveTab('history')}>
+        <button type="button" className={`bottom-nav-item${activeTab === 'history' ? ' active' : ''}`} onClick={() => goTab('history')}>
           <span className="bottom-nav-icon"><Clock size={19} /></span>
           <span>Repayments</span>
         </button>
@@ -952,7 +1092,7 @@ export default function Loans() {
                 <KpiCard label="Loan Value" value={fmt(emiMetrics.totalLoanValue)} tone="navy" icon={<CreditCard size={14} />} />
                 <KpiCard label="Principal" value={fmt(activeEmiRows.reduce((sum, loan) => sum + loan.principal, 0))} tone="navy" icon={<CreditCard size={14} />} />
                 <KpiCard label="Interest" value={fmt(activeEmiRows.reduce((sum, loan) => sum + loan.interest, 0))} tone="amber" icon={<Landmark size={14} />} />
-                <KpiCard label="Paid" value={fmt(activeEmiRows.reduce((sum, loan) => sum + (loan.emi_amount * loan.paid_emis), 0))} tone="muted" icon={<Banknote size={14} />} />
+                <KpiCard label="Paid" value={fmt(activeEmiRows.reduce((sum, loan) => sum + loan.paid, 0))} tone="muted" icon={<Banknote size={14} />} />
                 <KpiCard label="Outstanding" value={<span className="kpi-card-v--red">{fmt(emiMetrics.totalOutstanding)}</span>} tone="red" icon={<ArrowUpRight size={14} />} />
                 <KpiCard label="Monthly EMIs" value={fmt(emiMetrics.totalMonthlyEmis)} tone="green" icon={<ArrowDownLeft size={14} />} />
               </KpiGrid>
@@ -975,9 +1115,8 @@ export default function Loans() {
               ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 8 }}>
                   {filteredEmiRows.map(loan => {
-                    const totalPayable = loan.emi_amount * loan.tenure_months
-                    const outstanding = totalPayable - loan.emi_amount * loan.paid_emis
-                    const paid = loan.emi_amount * loan.paid_emis
+                    const outstanding = loan.outstanding
+                    const paid = loan.paid
                     const remainingMonths = Math.max(loan.tenure_months - loan.paid_emis, 0)
                     return (
                       <div
@@ -1438,12 +1577,18 @@ export default function Loans() {
                   className="form-inp"
                   value={repayType}
                   onChange={e => {
-                    const nextType = e.target.value === 'cash' ? 'cash' : 'jewel'
+                    const v = e.target.value
+                    const nextType = v === 'cash' ? 'cash' : v === 'emi' ? 'emi' : 'jewel'
                     setRepayType(nextType)
-                    const nextLoans = nextType === 'jewel' ? activeJewelRows : activeCashRows
-                    setRepayForm(f => ({ ...f, loan_id: nextLoans[0]?.id ?? '' }))
+                    const nextLoanId = loansForRepayType(nextType)[0]?.id ?? ''
+                    setRepayForm(f => ({
+                      ...f,
+                      loan_id: nextLoanId,
+                      amount: defaultRepayAmount(nextType, nextLoanId),
+                    }))
                   }}
                 >
+                  <option value="emi">EMI Loan</option>
                   <option value="jewel">Jewel Loan</option>
                   <option value="cash">Cash Loan</option>
                 </select>
@@ -1453,13 +1598,24 @@ export default function Loans() {
               <select
                 className="form-inp"
                 value={repayForm.loan_id}
-                onChange={e => setRepayForm(f => ({ ...f, loan_id: e.target.value }))}
+                onChange={e => {
+                  const loanId = e.target.value
+                  setRepayForm(f => ({
+                    ...f,
+                    loan_id: loanId,
+                    // Prefill only while adding, and never overwrite something typed.
+                    amount:
+                      repayType === 'emi' && !repayEditItem
+                        ? defaultRepayAmount('emi', loanId)
+                        : f.amount,
+                  }))
+                }}
                 disabled={Boolean(repayEditItem)}
               >
                 <option value="">Select loan</option>
                 {(repayEditItem
-                  ? (repayType === 'jewel' ? jewelRows : cashRows)
-                  : (repayType === 'jewel' ? activeJewelRows : activeCashRows)
+                  ? (repayType === 'emi' ? emiRows : repayType === 'jewel' ? jewelRows : cashRows)
+                  : loansForRepayType(repayType)
                 ).map(loan => (
                   <option key={loan.id} value={loan.id}>{loan.name}</option>
                 ))}

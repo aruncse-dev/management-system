@@ -187,6 +187,15 @@ export interface RawJewelLoanHistoryRow {
   note?: string;
 }
 
+/** Repayment rows share one shape across all three loan types. */
+export interface RawEmiLoanHistoryRow {
+  id: string;
+  loan_id: string;
+  date: string;
+  amount: number | string;
+  note?: string;
+}
+
 export interface RawCashLoanRow {
   id: string;
   person_name: string;
@@ -257,6 +266,12 @@ export interface AccountRow {
   usedFor: string;
   isActive: boolean;
   sortOrder: number;
+  /** Recurring deposit: set only when this account is an RD. */
+  rdInstalment?: number | null;
+  rdDay?: number | null;
+  rdMonths?: number | null;
+  rdStartDate?: string | null;
+  rdMaturityAmount?: number | null;
 }
 
 export type CreditSourceCategory = 'credit_card' | 'informal';
@@ -271,6 +286,15 @@ export interface CreditSourceRow {
   sortOrder: number;
 }
 
+/** One charge actually taken for a subscription. */
+export interface RawSubscriptionChargeRow {
+  id: string;
+  subscription_id: string;
+  date: string;
+  amount: number | string;
+  note?: string;
+}
+
 export type AccountPayload = {
   id?: string;
   name: string;
@@ -278,6 +302,12 @@ export type AccountPayload = {
   usedFor: AccountUsedFor;
   isActive?: boolean;
   sortOrder?: number;
+  /** Blank or omitted `rdInstalment` clears every other RD field server-side. */
+  rdInstalment?: number | string | null;
+  rdDay?: number | string | null;
+  rdMonths?: number | string | null;
+  rdStartDate?: string | null;
+  rdMaturityAmount?: number | string | null;
 };
 
 export type CreditSourcePayload = {
@@ -386,10 +416,47 @@ export interface RawHolding {
   synced: string;
 }
 
+export type TrendPoint = { key: string; income: number; expense: number; savings: number; net: number }
+export type SuggestionTone = 'green' | 'amber' | 'red' | 'navy'
+export type Suggestion = { tone: SuggestionTone; title: string; detail: string }
+export type LoanOutstanding = {
+  id: string
+  name: string
+  kind: 'emi' | 'jewel' | 'cash'
+  outstanding: number
+  annualRate: number
+  monthlyPayment: number
+}
+export type DashboardSummary = {
+  monthKey: string
+  cycle: { start: string; end: string; progress: number }
+  trend: TrendPoint[]
+  thisCycle: TrendPoint
+  income: { avgIncome: number; avgExpense: number; surplus: number; sampleMonths: number }
+  netWorth: {
+    assets: { savings: number; gold: number; stocks: number; mutualFunds: number; total: number }
+    liabilities: { emi: number; jewel: number; cash: number; total: number }
+    net: number
+  }
+  committed: {
+    emi: number
+    subscriptions: number
+    total: number
+    upcomingRenewals: { name: string; amount: number; dueDate: string; daysLeft: number }[]
+  }
+  budget: { total: number; spent: number }
+  loans: LoanOutstanding[]
+  payoff: (LoanOutstanding & { order: number; closesInMonths: number })[]
+  twelveMonth: { requiredMonthly: number; availableMonthly: number; shortfall: number; feasible: boolean }
+  suggestions: Suggestion[]
+}
+
 export const api = {
   invalidateCache,
   clearPersistentCache,
   init:          (month: string, year: string)   => get<InitData>('init', { month, year }),
+  getDashboardSummary: (month: string, year: string, months = 6) =>
+    get<DashboardSummary>('summary', { month, year, months: String(months) }),
   getData:       (month: string, year: string)  => get<Transaction[]>('getData', { month, year }),
   addRow:        (p: Record<string, unknown>)   => post<string>({ action: 'addRow', ...p }),
   updateRow:     (p: Record<string, unknown>)   => post<boolean>({ action: 'updateRow', ...p }),
@@ -445,6 +512,10 @@ export const api = {
   addEmi:    (p: Record<string, unknown>) => post<string>({ module: 'loans', action: 'addEntry', ...p }),
   updateEmi: (p: Record<string, unknown>) => post<boolean>({ module: 'loans', action: 'updateEntry', ...p }),
   deleteEmi: (id: string)                 => post<boolean>({ module: 'loans', action: 'deleteEntry', id }),
+  getEmiHistory:    ()                           => get<RawEmiLoanHistoryRow[]>('getHistory', { module: 'loans', type: 'emi' }),
+  addEmiHistory:    (p: Record<string, unknown>) => post<string>({ module: 'loans', action: 'addHistory', type: 'emi', ...p }),
+  updateEmiHistory: (p: Record<string, unknown>) => post<boolean>({ module: 'loans', action: 'updateHistory', type: 'emi', ...p }),
+  deleteEmiHistory: (id: string)                 => post<boolean>({ module: 'loans', action: 'deleteHistory', type: 'emi', id }),
   getJewelLoans:         ()                            => get<RawJewelLoanRow[]>('getEntries', { module: 'loans', type: 'jewel' }),
   addJewelLoan:          (p: Record<string, unknown>) => post<string>({ module: 'loans', action: 'addEntry', type: 'jewel', ...p }),
   updateJewelLoan:       (p: Record<string, unknown>) => post<boolean>({ module: 'loans', action: 'updateEntry', type: 'jewel', ...p }),
@@ -459,6 +530,7 @@ export const api = {
   deleteCashLoan:        (id: string)                 => post<boolean>({ module: 'loans', action: 'deleteEntry', type: 'cash', id }),
   getCashLoanHistory:    ()                           => get<RawCashLoanHistoryRow[]>('getHistory', { module: 'loans', type: 'cash' }),
   addCashLoanHistory:    (p: Record<string, unknown>) => post<string>({ module: 'loans', action: 'addHistory', type: 'cash', ...p }),
+  updateCashLoanHistory: (p: Record<string, unknown>) => post<boolean>({ module: 'loans', action: 'updateHistory', type: 'cash', ...p }),
   deleteCashLoanHistory: (id: string)                 => post<boolean>({ module: 'loans', action: 'deleteHistory', type: 'cash', id }),
   getProfile: async () => {
     const res = await fetch(`${new URL('/api/profile', window.location.origin)}`, {
@@ -578,6 +650,7 @@ export const api = {
     return result
   },
   getSubscriptionEntries: ()                   => get<RawSubscriptionRow[]>('getEntries', { module: 'subscriptions' }),
+  getSubscriptionCharges: ()                   => get<RawSubscriptionChargeRow[]>('getCharges', { module: 'subscriptions' }),
   addSubscriptionEntry: async (p: Record<string, unknown>) => {
     const result = await post<string>({ module: 'subscriptions', action: 'addEntry', ...p })
     invalidateCache({ action: 'getEntries', params: { module: 'subscriptions' } })

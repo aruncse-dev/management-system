@@ -176,6 +176,13 @@ export default function Settings() {
   const [acctName, setAcctName] = useState('');
   const [acctDesc, setAcctDesc] = useState('');
   const [acctUsed, setAcctUsed] = useState<AccountUsedFor>('both');
+  // Recurring-deposit terms. Held as strings so an empty box means "not an RD"
+  // rather than 0, which would read as a real instalment.
+  const [acctRdInstalment, setAcctRdInstalment] = useState('');
+  const [acctRdDay, setAcctRdDay] = useState('');
+  const [acctRdMonths, setAcctRdMonths] = useState('');
+  const [acctRdStart, setAcctRdStart] = useState('');
+  const [acctRdMaturity, setAcctRdMaturity] = useState('');
   const [acctBusy, setAcctBusy] = useState(false);
 
   const [crId, setCrId] = useState<string | undefined>();
@@ -453,6 +460,11 @@ export default function Settings() {
     setAcctName('');
     setAcctDesc('');
     setAcctUsed('both');
+    setAcctRdInstalment('');
+    setAcctRdDay('');
+    setAcctRdMonths('');
+    setAcctRdStart('');
+    setAcctRdMaturity('');
   }
 
   function resetCrForm() {
@@ -478,6 +490,11 @@ export default function Settings() {
     setAcctName(a.name);
     setAcctDesc(a.description ?? '');
     setAcctUsed((a.usedFor as AccountUsedFor) || 'both');
+    setAcctRdInstalment(a.rdInstalment != null ? String(a.rdInstalment) : '');
+    setAcctRdDay(a.rdDay != null ? String(a.rdDay) : '');
+    setAcctRdMonths(a.rdMonths != null ? String(a.rdMonths) : '');
+    setAcctRdStart(a.rdStartDate ?? '');
+    setAcctRdMaturity(a.rdMaturityAmount != null ? String(a.rdMaturityAmount) : '');
     setMoneyModalOpen(true);
   }
 
@@ -493,6 +510,11 @@ export default function Settings() {
           name: acctName.trim(),
           description: acctDesc.trim() || null,
           usedFor: acctUsed,
+          rdInstalment: acctRdInstalment.trim() || null,
+          rdDay: acctRdDay.trim() || null,
+          rdMonths: acctRdMonths.trim() || null,
+          rdStartDate: acctRdStart.trim() || null,
+          rdMaturityAmount: acctRdMaturity.trim() || null,
         });
         resetAcctForm();
         closeMoneyModal();
@@ -1288,6 +1310,62 @@ export default function Settings() {
                           <option value="both">Both</option>
                         </select>
                       </FormField>
+                      {acctUsed === 'savings' && (
+                        <>
+                          <FormField label="RD instalment (leave blank if not an RD)">
+                            <input
+                              className="form-inp"
+                              type="number"
+                              min="0"
+                              step="1"
+                              placeholder="e.g. 5000"
+                              value={acctRdInstalment}
+                              onChange={(e) => setAcctRdInstalment(e.target.value)}
+                            />
+                          </FormField>
+                          {acctRdInstalment.trim() !== '' && (
+                            <>
+                              <FormField label="Due day of month">
+                                <input
+                                  className="form-inp"
+                                  type="number"
+                                  min="1"
+                                  max="31"
+                                  value={acctRdDay}
+                                  onChange={(e) => setAcctRdDay(e.target.value)}
+                                />
+                              </FormField>
+                              <FormField label="Instalments in full term">
+                                <input
+                                  className="form-inp"
+                                  type="number"
+                                  min="1"
+                                  value={acctRdMonths}
+                                  onChange={(e) => setAcctRdMonths(e.target.value)}
+                                />
+                              </FormField>
+                              <FormField label="First instalment date">
+                                <input
+                                  className="form-inp"
+                                  type="date"
+                                  value={acctRdStart}
+                                  onChange={(e) => setAcctRdStart(e.target.value)}
+                                />
+                              </FormField>
+                              <FormField label="Maturity amount (optional)">
+                                <input
+                                  className="form-inp"
+                                  type="number"
+                                  min="0"
+                                  step="1"
+                                  value={acctRdMaturity}
+                                  onChange={(e) => setAcctRdMaturity(e.target.value)}
+                                />
+                              </FormField>
+                            </>
+                          )}
+                        </>
+                      )}
                     </>
                   ) : (
                     <>

@@ -15,6 +15,14 @@ export const transactions = pgTable('transactions', {
   transferTo: text('transfer_to'),
   notes: text('notes'),
   monthYear: text('month_year').notNull(),
+  /**
+   * Soft reference to the module row this transaction represents
+   * (`jewel_loan` | `cash_loan` | `emi_loan` | `savings` | `lending` | `subscription`).
+   * Deliberately not a foreign key — see the 2026-09-08-fintracker-spine migration.
+   */
+  refKind: text('ref_kind'),
+  /** Target row id for `refKind`. Unconstrained: may dangle if the target is deleted. */
+  refId: text('ref_id'),
 })
 
 /** `month_year`: `__global__` = default template; `YYYY-MM` overrides global for that month only (same category).
@@ -41,4 +49,14 @@ export const paymentSources = pgTable('payment_sources', {
   usedFor: text('used_for').notNull().default('both'),
   isActive: boolean('is_active').default(true),
   sortOrder: integer('sort_order').default(0),
+  /**
+   * Recurring-deposit terms. An account is an RD exactly when `rdInstalment` is
+   * set; all of these are null for an ordinary account or credit source.
+   * Maturity date is derived (`rdStartDate` + `rdMonths`), never stored.
+   */
+  rdInstalment: numeric('rd_instalment', { precision: 12, scale: 2 }),
+  rdDay: integer('rd_day'),
+  rdMonths: integer('rd_months'),
+  rdStartDate: date('rd_start_date'),
+  rdMaturityAmount: numeric('rd_maturity_amount', { precision: 12, scale: 2 }),
 })

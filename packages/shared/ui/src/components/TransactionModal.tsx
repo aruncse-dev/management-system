@@ -3,8 +3,31 @@ import { X } from 'lucide-react'
 import type { Transaction, TransactionForm } from '@fintracker-vault/types'
 import { CATEGORIES, INCOME_CATS } from '@fintracker-vault/config'
 import { CategoryCombobox } from './CategoryCombobox'
+import { RefCombobox } from './RefCombobox'
 
 const ALL_CATS = [...CATEGORIES, ...INCOME_CATS]
+
+/**
+ * A module row a transaction can be linked to.
+ *
+ * Selecting one stores `ref_kind`/`ref_id` on the transaction and the server
+ * mirrors the entry into that module's own ledger, so a loan repayment is typed
+ * once instead of twice. The reference is soft: if the target is later deleted
+ * the transaction survives with a link that no longer resolves.
+ */
+export type TransactionRefOption = {
+  /** Stored in `ref_kind` — e.g. `emi_loan`, `jewel_loan`, `cash_loan`. */
+  kind: string
+  /** Stored in `ref_id` — the target row's own id. */
+  id: string
+  label: string
+  /** Heading this option is grouped under in the dropdown. */
+  group: string
+  /** Transaction types this target accepts. Omitted means any type. */
+  types?: readonly string[]
+  /** Pre-fills the amount when it is still empty (fixed EMIs). */
+  amount?: number
+}
 
 export type TransactionModalApi = {
   addRow: (p: Record<string, unknown>) => Promise<unknown>
@@ -18,6 +41,12 @@ interface Props {
   year: string
   onClose: () => void
   onSaved: () => void
+  /**
+   * Duplicate this row. Rendered beside Delete when editing — the transaction
+   * list used to carry a per-row duplicate button 8px from the row's own tap
+   * target, which fired on mis-taps.
+   */
+  onDuplicate?: (row: Transaction) => void
   showStatus: (msg: string) => void
   api: TransactionModalApi
   /** Accounts + credit sources allowed as transaction `mode` (payment source). */
@@ -32,6 +61,8 @@ interface Props {
   amountLabel?: string
   /** Amount input placeholder (e.g. formatted zero in display currency). */
   amountPlaceholder?: string
+  /** Module rows this transaction can be linked to. Empty hides the field entirely. */
+  refOptions?: readonly TransactionRefOption[]
 }
 
 function todayISO() {
@@ -84,6 +115,7 @@ function buildTransactionFormFromRow(
       m: defaultMode,
       notes: '',
       toAcct: defaultTo,
+      ref: '',
     }
   }
   let notes = row.notes || ''
@@ -111,6 +143,7 @@ function buildTransactionFormFromRow(
     m: row.m || defaultMode,
     notes,
     toAcct,
+    ref: row.refKind && row.refId ? `${row.refKind}:${row.refId}` : '',
   }
 }
 
@@ -120,6 +153,7 @@ export default function TransactionModal({
   year,
   onClose,
   onSaved,
+  onDuplicate,
   showStatus,
   api,
   paymentModeOptions,
@@ -128,6 +162,7 @@ export default function TransactionModal({
   incomeCategoryOptions,
   amountLabel = 'Amount',
   amountPlaceholder = '0',
+  refOptions = [],
 }: Props) {
   const isEdit = Boolean(row?.id)
   const defaultMode = paymentModeOptions[0] ?? 'Cash'
@@ -140,6 +175,13 @@ export default function TransactionModal({
   const [delConfirm, setDelConfirm] = useState(false)
 
   const isTransfer = form.t === 'Transfer'
+  // A target only offers itself for the types it can represent — a loan
+  // repayment is an expense, so the field disappears on Income entirely.
+  const linkable = refOptions.filter(o => !o.types || o.types.includes(form.t))
+  const selectedRef = linkable.find(o => `${o.kind}:${o.id}` === form.ref) ?? null
+  // An edit whose target no longer resolves keeps its ref rather than silently
+  // dropping it — clearing the field would quietly unlink the module row.
+  const staleRef = form.ref && !selectedRef ? form.ref : ''
   const cats: readonly string[] =
     form.t === 'Income'
       ? (incomeCategoryOptions ?? ALL_CATS)
@@ -147,6 +189,33 @@ export default function TransactionModal({
 
   function set(k: keyof TransactionForm, v: string) {
     setForm(f => ({ ...f, [k]: v }))
+  }
+
+  /**
+   * Picking a link fills the amount and description when they are still blank.
+   * EMIs have no part payment, so their amount is known the moment the loan is
+   * chosen; anything already typed is left alone.
+   */
+  function setRef(v: string) {
+    const opt = refOptions.find(o => `${o.kind}:${o.id}` === v)
+    setForm(f => ({
+      ...f,
+      ref: v,
+      a: !f.a && opt?.amount ? String(opt.amount) : f.a,
+      desc: !f.desc.trim() && opt ? opt.label : f.desc,
+    }))
+  }
+
+  /**
+   * Changing the type can invalidate the link (an expense-only loan on an
+   * Income row), so drop it rather than saving a mirror that can never exist.
+   */
+  function setType(v: string) {
+    setForm(f => {
+      const opt = refOptions.find(o => `${o.kind}:${o.id}` === f.ref)
+      const keep = !opt || !opt.types || opt.types.includes(v)
+      return { ...f, t: v, ref: keep ? f.ref : '' }
+    })
   }
 
   async function save() {
@@ -158,6 +227,7 @@ export default function TransactionModal({
     const extra = form.notes.trim()
     const notes = isTransfer ? extra : form.notes
     const transferTo = isTransfer ? (form.toAcct || '').trim() : ''
+    const [refKind, refId] = (form.ref || '').split(':')
     const p = {
       month,
       year,
@@ -169,6 +239,9 @@ export default function TransactionModal({
       m: form.m,
       notes,
       ...(isTransfer ? { transferTo } : {}),
+      // Always sent, so clearing the dropdown actually unlinks on save.
+      refKind: refKind && refId ? refKind : '',
+      refId: refKind && refId ? refId : '',
     }
     try {
       if (isEdit && row?.id) await api.updateRow({ ...p, id: row.id })
@@ -245,7 +318,7 @@ export default function TransactionModal({
           </div>
           <div className="form-row">
             <label className="form-lbl">Type</label>
-            <select className="form-sel" value={form.t} onChange={e => set('t', e.target.value)}>
+            <select className="form-sel" value={form.t} onChange={e => setType(e.target.value)}>
               <option>Expense</option>
               <option>Income</option>
               <option>Transfer</option>
@@ -270,6 +343,17 @@ export default function TransactionModal({
               ))}
             </select>
           </div>
+          {linkable.length > 0 && (
+            <div className="form-row">
+              <label className="form-lbl">Link to</label>
+              <RefCombobox
+                value={form.ref ?? ''}
+                options={linkable}
+                onChange={setRef}
+                staleRef={staleRef}
+              />
+            </div>
+          )}
           {isTransfer && (
             <div className="form-row">
               <label className="form-lbl">Transfer To</label>
@@ -301,6 +385,15 @@ export default function TransactionModal({
             {isEdit && (
               <button type="button" className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={del} disabled={deleting}>
                 {deleting ? 'Deleting…' : delConfirm ? 'Confirm delete?' : 'Delete'}
+              </button>
+            )}
+            {isEdit && onDuplicate && row && (
+              <button
+                type="button"
+                className="ui-kit-btn ui-kit-btn--soft"
+                onClick={() => onDuplicate(row)}
+              >
+                Duplicate
               </button>
             )}
           </div>

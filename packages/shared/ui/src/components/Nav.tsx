@@ -16,6 +16,7 @@ import React from 'react'
 import { DynamicLucide } from './DynamicLucide'
 
 export type ModuleId =
+  | 'overview'
   | 'dashboard'
   | 'budget'
   | 'transactions'
