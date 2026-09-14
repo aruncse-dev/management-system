@@ -33,6 +33,7 @@ import {
   parseFintrackerPrefs,
   planPayoff,
   monthsToPayoff,
+  normalizeToMonthly,
 } from '@fintracker-vault/utils'
 
 
@@ -371,11 +372,21 @@ server.tool(
         ),
       )
     if (!rows.length) return text('No active subscriptions.')
-    const lines = rows.map(
-      (s) =>
-        `${s.name}  ${inr(num(s.amount))} ${s.currency}/${s.billingCycle}  ${s.autopay ? 'autopay' : 'manual'}  ${s.paymentMethod ?? '-'}`,
+    // The monthly equivalent the tool description promises, from the same
+    // helper the app and the summary endpoint use.
+    let runRate = 0
+    const lines = rows.map((s) => {
+      const perMonth = normalizeToMonthly(num(s.amount), s.billingCycle)
+      runRate += perMonth
+      const equiv = s.billingCycle === 'monthly' ? '' : `  (≈${inr(perMonth)}/mo)`
+      return `${s.name}  ${inr(num(s.amount))} ${s.currency}/${s.billingCycle}${equiv}  ${s.autopay ? 'autopay' : 'manual'}  ${s.paymentMethod ?? '-'}`
+    })
+    return text(
+      [
+        `${rows.length} active subscriptions (${inr(runRate)}/month equivalent):`,
+        ...lines,
+      ].join('\n'),
     )
-    return text([`${rows.length} active subscriptions:`, ...lines].join('\n'))
   },
 )
 

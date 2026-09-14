@@ -36,10 +36,11 @@ import {
   getAccountBalances,
   getNetWorth,
   getCommittedMonthlyOutflow,
+  getLendingOutstanding,
   getLoanOutstanding,
   type CycleRange,
 } from '@fintracker-vault/db'
-import { buildCycleRanges, closeAllWithin, planPayoff } from '@fintracker-vault/utils'
+import { buildCycleRanges, closeAllWithin, planPayoff, DEFAULT_USD_TO_INR, BILLING_CYCLES, parseBillingCycle } from '@fintracker-vault/utils'
 import { normalizeLendingSheetSlug } from './lendingSheetSlug'
 import {
   loadSavingsAccountLookup,
@@ -384,6 +385,15 @@ export const MIRROR_ID_PREFIX = 'txn:'
  */
 const LENDING_REF_KIND = 'lending'
 const SUBSCRIPTION_REF_KIND = 'subscription'
+
+const SUBSCRIPTION_STATUSES = ['active', 'cancelled'] as const
+
+/** Accepts only the statuses the UI and `getCommittedMonthlyOutflow` understand. */
+function normalizeSubscriptionStatus(raw: unknown): string | null {
+  if (raw === undefined || raw === null || raw === '') return 'active'
+  const v = String(raw).trim().toLowerCase()
+  return (SUBSCRIPTION_STATUSES as readonly string[]).includes(v) ? v : null
+}
 
 function parseLendingRef(refId: string): { sheetSlug: string; name: string } | null {
   const idx = refId.indexOf('|')
@@ -1137,14 +1147,15 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
           .from(subscriptionCharges)
           .where(whereOrgFilter(subscriptionCharges, budgetScope))
           .orderBy(desc(subscriptionCharges.date))
-          .catch(() => [])
         return ok(
           res,
           rows.map((r) => ({
             id: r.id,
             subscription_id: r.subscriptionId,
             date: String(r.date),
-            amount: r.amount,
+            // A number, not the raw `numeric` string, so callers can total it
+            // without each re-coercing.
+            amount: num(r.amount),
             note: r.note ?? undefined,
           })),
         )
@@ -1306,10 +1317,10 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
 
         const blob = settingsBlob as Record<string, string | number | boolean | null | undefined>
         const goldRate = num(blob.goldRate)
-        const usdToInr = num(blob.usdToInr) || 83
+        const usdToInr = num(blob.usdToInr) || DEFAULT_USD_TO_INR
 
         const orgId = scopeOrgId
-        const [trend, income, netWorth, committed, loans, budgetRows, accounts] = await Promise.all([
+        const [trend, income, netWorth, committed, loans, budgetRows, accounts, lendingOut] = await Promise.all([
           getIncomeExpenseTrend(db, orgId, ranges),
           getDerivedMonthlyIncome(db, orgId, ranges.slice(0, -1)),
           getNetWorth(db, orgId, { goldRatePerGram: goldRate }),
@@ -1319,6 +1330,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
           // Opening balances live in this settings blob keyed by account name,
           // not in a table, so the query takes them from here.
           getAccountBalances(db, orgId, { openingBal: readOpeningBal(settingsBlob) }),
+          getLendingOutstanding(db, orgId),
         ])
 
         const thisCycle = trend[trend.length - 1] ?? { income: 0, expense: 0, savings: 0, net: 0, key: currentRange.key }
@@ -1424,6 +1436,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
             budget: { total: totalBudget, spent: spentThisCycle },
             accounts,
             loans,
+            lending: lendingOut,
             payoff,
             twelveMonth,
             suggestions,
@@ -2104,19 +2117,32 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
 
       if (mod === 'subscriptions') {
         if (action === 'addEntry') {
+          const name = String(body.name ?? '').trim()
+          if (!name) return fail(res, 400, 'Name is required', traceId)
+          const amount = num(body.amount as string | number)
+          if (!Number.isFinite(amount) || amount <= 0) {
+            return fail(res, 400, 'Amount must be a number greater than 0', traceId)
+          }
+          const cycle = parseBillingCycle(String(body.billing_cycle ?? 'monthly'))
+          if (!cycle) {
+            return fail(res, 400, `Billing cycle must be one of: ${BILLING_CYCLES.join(', ')}`, traceId)
+          }
+          const status = normalizeSubscriptionStatus(body.status)
+          if (!status) return fail(res, 400, 'Status must be active or cancelled', traceId)
+
           const id = crypto.randomUUID()
           await db.insert(subscriptions).values({
             orgId: scopeOrgId,
             id,
-            name: String(body.name ?? ''),
+            name,
             category: typeof body.category === 'string' ? body.category : null,
-            amount: String(num(body.amount as string | number)),
+            amount: String(amount),
             currency: typeof body.currency === 'string' ? body.currency : 'INR',
-            billingCycle: String(body.billing_cycle ?? 'monthly'),
+            billingCycle: cycle,
             startDate: String(body.start_date ?? new Date().toISOString().slice(0, 10)),
             endDate: optionalDate(body.end_date),
             autopay: Boolean(body.autopay),
-            status: typeof body.status === 'string' ? body.status : 'active',
+            status,
             paymentMethod: typeof body.payment_method === 'string' ? body.payment_method : null,
             appUuid: typeof body.app_uuid === 'string' ? body.app_uuid : null,
             notes: typeof body.notes === 'string' ? body.notes : null,
@@ -2126,30 +2152,144 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         if (action === 'updateEntry') {
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
-          await db
+          if (typeof body.name === 'string' && !body.name.trim()) {
+            return fail(res, 400, 'Name is required', traceId)
+          }
+          if (body.amount !== undefined) {
+            const amt = num(body.amount as string | number)
+            if (!Number.isFinite(amt) || amt <= 0) {
+              return fail(res, 400, 'Amount must be a number greater than 0', traceId)
+            }
+          }
+          if (typeof body.billing_cycle === 'string' && !parseBillingCycle(body.billing_cycle)) {
+            return fail(res, 400, `Billing cycle must be one of: ${BILLING_CYCLES.join(', ')}`, traceId)
+          }
+          if (body.status !== undefined && !normalizeSubscriptionStatus(body.status)) {
+            return fail(res, 400, 'Status must be active or cancelled', traceId)
+          }
+          const updated = await db
             .update(subscriptions)
             .set({
-              name: typeof body.name === 'string' ? body.name : undefined,
+              name: typeof body.name === 'string' ? body.name.trim() : undefined,
               category: typeof body.category === 'string' ? body.category : undefined,
               amount: body.amount !== undefined ? String(num(body.amount as string | number)) : undefined,
               currency: typeof body.currency === 'string' ? body.currency : undefined,
-              billingCycle: typeof body.billing_cycle === 'string' ? body.billing_cycle : undefined,
+              billingCycle:
+                typeof body.billing_cycle === 'string'
+                  ? (parseBillingCycle(body.billing_cycle) ?? undefined)
+                  : undefined,
               startDate: typeof body.start_date === 'string' ? body.start_date : undefined,
               endDate: body.end_date !== undefined ? optionalDate(body.end_date) : undefined,
               autopay: body.autopay !== undefined ? Boolean(body.autopay) : undefined,
-              status: typeof body.status === 'string' ? body.status : undefined,
+              status: body.status !== undefined ? (normalizeSubscriptionStatus(body.status) ?? undefined) : undefined,
               paymentMethod: typeof body.payment_method === 'string' ? body.payment_method : undefined,
               appUuid: typeof body.app_uuid === 'string' ? body.app_uuid : undefined,
               notes: typeof body.notes === 'string' ? body.notes : undefined,
               updatedAt: new Date(),
             })
             .where(and(whereOrgFilter(subscriptions, budgetScope), eq(subscriptions.id, id)))
+            .returning({ id: subscriptions.id })
+          // Without this an update to a missing or other-org id reported success.
+          if (!updated.length) return fail(res, 404, 'Subscription not found', traceId)
+          return ok(res, true, traceId)
+        }
+        // Charge CRUD mirrors the loan repayment handlers: a charge posted from
+        // a transaction carries the derived id `txn:<txnId>` and stays owned by
+        // that transaction, so it is read-only here.
+        if (action === 'addCharge') {
+          const subscriptionId = typeof body.subscription_id === 'string' ? body.subscription_id.trim() : ''
+          if (!subscriptionId) return fail(res, 400, 'Missing subscription_id', traceId)
+          const amount = num(body.amount as string | number)
+          if (!Number.isFinite(amount) || amount <= 0) {
+            return fail(res, 400, 'Amount must be a number greater than 0', traceId)
+          }
+          const owner = await db
+            .select({ id: subscriptions.id })
+            .from(subscriptions)
+            .where(and(whereOrgFilter(subscriptions, budgetScope), eq(subscriptions.id, subscriptionId)))
+          if (!owner.length) return fail(res, 404, 'Subscription not found', traceId)
+
+          const id = crypto.randomUUID()
+          await db.insert(subscriptionCharges).values({
+            orgId: scopeOrgId,
+            id,
+            subscriptionId,
+            date: String(body.date ?? new Date().toISOString().slice(0, 10)),
+            amount: String(amount),
+            note: typeof body.note === 'string' ? body.note : null,
+          })
+          return ok(res, id, traceId)
+        }
+        if (action === 'updateCharge') {
+          const id = typeof body.id === 'string' ? body.id : ''
+          if (!id) return fail(res, 400, 'Missing id', traceId)
+          if (transactionIdFromMirrorId(id)) return fail(res, 409, MIRROR_READONLY_MESSAGE, traceId)
+          if (body.amount !== undefined) {
+            const amt = num(body.amount as string | number)
+            if (!Number.isFinite(amt) || amt <= 0) {
+              return fail(res, 400, 'Amount must be a number greater than 0', traceId)
+            }
+          }
+          const updated = await db
+            .update(subscriptionCharges)
+            .set({
+              subscriptionId: typeof body.subscription_id === 'string' ? body.subscription_id : undefined,
+              date: typeof body.date === 'string' ? body.date : undefined,
+              amount: body.amount !== undefined ? String(num(body.amount as string | number)) : undefined,
+              note: typeof body.note === 'string' ? body.note : undefined,
+            })
+            .where(and(whereOrgFilter(subscriptionCharges, budgetScope), eq(subscriptionCharges.id, id)))
+            .returning({ id: subscriptionCharges.id })
+          if (!updated.length) return fail(res, 404, 'Charge not found', traceId)
+          return ok(res, true, traceId)
+        }
+        if (action === 'deleteCharge') {
+          const id = typeof body.id === 'string' ? body.id : ''
+          if (!id) return fail(res, 400, 'Missing id', traceId)
+          await db
+            .delete(subscriptionCharges)
+            .where(and(whereOrgFilter(subscriptionCharges, budgetScope), eq(subscriptionCharges.id, id)))
+          // Deleting a mirrored row unlinks the transaction that made it, or it
+          // returns on that transaction's next save.
+          await unlinkMirrorSource(db, budgetScope, id)
           return ok(res, true, traceId)
         }
         if (action === 'deleteEntry') {
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
-          await db.delete(subscriptions).where(and(whereOrgFilter(subscriptions, budgetScope), eq(subscriptions.id, id)))
+
+          // Order matters: drop the subscription FIRST so a bad or cross-org id
+          // 404s without having already deleted anything.
+          const removed = await db
+            .delete(subscriptions)
+            .where(and(whereOrgFilter(subscriptions, budgetScope), eq(subscriptions.id, id)))
+            .returning({ id: subscriptions.id })
+          if (!removed.length) return fail(res, 404, 'Subscription not found', traceId)
+
+          // Unlink every transaction pointing at it before the charges go.
+          //
+          // A charge posted from the register has the derived id `txn:<txnId>`
+          // and is owned by that transaction, so deleting the row alone is not
+          // enough: `ref_id` would still name the dead subscription and
+          // `syncTransactionMirror` would re-insert the charge on that
+          // transaction's next save. Clearing by `ref_id` also catches
+          // transactions that never produced a charge (a non-Expense row, or a
+          // zero amount), which a per-charge unlink would miss.
+          await db
+            .update(transactions)
+            .set({ refKind: null, refId: null })
+            .where(
+              and(
+                whereOrgFilter(transactions, budgetScope),
+                eq(transactions.refKind, SUBSCRIPTION_REF_KIND),
+                eq(transactions.refId, id),
+              ),
+            )
+
+          // There is no FK, so the charges do not cascade on their own.
+          await db
+            .delete(subscriptionCharges)
+            .where(and(whereOrgFilter(subscriptionCharges, budgetScope), eq(subscriptionCharges.subscriptionId, id)))
           return ok(res, true, traceId)
         }
       }

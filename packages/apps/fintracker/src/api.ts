@@ -477,6 +477,13 @@ export type DashboardSummary = {
   /** All-time balance per payment account (opening balance + every transaction). */
   accounts: AccountBalanceRow[]
   loans: LoanOutstanding[]
+  /** Money lent out and not yet repaid. Deliberately outside `netWorth`. */
+  lending: {
+    lent: number
+    repaid: number
+    outstanding: number
+    books: { slug: string; lent: number; repaid: number; outstanding: number }[]
+  }
   payoff: (LoanOutstanding & { order: number; closesInMonths: number })[]
   twelveMonth: { requiredMonthly: number; availableMonthly: number; shortfall: number; feasible: boolean }
   suggestions: Suggestion[]
@@ -695,6 +702,22 @@ export const api = {
   deleteSubscriptionEntry: async (id: string) => {
     const result = await post<boolean>({ module: 'subscriptions', action: 'deleteEntry', id })
     invalidateCache({ action: 'getEntries', params: { module: 'subscriptions' } })
+    invalidateCache({ action: 'getCharges', params: { module: 'subscriptions' } })
+    return result
+  },
+  addSubscriptionCharge: async (p: Record<string, unknown>) => {
+    const result = await post<string>({ module: 'subscriptions', action: 'addCharge', ...p })
+    invalidateCache({ action: 'getCharges', params: { module: 'subscriptions' } })
+    return result
+  },
+  updateSubscriptionCharge: async (p: Record<string, unknown>) => {
+    const result = await post<boolean>({ module: 'subscriptions', action: 'updateCharge', ...p })
+    invalidateCache({ action: 'getCharges', params: { module: 'subscriptions' } })
+    return result
+  },
+  deleteSubscriptionCharge: async (id: string) => {
+    const result = await post<boolean>({ module: 'subscriptions', action: 'deleteCharge', id })
+    invalidateCache({ action: 'getCharges', params: { module: 'subscriptions' } })
     return result
   },
   getIntegrationStatus: (provider: string) =>
