@@ -1975,10 +1975,65 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
   gap: 5px;
 }
 
-/* Progress bar inside a HoldingCard's chips slot (dashboard categories). */
-.dash-cat-bar {
-  width: 100%;
+/* Dashboard "Over budget" rows.
+   One line per category inside a card: name, how far over, and what was spent.
+   The section is an exception report, so every row is over by definition —
+   hence no per-row status badge, tone mark or progress bar, all of which
+   restated the same one bit of information. */
+.dash-cat-list {
+  display: grid;
 }
+.dash-cat-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  /* No side padding: the enclosing card body already supplies the gutter. */
+  padding: 10px 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+/* The card's own 12px top/bottom padding covers the ends; without this the
+   first and last rows sit noticeably further in than the gaps between rows. */
+.dash-cat-list > .dash-cat-row:first-child { padding-top: 2px; }
+.dash-cat-list > .dash-cat-row:last-child { padding-bottom: 2px; }
+.dash-cat-row + .dash-cat-row {
+  border-top: 1px solid var(--border);
+}
+.dash-cat-row:hover .dash-cat-name,
+.dash-cat-row:focus-visible .dash-cat-name {
+  color: var(--navy);
+}
+.dash-cat-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* How far past the cap — the reason the row is listed at all. */
+.dash-cat-status {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.dash-cat-status.is-over { color: var(--rm); }
+.dash-cat-amt {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-align: right;
+}
+
 /* --- Account balances / Credit sources sheet -------------------------------
    Scoped to this one sheet on purpose: every other modal keeps the white body
    it has always had. Here the body is a list of cards rather than a form, and
