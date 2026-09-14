@@ -75,6 +75,7 @@ export const MENU_CATALOG_SEED: MenuCatalogSeedRow[] = [
   { id: 'vaultsettings', slug: 'vaultsettings', label: 'Settings', icon: 'Settings', path: '/vaultsettings', sectionId: 'system', sortOrder: 2, appSlugs: ['vault'] },
   // Staff (`staff` id matches legacy 0001 catalog row)
   { id: 'staff-attendance', slug: 'staff-attendance', label: 'Attendance', icon: 'CalendarDays', path: '/attendance', sectionId: 'staff-main', sortOrder: 0, appSlugs: ['staff'] },
-  { id: 'staff', slug: 'staff', label: 'Staffs', icon: 'Users', path: '/staffs', sectionId: 'staff-main', sortOrder: 1, appSlugs: ['staff'] },
+  { id: 'staff-history', slug: 'staff-history', label: 'History', icon: 'History', path: '/history', sectionId: 'staff-main', sortOrder: 1, appSlugs: ['staff'] },
+  { id: 'staff', slug: 'staff', label: 'Staffs', icon: 'Users', path: '/staffs', sectionId: 'staff-main', sortOrder: 2, appSlugs: ['staff'] },
   { id: 'staff-settings', slug: 'staff-settings', label: 'Settings', icon: 'Settings', path: '/settings', sectionId: 'system', sortOrder: 3, appSlugs: ['staff'] },
 ]

@@ -49,6 +49,7 @@ export const VAULT_MENUS: Record<string, { slug: string; label: string }[]> = {
 export const STAFF_MENUS: Record<string, { slug: string; label: string }[]> = {
   Menu: [
     { slug: 'staff-attendance', label: 'Attendance' },
+    { slug: 'staff-history', label: 'History' },
     { slug: 'staff', label: 'Staff' },
   ],
 }

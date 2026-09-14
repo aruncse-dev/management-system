@@ -3,7 +3,7 @@ import { Calendar, ChevronLeft, ChevronRight, RefreshCw, Users } from 'lucide-re
 import { MNS } from '../config'
 import { api } from '../api'
 import { useStaffWorkspace } from '../StaffWorkspaceContext'
-import type { AttendanceRow, StaffMember } from '../types'
+import type { AttendanceRow } from '../types'
 import { FormField, KpiCard, KpiGrid, LoadingState, ModalShell, SectionBlock, SectionChip, Spacer } from '../ui'
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
@@ -48,7 +48,7 @@ function dayCellVisual(rows: AttendanceRow[], dateStr: string): DayCellVisual {
 }
 
 export default function AttendancePage() {
-  const { staffList, staffLoading, staffError } = useStaffWorkspace()
+  const { staffList, activeStaff, staffById, staffLoading, staffError } = useStaffWorkspace()
   const [month, setMonth] = useState<string>(() => MNS[new Date().getMonth()])
   const [year, setYear] = useState<string>(() => String(new Date().getFullYear()))
   const [attendanceRows, setAttendanceRows] = useState<AttendanceRow[]>(() => {
@@ -134,18 +134,17 @@ export default function AttendancePage() {
 
   const monthIndex = MNS.indexOf(month as (typeof MNS)[number])
 
+  // Everyone who can still be marked, plus anyone deactivated who already has
+  // days in this month — deactivating someone must not erase their month.
   const dashboardRows = useMemo(() => {
-    return staffList.map(s => ({
-      staff: s,
-      ...staffMonthStats(attendanceRows, s.id),
-    }))
+    const withRows = new Set(attendanceRows.map(r => r.staffId))
+    return staffList
+      .filter(s => s.active || withRows.has(s.id))
+      .map(s => ({
+        staff: s,
+        ...staffMonthStats(attendanceRows, s.id),
+      }))
   }, [staffList, attendanceRows])
-
-  const staffById = useMemo(() => {
-    const m: Record<string, StaffMember> = {}
-    for (const s of staffList) m[s.id] = s
-    return m
-  }, [staffList])
 
   const dayModalEntries = useMemo(() => {
     if (!dayModalDate) return []
@@ -154,8 +153,8 @@ export default function AttendancePage() {
 
   const staffAvailableForAdd = useMemo(() => {
     const taken = new Set(dayModalEntries.map(e => e.staffId))
-    return staffList.filter(s => !taken.has(s.id))
-  }, [staffList, dayModalEntries])
+    return activeStaff.filter(s => !taken.has(s.id))
+  }, [activeStaff, dayModalEntries])
 
   useEffect(() => {
     if (!dayModalDate) return
@@ -368,8 +367,14 @@ export default function AttendancePage() {
                     key={staff.id}
                     label={staff.name}
                     value={workedDays}
-                    subtitle={otDays === 1 ? '1 OT day' : `${otDays} OT days`}
-                    tone="navy"
+                    subtitle={
+                      staff.active
+                        ? otDays === 1
+                          ? '1 OT day'
+                          : `${otDays} OT days`
+                        : `Inactive · ${otDays} OT`
+                    }
+                    tone={staff.active ? 'navy' : 'muted'}
                     icon={<Users size={14} />}
                   />
                 ))}
@@ -401,7 +406,7 @@ export default function AttendancePage() {
               ) : (
                 <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 8 }}>
                   {dayModalEntries.map(e => {
-                    const name = staffById[e.staffId]?.name ?? e.staffId
+                    const name = staffById.get(e.staffId)?.name ?? e.staffId
                     return (
                       <li
                         key={e.entryId || `${e.staffId}-${e.date}`}
@@ -444,7 +449,11 @@ export default function AttendancePage() {
                 Add staff
               </div>
               {staffAvailableForAdd.length === 0 ? (
-                <div style={{ color: 'var(--muted)', fontSize: 13 }}>Everyone is already marked for this day.</div>
+                <div style={{ color: 'var(--muted)', fontSize: 13 }}>
+                  {activeStaff.length === 0
+                    ? 'No active staff. Mark someone active on the Staffs page to record attendance.'
+                    : 'Everyone is already marked for this day.'}
+                </div>
               ) : (
                 <div style={{ display: 'grid', gap: 12 }}>
                   <FormField label="Staff">

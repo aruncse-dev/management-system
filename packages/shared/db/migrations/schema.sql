@@ -445,7 +445,11 @@ CREATE TABLE "staff_members" (
 	"joined_date" date,
 	"status" text DEFAULT 'active' NOT NULL,
 	"salary_type" text,
+	"weekly_off" text DEFAULT 'none' NOT NULL,
+	"paid_leaves_per_month" integer DEFAULT 0 NOT NULL,
 	"salary_amount" text
 );
 
 CREATE UNIQUE INDEX "org_members_org_user_unique" ON "org_members" USING btree ("org_id","user_email");
+CREATE UNIQUE INDEX "attendance_org_staff_month_day_unique" ON "attendance" USING btree ("org_id","staff_id","month_year","day");
+CREATE INDEX "attendance_org_month_idx" ON "attendance" USING btree ("org_id","month_year");
