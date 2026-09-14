@@ -21,6 +21,8 @@ import { goldItems, goldResources } from '../schema/gold'
 import { stocks, mutualFunds } from '../schema/portfolio'
 import { cashLoanRepayments, cashLoans, emiLoanRepayments, emiLoans, jewelLoanRepayments, jewelLoans } from '../schema/loans'
 import { subscriptions } from '../schema/subscriptions'
+import { lending } from '../schema/lending'
+import { normalizeToMonthly, nextRenewal, daysUntil } from '@fintracker-vault/utils'
 
 type Db = ReturnType<typeof getDb>
 
@@ -335,6 +337,64 @@ export async function getNetWorth(
   }
 }
 
+export type LendingOutstanding = {
+  /** Everything handed out, all time. */
+  lent: number
+  /** Everything received back. */
+  repaid: number
+  /** Still owed to the org — `lent - repaid`, floored at 0 per book. */
+  outstanding: number
+  /** Per book (`lending`, `vijaya-amma`, …), largest outstanding first. */
+  books: { slug: string; lent: number; repaid: number; outstanding: number }[]
+}
+
+/**
+ * Money lent out and not yet repaid.
+ *
+ * Deliberately NOT folded into `getNetWorth()`: receivables are a softer asset
+ * than a bank balance, and changing net worth would silently move the figure
+ * the MCP server reports. The Overview shows this alongside net worth instead.
+ *
+ * Negative per-book balances are floored at 0 — a book that has received more
+ * than it lent is a bookkeeping artefact, not a debt the org owes.
+ */
+export async function getLendingOutstanding(
+  db: Db,
+  orgId: string | null,
+): Promise<LendingOutstanding> {
+  const rows = await db.select().from(lending).where(scopeOf(lending, orgId))
+
+  const byBook = new Map<string, { lent: number; repaid: number }>()
+  for (const r of rows) {
+    const slug = String(r.sheetSlug || 'lending')
+    const book = byBook.get(slug) ?? { lent: 0, repaid: 0 }
+    const amount = num(r.amount)
+    // `REPAY` is the canonical stored value and what the transaction mirror
+    // writes; `RECEIVED` is a legacy alias for the same thing. Matching only
+    // one of them silently drops real repayments and overstates what is owed.
+    const type = String(r.type).trim().toUpperCase()
+    if (type === 'LEND') book.lent += amount
+    else if (type === 'REPAY' || type === 'RECEIVED') book.repaid += amount
+    byBook.set(slug, book)
+  }
+
+  const books = Array.from(byBook.entries())
+    .map(([slug, b]) => ({
+      slug,
+      lent: b.lent,
+      repaid: b.repaid,
+      outstanding: Math.max(0, b.lent - b.repaid),
+    }))
+    .sort((a, b) => b.outstanding - a.outstanding)
+
+  return {
+    lent: books.reduce((s, b) => s + b.lent, 0),
+    repaid: books.reduce((s, b) => s + b.repaid, 0),
+    outstanding: books.reduce((s, b) => s + b.outstanding, 0),
+    books,
+  }
+}
+
 export type CommittedOutflow = {
   emi: number
   subscriptions: number
@@ -345,9 +405,11 @@ export type CommittedOutflow = {
 /**
  * Fixed monthly commitments: loan EMIs plus subscriptions normalised to a month.
  *
- * Note: the subscriptions page sums every row regardless of `status`, so its
- * totals include cancelled plans. This filters to `status = 'active'`, so the
- * figure here can legitimately be lower than the one that page shows.
+ * Both this and the subscriptions page now price plans with
+ * `normalizeToMonthly` from `@fintracker-vault/utils` over `status = 'active'`
+ * rows only, so the two screens agree. They used to disagree by design: the
+ * page summed every row regardless of status and only counted plans whose
+ * cycle was literally `monthly`.
  */
 export async function getCommittedMonthlyOutflow(
   db: Db,
@@ -365,35 +427,28 @@ export async function getCommittedMonthlyOutflow(
 
   const emi = loans.reduce((s, l) => s + l.monthlyPayment, 0)
 
-  const perMonth = (amount: number, cycle: string) => {
-    switch (String(cycle).toLowerCase()) {
-      case 'yearly':
-        return amount / 12
-      case 'quarterly':
-        return amount / 3
-      case 'weekly':
-        return (amount * 52) / 12
-      default:
-        return amount
-    }
-  }
-
   let subsTotal = 0
   const upcomingRenewals: CommittedOutflow['upcomingRenewals'] = []
 
   for (const s of subs) {
     const amountInr =
       String(s.currency).toUpperCase() === 'USD' ? num(s.amount) * opts.usdToInr : num(s.amount)
-    subsTotal += perMonth(amountInr, s.billingCycle)
+    subsTotal += normalizeToMonthly(amountInr, s.billingCycle)
 
-    const due = nextRenewal(String(s.startDate), s.endDate ? String(s.endDate) : null, s.billingCycle, now)
+    const due = nextRenewal({
+      startDate: String(s.startDate),
+      endDate: s.endDate ? String(s.endDate) : null,
+      cycle: s.billingCycle,
+      autopay: Boolean(s.autopay),
+      now,
+    })
     if (due) {
-      const daysLeft = Math.ceil((due.getTime() - now.getTime()) / 86_400_000)
+      const daysLeft = daysUntil(due, now)
       if (daysLeft >= 0 && daysLeft <= 30) {
         upcomingRenewals.push({
           name: s.name,
           amount: amountInr,
-          dueDate: due.toISOString().slice(0, 10),
+          dueDate: toIsoDate(due),
           daysLeft,
         })
       }
@@ -404,31 +459,12 @@ export async function getCommittedMonthlyOutflow(
   return { emi, subscriptions: subsTotal, total: emi + subsTotal, upcomingRenewals }
 }
 
-function addCycle(d: Date, cycle: string): Date {
-  const n = new Date(d)
-  switch (String(cycle).toLowerCase()) {
-    case 'yearly':
-      n.setFullYear(n.getFullYear() + 1)
-      break
-    case 'quarterly':
-      n.setMonth(n.getMonth() + 3)
-      break
-    case 'weekly':
-      n.setDate(n.getDate() + 7)
-      break
-    default:
-      n.setMonth(n.getMonth() + 1)
-  }
-  return n
-}
-
-/** Roll forward from the anchor date until the renewal is in the future. */
-function nextRenewal(startDate: string, endDate: string | null, cycle: string, now: Date): Date | null {
-  const anchor = new Date(endDate || startDate)
-  if (Number.isNaN(anchor.getTime())) return null
-  let due = endDate ? anchor : addCycle(anchor, cycle)
-  for (let i = 0; i < 600 && due <= now; i++) due = addCycle(due, cycle)
-  return due > now ? due : null
+/** Local-time ISO date, matching how `nextRenewal` parses. */
+function toIsoDate(d: Date): string {
+  const y = String(d.getFullYear()).padStart(4, '0')
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 export type AccountBalance = {

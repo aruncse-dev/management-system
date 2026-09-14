@@ -41,6 +41,27 @@ const DAY_MS = 86_400_000
 const TREND_MONTHS = 2
 const MAX_CATEGORY_ROWS = 5
 
+type CategoryStatus = 'over' | 'critical' | 'near' | 'ok' | 'none'
+
+/** Sort weight — lower sorts first. Matches the badge thresholds on the Budget tab. */
+const STATUS_RANK: Record<CategoryStatus, number> = {
+  over: 0,
+  critical: 1,
+  near: 2,
+  ok: 3,
+  none: 4,
+}
+
+const ATTENTION_STATUSES = new Set<CategoryStatus>(['over', 'critical', 'near'])
+
+const STATUS_LABEL: Record<CategoryStatus, string> = {
+  over: 'OVER',
+  critical: 'CRITICAL',
+  near: 'NEAR',
+  ok: 'OK',
+  none: '',
+}
+
 /** Inclusive day count between two ISO dates. */
 function daysBetween(startIso: string, endIso: string): number {
   const a = new Date(startIso + 'T00:00:00').getTime()
@@ -98,6 +119,8 @@ export default function Dashboard({ onCategoryClick, onGoTab }: Props) {
   const [sheet, setSheet] = useState<'accounts' | 'credit' | null>(null)
   /** Account-kind filter inside the accounts sheet; `''` shows every kind. */
   const [sheetKind, setSheetKind] = useState('')
+  /** Collapsed by default: the rows that need a decision are always shown regardless. */
+  const [showAllCategories, setShowAllCategories] = useState(false)
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
   useEffect(() => {
     let cancelled = false
@@ -177,7 +200,7 @@ export default function Dashboard({ onCategoryClick, onGoTab }: Props) {
   const exp = sumType(rows, 'Expense')
   const net = inc - exp
   const cm = catMap(rows, budget)
-  const { totalBudget, ovCount } = budgetSummary(applicableBudget, cm)
+  const { totalBudget } = budgetSummary(applicableBudget, cm)
 
   // ---- Cycle position -------------------------------------------------------
   const totalDays = cycle ? daysBetween(cycle.start, cycle.end) : 0
@@ -238,14 +261,45 @@ export default function Dashboard({ onCategoryClick, onGoTab }: Props) {
     .filter(([, amount]) => amount > 0)
     .map(([name, spent]) => {
       const cap = budgetByName.get(name) ?? 0
-      return { name, spent, cap, hasCap: cap > 0, over: cap > 0 && spent > cap }
+      const hasCap = cap > 0
+      const pct = hasCap ? (spent / cap) * 100 : 0
+      const status: CategoryStatus = !hasCap
+        ? 'none'
+        : spent > cap
+          ? 'over'
+          : pct >= 90
+            ? 'critical'
+            : pct >= 75
+              ? 'near'
+              : 'ok'
+      return { name, spent, cap, hasCap, pct, status, over: status === 'over' }
     })
-  const maxCat = allCategories.reduce((m, c) => Math.max(m, c.spent), 0)
-  // Biggest first. Ranking overspend first hid Credit Repayment — the second
-  // largest category — because its ₹0 cap means `over` is false.
-  const categoryRows = [...allCategories]
-    .sort((a, b) => b.spent - a.spent)
-    .slice(0, MAX_CATEGORY_ROWS)
+
+  /**
+   * Trouble first, size second.
+   *
+   * Ranking purely by spend meant a category 40% past its cap stayed invisible
+   * if it happened to be the sixth largest — the section looked like a
+   * leaderboard rather than something to act on. Budgeted categories sort by
+   * severity, then by how far past the cap they are; unbudgeted ones follow,
+   * ranked by spend, because there is nothing to be over.
+   */
+  const rankedCategories = [...allCategories].sort((a, b) => {
+    const rank = STATUS_RANK[a.status] - STATUS_RANK[b.status]
+    if (rank !== 0) return rank
+    if (a.hasCap && b.hasCap && a.pct !== b.pct) return b.pct - a.pct
+    return b.spent - a.spent
+  })
+
+  /** Everything that needs a decision: over, critical or near its cap. */
+  const attentionCount = allCategories.filter(c => ATTENTION_STATUSES.has(c.status)).length
+  // Always show the ones in trouble, and enough of the rest to give context.
+  const visibleCount = showAllCategories
+    ? rankedCategories.length
+    : Math.max(attentionCount, Math.min(MAX_CATEGORY_ROWS, rankedCategories.length))
+  const categoryRows = rankedCategories.slice(0, visibleCount)
+  const hiddenCategories = rankedCategories.slice(visibleCount)
+  const hiddenSpend = hiddenCategories.reduce((sum, c) => sum + c.spent, 0)
 
   return (
     <div className="pg dashboard-page ui-kit-page-shell monthly-subpage">
@@ -374,54 +428,83 @@ export default function Dashboard({ onCategoryClick, onGoTab }: Props) {
         <SectionBlock
           title="Categories"
           icon={<Layers size={14} />}
-          subtitle={ovCount > 0 ? `${ovCount} over budget` : 'All within budget'}
+          subtitle={
+            attentionCount > 0
+              ? `${attentionCount} need${attentionCount === 1 ? 's' : ''} attention`
+              : 'All within budget'
+          }
           right={<SectionChip>{allCategories.length}</SectionChip>}
         >
           <div className="ui-stack">
             <ListStack>
               {categoryRows.map((c) => {
-                const barPct = c.hasCap
-                  ? Math.min((c.spent / c.cap) * 100, 100)
-                  : maxCat > 0
-                    ? (c.spent / maxCat) * 100
-                    : 0
+                // One meaning only: how much of this category's cap is used.
+                // A category with no cap gets no bar at all, rather than a bar
+                // that silently switches to meaning "share of the biggest".
+                const barPct = c.hasCap ? Math.min(c.pct, 100) : 0
                 return (
                   <HoldingCard
                     key={c.name}
                     title={c.name}
                     accentTone={c.over ? 'red' : 'navy'}
                     compactTitle
+                    rightTop={
+                      c.hasCap ? (
+                        <span className={`budget-badge ${c.status}`}>{STATUS_LABEL[c.status]}</span>
+                      ) : (
+                        <span className="budget-badge ok" style={{ opacity: 0.55 }}>NO BUDGET</span>
+                      )
+                    }
                     leftLabel="Spent"
                     leftValue={fmt(c.spent)}
                     centerLabel="Budget"
                     centerValue={c.hasCap ? fmt(c.cap) : '—'}
-                    rightLabel={c.over ? 'Over by' : c.hasCap ? 'Left' : 'Share'}
+                    rightLabel={c.over ? 'Over by' : c.hasCap ? 'Left' : 'Share of spend'}
                     rightValue={
                       c.over
                         ? fmt(c.spent - c.cap)
                         : c.hasCap
                           ? fmt(c.cap - c.spent)
-                          : `${Math.round(barPct)}%`
+                          : exp > 0
+                            ? `${Math.round((c.spent / exp) * 100)}%`
+                            : '—'
                     }
                     onClick={onCategoryClick ? () => onCategoryClick(c.name) : undefined}
                     chips={
-                      <div className="bar-bg dash-cat-bar">
-                        <div
-                          className="bar-f"
-                          style={{
-                            width: `${barPct}%`,
-                            background: c.over ? 'var(--rm)' : c.hasCap ? 'var(--gm)' : 'var(--teal)',
-                          }}
-                        />
-                      </div>
+                      c.hasCap ? (
+                        <div className="bar-bg dash-cat-bar">
+                          <div
+                            className="bar-f"
+                            style={{
+                              width: `${barPct}%`,
+                              background: c.over
+                                ? 'var(--rm)'
+                                : c.status === 'critical' || c.status === 'near'
+                                  ? 'var(--amber)'
+                                  : 'var(--gm)',
+                            }}
+                          />
+                        </div>
+                      ) : undefined
                     }
                   />
                 )
               })}
             </ListStack>
+            {hiddenCategories.length ? (
+              <button type="button" className="dash-more" onClick={() => setShowAllCategories(true)}>
+                Show {hiddenCategories.length} more ({fmt(hiddenSpend)})
+                <ArrowRight size={13} />
+              </button>
+            ) : null}
+            {showAllCategories && rankedCategories.length > MAX_CATEGORY_ROWS ? (
+              <button type="button" className="dash-more" onClick={() => setShowAllCategories(false)}>
+                Show less
+              </button>
+            ) : null}
             {onGoTab ? (
               <button type="button" className="dash-more" onClick={() => onGoTab('bud')}>
-                All {allCategories.length} categories
+                Manage budgets
                 <ArrowRight size={13} />
               </button>
             ) : null}

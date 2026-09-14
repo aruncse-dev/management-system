@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Banknote, BarChart3, CalendarClock, CreditCard, HandCoins, Landmark, Clock, Layers3, ArrowDownLeft, ArrowUpRight, Plus } from 'lucide-react'
+import { Banknote, BarChart3, CalendarClock, CreditCard, HandCoins, Landmark, Clock, Layers3, ArrowDownLeft, ArrowUpRight, Plus, Search } from 'lucide-react'
 import { api, RawCashLoanHistoryRow, RawCashLoanRow, RawEmiLoanHistoryRow, RawEmiRow, RawJewelLoanHistoryRow, RawJewelLoanRow } from '../api'
 import { isMirroredRow, MIRRORED_ROW_BADGE, MIRRORED_ROW_NOTE } from '../lib/mirroredRows'
 import { useFormatMoney } from '../hooks/useFormatMoney'
-import { FilterChips, FormField, HoldingCard, KpiCard, KpiGrid, LoadingState, ModalActions, ModalShell, ProgressBar, RightLegendDonut, SectionBlock, SectionChip, Spacer, UiCard } from '../ui'
+import { FilterChips, FormField, HoldingCard, KpiCard, KpiGrid, LoadingState, ModalActions, ModalShell, ProgressBar, RightLegendDonut, SearchField, SectionBlock, SectionChip, Spacer, UiCard } from '../ui'
 
 type LoanSource = 'EMI' | 'Jewel' | 'Cash'
 type LoansTab = 'dashboard' | 'emi' | 'jewel' | 'cash' | 'history'
@@ -608,6 +608,7 @@ export default function Loans() {
   const [emiListFilter, setEmiListFilter] = useState<LoanListFilter>('active')
   const [jewelListFilter, setJewelListFilter] = useState<LoanListFilter>('active')
   const [cashListFilter, setCashListFilter] = useState<LoanListFilter>('active')
+  const [historySearch, setHistorySearch] = useState('')
   const fabStyle = {
     position: 'fixed' as const,
     bottom: 24,
@@ -788,7 +789,23 @@ export default function Loans() {
     return { totalLoanCount, totalOutstanding, totalLoanValue, totalMonthlyEmis }
   }, [activeEmiRows])
 
-  const filteredHistory = history
+  /**
+   * Repayments matching the search box.
+   *
+   * Matches across the joined fields rather than one, so "jewel", a loan name
+   * and a note fragment all work in the same box. `historyByMonth` derives from
+   * this, so the month groups and their totals narrow with the search.
+   */
+  const filteredHistory = useMemo(() => {
+    const q = historySearch.trim().toLowerCase()
+    if (!q) return history
+    return history.filter(row =>
+      [row.title, row.subtitle, row.note, row.source, row.date, String(row.amount)]
+        .join(' ')
+        .toLowerCase()
+        .includes(q),
+    )
+  }, [history, historySearch])
 
   /**
    * Repayments bucketed by month, newest month first.
@@ -1539,10 +1556,21 @@ export default function Loans() {
             icon={<Clock size={14} />}
             right={<SectionChip tone="muted">{filteredHistory.length}</SectionChip>}
           >
+            {history.length > 0 ? (
+              <SearchField
+                value={historySearch}
+                placeholder="Search loan, note, type…"
+                onChange={setHistorySearch}
+                onClear={() => setHistorySearch('')}
+                prefix={<Search size={14} />}
+              />
+            ) : null}
             {error ? (
               <p style={{ color: '#EF4444', fontSize: 13, padding: '0.5rem 0' }}>⚠ {error}</p>
             ) : filteredHistory.length === 0 ? (
-              <p style={{ color: 'var(--muted)', padding: '0.5rem 0', fontSize: 14 }}>No repayments yet.</p>
+              <p style={{ color: 'var(--muted)', padding: '0.5rem 0', fontSize: 14 }}>
+                {historySearch ? 'No repayments match that search.' : 'No repayments yet.'}
+              </p>
             ) : (
               <div className="ui-stack">
                 {historyByMonth.map(group => (

@@ -10,22 +10,56 @@ import {
   Lightbulb,
   CalendarClock,
   CalendarDays,
+  HandCoins,
+  LineChart,
 } from 'lucide-react'
 import { useFormatMoney } from '../hooks/useFormatMoney'
-import { BalanceRow, KpiCard, KpiGrid, LoadingState, SectionBlock, UiCard } from '../ui'
+import {
+  BalanceRow,
+  KpiCard,
+  KpiGrid,
+  LoadingState,
+  MiniBarChart,
+  SectionBlock,
+  SectionChip,
+  UiCard,
+} from '../ui'
 import { api, type DashboardSummary } from '../api'
-import { accountKindMeta } from '../config'
-import { AccountKindPills, AccountKindTotals, kindsPresent, totalByKind } from '../components/AccountKindPills'
 
 /**
- * Whole-portfolio view: net worth, multi-month trend, fixed commitments and
- * suggestions.
+ * Whole-portfolio view: what you are worth, what you owe, what is committed.
  *
  * Deliberately separate from the Dashboard tab, which is scoped to the single
  * month selected in the header. Nothing here responds to the month stepper —
  * these figures are point-in-time or trailing, so `/monthly` hides the month
  * nav while this tab is active.
+ *
+ * Every section answers a different question. Liabilities used to appear twice
+ * — once as the Net Worth row's expense leg and again as its own section — so
+ * the two now share one section, and the long per-account roster moved behind
+ * a sheet rather than being the tallest thing on a net-worth page.
  */
+/**
+ * Sub-heading inside a section, with its own total.
+ *
+ * Assets and Liabilities are two groups of one section rather than two
+ * sections, so they need a lighter heading than `SectionBlock` gives. Spacing
+ * comes from the enclosing `.ui-stack`, never from inline margins — mixing the
+ * two is what made the grids sit at different distances from their headings.
+ */
+function GroupHeading({ label, total, tone }: { label: string; total: string; tone: 'green' | 'red' }) {
+  return (
+    <div className="ui-kit-section">
+      <div className="ui-kit-section-left">
+        <span className="ui-kit-section-title" style={{ fontSize: 12 }}>{label}</span>
+      </div>
+      <div className="ui-kit-section-right">
+        <SectionChip tone={tone}>{total}</SectionChip>
+      </div>
+    </div>
+  )
+}
+
 export default function Overview() {
   const fmt = useFormatMoney()
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
@@ -50,38 +84,15 @@ export default function Overview() {
     }
   }, [])
 
-  /** `''` shows every kind. */
-  const [kindFilter, setKindFilter] = useState('')
-
-  /**
-   * Spendable accounts only.
-   *
-   * Closed ones are not money you can reach, and `used_for = 'savings'` accounts
-   * are excluded for a subtler reason: their money lives in the savings ledger,
-   * not the transaction register, so a balance folded from transactions is a
-   * truthful zero and a misleading one. They are already represented by the
-   * Savings figure in Net Worth below; listing them here at ₹0 beside the
-   * Savings page's real numbers would just look broken.
-   */
-  const openAccounts = useMemo(
-    () => (summary?.accounts ?? []).filter((a) => !a.closedOn && a.usedFor !== 'savings'),
+  /** Six cycles of income vs expense — already in the payload, never drawn until now. */
+  const trendPoints = useMemo(
+    () =>
+      (summary?.trend ?? []).map((t) => ({
+        label: t.key.slice(5),
+        primary: t.income,
+        secondary: t.expense,
+      })),
     [summary],
-  )
-  const visibleAccounts = useMemo(
-    () => (kindFilter ? openAccounts.filter((a) => (a.kind || 'savings_bank') === kindFilter) : openAccounts),
-    [openAccounts, kindFilter],
-  )
-  const kindTotals = useMemo(
-    () => totalByKind(openAccounts.map((a) => ({ accountKind: a.kind, balance: a.balance }))),
-    [openAccounts],
-  )
-  const availableTotal = useMemo(
-    () => openAccounts.reduce((sum, a) => sum + a.balance, 0),
-    [openAccounts],
-  )
-  const presentKinds = useMemo(
-    () => kindsPresent(openAccounts.map((a) => ({ accountKind: a.kind }))),
-    [openAccounts],
   )
 
   // Shell and page must be SEPARATE elements: the gutter rule is
@@ -112,6 +123,7 @@ export default function Overview() {
   const nw = summary.netWorth
   const committed = summary.committed
   const income = summary.income
+  const lending = summary.lending
 
   return (
     <div className="ui-kit-page-shell overview-page">
@@ -129,53 +141,13 @@ export default function Overview() {
         </SectionBlock>
       ) : null}
 
-      <SectionBlock
-        title="Available"
-        icon={<Wallet size={14} />}
-        subtitle="Every account, all time — opening balance plus every transaction since"
-      >
-        <div className="ui-stack">
-          <KpiCard
-            full
-            label="Total available"
-            value={`${availableTotal < 0 ? '−' : ''}${fmt(Math.abs(availableTotal))}`}
-            tone={availableTotal >= 0 ? 'green' : 'red'}
-            icon={<Wallet size={14} />}
-            subtitle={`${openAccounts.length} open account${openAccounts.length === 1 ? '' : 's'}`}
-          />
-          <AccountKindTotals totals={kindTotals} formatValue={fmt} onSelect={setKindFilter} />
-          <AccountKindPills kinds={presentKinds} active={kindFilter} onChange={setKindFilter} />
-          {visibleAccounts.map((a) => {
-            const meta = accountKindMeta(a.kind)
-            return (
-              <BalanceRow
-                key={a.name}
-                title={a.name}
-                subtitle={meta.label}
-                icon={<meta.icon size={14} aria-hidden />}
-                iconTone={a.balance < 0 ? 'red' : 'navy'}
-                value={`${a.balance < 0 ? '−' : ''}${fmt(Math.abs(a.balance))}`}
-                valueTone={a.balance < 0 ? 'red' : undefined}
-                income={fmt(a.inflow)}
-                expense={fmt(a.outflow)}
-                incomeIcon={<ArrowDownRight size={11} strokeWidth={2.4} />}
-                expenseIcon={<ArrowUpRight size={11} strokeWidth={2.4} />}
-              />
-            )
-          })}
-          {visibleAccounts.length === 0 ? (
-            <p style={{ color: 'var(--muted)', fontSize: 14, margin: 0 }}>
-              No accounts to show. Add them in Settings → Accounts.
-            </p>
-          ) : null}
-        </div>
-      </SectionBlock>
-
+      {/* 1 — The headline, and the categories that make it up. */}
       <SectionBlock
         title="Net Worth"
         icon={<Scale size={14} />}
         subtitle="Savings, gold and investments less all loans"
       >
+        <div className="ui-stack">
         <BalanceRow
           title="Net Worth"
           value={`${nw.net < 0 ? '−' : ''}${fmt(Math.abs(nw.net))}`}
@@ -186,33 +158,95 @@ export default function Overview() {
           incomeIcon={<ArrowDownRight size={11} strokeWidth={2.4} />}
           expenseIcon={<ArrowUpRight size={11} strokeWidth={2.4} />}
         />
+
+        <GroupHeading label="Assets" total={fmt(nw.assets.total)} tone="green" />
         <KpiGrid variant="compact">
           <KpiCard label="Savings" value={fmt(nw.assets.savings)} tone="muted" icon={<Banknote size={14} />} />
           <KpiCard label="Gold" value={fmt(nw.assets.gold)} tone="muted" icon={<Package size={14} />} />
           <KpiCard label="Stocks" value={fmt(nw.assets.stocks)} tone="muted" icon={<TrendingUp size={14} />} />
           <KpiCard label="Mutual Funds" value={fmt(nw.assets.mutualFunds)} tone="muted" icon={<TrendingUp size={14} />} />
         </KpiGrid>
-      </SectionBlock>
 
-      <SectionBlock title="Liabilities" icon={<Banknote size={14} />}>
+        <GroupHeading label="Liabilities" total={fmt(nw.liabilities.total)} tone="red" />
         <KpiGrid variant="compact">
           <KpiCard label="EMI loans" value={fmt(nw.liabilities.emi)} tone="muted" accentTone="red" icon={<Banknote size={14} />} />
           <KpiCard label="Jewel loans" value={fmt(nw.liabilities.jewel)} tone="muted" accentTone="red" icon={<Package size={14} />} />
           <KpiCard label="Cash loans" value={fmt(nw.liabilities.cash)} tone="muted" accentTone="red" icon={<Wallet size={14} />} />
-          <KpiCard label="Open loans" value={summary.loans.length} tone="muted" icon={<Scale size={14} />} />
+          <KpiCard
+            label="Open loans"
+            value={summary.loans.length}
+            tone="muted"
+            icon={<Scale size={14} />}
+            subtitle={summary.loans.length === 1 ? 'account' : 'accounts'}
+          />
         </KpiGrid>
+        </div>
       </SectionBlock>
 
+      {/* 2 — Receivables sit beside net worth, not inside it: money owed to you
+          is a softer asset than a balance, and folding it in would silently
+          move the figure the analysis MCP reports. */}
+      {lending.lent > 0 ? (
+        <SectionBlock
+          title="Receivables"
+          icon={<HandCoins size={14} />}
+          subtitle="Lent out and not yet repaid — counted separately from net worth"
+        >
+          <div className="ui-stack">
+          <KpiCard
+            full
+            label="Outstanding"
+            value={fmt(lending.outstanding)}
+            tone={lending.outstanding > 0 ? 'amber' : 'muted'}
+            icon={<HandCoins size={14} />}
+            subtitle={`${fmt(lending.lent)} lent · ${fmt(lending.repaid)} back`}
+          />
+          {lending.books.length > 1 ? (
+            <KpiGrid variant="compact">
+              {lending.books.map((b) => (
+                <KpiCard
+                  key={b.slug}
+                  label={b.slug === 'lending' ? 'Lending' : b.slug.replace(/-/g, ' ')}
+                  value={fmt(b.outstanding)}
+                  tone="muted"
+                  icon={<HandCoins size={14} />}
+                />
+              ))}
+            </KpiGrid>
+          ) : null}
+          </div>
+        </SectionBlock>
+      ) : null}
+
+      {/* 3 — What leaves every month regardless of behaviour. */}
       <SectionBlock title="Monthly Commitments" icon={<CalendarClock size={14} />}>
+        <div className="ui-stack">
         <KpiGrid variant="compact">
-          <KpiCard label="Loan EMIs" value={fmt(committed.emi)} tone="muted" icon={<Banknote size={14} />} />
-          <KpiCard label="Subscriptions" value={fmt(committed.subscriptions)} tone="muted" icon={<CalendarDays size={14} />} />
+          <KpiCard
+            label="Loan EMIs"
+            value={fmt(committed.emi)}
+            tone="muted"
+            icon={<Banknote size={14} />}
+            subtitle="Scheduled EMI loans only"
+          />
+          <KpiCard
+            label="Subscriptions"
+            value={fmt(committed.subscriptions)}
+            tone="muted"
+            icon={<CalendarDays size={14} />}
+            subtitle="Active plans, per month"
+          />
           <KpiCard
             label="Total committed"
             value={fmt(committed.total)}
             tone="muted"
             accentTone={committed.total > income.avgIncome * 0.5 ? 'red' : 'green'}
             icon={<Scale size={14} />}
+            subtitle={
+              income.avgIncome > 0
+                ? `${Math.round((committed.total / income.avgIncome) * 100)}% of avg income`
+                : undefined
+            }
           />
         </KpiGrid>
         {committed.upcomingRenewals.length ? (
@@ -227,7 +261,29 @@ export default function Overview() {
             </div>
           </UiCard>
         ) : null}
+        </div>
       </SectionBlock>
+
+      {/* 4 — Six cycles of direction. The data was always fetched; nothing drew it. */}
+      {trendPoints.length > 1 ? (
+        <SectionBlock
+          title="Trend"
+          icon={<LineChart size={14} />}
+          subtitle={`Last ${trendPoints.length} cycles · income vs expense`}
+          right={
+            income.sampleMonths > 0 ? (
+              <SectionChip tone={income.surplus >= 0 ? 'green' : 'red'}>
+                {income.surplus >= 0 ? '+' : '−'}{fmt(Math.abs(income.surplus))}/mo
+              </SectionChip>
+            ) : null
+          }
+        >
+          <UiCard>
+            <MiniBarChart points={trendPoints} valueFormatter={fmt} />
+          </UiCard>
+        </SectionBlock>
+      ) : null}
+
       </div>
     </div>
   )

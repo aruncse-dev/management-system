@@ -1,10 +1,19 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Check, Plus, Repeat2, Search, BarChart3, Bell, DollarSign, IndianRupee, Landmark } from 'lucide-react'
+import { Check, Plus, Repeat2, Search, BarChart3, Bell, CalendarClock, Clock, DollarSign, IndianRupee, Landmark } from 'lucide-react'
 import { api, type RawSubscriptionChargeRow, type RawSubscriptionRow, type RawVaultAppRow, type GoldSettings } from '../api'
-import { CatIcon, FormField, LoadingState, ModalActions, ModalShell, SearchField, SectionBlock, SectionChip, Spacer, KpiCard, KpiGrid } from '../ui'
+import { CatIcon, FilterChips, FormField, HoldingCard, InfoCallout, LoadingState, ModalActions, ModalShell, SearchField, SectionBlock, SectionChip, Spacer, KpiCard, KpiGrid } from '../ui'
 import { mergeCategoriesWithBudgetNames } from '../utils'
+import { isMirroredRow, MIRRORED_ROW_NOTE } from '../lib/mirroredRows'
 import { useMoneyFormatting } from '../hooks/useFormatMoney'
-import { currencySymbol, type SupportedCurrency } from '../../../../shared/utils/src/formatters'
+import {
+  currencySymbol,
+  type SupportedCurrency,
+  BILLING_CYCLES,
+  DEFAULT_USD_TO_INR,
+  daysUntil,
+  nextRenewal,
+  normalizeToMonthly,
+} from '@fintracker-vault/utils'
 import { CATEGORIES } from '../constants'
 import { useStore } from '../store'
 import { useFintrackerModes } from '../context/FintrackerModesContext'
@@ -16,6 +25,7 @@ type SubscriptionFormState = {
   currency: string
   billing_cycle: string
   start_date: string
+  end_date: string
   autopay: boolean
   status: string
   payment_method: string
@@ -47,6 +57,7 @@ const EMPTY_FORM: SubscriptionFormState = {
   currency: 'INR',
   billing_cycle: 'monthly',
   start_date: '',
+  end_date: '',
   autopay: true,
   status: 'active',
   payment_method: '',
@@ -77,30 +88,20 @@ function parseDate(value: string) {
   return Number.isNaN(dt.getTime()) ? null : dt
 }
 
-function addCycle(date: Date, cycle: string) {
-  const c = cycle.trim().toLowerCase()
-  const next = new Date(date.getTime())
-  if (c === 'yearly') next.setFullYear(next.getFullYear() + 1)
-  else if (c === 'quarterly') next.setMonth(next.getMonth() + 3)
-  else if (c === 'weekly') next.setDate(next.getDate() + 7)
-  else next.setMonth(next.getMonth() + 1)
-  return next
-}
-
-/** Next billing date: autopay rolls forward; without autopay, no date if the cycle end is already past. */
+/**
+ * Next billing date for a row.
+ *
+ * The math lives in `@fintracker-vault/utils` so this page, the `/overview`
+ * summary and the MCP server cannot drift apart again.
+ */
 function resolveNextRenewal(row: SubscriptionEntry, now = new Date()) {
-  const cycle = row.billing_cycle.trim().toLowerCase()
-  const start = parseDate(row.start_date)
-  if (!start) return null
-  let next = parseDate(row.end_date) || addCycle(start, cycle)
-  if (row.autopay) {
-    while (next < now) {
-      next = addCycle(next, cycle)
-    }
-    return next
-  }
-  if (next < now) return null
-  return next
+  return nextRenewal({
+    startDate: row.start_date,
+    endDate: row.end_date || null,
+    cycle: row.billing_cycle,
+    autopay: row.autopay,
+    now,
+  })
 }
 
 function toIsoDate(date: Date) {
@@ -114,11 +115,6 @@ function toShortDate(date: Date) {
   const d = String(date.getDate()).padStart(2, '0')
   const mon = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][date.getMonth()]
   return `${d} ${mon}`
-}
-
-function daysUntil(date: Date, now = new Date()) {
-  const ms = date.getTime() - now.getTime()
-  return Math.ceil(ms / (1000 * 60 * 60 * 24))
 }
 
 /** Autopay alert card: ≤7d red, 8–14d amber, else green. */
@@ -144,12 +140,81 @@ function currencyKpiIcon(code: SupportedCurrency) {
   return <IndianRupee size={16} aria-hidden />
 }
 
+/**
+ * Row amount in rupees.
+ *
+ * Only USD has a stored rate (`settings.usdToInr`), so only USD is converted
+ * and the currency select offers only the two it can price. Any other currency
+ * already on a row is taken at 1:1 rather than dropped.
+ */
 function rowAmountInr(row: SubscriptionEntry, usdToInr: number): number {
   const amt = Number(row.amount) || 0
   return (row.currency || 'INR').trim().toUpperCase() === 'USD' ? amt * usdToInr : amt
 }
 
 const AUTOPAY_ALERT_DAYS = 30
+
+/** `yyyy-mm`, so lexical order is chronological. */
+function monthGroupKey(dateStr: string): string {
+  const d = parseDate(dateStr)
+  if (!d) return '0000-00'
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+function monthGroupLabel(dateStr: string): string {
+  const d = parseDate(dateStr)
+  if (!d) return 'Undated'
+  const m = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()]
+  return `${m} ${d.getFullYear()}`
+}
+
+const SUBSCRIPTION_STATUSES = ['active', 'cancelled'] as const
+
+type SubscriptionTab = 'dashboard' | 'subscriptions' | 'charges'
+
+type SubscriptionStatusFilter = 'active' | 'all' | 'cancelled'
+
+/**
+ * Status chips, mirroring `LoanListFilterBar` on the loans page.
+ *
+ * Defaults to Active for the same reason loans does: opening on All buries the
+ * plans you are actually paying for under the ones you have cancelled.
+ */
+function SubscriptionStatusFilterBar({
+  value,
+  onChange,
+  activeCount,
+  cancelledCount,
+  totalCount,
+}: {
+  value: SubscriptionStatusFilter
+  onChange: (next: SubscriptionStatusFilter) => void
+  activeCount: number
+  cancelledCount: number
+  totalCount: number
+}) {
+  const options: { id: SubscriptionStatusFilter; label: string }[] = [
+    { id: 'active', label: `Active (${activeCount})` },
+    { id: 'all', label: `All (${totalCount})` },
+    { id: 'cancelled', label: `Cancelled (${cancelledCount})` },
+  ]
+  const activeLabel = options.find(o => o.id === value)?.label ?? options[0].label
+  return (
+    <FilterChips
+      items={options.map(o => o.label)}
+      active={activeLabel}
+      onChange={label => {
+        const next = options.find(o => o.label === label)?.id
+        if (next) onChange(next)
+      }}
+    />
+  )
+}
+
+/** The one definition of "active", matching the `status = 'active'` filter the summary endpoint uses. */
+function isActive(row: SubscriptionEntry): boolean {
+  return row.status.trim().toLowerCase() === 'active'
+}
 
 function normalizeRow(row: RawSubscriptionRow): SubscriptionEntry {
   return {
@@ -180,18 +245,24 @@ export default function SubscriptionsPage() {
   )
   const [rows, setRows] = useState<SubscriptionEntry[]>([])
   const [apps, setApps] = useState<RawVaultAppRow[]>([])
-  const [usdToInr, setUsdToInr] = useState(85)
+  const [usdToInr, setUsdToInr] = useState(DEFAULT_USD_TO_INR)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
-  const [tab, setTab] = useState<'dashboard' | 'subscriptions'>('dashboard')
+  const [statusFilter, setStatusFilter] = useState<SubscriptionStatusFilter>('active')
+  const [tab, setTab] = useState<SubscriptionTab>('dashboard')
+  const [chargeSearch, setChargeSearch] = useState('')
   const [mode, setMode] = useState<'add' | 'edit' | null>(null)
   const [editingId, setEditingId] = useState('')
   const [form, setForm] = useState<SubscriptionFormState>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
+  /** Modal-scoped: the page-level `error` renders behind an open modal. */
+  const [formError, setFormError] = useState('')
   const [toast, setToast] = useState('')
   const [charges, setCharges] = useState<RawSubscriptionChargeRow[]>([])
+  /** Non-fatal: the rest of the page still renders without charges. */
+  const [chargesError, setChargesError] = useState('')
 
   /**
    * Most recent charge per subscription.
@@ -215,13 +286,25 @@ export default function SubscriptionsPage() {
         api.getSubscriptionEntries(),
         api.getApps().catch(() => [] as RawVaultAppRow[]),
         api.getSettings().catch(() => ({} as GoldSettings)),
-        // Charges are new; an older database simply has none.
-        api.getSubscriptionCharges().catch(() => [] as RawSubscriptionChargeRow[]),
+        // Tolerated so a charge-read failure cannot blank the whole page, but
+        // recorded: silently showing an empty list would read as "never
+        // charged" when it actually means the read failed.
+        api
+          .getSubscriptionCharges()
+          .then(r => ({ rows: r, failed: false }))
+          .catch((e: unknown) => ({
+            rows: [] as RawSubscriptionChargeRow[],
+            failed: true,
+            message: e instanceof Error ? e.message : 'Could not load charges',
+          })),
       ])
       setRows(subscriptionRows.map(normalizeRow))
-      setCharges(chargeRows)
+      setCharges(chargeRows.rows)
+      setChargesError(
+        chargeRows.failed ? ('message' in chargeRows ? String(chargeRows.message) : 'Could not load charges') : '',
+      )
       setApps(appRows)
-      setUsdToInr(settings.usdToInr || 85)
+      setUsdToInr(settings.usdToInr || DEFAULT_USD_TO_INR)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load subscriptions')
     } finally {
@@ -231,10 +314,16 @@ export default function SubscriptionsPage() {
 
   useEffect(() => { void load() }, [])
 
+  const statusScopedRows = useMemo(() => {
+    if (statusFilter === 'all') return rows
+    if (statusFilter === 'cancelled') return rows.filter(r => !isActive(r))
+    return rows.filter(isActive)
+  }, [rows, statusFilter])
+
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return rows
-    return rows.filter(row => [
+    if (!q) return statusScopedRows
+    return statusScopedRows.filter(row => [
       row.name,
       row.category,
       row.billing_cycle,
@@ -243,59 +332,142 @@ export default function SubscriptionsPage() {
       row.notes,
       apps.find(app => app.app_uuid === row.app_uuid)?.app_name || '',
     ].join(' ').toLowerCase().includes(q))
-  }, [rows, search, apps])
+  }, [statusScopedRows, search, apps])
 
-  const monthlyPlanSumINR = useMemo(
+  const activeRows = useMemo(() => rows.filter(isActive), [rows])
+  const cancelledCount = rows.length - activeRows.length
+
+  /**
+   * What the active plans actually cost per month.
+   *
+   * Every cycle is normalised, so a yearly plan contributes a twelfth rather
+   * than nothing, and cancelled plans are excluded. This is the same figure
+   * `/overview` shows under "Subscriptions" — before, the two disagreed on
+   * both counts.
+   */
+  const monthlyRunRateINR = useMemo(
     () =>
-      rows
-        .filter(r => r.billing_cycle.trim().toLowerCase() === 'monthly')
-        .reduce((s, r) => s + rowAmountInr(r, usdToInr), 0),
-    [rows, usdToInr]
+      activeRows.reduce(
+        (sum, r) => sum + normalizeToMonthly(rowAmountInr(r, usdToInr), r.billing_cycle),
+        0,
+      ),
+    [activeRows, usdToInr],
   )
 
-  const yearlyPlanSumINR = useMemo(
-    () =>
-      rows
-        .filter(r => r.billing_cycle.trim().toLowerCase() === 'yearly')
-        .reduce((s, r) => s + rowAmountInr(r, usdToInr), 0),
-    [rows, usdToInr]
+  const annualOutlookINR = useMemo(() => monthlyRunRateINR * 12, [monthlyRunRateINR])
+
+  /** Monthly-equivalent split by cycle, so the run-rate can be read back. */
+  const runRateByCycle = useMemo(() => {
+    const acc: Record<string, number> = {}
+    for (const r of activeRows) {
+      const key = r.billing_cycle.trim().toLowerCase()
+      acc[key] = (acc[key] || 0) + normalizeToMonthly(rowAmountInr(r, usdToInr), r.billing_cycle)
+    }
+    return acc
+  }, [activeRows, usdToInr])
+
+  /**
+   * Plans whose cycle nothing can price.
+   *
+   * `normalizeToMonthly` returns 0 for an unrecognised cycle rather than
+   * guessing monthly, so these would silently vanish from the totals. Surface
+   * them instead of quietly under-reporting.
+   */
+  const unpricedRows = useMemo(
+    () => activeRows.filter(r => !(BILLING_CYCLES as readonly string[]).includes(r.billing_cycle.trim().toLowerCase())),
+    [activeRows],
   )
 
-  const weeklyQuarterlyEquivMonthlyINR = useMemo(
-    () =>
-      rows.reduce((s, r) => {
-        const c = r.billing_cycle.trim().toLowerCase()
-        const inr = rowAmountInr(r, usdToInr)
-        if (c === 'weekly') return s + inr * (52 / 12)
-        if (c === 'quarterly') return s + inr / 3
-        return s
-      }, 0),
-    [rows, usdToInr]
-  )
+  /** Charges joined to their subscription so the list can show a name, not an id. */
+  const chargeRows = useMemo(() => {
+    const nameById = new Map(rows.map(r => [r.id, r.name]))
+    return charges
+      .map(c => ({
+        id: String(c.id),
+        subscriptionId: String(c.subscription_id),
+        name: nameById.get(String(c.subscription_id)) || 'Unknown subscription',
+        date: String(c.date || ''),
+        amount: Number(c.amount) || 0,
+        note: String(c.note || ''),
+        mirrored: isMirroredRow(String(c.id)),
+      }))
+      .sort((a, b) => b.date.localeCompare(a.date))
+  }, [charges, rows])
 
-  const annualOutlookINR = useMemo(
-    () => monthlyPlanSumINR * 12 + yearlyPlanSumINR + weeklyQuarterlyEquivMonthlyINR * 12,
-    [monthlyPlanSumINR, yearlyPlanSumINR, weeklyQuarterlyEquivMonthlyINR]
-  )
+  const filteredCharges = useMemo(() => {
+    const q = chargeSearch.trim().toLowerCase()
+    if (!q) return chargeRows
+    return chargeRows.filter(c =>
+      [c.name, c.note, c.date, String(c.amount)].join(' ').toLowerCase().includes(q),
+    )
+  }, [chargeRows, chargeSearch])
 
-  const autopayRenewalAlerts = useMemo(() => {
+  /** Charges bucketed by month, newest first, with the per-month total. */
+  const chargesByMonth = useMemo(() => {
+    const groups = new Map<string, { key: string; label: string; rows: typeof filteredCharges; total: number }>()
+    for (const row of filteredCharges) {
+      const key = monthGroupKey(row.date)
+      let group = groups.get(key)
+      if (!group) {
+        group = { key, label: monthGroupLabel(row.date), rows: [], total: 0 }
+        groups.set(key, group)
+      }
+      group.rows.push(row)
+      group.total += row.amount
+    }
+    return Array.from(groups.values()).sort((a, b) => b.key.localeCompare(a.key))
+  }, [filteredCharges])
+
+  /**
+   * The next charge for every active plan, soonest first.
+   *
+   * One list feeds both the autopay alerts and the dashboard figures, so the
+   * "next renewal" card and the alert row below it can never name different
+   * dates for the same plan.
+   */
+  const upcomingCharges = useMemo(() => {
     const now = new Date()
-    type AlertItem = { row: SubscriptionEntry; date: Date; daysLeft: number }
-    return rows
-      .filter(row => row.status.trim().toLowerCase() === 'active' && row.autopay)
-      .map((row): AlertItem | null => {
+    type ChargeItem = { row: SubscriptionEntry; date: Date; daysLeft: number; amountInr: number }
+    return activeRows
+      .map((row): ChargeItem | null => {
         const date = resolveNextRenewal(row, now)
         if (!date) return null
         const daysLeft = daysUntil(date, now)
-        if (daysLeft < 0 || daysLeft > AUTOPAY_ALERT_DAYS) return null
-        return { row, date, daysLeft }
+        if (daysLeft < 0) return null
+        return { row, date, daysLeft, amountInr: rowAmountInr(row, usdToInr) }
       })
-      .filter((item): item is AlertItem => item !== null)
+      .filter((item): item is ChargeItem => item !== null)
       .sort(
-        (a, b) =>
-          a.date.getTime() - b.date.getTime() || a.row.name.localeCompare(b.row.name)
+        (a, b) => a.date.getTime() - b.date.getTime() || a.row.name.localeCompare(b.row.name),
       )
-  }, [rows])
+  }, [activeRows, usdToInr])
+
+  /**
+   * Cash actually leaving in the next 30 days.
+   *
+   * Distinct from the run-rate above, which is smoothed: a yearly plan renewing
+   * next week costs its whole price then, not a twelfth of it.
+   */
+  const dueSoonTotal = useMemo(
+    () =>
+      upcomingCharges
+        .filter(c => c.daysLeft <= AUTOPAY_ALERT_DAYS)
+        .reduce((sum, c) => sum + c.amountInr, 0),
+    [upcomingCharges],
+  )
+
+  const nextCharge = upcomingCharges[0] ?? null
+
+  /** Charges that a delete would take with it — deleting a plan is not reversible. */
+  const editingChargeCount = useMemo(
+    () => (editingId ? charges.filter(c => String(c.subscription_id) === editingId).length : 0),
+    [charges, editingId],
+  )
+
+  const autopayRenewalAlerts = useMemo(
+    () => upcomingCharges.filter(c => c.row.autopay && c.daysLeft <= AUTOPAY_ALERT_DAYS),
+    [upcomingCharges],
+  )
 
   const startAdd = () => {
     setMode('add')
@@ -314,6 +486,7 @@ export default function SubscriptionsPage() {
       currency: row.currency || 'INR',
       billing_cycle: row.billing_cycle || 'monthly',
       start_date: row.start_date || '',
+      end_date: row.end_date || '',
       autopay: row.autopay,
       status: row.status || 'active',
       payment_method: row.payment_method,
@@ -321,6 +494,7 @@ export default function SubscriptionsPage() {
       notes: row.notes,
     })
     setDeleteConfirm(false)
+    setFormError('')
   }
 
   const closeForm = () => {
@@ -328,19 +502,27 @@ export default function SubscriptionsPage() {
     setEditingId('')
     setForm(EMPTY_FORM)
     setDeleteConfirm(false)
+    setFormError('')
   }
 
   const save = async () => {
+    if (saving) return
+    setFormError('')
     if (!form.name.trim()) {
-      setError('name is required')
+      setFormError('Enter a subscription name.')
       return
     }
-    if (!form.amount.trim() || Number(form.amount) <= 0) {
-      setError('amount must be greater than 0')
+    const amount = Number(form.amount)
+    if (!form.amount.trim() || !Number.isFinite(amount) || amount <= 0) {
+      setFormError('Enter an amount greater than 0.')
       return
     }
     if (!form.start_date.trim()) {
-      setError('start_date is required')
+      setFormError('Pick a start date.')
+      return
+    }
+    if (form.end_date.trim() && form.end_date.trim() < form.start_date.trim()) {
+      setFormError('End date cannot be before the start date.')
       return
     }
     setSaving(true)
@@ -353,6 +535,7 @@ export default function SubscriptionsPage() {
         currency: form.currency.trim() || 'INR',
         billing_cycle: form.billing_cycle.trim().toLowerCase() || 'monthly',
         start_date: form.start_date.trim(),
+        end_date: form.end_date.trim(),
         autopay: form.autopay,
         status: form.status.trim().toLowerCase() || 'active',
         payment_method: form.payment_method.trim(),
@@ -369,7 +552,7 @@ export default function SubscriptionsPage() {
       setToast('Subscription saved')
       window.setTimeout(() => setToast(''), 1400)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Save failed')
+      setFormError(e instanceof Error ? e.message : 'Save failed')
     } finally {
       setSaving(false)
     }
@@ -392,14 +575,16 @@ export default function SubscriptionsPage() {
       window.setTimeout(() => setToast(''), 1400)
       closeForm()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Delete failed')
+      // Reset the confirm so a failed delete does not leave the button armed.
+      setDeleteConfirm(false)
+      setFormError(e instanceof Error ? e.message : 'Delete failed')
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <div className="ui-kit-page-shell subscriptions-page">
+    <div className="ui-kit-page-shell">
       <nav className="bottom-nav">
         <button
           type="button"
@@ -417,6 +602,14 @@ export default function SubscriptionsPage() {
           <span className="bottom-nav-icon"><Repeat2 size={19} /></span>
           <span>Subscriptions</span>
         </button>
+        <button
+          type="button"
+          className={`bottom-nav-item${tab === 'charges' ? ' active' : ''}`}
+          onClick={() => setTab('charges')}
+        >
+          <span className="bottom-nav-icon"><Clock size={19} /></span>
+          <span>Charges</span>
+        </button>
       </nav>
 
       <div className="pg subscriptions-page">
@@ -430,32 +623,75 @@ export default function SubscriptionsPage() {
             icon={<BarChart3 size={16} />}
             right={loading ? <LoadingState variant="inline" /> : null}
           >
+            <KpiCard
+              full
+              label="Monthly run-rate"
+              value={loading ? '—' : fmt(monthlyRunRateINR)}
+              tone="navy"
+              icon={currencyKpiIcon(displayCurrency)}
+              subtitle={
+                loading
+                  ? undefined
+                  : `${activeRows.length} active plan${activeRows.length === 1 ? '' : 's'}${
+                      cancelledCount ? ` · ${cancelledCount} cancelled` : ''
+                    }`
+              }
+            />
+            <Spacer size={10} />
             <KpiGrid variant="dash">
-              <KpiCard
-                label="Total subscriptions"
-                value={loading ? '—' : rows.length}
-                tone="navy"
-                icon={<Repeat2 size={16} />}
-              />
-              <KpiCard
-                label="Monthly plans"
-                value={loading ? '—' : fmt(monthlyPlanSumINR)}
-                tone="navy"
-                icon={currencyKpiIcon(displayCurrency)}
-              />
-              <KpiCard
-                label="Yearly plans"
-                value={loading ? '—' : fmt(yearlyPlanSumINR)}
-                tone="navy"
-                icon={currencyKpiIcon(displayCurrency)}
-              />
               <KpiCard
                 label="Annual outlook"
                 value={loading ? '—' : fmt(annualOutlookINR)}
                 tone="navy"
                 icon={currencyKpiIcon(displayCurrency)}
+                subtitle="Run-rate × 12"
+              />
+              <KpiCard
+                label="Active plans"
+                value={loading ? '—' : activeRows.length}
+                tone="muted"
+                icon={<Repeat2 size={16} />}
+                subtitle={cancelledCount ? `${cancelledCount} cancelled` : 'None cancelled'}
+              />
+              <KpiCard
+                label="Due in 30 days"
+                value={loading ? '—' : fmt(dueSoonTotal)}
+                tone="muted"
+                accentTone={dueSoonTotal > monthlyRunRateINR ? 'red' : undefined}
+                icon={currencyKpiIcon(displayCurrency)}
+                subtitle={
+                  loading
+                    ? undefined
+                    : `${autopayRenewalAlerts.length || upcomingCharges.filter(c => c.daysLeft <= AUTOPAY_ALERT_DAYS).length} charge${
+                        upcomingCharges.filter(c => c.daysLeft <= AUTOPAY_ALERT_DAYS).length === 1 ? '' : 's'
+                      } coming`
+                }
+              />
+              <KpiCard
+                label="Next renewal"
+                value={loading ? '—' : nextCharge ? toShortDate(nextCharge.date) : '—'}
+                tone="muted"
+                icon={<CalendarClock size={16} />}
+                subtitle={
+                  loading
+                    ? undefined
+                    : nextCharge
+                      ? `${nextCharge.row.name} · ${nextCharge.daysLeft === 0 ? 'today' : `${nextCharge.daysLeft}d`}`
+                      : 'Nothing scheduled'
+                }
               />
             </KpiGrid>
+            {!loading && unpricedRows.length > 0 ? (
+              <>
+                <Spacer size={10} />
+                <InfoCallout title="Not counted in the run-rate" tone="amber">
+                  {unpricedRows.length} plan{unpricedRows.length === 1 ? ' has' : 's have'} an
+                  unrecognised billing cycle ({unpricedRows.map(r => r.billing_cycle).filter(Boolean).join(', ') || '—'}).
+                  Edit {unpricedRows.length === 1 ? 'it' : 'them'} to a supported cycle to include{' '}
+                  {unpricedRows.length === 1 ? 'it' : 'them'}.
+                </InfoCallout>
+              </>
+            ) : null}
           </SectionBlock>
           <Spacer size={12} />
 
@@ -511,15 +747,22 @@ export default function SubscriptionsPage() {
           <SectionBlock
             title="All Subscriptions"
             icon={<Repeat2 size={16} />}
-            right={loading ? <LoadingState variant="inline" /> : <SectionChip>{rows.length}</SectionChip>}
+            right={loading ? <LoadingState variant="inline" /> : <SectionChip>{filteredRows.length}</SectionChip>}
           >
             <div className="ui-stack">
               <SearchField
                 value={search}
-                placeholder="Search subscriptions..."
+                placeholder="Search subscriptions…"
                 onChange={setSearch}
                 onClear={() => setSearch('')}
                 prefix={<Search size={14} />}
+              />
+              <SubscriptionStatusFilterBar
+                value={statusFilter}
+                onChange={setStatusFilter}
+                activeCount={activeRows.length}
+                cancelledCount={cancelledCount}
+                totalCount={rows.length}
               />
             </div>
           </SectionBlock>
@@ -528,10 +771,13 @@ export default function SubscriptionsPage() {
           {loading && <LoadingState variant="section" />}
 
           {!loading && filteredRows.length === 0 && (
-            <div className="ui-stack">
-              <div style={{ padding: '18px 14px', color: 'var(--muted)', fontSize: 13, fontWeight: 600, textAlign: 'center' }}>
-                No subscriptions found. Add one with the plus button.
-              </div>
+            <div className="gold-empty">
+              <Repeat2 size={28} />
+              <p>
+                {search || statusFilter !== 'all'
+                  ? 'No subscriptions match those filters.'
+                  : 'No subscriptions yet. Tap + to add one.'}
+              </p>
             </div>
           )}
 
@@ -563,6 +809,9 @@ export default function SubscriptionsPage() {
                         ) : null}
                       </div>
                       <div className="ui-kit-holding-card-head-right">
+                        {!isActive(row) ? (
+                          <span className="ui-pill ui-tone-muted">Cancelled</span>
+                        ) : null}
                         <div className="ui-kit-holding-icon ui-kit-holding-icon--bg ui-tone-navy">
                           <span style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--muted)', flexShrink: 0 }}>
                             <CatIcon cat={row.category || 'Others'} size={14} />
@@ -606,6 +855,87 @@ export default function SubscriptionsPage() {
         </>
       )}
 
+      {tab === 'charges' && (
+        <>
+          <SectionBlock
+            title="Charges"
+            icon={<Clock size={16} />}
+            subtitle="What these plans have actually taken"
+            right={loading ? <LoadingState variant="inline" /> : <SectionChip tone="muted">{filteredCharges.length}</SectionChip>}
+          >
+            {chargeRows.length > 0 ? (
+              <SearchField
+                value={chargeSearch}
+                placeholder="Search plan, note, amount…"
+                onChange={setChargeSearch}
+                onClear={() => setChargeSearch('')}
+                prefix={<Search size={14} />}
+              />
+            ) : null}
+          </SectionBlock>
+          <Spacer size={12} />
+
+          {loading && <LoadingState variant="section" />}
+
+          {!loading && chargesError ? (
+            <InfoCallout title="Charges could not be loaded" tone="red">
+              {chargesError}. This list is incomplete — it is not proof that nothing was charged.
+            </InfoCallout>
+          ) : null}
+
+          {!loading && !chargesError && filteredCharges.length === 0 && (
+            <div className="gold-empty">
+              <Clock size={28} />
+              <p>
+                {chargeSearch
+                  ? 'No charges match that search.'
+                  : 'No charges recorded yet. They appear here when a transaction is linked to a subscription.'}
+              </p>
+            </div>
+          )}
+
+          {!loading && filteredCharges.length > 0 && (
+            <div className="ui-stack">
+              {chargesByMonth.map(group => (
+                <section key={group.key} className="repay-month">
+                  <header className="repay-month-head">
+                    <span className="repay-month-label">{group.label}</span>
+                    <span className="repay-month-total">
+                      {fmt(group.total)}
+                      <span className="repay-month-count">
+                        {` · ${group.rows.length} charge${group.rows.length === 1 ? '' : 's'}`}
+                      </span>
+                    </span>
+                  </header>
+                  <div className="repay-month-rows">
+                    {group.rows.map(row => (
+                      <HoldingCard
+                        key={row.id}
+                        title={row.name}
+                        subtitle={row.note || (row.mirrored ? MIRRORED_ROW_NOTE : 'Charge')}
+                        leftLabel="Amount"
+                        leftValue={fmt(row.amount)}
+                        centerLabel="Date"
+                        centerValue={row.date || '-'}
+                        rightLabel="Source"
+                        rightValue={row.mirrored ? 'Transaction' : 'Manual'}
+                        accentTone={row.mirrored ? 'amber' : 'navy'}
+                        icon={<Clock size={14} />}
+                        iconPosition="right"
+                        iconBackground
+                        className="stock-entry-card"
+                      />
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+
+      {tab !== 'charges' ? (
       <button
         type="button"
         className="ui-kit-btn ui-kit-btn--solid"
@@ -627,6 +957,7 @@ export default function SubscriptionsPage() {
       >
         <Plus size={20} />
       </button>
+      ) : null}
 
       {mode && (
         <ModalShell
@@ -635,15 +966,29 @@ export default function SubscriptionsPage() {
           footer={
             <ModalActions
               secondaryLabel="Cancel"
-              primaryLabel={mode === 'add' ? 'Add' : 'Save'}
+              primaryLabel={saving ? 'Saving…' : mode === 'add' ? 'Add' : 'Save'}
               onSecondary={closeForm}
               onPrimary={save}
-              leading={mode === 'edit' ? <button type="button" className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={confirmDelete} disabled={saving}>{saving ? 'Deleting…' : deleteConfirm ? 'Confirm delete?' : 'Delete'}</button> : null}
+              leading={mode === 'edit' ? <button type="button" className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={confirmDelete} disabled={saving}>{saving
+                    ? 'Deleting…'
+                    : deleteConfirm
+                      ? `Delete "${form.name.trim() || 'this plan'}"${editingChargeCount ? ` and ${editingChargeCount} charge${editingChargeCount === 1 ? '' : 's'}` : ''}?`
+                      : 'Delete'}</button> : null}
               disabled={saving}
             />
           }
         >
           <form onSubmit={(e: FormEvent) => { e.preventDefault(); void save() }} style={{ display: 'grid', gap: 12 }}>
+            {formError ? (
+              <p className="ui-kit-callout ui-tone-red" role="alert" style={{ margin: 0 }}>{formError}</p>
+            ) : null}
+            {mode === 'edit' && editingChargeCount > 0 ? (
+              <InfoCallout title="This plan has charge history" tone="amber">
+                {editingChargeCount} recorded charge{editingChargeCount === 1 ? '' : 's'} would be deleted with it,
+                and any linked register entries unlinked. To stop billing without losing the history, set Status to
+                Cancelled instead.
+              </InfoCallout>
+            ) : null}
             <FormField label="Name">
               <input className="form-inp" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
             </FormField>
@@ -664,14 +1009,23 @@ export default function SubscriptionsPage() {
             </FormField>
             <FormField label="Billing Cycle">
               <select className="form-inp" value={form.billing_cycle} onChange={e => setForm(f => ({ ...f, billing_cycle: e.target.value }))}>
-                <option value="monthly">Monthly</option>
-                <option value="quarterly">Quarterly</option>
-                <option value="yearly">Yearly</option>
-                <option value="weekly">Weekly</option>
+                {BILLING_CYCLES.map(c => (
+                  <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+                ))}
               </select>
             </FormField>
-            <FormField label="Start Date">
+            <FormField label="Start Date *">
               <input className="form-inp" type="date" value={form.start_date} onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))} />
+            </FormField>
+            <FormField label="End Date" hint="Leave blank while the plan is open-ended. A past date stops renewals.">
+              <input className="form-inp" type="date" value={form.end_date} onChange={e => setForm(f => ({ ...f, end_date: e.target.value }))} />
+            </FormField>
+            <FormField label="Status" hint="Cancelled plans stay on record but leave the run-rate.">
+              <select className="form-inp" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
+                {SUBSCRIPTION_STATUSES.map(st => (
+                  <option key={st} value={st}>{st.charAt(0).toUpperCase() + st.slice(1)}</option>
+                ))}
+              </select>
             </FormField>
             <FormField label="Payment Method">
               <select className="form-inp" value={form.payment_method} onChange={e => setForm(f => ({ ...f, payment_method: e.target.value }))}>
@@ -701,6 +1055,8 @@ export default function SubscriptionsPage() {
                 Enabled
               </label>
             </FormField>
+            {/* Lets Enter submit without duplicating the ModalActions button. */}
+            <button type="submit" hidden aria-hidden="true" tabIndex={-1} />
           </form>
         </ModalShell>
       )}
