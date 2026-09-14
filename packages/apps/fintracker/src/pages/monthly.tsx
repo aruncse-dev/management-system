@@ -204,7 +204,6 @@ export default function Monthly() {
         {tab === 'dash' && (
           <Dashboard
             onCategoryClick={cat => { dispatch({ type: 'SET_CAT_FILTER', payload: cat }); goTab('txns') }}
-            onGoTab={goTab}
           />
         )}
         {tab === 'txns' && (
