@@ -1,7 +1,7 @@
 import type { AppProps } from 'next/app'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
-import { CalendarDays, Users } from 'lucide-react'
+import { CalendarDays, History, Users } from 'lucide-react'
 import { AppAuthGate, SimpleAppNav, type SimpleAppNavSection } from '@fintracker-vault/ui'
 import { getClientAuthEnv } from '../clientAuthEnv'
 import { StaffWorkspaceProvider } from '../StaffWorkspaceContext'
@@ -10,6 +10,7 @@ import '../styles/globals.css'
 
 const STAFF_PAGE_TITLES: Record<string, string> = {
   '/attendance': 'Attendance',
+  '/history': 'History',
   '/staffs': 'Staffs',
 }
 
@@ -18,6 +19,7 @@ const STAFF_NAV_SECTIONS: SimpleAppNavSection[] = [
     heading: 'Menu',
     items: [
       { path: '/attendance', label: 'Attendance', icon: <CalendarDays size={18} /> },
+      { path: '/history', label: 'History', icon: <History size={18} /> },
       { path: '/staffs', label: 'Staffs', icon: <Users size={18} /> },
     ],
   },

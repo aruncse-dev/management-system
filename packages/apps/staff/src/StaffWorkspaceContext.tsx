@@ -11,7 +11,16 @@ import { api } from './api'
 import type { StaffMember } from './types'
 
 type StaffWorkspaceValue = {
+  /**
+   * Every staff member, active and inactive. Inactive people still own past
+   * attendance, so dropping them here is what made history render raw ids.
+   * Use `activeStaff` for anything that creates new records.
+   */
   staffList: StaffMember[]
+  /** Staff eligible for new attendance entry. */
+  activeStaff: StaffMember[]
+  /** Name lookup that also resolves people who have since been deactivated. */
+  staffById: Map<string, StaffMember>
   staffLoading: boolean
   /** Set when the last `listStaff` request failed (initial or refresh). */
   staffError: string | null
@@ -32,7 +41,7 @@ export function StaffWorkspaceProvider({ children }: { children: ReactNode }) {
     try {
       setStaffError(null)
       const list = await api.listStaff()
-      setStaffList(list.filter(s => s.active))
+      setStaffList(list)
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Load failed'
       setStaffError(msg)
@@ -46,14 +55,19 @@ export function StaffWorkspaceProvider({ children }: { children: ReactNode }) {
     void refreshStaff()
   }, [refreshStaff])
 
+  const activeStaff = useMemo(() => staffList.filter(s => s.active), [staffList])
+  const staffById = useMemo(() => new Map(staffList.map(s => [s.id, s])), [staffList])
+
   const value = useMemo(
     () => ({
       staffList,
+      activeStaff,
+      staffById,
       staffLoading,
       staffError,
       refreshStaff,
     }),
-    [staffList, staffLoading, staffError, refreshStaff],
+    [staffList, activeStaff, staffById, staffLoading, staffError, refreshStaff],
   )
 
   return <StaffWorkspaceContext.Provider value={value}>{children}</StaffWorkspaceContext.Provider>

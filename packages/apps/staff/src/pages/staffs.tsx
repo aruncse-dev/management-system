@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Plus, Search, Users } from 'lucide-react'
+import { Plus, Search, UserCheck, Users, UserX } from 'lucide-react'
 import { api } from '../api'
 import { useStaffWorkspace } from '../StaffWorkspaceContext'
-import type { SalaryBasis, StaffMember } from '../types'
+import { WEEKLY_OFF_LABELS, type SalaryBasis, type StaffMember, type WeeklyOff } from '../types'
 import {
   FormField,
+  ListStack,
   LoadingState,
   ModalActions,
   ModalShell,
@@ -37,8 +38,29 @@ type ModalMode = 'add' | 'edit'
 /** Search is only useful once the list is a bit long; threshold is exclusive of 4 (i.e. show at 5+). */
 const STAFF_SEARCH_MIN_COUNT = 5
 
+const WEEKLY_OFF_OPTIONS: WeeklyOff[] = ['none', 'sunday', 'sat_sun']
+
+/** The single sub-line on a staff row: only what differs between people. */
+function staffMeta(s: StaffMember) {
+  const bits: string[] = []
+  if (!s.active) bits.push('Inactive')
+  // Weekly off and leave only affect monthly pay; showing them on a daily worker
+  // implies a rule that is not applied to them.
+  if (s.salaryType === 'monthly') {
+    bits.push(s.weeklyOff === 'none' ? 'No weekly off' : s.weeklyOff === 'sunday' ? 'Sun off' : 'Sat+Sun off')
+    if (s.paidLeavesPerMonth > 0) bits.push(`${s.paidLeavesPerMonth} paid leave`)
+  } else {
+    bits.push('Paid per day worked')
+  }
+  return bits.join(' · ')
+}
+
+const STATUS_FILTERS = ['Active', 'Inactive', 'All'] as const
+type StatusFilter = (typeof STATUS_FILTERS)[number]
+
 export default function StaffsPage() {
   const { staffList: rows, staffLoading: loading, staffError, refreshStaff } = useStaffWorkspace()
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('Active')
   const [toast, setToast] = useState('')
   const [search, setSearch] = useState('')
   const [modalMode, setModalMode] = useState<ModalMode | null>(null)
@@ -47,6 +69,9 @@ export default function StaffsPage() {
   const [gender, setGender] = useState('')
   const [salaryType, setSalaryType] = useState<SalaryBasis>('daily')
   const [salaryAmount, setSalaryAmount] = useState('')
+  const [weeklyOff, setWeeklyOff] = useState<WeeklyOff>('none')
+  const [paidLeaves, setPaidLeaves] = useState('0')
+  const [active, setActive] = useState(true)
   const [saving, setSaving] = useState(false)
   const [modalErr, setModalErr] = useState('')
 
@@ -55,11 +80,20 @@ export default function StaffsPage() {
     setTimeout(() => setToast(''), 2800)
   }, [])
 
+  const activeCount = useMemo(() => rows.filter(s => s.active).length, [rows])
+  const inactiveCount = rows.length - activeCount
+
+  const scoped = useMemo(() => {
+    if (statusFilter === 'All') return rows
+    const wantActive = statusFilter === 'Active'
+    return rows.filter(s => s.active === wantActive)
+  }, [rows, statusFilter])
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return rows
-    return rows.filter(s => s.name.toLowerCase().includes(q))
-  }, [rows, search])
+    if (!q) return scoped
+    return scoped.filter(s => s.name.toLowerCase().includes(q))
+  }, [scoped, search])
 
   const showSearch = rows.length >= STAFF_SEARCH_MIN_COUNT
   const searchActive = showSearch && search.trim().length > 0
@@ -76,6 +110,9 @@ export default function StaffsPage() {
     setGender('')
     setSalaryType('daily')
     setSalaryAmount('')
+    setWeeklyOff('none')
+    setPaidLeaves('0')
+    setActive(true)
   }
 
   function openEdit(s: StaffMember) {
@@ -86,6 +123,9 @@ export default function StaffsPage() {
     setGender(s.gender ?? '')
     setSalaryType(s.salaryType)
     setSalaryAmount(String(s.salaryAmount ?? 0))
+    setWeeklyOff(s.weeklyOff ?? 'none')
+    setPaidLeaves(String(s.paidLeavesPerMonth ?? 0))
+    setActive(s.active)
   }
 
   function dismissModal() {
@@ -106,17 +146,39 @@ export default function StaffsPage() {
       setModalErr('Enter a valid amount.')
       return
     }
+    const leaves = parseInt(paidLeaves, 10)
+    if (Number.isNaN(leaves) || leaves < 0 || leaves > 31) {
+      setModalErr('Paid leaves must be between 0 and 31.')
+      return
+    }
     setModalErr('')
     setSaving(true)
     let successMsg = ''
     let closedModal = false
     try {
       if (modalMode === 'add') {
-        await api.addStaff({ name: n, gender: gender || undefined, salaryType, salaryAmount: amt })
+        await api.addStaff({
+          name: n,
+          gender: gender || undefined,
+          salaryType,
+          salaryAmount: amt,
+          weeklyOff,
+          paidLeavesPerMonth: leaves,
+        })
         successMsg = '✓ Added'
       } else if (modalMode === 'edit' && editId) {
-        await api.updateStaff({ id: editId, name: n, gender: gender || undefined, salaryType, salaryAmount: amt })
-        successMsg = '✓ Saved'
+        // Always send `active` — the API only touches status when it is present.
+        await api.updateStaff({
+          id: editId,
+          name: n,
+          active,
+          gender: gender || undefined,
+          salaryType,
+          salaryAmount: amt,
+          weeklyOff,
+          paidLeavesPerMonth: leaves,
+        })
+        successMsg = active ? '✓ Saved' : '✓ Saved as inactive'
       }
       setModalMode(null)
       setEditId(null)
@@ -136,6 +198,22 @@ export default function StaffsPage() {
     <div className="ui-kit-page-shell" style={{ paddingTop: 0 }}>
       <SectionBlock title="Staff" icon={<Users size={16} />} right={<SectionChip>{rows.length}</SectionChip>}>
         <div className="ui-stack">
+          {inactiveCount > 0 ? (
+            <div className="ui-kit-filter-chips" role="radiogroup" aria-label="Staff status">
+              {STATUS_FILTERS.map(f => (
+                <button
+                  key={f}
+                  type="button"
+                  role="radio"
+                  aria-checked={statusFilter === f}
+                  className={`ui-kit-filter-chip${statusFilter === f ? ' active' : ''}`}
+                  onClick={() => setStatusFilter(f)}
+                >
+                  {f === 'Active' ? `Active (${activeCount})` : f === 'Inactive' ? `Inactive (${inactiveCount})` : `All (${rows.length})`}
+                </button>
+              ))}
+            </div>
+          ) : null}
           {showSearch ? (
             <SearchField
               value={search}
@@ -150,11 +228,11 @@ export default function StaffsPage() {
               <>
                 <span>{filtered.length} matching</span>
                 <span aria-hidden> · </span>
-                <span>{rows.length} total</span>
+                <span>{scoped.length} {statusFilter.toLowerCase()}</span>
               </>
             ) : (
               <span>
-                {rows.length} staff
+                {scoped.length} {statusFilter === 'All' ? 'staff' : `${statusFilter.toLowerCase()} staff`}
               </span>
             )}
           </div>
@@ -181,7 +259,13 @@ export default function StaffsPage() {
               gap: 6,
             }}
           >
-            <span>{rows.length === 0 ? 'No staff yet.' : 'No matches for this search.'}</span>
+            <span>
+              {rows.length === 0
+                ? 'No staff yet.'
+                : searchActive
+                  ? 'No matches for this search.'
+                  : `No ${statusFilter.toLowerCase()} staff.`}
+            </span>
             {rows.length > 0 ? (
               <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--muted)' }}>
                 {rows.length} staff total
@@ -189,22 +273,20 @@ export default function StaffsPage() {
             ) : null}
           </div>
         ) : (
-          <div className="txn-cards">
+          <ListStack>
             {filtered.map(s => (
               <TransactionCard
                 key={s.id}
+                variant="row"
                 title={s.name}
-                amount={`₹${s.salaryAmount}`}
-                type={s.gender || '—'}
-                typeLabel="Gender"
-                date={s.salaryType === 'monthly' ? 'Monthly' : 'Per day'}
-                dateLabel="Basis"
-                tone="navy"
-                icon={<Users size={14} />}
+                meta={staffMeta(s)}
+                amount={`₹${s.salaryAmount.toLocaleString('en-IN')}${s.salaryType === 'monthly' ? '/mo' : '/day'}`}
+                tone={s.active ? 'navy' : 'muted'}
+                icon={s.active ? <Users size={14} /> : <UserX size={14} />}
                 onClick={() => openEdit(s)}
               />
             ))}
-          </div>
+          </ListStack>
         )}
       </main>
 
@@ -270,6 +352,66 @@ export default function StaffsPage() {
                 placeholder="0"
               />
             </FormField>
+            {salaryType === 'monthly' ? (
+              <>
+            <FormField label="Weekly off" hint="Days they are not expected in. Sets the month's expected working days.">
+              <div className="ui-kit-filter-chips" role="radiogroup" aria-label="Weekly off">
+                {WEEKLY_OFF_OPTIONS.map(w => (
+                  <button
+                    key={w}
+                    type="button"
+                    role="radio"
+                    aria-checked={weeklyOff === w}
+                    className={`ui-kit-filter-chip${weeklyOff === w ? ' active' : ''}`}
+                    onClick={() => setWeeklyOff(w)}
+                  >
+                    {w === 'none' ? 'None' : w === 'sunday' ? 'Sunday' : 'Sat + Sun'}
+                  </button>
+                ))}
+              </div>
+            </FormField>
+            <FormField label="Paid leaves per month" hint="Absences beyond this are deducted from the monthly salary.">
+              <input
+                className="form-inp"
+                inputMode="numeric"
+                value={paidLeaves}
+                onChange={e => setPaidLeaves(e.target.value)}
+                placeholder="0"
+              />
+            </FormField>
+              </>
+            ) : null}
+            {modalMode === 'edit' ? (
+              <FormField
+                label="Status"
+                hint={
+                  active
+                    ? 'Can be marked on the attendance calendar.'
+                    : 'Hidden from the attendance calendar. Past attendance and history are kept.'
+                }
+              >
+                <div className="ui-kit-filter-chips" role="radiogroup" aria-label="Status">
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    className={`ui-kit-filter-chip${active ? ' active' : ''}`}
+                    onClick={() => setActive(true)}
+                  >
+                    <UserCheck size={13} /> Active
+                  </button>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={!active}
+                    className={`ui-kit-filter-chip${!active ? ' active' : ''}`}
+                    onClick={() => setActive(false)}
+                  >
+                    <UserX size={13} /> Inactive
+                  </button>
+                </div>
+              </FormField>
+            ) : null}
           </div>
         </ModalShell>
       ) : null}

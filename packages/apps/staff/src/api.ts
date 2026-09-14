@@ -1,5 +1,5 @@
 import { API_URL } from './constants'
-import type { AttendanceRow, MonthRef, SalaryBasis, StaffMember } from './types'
+import type { AttendanceRow, HistoryRow, MonthRef, SalaryBasis, StaffMember, WeeklyOff } from './types'
 
 type ApiResponse<T> =
   | { ok: true; data: T; traceId?: string; debug?: Record<string, unknown> }
@@ -83,7 +83,14 @@ export const api = {
 
   listStaff: () => get<StaffMember[]>('listStaff', {}),
 
-  addStaff: async (payload: { name: string; gender?: string; salaryType?: SalaryBasis; salaryAmount?: number }) => {
+  addStaff: async (payload: {
+    name: string
+    gender?: string
+    salaryType?: SalaryBasis
+    salaryAmount?: number
+    weeklyOff?: WeeklyOff
+    paidLeavesPerMonth?: number
+  }) => {
     const result = await post<StaffMember>({ action: 'addStaff', ...payload })
     invalidateCache({ action: 'listStaff', params: {} })
     return result
@@ -96,6 +103,8 @@ export const api = {
     gender?: string
     salaryType: SalaryBasis
     salaryAmount: number
+    weeklyOff?: WeeklyOff
+    paidLeavesPerMonth?: number
   }) => {
     const result = await post<StaffMember>({ action: 'updateStaff', ...payload })
     invalidateCache({ action: 'listStaff', params: {} })
@@ -103,6 +112,13 @@ export const api = {
   },
 
   getMonths: () => get<MonthRef[]>('getMonths', {}),
+
+  /** Per-staff, per-month totals and pay estimates. Omit the range for every recorded month. */
+  getHistory: (range?: { from?: string; to?: string }) =>
+    get<HistoryRow[]>('getHistory', {
+      ...(range?.from && { from: range.from }),
+      ...(range?.to && { to: range.to }),
+    }),
 
   getAttendance: (month: string, year: string) => get<AttendanceRow[]>('getAttendance', { month, year }),
 
