@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { and, asc, eq, sql } from 'drizzle-orm'
 import { encryptSensitiveField } from './sensitiveFieldCrypto'
 import { getDb } from './neon'
 import { bankingRecords, vaultApps } from './schema/vault'
@@ -6,9 +6,20 @@ import { bankingRecords, vaultApps } from './schema/vault'
 type BankingRow = typeof bankingRecords.$inferSelect
 type VaultAppRow = typeof vaultApps.$inferSelect
 
+/**
+ * Ordered by holder, then bank.
+ *
+ * Case-insensitive, because these are hand-typed and `SBI` sorting before
+ * `axis` is not an order anyone reads as alphabetical. Sorting here rather than
+ * in the page keeps every consumer agreeing on one order.
+ */
 export async function getBankingRecords(orgId: string) {
   const db = await getDb()
-  return db.select().from(bankingRecords).where(eq(bankingRecords.orgId, orgId))
+  return db
+    .select()
+    .from(bankingRecords)
+    .where(eq(bankingRecords.orgId, orgId))
+    .orderBy(asc(sql`lower(coalesce(${bankingRecords.holderName}, ''))`), asc(sql`lower(${bankingRecords.bankName})`))
 }
 
 export async function getBankingRecord(orgId: string, id: string) {
@@ -100,9 +111,14 @@ export async function deleteBankingRecord(orgId: string, id: string) {
   await db.delete(bankingRecords).where(and(eq(bankingRecords.orgId, orgId), eq(bankingRecords.id, id)))
 }
 
+/** Alphabetical by name, case-insensitive. */
 export async function getVaultApps(orgId: string) {
   const db = await getDb()
-  return db.select().from(vaultApps).where(eq(vaultApps.orgId, orgId))
+  return db
+    .select()
+    .from(vaultApps)
+    .where(eq(vaultApps.orgId, orgId))
+    .orderBy(asc(sql`lower(${vaultApps.appName})`))
 }
 
 export async function getVaultApp(orgId: string, id: string) {

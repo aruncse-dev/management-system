@@ -18,6 +18,8 @@ export const middleware = createFtMiddleware({
   getSessionOptions,
   lowercaseRoutes: LOWERCASE_ROUTES,
   isPublicPath,
+  // Admin's `/` is a redirect stub, not a login screen — see `loginPath`.
+  loginPath: '/admin/login',
 })
 
 export const config = {

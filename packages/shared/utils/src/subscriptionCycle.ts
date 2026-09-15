@@ -12,9 +12,15 @@
  * (the anchored month, e.g. 19 Apr – 18 May). That is an unrelated concept.
  */
 
-export type BillingCycle = 'weekly' | 'monthly' | 'quarterly' | 'yearly'
+export type BillingCycle = 'weekly' | 'monthly' | 'quarterly' | 'half_yearly' | 'yearly'
 
-export const BILLING_CYCLES: readonly BillingCycle[] = ['weekly', 'monthly', 'quarterly', 'yearly']
+export const BILLING_CYCLES: readonly BillingCycle[] = [
+  'weekly',
+  'monthly',
+  'quarterly',
+  'half_yearly',
+  'yearly',
+]
 
 /** Rupees per USD when the org has not set a rate. One value, server and client. */
 export const DEFAULT_USD_TO_INR = 83
@@ -30,10 +36,11 @@ export const DEFAULT_USD_TO_INR = 83
  */
 const MAX_CORRECTION_STEPS = 8
 
-const MONTHS_PER_CYCLE: Record<BillingCycle, number> = {
+export const MONTHS_PER_CYCLE: Record<BillingCycle, number> = {
   weekly: 0, // handled by day arithmetic, not months
   monthly: 1,
   quarterly: 3,
+  half_yearly: 6,
   yearly: 12,
 }
 
@@ -43,9 +50,17 @@ const MONTHS_PER_CYCLE: Record<BillingCycle, number> = {
  * Both previous copies used a `default:` branch that silently treated an
  * unrecognised cycle as monthly, so a `half-yearly` row was costed at 6× its
  * real monthly rate. Callers now decide what to do with an unknown cycle.
+ *
+ * Separators are normalised before comparing (`Half-Yearly`, `half yearly` and
+ * `half_yearly` are one cycle, not three), because `insurance.premium_mode` has
+ * always been free text and carries every spelling. Normalising is not
+ * guessing — an unrecognised *word* still returns `null`.
  */
 export function parseBillingCycle(raw: string): BillingCycle | null {
-  const c = String(raw ?? '').trim().toLowerCase()
+  const c = String(raw ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_')
   return (BILLING_CYCLES as readonly string[]).includes(c) ? (c as BillingCycle) : null
 }
 
@@ -65,6 +80,8 @@ export function normalizeToMonthly(amount: number, cycle: string): number {
       return amount
     case 'quarterly':
       return amount / 3
+    case 'half_yearly':
+      return amount / 6
     case 'yearly':
       return amount / 12
     default:
@@ -91,6 +108,9 @@ export function addCycle(date: Date, cycle: string): Date {
       break
     case 'quarterly':
       next.setMonth(next.getMonth() + 3)
+      break
+    case 'half_yearly':
+      next.setMonth(next.getMonth() + 6)
       break
     case 'yearly':
       next.setFullYear(next.getFullYear() + 1)

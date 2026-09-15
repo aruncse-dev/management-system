@@ -282,7 +282,7 @@ export default function VaultHealthPage() {
       </SectionBlock>
 
       {dueToday.length > 0 && (
-        <div className="card" style={{ margin: '0 16px 12px', padding: 12, background: 'rgba(30,92,199,.08)', border: '1px solid rgba(30,92,199,.2)' }}>
+        <div className="card" style={{ margin: '0 0 12px', padding: 12, background: 'rgba(30,92,199,.08)', border: '1px solid rgba(30,92,199,.2)' }}>
           <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 6 }}>Reminder times today</div>
           {dueToday.map(line => (
             <div key={line} style={{ fontSize: 13 }}>{line}</div>

@@ -1,10 +1,15 @@
-import { and, eq } from 'drizzle-orm'
+import { and, asc, eq, sql } from 'drizzle-orm'
 import { getDb } from './neon'
 import { persons, vaultDocuments } from './schema/vault'
 
+/** Alphabetical by name, case-insensitive — this list is also every person picker. */
 export async function getPersons(orgId: string) {
   const db = await getDb()
-  return db.select().from(persons).where(eq(persons.orgId, orgId))
+  return db
+    .select()
+    .from(persons)
+    .where(eq(persons.orgId, orgId))
+    .orderBy(asc(sql`lower(${persons.name})`))
 }
 
 export async function getPerson(orgId: string, uuid: string) {

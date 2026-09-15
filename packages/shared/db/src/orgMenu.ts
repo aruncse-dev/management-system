@@ -47,27 +47,6 @@ export async function setOrgEnabledMenuIds(
 }
 
 
-/**
- * Menus that ride along with another enabled menu, so they need no separate
- * `enabled_menus` entry.
- *
- * `overview` is the portfolio-wide companion to `dashboard` (Monthly Expenses):
- * it reads the same finance data, so any org that tracks monthly expenses
- * should see it without an extra admin toggle.
- */
-const MENU_COMPANIONS: Record<string, string[]> = {
-  dashboard: ['overview'],
-}
-
-/** Expand an org's enabled set with any companion menus it implies. */
-function withCompanions(enabled: Set<string>): Set<string> {
-  const out = new Set(enabled)
-  for (const id of enabled) {
-    for (const companion of MENU_COMPANIONS[id] ?? []) out.add(companion)
-  }
-  return out
-}
-
 export type ResolvedMenuItem = {
   id: string
   slug: string
@@ -82,10 +61,20 @@ export type ResolvedMenuItem = {
 /** Get enabled menus for an org and app (from static data + org config). */
 export async function getEnabledOrgMenu(orgId: string, appSlug: string): Promise<ResolvedMenuItem[]> {
   const menuConfig = await getOrgMenuConfig(orgId)
-  const configured = new Set(menuConfig[appSlug] ?? [])
+  /**
+   * The org's stored set, used as-is.
+   *
+   * `overview` used to be added here implicitly whenever `dashboard` was on.
+   * That made the admin toggle a lie: `getOrgMenuEditorState` reads the raw
+   * stored set, so unticking Overview saved as off, displayed as off, and
+   * changed nothing. Every menu is now explicit, so the two agree.
+   *
+   * Orgs relying on the old implicit rule were backfilled by
+   * `20260914130000_overview_explicit_menu.sql`.
+   */
+  const enabledMenuIds = new Set(menuConfig[appSlug] ?? [])
 
-  if (configured.size === 0) return []
-  const enabledMenuIds = withCompanions(configured)
+  if (enabledMenuIds.size === 0) return []
 
   const appMenus = STATIC_MENUS[appSlug as AppSlug]
   if (!appMenus) return []

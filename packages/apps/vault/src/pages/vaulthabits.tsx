@@ -355,7 +355,7 @@ export default function VaultHabitsPage() {
       </SectionBlock>
 
       {tab === 'dashboard' && (
-        <div className="pg" style={{ paddingTop: 8, paddingLeft: 16, paddingRight: 16 }}>
+        <div className="pg" style={{ paddingTop: 8 }}>
           {loading ? (
             <div className="muted">Loading…</div>
           ) : (

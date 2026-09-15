@@ -26,6 +26,11 @@ import {
   subscriptions,
   subscriptionCharges,
   transactions,
+  insurance,
+  insurancePremiums,
+  getInsurancePolicies,
+  getInsurancePremiums,
+  vaultApps,
   getIntegrationProviderBySlug,
   integrationHasCredentials,
   resolveIntegrationProviderCredentials,
@@ -386,6 +391,17 @@ export const MIRROR_ID_PREFIX = 'txn:'
 const LENDING_REF_KIND = 'lending'
 const SUBSCRIPTION_REF_KIND = 'subscription'
 
+/**
+ * Insurance premiums.
+ *
+ * The odd one out: the policy row lives in the *vault* app's tables, not this
+ * one. The register still links to it and mirrors premiums into
+ * `insurance_premiums` exactly as it does for subscriptions — same database,
+ * same org scope — but every policy write belongs to vault. Reads here are
+ * deliberately narrow: a label and an amount, never the vault's contents.
+ */
+const INSURANCE_REF_KIND = 'insurance'
+
 const SUBSCRIPTION_STATUSES = ['active', 'cancelled'] as const
 
 /** Accepts only the statuses the UI and `getCommittedMonthlyOutflow` understand. */
@@ -532,9 +548,16 @@ async function resolveSavingsTransferTarget(
  *
  *   emi_loan      loan's `emi_amount`      — fixed, no part payment
  *   subscription  subscription's `amount`  — the plan price
+ *   insurance     policy's `premium`       — the contracted premium
  *   savings       account's `rd_instalment` when the account is an RD
  *   jewel/cash    none — repayments genuinely vary, so the transaction wins
  *   lending       none — every amount is its own
+ *
+ * Insurance has a wrinkle the others don't: a real premium debit can carry GST
+ * or a late fee, so the ledger deliberately tracks the *contract* while the
+ * register keeps the actual rupees. When the exact amount matters more, deleting
+ * the mirrored row unlinks the pair (keeping the transaction) and a manual
+ * premium can be typed in vault instead.
  */
 async function scheduledAmountFor(
   db: ReturnType<typeof getDb>,
@@ -558,6 +581,15 @@ async function scheduledAmountFor(
       .where(and(whereOrgFilter(subscriptions, scope), eq(subscriptions.id, refId)))
       .limit(1)
     const n = Number(sub?.v)
+    return Number.isFinite(n) && n > 0 ? n : null
+  }
+  if (kind === INSURANCE_REF_KIND) {
+    const [policy] = await db
+      .select({ v: insurance.premium })
+      .from(insurance)
+      .where(and(whereOrgFilter(insurance, scope), eq(insurance.id, refId)))
+      .limit(1)
+    const n = Number(policy?.v)
     return Number.isFinite(n) && n > 0 ? n : null
   }
   if (kind === SAVINGS_REF_KIND) {
@@ -603,7 +635,23 @@ async function syncTransactionMirror(
   const prevSub = opts.prevRefKind === SUBSCRIPTION_REF_KIND
   const nextSub =
     opts.refKind === SUBSCRIPTION_REF_KIND && opts.refId && opts.amount > 0 && opts.type === 'Expense'
-  if (!prev && !next && !prevSavings && !nextSavings && !prevLending && !nextLending && !prevSub && !nextSub)
+  const prevIns = opts.prevRefKind === INSURANCE_REF_KIND
+  // Expense-only, deliberately: a maturity payout or a claim is money coming
+  // back *in* and is not a premium.
+  const nextIns =
+    opts.refKind === INSURANCE_REF_KIND && opts.refId && opts.amount > 0 && opts.type === 'Expense'
+  if (
+    !prev &&
+    !next &&
+    !prevSavings &&
+    !nextSavings &&
+    !prevLending &&
+    !nextLending &&
+    !prevSub &&
+    !nextSub &&
+    !prevIns &&
+    !nextIns
+  )
     return
 
   const pairedId = `${MIRROR_ID_PREFIX}${opts.txnId}`
@@ -639,6 +687,23 @@ async function syncTransactionMirror(
       id: pairedId,
       orgId,
       subscriptionId: opts.refId,
+      date: opts.isoDate,
+      amount: String(scheduled ?? opts.amount),
+      note: opts.note || 'From transaction',
+    })
+  }
+
+  if (prevIns) {
+    await db
+      .delete(insurancePremiums)
+      .where(and(whereOrgFilter(insurancePremiums, scope), eq(insurancePremiums.id, pairedId)))
+  }
+  if (nextIns && opts.refId) {
+    const scheduled = await scheduledAmountFor(db, scope, INSURANCE_REF_KIND, opts.refId)
+    await db.insert(insurancePremiums).values({
+      id: pairedId,
+      orgId,
+      policyId: opts.refId,
       date: opts.isoDate,
       amount: String(scheduled ?? opts.amount),
       note: opts.note || 'From transaction',
@@ -1138,6 +1203,88 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         }
       }
 
+
+      /**
+       * Insurance policies, read-only.
+       *
+       * The policy rows belong to the vault app; this endpoint exists so the
+       * register can offer them in the ref picker and show a due date. The
+       * projection is deliberately narrow — no policy number, no nominee, no
+       * notes. The register needs a label and an amount, not the vault's
+       * contents, and widening this is how a records app leaks into a money app.
+       */
+      if (mod === 'insurance' && action === 'getEntries') {
+        const rows = await getInsurancePolicies(db, scopeOrgId)
+        return ok(
+          res,
+          rows.map((r) => ({
+            id: r.id,
+            plan_name: r.planName,
+            insurer: r.insurer,
+            policy_type: r.policyType,
+            premium_amount: r.premium,
+            premium_mode: r.premiumModeRaw,
+            premium_mode_label: r.premiumModeLabel,
+            status: r.status,
+            next_due: r.nextDue ?? '',
+            days_until_due: r.daysUntilDue,
+            monthly_cost: r.monthlyCost,
+          })),
+          traceId,
+        )
+      }
+
+      if (mod === 'insurance' && action === 'getPremiums') {
+        const policyId = typeof req.query.policy_id === 'string' ? req.query.policy_id : undefined
+        const rows = await getInsurancePremiums(db, scopeOrgId, policyId)
+        return ok(
+          res,
+          rows.map((r) => ({
+            id: r.id,
+            policy_id: r.policyId,
+            date: r.date,
+            amount: r.amount,
+            note: r.note,
+          })),
+          traceId,
+        )
+      }
+
+      /**
+       * Vault apps, read-only — name and logo only.
+       *
+       * `subscriptions.app_uuid` points at a `vault_apps` row, and the
+       * subscriptions page has always called this to show which app a plan
+       * belongs to. Until now there was no handler, so the call 400'd, the
+       * error was swallowed by a `.catch(() => [])`, and the app-name column
+       * was permanently blank while search by app name silently never matched.
+       *
+       * Hand-written projection rather than `select()` on purpose: the table
+       * also holds `username_enc` and `password_enc`, and those must never
+       * reach the register.
+       */
+      if (mod === 'vault' && action === 'getApps') {
+        const rows = await db
+          .select({
+            id: vaultApps.id,
+            appName: vaultApps.appName,
+            appLink: vaultApps.appLink,
+            logo: vaultApps.logo,
+          })
+          .from(vaultApps)
+          .where(whereOrgFilter(vaultApps, budgetScope))
+          .orderBy(desc(vaultApps.appName))
+        return ok(
+          res,
+          rows.map((r) => ({
+            app_uuid: r.id,
+            app_name: r.appName,
+            app_link: r.appLink ?? '',
+            logo: r.logo ?? '',
+          })),
+          traceId,
+        )
+      }
 
       if (mod === 'subscriptions' && action === 'getCharges') {
         // Newest first: the only question anyone asks of this list is "when was

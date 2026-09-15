@@ -103,6 +103,24 @@ export default function VaultAppsPage() {
     ].join(' ').toLowerCase().includes(q))
   }, [rows, search])
 
+  /**
+   * Apps grouped by category.
+   *
+   * A flat 3-column icon grid of every app gave no way to find one by kind; the
+   * `category` was stored and never shown. The server already returns these
+   * alphabetically, so this only preserves that order within each group.
+   */
+  const groupedRows = useMemo(() => {
+    const groups = new Map<string, typeof filteredRows>()
+    for (const row of filteredRows) {
+      const key = (row.category || '').trim() || 'Other'
+      const list = groups.get(key)
+      if (list) list.push(row)
+      else groups.set(key, [row])
+    }
+    return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b))
+  }, [filteredRows])
+
   const startAdd = () => {
     setMode('add')
     setEditingUuid('')
@@ -221,13 +239,20 @@ export default function VaultAppsPage() {
       {loading ? (
         <div className="ui-kit-loading ui-kit-loading--page">Loading…</div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 4 }}>
+        <div className="ui-stack">
           {filteredRows.length === 0 ? (
-            <div style={{ gridColumn: '1 / -1', padding: '18px 14px', color: 'var(--muted)', fontSize: 13, fontWeight: 600, textAlign: 'center' }}>
+            <div style={{ padding: '18px 14px', color: 'var(--muted)', fontSize: 13, fontWeight: 600, textAlign: 'center' }}>
               No apps found. Add one with the plus button.
             </div>
           ) : (
-            filteredRows.map(row => (
+            groupedRows.map(([category, group]) => (
+            <div key={category} style={{ display: 'grid', gap: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', padding: '4px 2px' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)' }}>{category}</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)' }}>{group.length}</div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 4 }}>
+            {group.map(row => (
               <div
                 key={row.app_uuid}
                 style={{
@@ -268,6 +293,9 @@ export default function VaultAppsPage() {
                   </div>
                 </button>
               </div>
+            ))}
+              </div>
+            </div>
             ))
           )}
         </div>

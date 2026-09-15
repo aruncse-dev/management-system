@@ -1,4 +1,4 @@
-import { boolean, date, numeric, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
+import { boolean, date, integer, numeric, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
 
 export const vaultApps = pgTable('vault_apps', {
   id: text('id').primaryKey(),
@@ -54,6 +54,41 @@ export const insurance = pgTable('insurance', {
   owner: text('owner'),
   premium: numeric('premium', { precision: 12, scale: 2 }),
   premiumMode: text('premium_mode'),
+  /**
+   * `active` | `lapsed` | `paid_up` | `matured`.
+   *
+   * Only `active` is offered for linking in the register and only `active` is
+   * summed into the committed monthly outflow — a paid-up policy is still a
+   * record worth keeping, but it is not money you owe every month.
+   */
+  status: text('status').default('active').notNull(),
+  /**
+   * Premiums paid before row-level tracking existed — an OPENING count, added
+   * to `insurance_premiums` rows rather than replaced by them (the same
+   * contract as `emiLoans.paidEmis`).
+   *
+   * Keeps the paid count honest without inventing payment rows whose dates
+   * nobody could vouch for, and stays hand-editable afterwards.
+   */
+  paidPremiumsOpening: integer('paid_premiums_opening').default(0).notNull(),
+  /**
+   * Years of premiums, when that differs from the policy term.
+   *
+   * Regular-pay plans pay until maturity and leave this null. A limited-pay
+   * plan ("pay 10, covered 30") stops billing long before maturity, and without
+   * this the schedule would keep inventing premiums for the remaining years.
+   */
+  premiumPaymentTermYears: integer('premium_payment_term_years'),
+  /**
+   * The end date is a renewal, not a maturity.
+   *
+   * Health and motor cover run a year at a time and roll over, so the schedule
+   * must not stop at `maturityDate`. False for life and term, which really do
+   * end.
+   */
+  renews: boolean('renews').default(false).notNull(),
+  /** E-card or policy pack link. Same shape as `vaultDocuments.driveUrl`. */
+  ecardUrl: text('ecard_url'),
   paymentMethod: text('payment_method'),
   issueDate: date('issue_date'),
   maturityDate: date('maturity_date'),
@@ -63,6 +98,47 @@ export const insurance = pgTable('insurance', {
   notes: text('notes'),
   personUuid: text('person_uuid'),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
+/**
+ * Premiums actually paid for a policy — mirrors `subscriptionCharges` and the
+ * three loan repayment tables.
+ *
+ * A premium posted from a linked transaction gets the derived id
+ * `txn:<txnId>`, so the register entry and the premium stay one fact rather
+ * than two.
+ *
+ * This is a MIRROR, not a second expense. Anything computing spend reads
+ * `transactions` and nothing else — summing both double-counts every premium.
+ */
+export const insurancePremiums = pgTable('insurance_premiums', {
+  id: text('id').primaryKey(),
+  orgId: text('org_id'),
+  policyId: text('policy_id').notNull(),
+  date: date('date').notNull(),
+  amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
+  note: text('note'),
+})
+
+/**
+ * People covered by a policy.
+ *
+ * `insurance.personUuid` stays the policy HOLDER — who owns the contract —
+ * which is a different question from who it covers. A group or family-floater
+ * policy covers several people, so that side is its own table.
+ */
+export const insuranceMembers = pgTable('insurance_members', {
+  id: text('id').primaryKey(),
+  orgId: text('org_id'),
+  policyId: text('policy_id').notNull(),
+  personUuid: text('person_uuid').notNull(),
+  /**
+   * `insured` | `nominee` — the capacity this person appears in.
+   *
+   * A policy names people for two different reasons and they are not the same
+   * list: the insured is who it covers, the nominee is who it pays.
+   */
+  role: text('role').default('insured').notNull(),
 })
 
 export const vaultDocuments = pgTable('vault_documents', {
