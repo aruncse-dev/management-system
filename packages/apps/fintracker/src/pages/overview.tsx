@@ -1,18 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import {
-  TrendingUp,
-  Banknote,
-  Package,
-  Wallet,
-  ArrowDownRight,
-  ArrowUpRight,
-  Scale,
-  Lightbulb,
-  CalendarClock,
-  CalendarDays,
-  HandCoins,
-  LineChart,
-} from 'lucide-react'
+import { ArrowDownRight, ArrowUpRight, Banknote, CalendarClock, CalendarDays, HandCoins, Lightbulb, LineChart, Package, Scale, Shield, TrendingUp, Wallet } from 'lucide-react'
 import { useFormatMoney } from '../hooks/useFormatMoney'
 import {
   BalanceRow,
@@ -237,6 +224,13 @@ export default function Overview() {
             subtitle="Active plans, per month"
           />
           <KpiCard
+            label="Insurance"
+            value={fmt(committed.insurance)}
+            tone="muted"
+            icon={<Shield size={14} />}
+            subtitle="Active policies, per month"
+          />
+          <KpiCard
             label="Total committed"
             value={fmt(committed.total)}
             tone="muted"
@@ -250,12 +244,32 @@ export default function Overview() {
           />
         </KpiGrid>
         {committed.upcomingRenewals.length ? (
-          <UiCard subtitle={`${committed.upcomingRenewals.length} renewal(s) in the next 30 days`}>
+          <UiCard
+            subtitle={(() => {
+              // Overdue premiums are counted separately: a subscription bills
+              // itself whether you look or not, but an unpaid premium is a
+              // thing you have to go and do.
+              const overdue = committed.upcomingRenewals.filter((r) => r.daysLeft < 0).length
+              const soon = committed.upcomingRenewals.length - overdue
+              return [
+                overdue ? `${overdue} overdue` : '',
+                soon ? `${soon} due in the next 30 days` : '',
+              ]
+                .filter(Boolean)
+                .join(' · ')
+            })()}
+          >
             <div className="dash-overflow-list">
               {committed.upcomingRenewals.slice(0, 8).map((r) => (
-                <div key={`${r.name}-${r.dueDate}`} className="dash-tag">
+                <div
+                  key={`${r.kind}-${r.name}-${r.dueDate}`}
+                  className="dash-tag"
+                  style={r.daysLeft < 0 ? { color: 'var(--red, #B91C1C)' } : undefined}
+                >
                   <span>{r.name}</span>
-                  <span>{fmt(r.amount)} · {r.daysLeft}d</span>
+                  <span>
+                    {fmt(r.amount)} · {r.daysLeft < 0 ? `${Math.abs(r.daysLeft)}d overdue` : `${r.daysLeft}d`}
+                  </span>
                 </div>
               ))}
             </div>

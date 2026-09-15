@@ -123,6 +123,25 @@ export function VaultBankingPage() {
     })
   }, [rows, search])
 
+  /**
+   * Accounts grouped by whose they are.
+   *
+   * One flat list made it hard to see whose account was whose once the same
+   * bank appeared under two holders. The server already returns these ordered
+   * by holder then bank, so this only has to preserve that order rather than
+   * re-sort.
+   */
+  const groupedRows = useMemo(() => {
+    const groups = new Map<string, typeof filteredRows>()
+    for (const row of filteredRows) {
+      const key = (row.account_holder_name || '').trim() || 'Unassigned'
+      const list = groups.get(key)
+      if (list) list.push(row)
+      else groups.set(key, [row])
+    }
+    return [...groups.entries()]
+  }, [filteredRows])
+
   const startAdd = () => {
     setMode('add')
     setEditingId('')
@@ -248,7 +267,15 @@ export function VaultBankingPage() {
           {filteredRows.length === 0 ? (
             <div className="lb">No entries</div>
           ) : (
-            filteredRows.map(row => {
+            groupedRows.map(([holder, group]) => (
+              <div key={holder} style={{ display: 'grid', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', padding: '4px 2px' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)' }}>{holder}</div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                    {group.length} {group.length === 1 ? 'account' : 'accounts'}
+                  </div>
+                </div>
+                {group.map(row => {
               const app = apps.find(item => item.app_uuid === row.app_uuid)
               return (
                 <div key={row.id} style={{ display: 'grid', gap: 6 }}>
@@ -293,7 +320,9 @@ export function VaultBankingPage() {
                   />
                 </div>
               )
-            })
+                })}
+              </div>
+            ))
           )}
         </div>
       )}

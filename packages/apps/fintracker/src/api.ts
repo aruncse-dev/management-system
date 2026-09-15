@@ -376,25 +376,36 @@ export interface RawVaultAppRow {
   updated_at?: string;
 }
 
+/**
+ * An insurance policy as the REGISTER sees it.
+ *
+ * Deliberately narrower than vault's own row: the policy is a vault record, and
+ * this app only needs a label, an amount and a due date to link a transaction
+ * to it. No policy number, no nominee, no notes — widening this is how a
+ * records app leaks into a money app.
+ */
 export interface RawInsuranceRow {
   id: string;
-  policy_type: string;
   plan_name: string;
   insurer: string;
-  app_uuid?: string;
-  policy_number: string;
-  policy_owner: string;
-  premium_amount: number | string;
+  policy_type: string;
+  premium_amount: number;
   premium_mode: string;
-  payment_method: string;
-  policy_term: string;
-  issue_date: string;
-  maturity_date: string;
-  sum_assured: number | string;
-  cash_value: number | string;
-  nominee_name: string;
-  notes: string;
-  updated_at?: string;
+  premium_mode_label: string;
+  /** 'active' | 'lapsed' | 'paid_up' | 'matured' — only active is linkable. */
+  status: string;
+  next_due: string;
+  /** Negative when overdue. */
+  days_until_due: number | null;
+  monthly_cost: number;
+}
+
+export interface RawInsurancePremiumRow {
+  id: string;
+  policy_id: string;
+  date: string;
+  amount: number;
+  note: string;
 }
 
 export interface RawSubscriptionRow {
@@ -470,8 +481,20 @@ export type DashboardSummary = {
   committed: {
     emi: number
     subscriptions: number
+    /** Active policies, monthly-normalised. Single-premium policies contribute 0. */
+    insurance: number
     total: number
-    upcomingRenewals: { name: string; amount: number; dueDate: string; daysLeft: number }[]
+    /**
+     * Due soon, across subscriptions and insurance. `daysLeft` may be NEGATIVE
+     * for a premium: an unpaid one is overdue, not quietly renewed.
+     */
+    upcomingRenewals: {
+      name: string
+      amount: number
+      dueDate: string
+      daysLeft: number
+      kind: 'subscription' | 'insurance'
+    }[]
   }
   budget: { total: number; spent: number }
   /** All-time balance per payment account (opening balance + every transaction). */
@@ -669,24 +692,16 @@ export const api = {
     invalidateCache({ action: 'getApp', params: { module: 'vault', app_uuid: appUuid } })
     return result
   },
-  getInsuranceEntries: ()                   => get<RawInsuranceRow[]>('getEntries', { module: 'insurance' }),
-  addInsuranceEntry: async (p: Record<string, unknown>) => {
-    const result = await post<string>({ module: 'insurance', action: 'addEntry', ...p })
-    invalidateCache({ action: 'getEntries', params: { module: 'insurance' } })
-    return result
-  },
-  updateInsuranceEntry: async (p: Record<string, unknown>) => {
-    const result = await post<boolean>({ module: 'insurance', action: 'updateEntry', ...p })
-    invalidateCache({ action: 'getEntries', params: { module: 'insurance' } })
-    if (typeof p.id === 'string') invalidateCache({ action: 'getEntry', params: { module: 'insurance', id: p.id } })
-    return result
-  },
-  deleteInsuranceEntry: async (id: string) => {
-    const result = await post<boolean>({ module: 'insurance', action: 'deleteEntry', id })
-    invalidateCache({ action: 'getEntries', params: { module: 'insurance' } })
-    invalidateCache({ action: 'getEntry', params: { module: 'insurance', id } })
-    return result
-  },
+  /**
+   * Policies, read-only.
+   *
+   * Vault owns every policy write — the form, the persons join and the app link
+   * all live there. The add/update/delete stubs that used to sit here targeted a
+   * module this app has never implemented and returned 400 on every call.
+   */
+  getInsuranceEntries: () => get<RawInsuranceRow[]>('getEntries', { module: 'insurance' }),
+  getInsurancePremiums: (policyId?: string) =>
+    get<RawInsurancePremiumRow[]>('getPremiums', { module: 'insurance', ...(policyId ? { policy_id: policyId } : {}) }),
   getSubscriptionEntries: ()                   => get<RawSubscriptionRow[]>('getEntries', { module: 'subscriptions' }),
   getSubscriptionCharges: ()                   => get<RawSubscriptionChargeRow[]>('getCharges', { module: 'subscriptions' }),
   addSubscriptionEntry: async (p: Record<string, unknown>) => {

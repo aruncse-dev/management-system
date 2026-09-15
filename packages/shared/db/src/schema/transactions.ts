@@ -17,8 +17,11 @@ export const transactions = pgTable('transactions', {
   monthYear: text('month_year').notNull(),
   /**
    * Soft reference to the module row this transaction represents
-   * (`jewel_loan` | `cash_loan` | `emi_loan` | `savings` | `lending` | `subscription`).
+   * (`jewel_loan` | `cash_loan` | `emi_loan` | `savings` | `lending` |
+   * `subscription` | `insurance`).
    * Deliberately not a foreign key — see the 2026-09-08-fintracker-spine migration.
+   * `insurance` points at a policy the *vault* app owns, so the target row can
+   * be created and deleted by a different app than the one writing this link.
    */
   refKind: text('ref_kind'),
   /** Target row id for `refKind`. Unconstrained: may dangle if the target is deleted. */

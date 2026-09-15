@@ -46,6 +46,22 @@ function cacheKey(action: string, params: Record<string, string>) {
   return `${action}\0${JSON.stringify(sorted)}`;
 }
 
+/**
+ * Drop every cached insurance read.
+ *
+ * Policies and premiums are one fact split across two endpoints: recording a
+ * payment changes the policy's due date and paid count as well as the ledger.
+ * Invalidating only the endpoint that was written would leave the 60s GET cache
+ * serving a stale due date right after the user paid it.
+ *
+ * `getPremiums` is called both with and without a `policy_id`, so it is matched
+ * by action alone rather than by an exact param set.
+ */
+function invalidateInsurance() {
+  invalidateCache({ action: 'getEntries', params: { module: 'insurance' } });
+  invalidateCache({ action: 'getPremiums' });
+}
+
 function invalidateCache(matcher?: { action?: string; params?: Record<string, string> }) {
   if (!matcher) {
     getCache.clear();
@@ -281,6 +297,48 @@ export interface RawInsuranceRow {
   notes: string;
   updated_at?: string;
   person_uuid?: string;
+  /** 'active' | 'lapsed' | 'paid_up' | 'matured' */
+  status: string;
+  premium_mode_label: string;
+  /** Premiums paid before row-level tracking existed; ADDED to the ledger rows. */
+  paid_premiums_opening: number;
+  /** opening + ledger rows. Display only — the due date never uses it once a row exists. */
+  paid_count: number;
+  /** Rupees in the ledger. Never a spend figure — premiums are mirrors of transactions. */
+  paid_total: number;
+  last_paid_on: string;
+  next_due: string;
+  /** Negative when overdue. */
+  days_until_due: number | null;
+  monthly_cost: number;
+  /** `persons.uuid` of everyone this policy covers. Empty for a single-life policy. */
+  member_uuids: string[];
+  /** `persons.uuid` of the nominees — who gets paid, not who is covered. */
+  nominee_uuids: string[];
+  /** Years of premiums when it differs from the policy term; null = regular pay. */
+  premium_payment_term_years: number | null;
+  /** The end date is a renewal, not an ending — health and motor cover roll over. */
+  renews: boolean;
+  /** E-card or policy pack link. */
+  ecard_url: string;
+  /** Premiums payable over the paying term; null when the policy renews forever. */
+  premiums_total: number | null;
+  /** Left over the term, or left in the current year when it renews. */
+  premiums_remaining: number | null;
+  /** Progress as one string, e.g. `16 / 192`. */
+  premiums_progress: string;
+  /** When the final premium falls due; empty when it renews. */
+  last_payable_on: string;
+}
+
+export interface RawInsurancePremiumRow {
+  id: string;
+  policy_id: string;
+  date: string;
+  amount: number;
+  note: string;
+  /** Created from a transaction — read-only here, deletable to unlink. */
+  mirrored: boolean;
 }
 
 export interface PersonRow {
@@ -457,21 +515,38 @@ export const api = {
     return result
   },
   getInsuranceEntries: ()                   => get<RawInsuranceRow[]>('getEntries', { module: 'insurance' }),
+  getInsurancePremiums: (policyId?: string) =>
+    get<RawInsurancePremiumRow[]>('getPremiums', { module: 'insurance', ...(policyId ? { policy_id: policyId } : {}) }),
   addInsuranceEntry: async (p: Record<string, unknown>) => {
     const result = await post<string>({ module: 'insurance', action: 'addEntry', ...p })
-    invalidateCache({ action: 'getEntries', params: { module: 'insurance' } })
+    invalidateInsurance()
     return result
   },
   updateInsuranceEntry: async (p: Record<string, unknown>) => {
     const result = await post<boolean>({ module: 'insurance', action: 'updateEntry', ...p })
-    invalidateCache({ action: 'getEntries', params: { module: 'insurance' } })
+    invalidateInsurance()
     if (typeof p.id === 'string') invalidateCache({ action: 'getEntry', params: { module: 'insurance', id: p.id } })
     return result
   },
   deleteInsuranceEntry: async (id: string) => {
     const result = await post<boolean>({ module: 'insurance', action: 'deleteEntry', id })
-    invalidateCache({ action: 'getEntries', params: { module: 'insurance' } })
+    invalidateInsurance()
     invalidateCache({ action: 'getEntry', params: { module: 'insurance', id } })
+    return result
+  },
+  addInsurancePremium: async (p: Record<string, unknown>) => {
+    const result = await post<string>({ module: 'insurance', action: 'addPremium', ...p })
+    invalidateInsurance()
+    return result
+  },
+  updateInsurancePremium: async (p: Record<string, unknown>) => {
+    const result = await post<boolean>({ module: 'insurance', action: 'updatePremium', ...p })
+    invalidateInsurance()
+    return result
+  },
+  deleteInsurancePremium: async (id: string) => {
+    const result = await post<boolean>({ module: 'insurance', action: 'deletePremium', id })
+    invalidateInsurance()
     return result
   },
   getPersons: () => get<PersonRow[]>('getEntries', { module: 'persons' }),

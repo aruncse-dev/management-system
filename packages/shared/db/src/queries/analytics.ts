@@ -13,7 +13,7 @@
  * `expenseCycle.ts`). Keeping the cycle math with the caller means the trend
  * buckets always match what the Monthly tab shows.
  */
-import { and, eq, inArray, isNull } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import type { getDb } from '../neon'
 import { paymentSources, transactions } from '../schema/transactions'
 import { savings } from '../schema/savings'
@@ -23,20 +23,10 @@ import { cashLoanRepayments, cashLoans, emiLoanRepayments, emiLoans, jewelLoanRe
 import { subscriptions } from '../schema/subscriptions'
 import { lending } from '../schema/lending'
 import { normalizeToMonthly, nextRenewal, daysUntil } from '@fintracker-vault/utils'
+import { getInsuranceCommitment } from './insurance'
+import { num, scopeOf, toIsoDate } from './scope'
 
 type Db = ReturnType<typeof getDb>
-
-/** Org scope, matching the dispatcher's legacy fallback: null org ⇒ the `org_id IS NULL` bucket. */
-function scopeOf(table: { orgId: unknown }, orgId: string | null) {
-  const col = table.orgId as Parameters<typeof eq>[0]
-  return orgId ? eq(col, orgId) : isNull(col)
-}
-
-function num(v: string | number | null | undefined): number {
-  if (v === null || v === undefined) return 0
-  const n = typeof v === 'number' ? v : parseFloat(v)
-  return Number.isFinite(n) ? n : 0
-}
 
 export type CycleRange = { key: string; start: string; end: string }
 
@@ -398,8 +388,23 @@ export async function getLendingOutstanding(
 export type CommittedOutflow = {
   emi: number
   subscriptions: number
+  insurance: number
   total: number
-  upcomingRenewals: { name: string; amount: number; dueDate: string; daysLeft: number }[]
+  /**
+   * Due soon, across subscriptions and insurance.
+   *
+   * `kind` exists so the UI can say "renewal" or "premium" rather than
+   * mislabelling one as the other. `daysLeft` may be NEGATIVE for insurance:
+   * a subscription bills itself whether you look or not, but an unpaid premium
+   * is overdue and needs a person to act.
+   */
+  upcomingRenewals: {
+    name: string
+    amount: number
+    dueDate: string
+    daysLeft: number
+    kind: 'subscription' | 'insurance'
+  }[]
 }
 
 /**
@@ -417,12 +422,13 @@ export async function getCommittedMonthlyOutflow(
   opts: { usdToInr: number; today?: Date },
 ): Promise<CommittedOutflow> {
   const now = opts.today ?? new Date()
-  const [loans, subs] = await Promise.all([
+  const [loans, subs, ins] = await Promise.all([
     getLoanOutstanding(db, orgId),
     db
       .select()
       .from(subscriptions)
       .where(and(scopeOf(subscriptions, orgId), eq(subscriptions.status, 'active'))),
+    getInsuranceCommitment(db, orgId, { now }),
   ])
 
   const emi = loans.reduce((s, l) => s + l.monthlyPayment, 0)
@@ -450,21 +456,31 @@ export async function getCommittedMonthlyOutflow(
           amount: amountInr,
           dueDate: toIsoDate(due),
           daysLeft,
+          kind: 'subscription',
         })
       }
     }
   }
 
-  upcomingRenewals.sort((a, b) => a.daysLeft - b.daysLeft)
-  return { emi, subscriptions: subsTotal, total: emi + subsTotal, upcomingRenewals }
-}
+  for (const d of ins.due) {
+    upcomingRenewals.push({
+      name: d.name,
+      amount: d.amount,
+      dueDate: d.dueDate,
+      daysLeft: d.daysLeft,
+      kind: 'insurance',
+    })
+  }
 
-/** Local-time ISO date, matching how `nextRenewal` parses. */
-function toIsoDate(d: Date): string {
-  const y = String(d.getFullYear()).padStart(4, '0')
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
+  // Overdue premiums sort first, ahead of everything merely upcoming.
+  upcomingRenewals.sort((a, b) => a.daysLeft - b.daysLeft)
+  return {
+    emi,
+    subscriptions: subsTotal,
+    insurance: ins.monthly,
+    total: emi + subsTotal + ins.monthly,
+    upcomingRenewals,
+  }
 }
 
 export type AccountBalance = {

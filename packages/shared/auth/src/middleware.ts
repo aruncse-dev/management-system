@@ -47,6 +47,19 @@ export type CreateFtMiddlewareOptions = {
   lowercaseRoutes?: Set<string>
   isPublicPath?: (pathname: string) => boolean
   /**
+   * Where to send an unauthenticated page request. Defaults to `/`.
+   *
+   * For fintracker, vault and staff `/` *is* the login screen, so the default
+   * is right. Admin is different: its `/` is a bare redirect stub pointing at
+   * `/admin/orgs` and the real login lives at `/admin/login`. Sending an
+   * unauthenticated visitor to `/` there produced an infinite redirect —
+   * `/` → `/admin/orgs` → `/?next=/admin/orgs` → `/` — which made the whole
+   * console unreachable.
+   *
+   * Must be public per `isPublicPath`, or the redirect target bounces too.
+   */
+  loginPath?: string
+  /**
    * Optional separate session for a platform admin area (`/admin`, `/api/admin/*`).
    * Requires `isPublicPath` to include `/admin/login` and `isPublicAdminApi` for auth endpoints.
    */
@@ -59,6 +72,7 @@ export type CreateFtMiddlewareOptions = {
 export function createFtMiddleware(options: CreateFtMiddlewareOptions) {
   const isPublicPath = options.isPublicPath ?? defaultIsPublicPath
   const { getSessionOptions, lowercaseRoutes, adminConsole } = options
+  const loginPath = options.loginPath ?? '/'
 
   return async function middleware(request: NextRequest): Promise<NextResponse> {
     const pathnameRaw = request.nextUrl.pathname
@@ -156,10 +170,12 @@ export function createFtMiddleware(options: CreateFtMiddlewareOptions) {
 
     if (!session.email) {
       const url = request.nextUrl.clone()
-      url.pathname = '/'
+      url.pathname = loginPath
       // Keep where they were headed so an expiry doesn't also lose their place.
+      // Compared against `loginPath`, not `/`: sending `?next=` back to the page
+      // we are already redirecting to just makes the login bounce to itself.
       url.search =
-        pathnameRaw && pathnameRaw !== '/'
+        pathnameRaw && pathnameRaw !== loginPath
           ? `?next=${encodeURIComponent(pathnameRaw + request.nextUrl.search)}`
           : ''
       return NextResponse.redirect(url)

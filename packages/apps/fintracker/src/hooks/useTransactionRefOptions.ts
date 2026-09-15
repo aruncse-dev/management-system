@@ -94,6 +94,14 @@ export function transactionRefHref(ref: { kind: string; id: string }): string | 
       return '/loans?tab=cash'
     case 'subscription':
       return '/subscriptions'
+    case 'insurance':
+      // Policies live in the vault app, a different origin in dev and a
+      // different deployment in production. Without the base URL configured
+      // there is nowhere same-origin to send them, so the jump button simply
+      // does not render rather than linking to a 404 on this app.
+      return process.env.NEXT_PUBLIC_VAULT_URL
+        ? `${String(process.env.NEXT_PUBLIC_VAULT_URL).replace(/\/$/, '')}/vaultinsurance`
+        : undefined
     case 'savings':
       return '/savings'
     case 'lending': {
@@ -112,6 +120,7 @@ export function transactionRefKindLabel(kind: string): string {
     case 'jewel_loan': return 'Jewel loans'
     case 'cash_loan': return 'Cash loans'
     case 'subscription': return 'Subscriptions'
+    case 'insurance': return 'Insurance'
     case 'savings': return 'Savings'
     case 'lending': return 'Lending'
     default: return 'linked entry'
@@ -125,7 +134,7 @@ export function useTransactionRefOptions(): TransactionRefOption[] {
     let cancelled = false
     void (async () => {
       try {
-        const [emi, jewel, cash, lendingDefault, lendingVijaya, subs, accounts] = await Promise.all([
+        const [emi, jewel, cash, lendingDefault, lendingVijaya, subs, accounts, policies] = await Promise.all([
           api.getEmi(),
           api.getJewelLoans(),
           api.getCashLoans(),
@@ -133,6 +142,7 @@ export function useTransactionRefOptions(): TransactionRefOption[] {
           api.getLending(LENDING_SHEET_SLUG_VIJAYA),
           api.getSubscriptionEntries(),
           api.getAccountsList(),
+          api.getInsuranceEntries(),
         ])
         if (cancelled) return
         const ongoing = (s?: string) => (s ?? 'Ongoing') !== 'Closed'
@@ -176,6 +186,20 @@ export function useTransactionRefOptions(): TransactionRefOption[] {
               types: ['Expense'] as const,
             })),
           ...savingsAccounts(accounts),
+          // Policies live in the vault app; the register only links to them.
+          // Expense-only and active-only, matching subscriptions — and the
+          // Expense restriction also keeps the option out of the Transfer flow,
+          // where `resolveSavingsTransferTarget` would override the link.
+          ...policies
+            .filter(p => (p.status ?? 'active') === 'active')
+            .map(p => ({
+              kind: 'insurance',
+              id: p.id,
+              label: p.plan_name || p.insurer || 'Policy',
+              group: 'Insurance',
+              amount: Number(p.premium_amount) || undefined,
+              types: ['Expense'] as const,
+            })),
         ])
       } catch {
         // A link is an enhancement, never a blocker: without it the modal simply
