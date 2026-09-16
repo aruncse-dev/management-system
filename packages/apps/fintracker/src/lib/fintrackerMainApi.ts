@@ -1221,6 +1221,10 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
             id: r.id,
             plan_name: r.planName,
             insurer: r.insurer,
+            // Two family policies can share a plan name — "Activ One MAX" is
+            // held once by each parent — so the picker needs the holder to tell
+            // them apart. A name, not the uuid: fintracker has no persons list.
+            holder: r.holder,
             policy_type: r.policyType,
             premium_amount: r.premium,
             premium_mode: r.premiumModeRaw,

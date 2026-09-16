@@ -388,6 +388,8 @@ export interface RawInsuranceRow {
   id: string;
   plan_name: string;
   insurer: string;
+  /** Linked person's name, or the free-text owner. Empty when neither is set. */
+  holder: string;
   policy_type: string;
   premium_amount: number;
   premium_mode: string;
