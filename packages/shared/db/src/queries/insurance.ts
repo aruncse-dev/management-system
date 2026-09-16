@@ -11,7 +11,7 @@
  */
 import { and, desc, eq } from 'drizzle-orm'
 import type { getDb } from '../neon'
-import { insurance, insuranceMembers, insurancePremiums } from '../schema/vault'
+import { insurance, insuranceMembers, insurancePremiums, persons } from '../schema/vault'
 import {
   type PremiumMode,
   daysUntil,
@@ -43,6 +43,13 @@ export type InsurancePolicyView = {
   insurer: string
   policyType: string
   owner: string
+  /**
+   * Who holds the policy, as a name: the linked person, or the free-text
+   * `owner` when nobody is linked. Resolved here rather than in each app
+   * because fintracker has no persons list of its own and would otherwise show
+   * two identically-named family policies it cannot tell apart.
+   */
+  holder: string
   policyNo: string
   personUuid: string
   appId: string
@@ -121,11 +128,14 @@ export async function getInsurancePolicies(
   opts?: { now?: Date },
 ): Promise<InsurancePolicyView[]> {
   const now = opts?.now ?? new Date()
-  const [policies, premiums, members] = await Promise.all([
+  const [policies, premiums, members, people] = await Promise.all([
     db.select().from(insurance).where(scopeOf(insurance, orgId)).orderBy(desc(insurance.updatedAt)),
     db.select().from(insurancePremiums).where(scopeOf(insurancePremiums, orgId)),
     db.select().from(insuranceMembers).where(scopeOf(insuranceMembers, orgId)),
+    db.select({ uuid: persons.uuid, name: persons.name }).from(persons).where(scopeOf(persons, orgId)),
   ])
+
+  const personName = new Map(people.map((pr) => [pr.uuid, toStr(pr.name)]))
 
   // Insured and nominee are both rows here; the role says which list a person
   // belongs to. They are different questions and must not be merged.
@@ -171,6 +181,7 @@ export async function getInsurancePolicies(
       insurer: toStr(p.insurer),
       policyType: toStr(p.policyType),
       owner: toStr(p.owner),
+      holder: personName.get(toStr(p.personUuid)) || toStr(p.owner),
       policyNo: toStr(p.policyNo),
       personUuid: toStr(p.personUuid),
       appId: toStr(p.appId),

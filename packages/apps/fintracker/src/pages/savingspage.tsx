@@ -7,7 +7,7 @@ import { mergeCategoriesWithBudgetNames } from '../utils'
 import { isMirroredRow, MIRRORED_ROW_BADGE, MIRRORED_ROW_NOTE } from '../lib/mirroredRows'
 import { useMoneyFormatting } from '../hooks/useFormatMoney'
 import { useStore } from '../store'
-import { BalanceRow, CategoryCombobox, CatIcon, FormField, KpiCard, KpiGrid, LoadingState, SearchField, SectionBlock, SectionChip, Spacer, TransactionCard } from '../ui'
+import { BalanceRow, OptionCombobox, CatIcon, FormField, KpiCard, KpiGrid, LoadingState, SearchField, SectionBlock, SectionChip, Spacer, TransactionCard } from '../ui'
 
 type SavingsType = 'Income' | 'Expense' | 'Transfer'
 type SavingsTab = 'dashboard' | 'transactions'
@@ -896,7 +896,7 @@ export default function SavingsPage({
                 </FormField>
                 {form.type === 'Expense' && (
                   <FormField label="Category">
-                    <CategoryCombobox value={form.category} options={savingsExpenseCategories} onChange={(v: string) => setField('category', v)} />
+                    <OptionCombobox value={form.category} options={savingsExpenseCategories} onChange={(v: string) => setField('category', v)} />
                   </FormField>
                 )}
                 {form.type === 'Transfer' && (

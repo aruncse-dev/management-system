@@ -5,7 +5,7 @@ import { api, RawLendingRow } from '../api'
 import { isMirroredRow, MIRRORED_ROW_NOTE } from '../lib/mirroredRows'
 import { LENDING_SHEET_SLUG_VIJAYA, normalizeLendingSheetSlug } from '../lib/lendingSheetSlug'
 import { useFormatMoney, useMoneyFormatting } from '../hooks/useFormatMoney'
-import { CategoryCombobox, FormField, HoldingCard, KpiCard, KpiGrid, LoadingState, SearchField, SectionBlock, SectionChip } from '../ui'
+import { OptionCombobox, FormField, HoldingCard, KpiCard, KpiGrid, LoadingState, SearchField, SectionBlock, SectionChip } from '../ui'
 
 type LendType = 'LEND' | 'RECEIVED'
 type LendTab = 'dashboard' | 'lended' | 'received'
@@ -510,7 +510,7 @@ export default function Lending({ sheetSlug: sheetSlugProp, onTabChange }: Lendi
                     // person became two, each with half the money. This suggests
                     // everyone already in the book while still accepting a name
                     // that genuinely is new.
-                    <CategoryCombobox
+                    <OptionCombobox
                       value={form.name}
                       options={people.map(p => p.name)}
                       onChange={v => set('name', v)}

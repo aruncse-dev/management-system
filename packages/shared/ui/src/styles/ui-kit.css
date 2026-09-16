@@ -1510,6 +1510,17 @@
   gap: 8px;
   margin-top: 6px;
 }
+/* The collapsed field is an <input>, so a long link name scrolls out of sight
+   inside it. Restating it here, wrapped, is the only place the whole name is
+   actually readable once chosen. */
+.ui-kit-ref-selected-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
 .ui-kit-ref-kind {
   display: inline-flex;
   align-items: center;
@@ -1544,7 +1555,9 @@
 }
 .ui-kit-ref-opt {
   display: flex;
-  align-items: center;
+  /* Top-aligned because the label now wraps: a two-line name with a centred
+     badge beside it leaves the badge floating in the middle of nowhere. */
+  align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
   width: 100%;
@@ -1560,11 +1573,13 @@
 .ui-kit-ref-opt:last-child { border-bottom: none; }
 .ui-kit-ref-opt.is-active { background: var(--navy-lt); }
 .ui-kit-ref-opt.is-selected { background: rgba(30, 92, 199, .08); }
+/* Wraps rather than truncating. "Baskar · Activ One MAX" is longer than the
+   row is wide on a phone, and an ellipsis there hides the very part that
+   distinguishes one policy from the other. */
 .ui-kit-ref-opt-label {
+  flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .ui-kit-ref-empty {
   padding: 12px 14px;

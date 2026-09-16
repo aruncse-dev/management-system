@@ -1,13 +1,37 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 
-export function CategoryCombobox({
+/**
+ * Picker for a closed list of strings — type to filter, arrow keys, Enter to
+ * commit.
+ *
+ * Was `CategoryCombobox`, and category is still what it mostly picks, but the
+ * payment mode and the transfer target were plain `<select>`s sitting in the
+ * same form. On a phone that is two different interactions for the same job:
+ * one you scan and type, one that opens the OS wheel. Same control for both.
+ *
+ * Only a listed option can be committed. Typing something unrecognised and
+ * leaving restores the current value rather than saving the text, which is what
+ * keeps the account name spellable in one way only.
+ */
+export function OptionCombobox({
   value,
   options,
   onChange,
+  ariaLabel = 'Category',
+  placeholder = 'Tap to search categories',
+  order = 'alpha',
 }: {
   value: string
   options: readonly string[]
   onChange: (v: string) => void
+  ariaLabel?: string
+  placeholder?: string
+  /**
+   * `given` keeps the caller's order. Accounts arrive sorted by `sort_order`,
+   * which groups the banks above the credit cards — alphabetising that list
+   * would shuffle the grouping away for no gain.
+   */
+  order?: 'alpha' | 'given'
 }) {
   const comboboxId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -20,9 +44,14 @@ export function CategoryCombobox({
 
   const sorted = useMemo(() => {
     const uniq = new Set(options.map(String))
+    // A value the list no longer offers is kept rather than dropped: editing an
+    // old row must not silently retype its account as the first one available.
     if (value && !uniq.has(value)) uniq.add(value)
-    return [...uniq].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
-  }, [options, value])
+    const list = [...uniq]
+    return order === 'given'
+      ? list
+      : list.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+  }, [options, value, order])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -74,8 +103,8 @@ export function CategoryCombobox({
         aria-controls={showList ? `${comboboxId}-listbox` : undefined}
         aria-autocomplete="list"
         role="combobox"
-        aria-label="Category"
-        placeholder={focused ? 'Type to filter…' : 'Tap to search categories'}
+        aria-label={ariaLabel}
+        placeholder={focused ? 'Type to filter…' : placeholder}
         value={inputValue}
         onFocus={() => { setFocused(true); setQuery(''); setHighlight(0) }}
         onChange={e => { setQuery(e.target.value); setHighlight(0) }}

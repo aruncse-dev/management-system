@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { X } from 'lucide-react'
 import type { Transaction, TransactionForm } from '@fintracker-vault/types'
 import { CATEGORIES, INCOME_CATS } from '@fintracker-vault/config'
-import { CategoryCombobox } from './CategoryCombobox'
+import { OptionCombobox } from './OptionCombobox'
 import { RefCombobox } from './RefCombobox'
 
 const ALL_CATS = [...CATEGORIES, ...INCOME_CATS]
@@ -320,21 +320,24 @@ export default function TransactionModal({
           {!isTransfer && (
             <div className="form-row">
               <label className="form-lbl">Category</label>
-              <CategoryCombobox value={form.c} options={cats} onChange={v => set('c', v)} />
+              <OptionCombobox value={form.c} options={cats} onChange={v => set('c', v)} />
             </div>
           )}
           <div className="form-row">
             <label className="form-lbl">Mode / Account</label>
-            <select className="form-sel" value={form.m} onChange={e => set('m', e.target.value)}>
-              {form.m && !paymentModeOptions.includes(form.m) ? (
-                <option value={form.m}>{form.m} (legacy)</option>
-              ) : null}
-              {paymentModeOptions.map(m => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
+            {/* A combobox, like category and link above it. The account list is
+                the longest closed list in this form, and the one most worth
+                typing two letters at rather than scrolling. An account the list
+                no longer offers is preserved by the combobox itself, so the
+                explicit "(legacy)" option this replaced is no longer needed. */}
+            <OptionCombobox
+              value={form.m}
+              options={paymentModeOptions}
+              onChange={v => set('m', v)}
+              ariaLabel="Mode / Account"
+              placeholder="Tap to search accounts"
+              order="given"
+            />
           </div>
           {linkable.length > 0 && (
             <div className="form-row">
@@ -350,16 +353,17 @@ export default function TransactionModal({
           {isTransfer && (
             <div className="form-row">
               <label className="form-lbl">Transfer To</label>
-              <select className="form-sel" value={form.toAcct} onChange={e => set('toAcct', e.target.value)}>
-                {form.toAcct && !transferTargetOptions.includes(form.toAcct) ? (
-                  <option value={form.toAcct}>{form.toAcct} (legacy)</option>
-                ) : null}
-                {transferTargetOptions.map(a => (
-                  <option key={a} value={a}>
-                    {a}
-                  </option>
-                ))}
-              </select>
+              <OptionCombobox
+                /* `toAcct` is optional on the form type; the <select> this
+                   replaced fell back to its first option when unset, and the
+                   default target is that same first option. */
+                value={form.toAcct ?? defaultTo}
+                options={transferTargetOptions}
+                onChange={v => set('toAcct', v)}
+                ariaLabel="Transfer To"
+                placeholder="Tap to search accounts"
+                order="given"
+              />
             </div>
           )}
           <div className="form-row">

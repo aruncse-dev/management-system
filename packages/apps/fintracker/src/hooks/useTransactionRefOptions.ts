@@ -195,7 +195,14 @@ export function useTransactionRefOptions(): TransactionRefOption[] {
             .map(p => ({
               kind: 'insurance',
               id: p.id,
-              label: p.plan_name || p.insurer || 'Policy',
+              // The holder leads, because the plan name alone does not identify
+              // the policy: both Activ One MAX rows read "Activ One MAX" and
+              // differ only in whose they are. Every other module's rows are
+              // already unique by name, so only insurance needs the prefix.
+              label: [p.holder, p.plan_name || p.insurer || 'Policy']
+                .map(part => (part ?? '').trim())
+                .filter(Boolean)
+                .join(' · '),
               group: 'Insurance',
               amount: Number(p.premium_amount) || undefined,
               types: ['Expense'] as const,

@@ -9,7 +9,7 @@ function keyOf(o: TransactionRefOption): string {
 /**
  * Picker for the module row a transaction links to.
  *
- * Deliberately the same shape as `CategoryCombobox` — type to filter, arrow
+ * Deliberately the same shape as `OptionCombobox` — type to filter, arrow
  * keys, Enter to commit — because it sits two fields below it in the same form
  * and a plain `<select>` there behaved differently for no reason the user could
  * see. What it adds is the option's *type*: "Fuel" means nothing until you can
@@ -136,9 +136,11 @@ export function RefCombobox({
         />
       </div>
 
-      {/* The selected link's type, stated rather than implied by the name. */}
+      {/* The selected link in full — its name, which the input above truncates,
+          and its type, stated rather than implied by the name. */}
       {selected && !focused ? (
         <div className="ui-kit-ref-selected">
+          <span className="ui-kit-ref-selected-label">{selected.label}</span>
           <span className="ui-kit-ref-kind">{selected.group}</span>
           <button type="button" className="ui-kit-ref-clear" onClick={() => commit('')}>
             Remove link
