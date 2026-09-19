@@ -7,3 +7,4 @@ export * from './localDate';
 export * from './subscriptionCycle';
 export * from './premiumMode';
 export * from './insuranceTypes';
+export * from './quickAdd';
