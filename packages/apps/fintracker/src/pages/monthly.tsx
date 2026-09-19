@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { ChevronLeft, ChevronRight, X as XIcon } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, X as XIcon, Zap } from 'lucide-react'
 import { useRouter } from 'next/router'
 import { useStore } from '../store'
 import { api } from '../api'
@@ -10,12 +10,12 @@ import Transactions from './transactions'
 import Budget from './budget'
 import { MNS } from '../config'
 import { BudgetMonthRangeFields } from '../components/BudgetMonthRangeFields'
+import { QuickAddBar } from '../components/QuickAddBar'
 import { expenseCategoriesWithBudget, incomeCategoriesWithBudget, isoDate, monthYearApiKey } from '../utils'
 import { useFintrackerModes } from '../context/FintrackerModesContext'
 import { cycleMonthYearForDate, cycleSubtitle } from '../expenseCycle'
 import { useMoneyFormatting } from '../hooks/useFormatMoney'
 import { useTransactionRefOptions } from '../hooks/useTransactionRefOptions'
-import type { QuickAddSuggestion } from '../api'
 
 type TabId = 'dash' | 'txns' | 'bud'
 
@@ -39,9 +39,10 @@ export default function Monthly() {
   const money = useMoneyFormatting()
   const { paymentModeOptions, transferTargetOptions } = useFintrackerModes()
   const refOptions = useTransactionRefOptions()
-  const [quickAddSuggestions, setQuickAddSuggestions] = useState<QuickAddSuggestion[]>([])
   const [tab, setTab] = useState<TabId>('dash')
   const [modalOpen, setModalOpen] = useState(false)
+  /** The floating one-line entry. Opened by the plus button on every tab but Budget. */
+  const [quickOpen, setQuickOpen] = useState(false)
   /** Forces TransactionModal to remount; duplicated rows all share id ''. */
   const [modalNonce, setModalNonce] = useState(0)
   const [editRow, setEditRow] = useState<typeof state.rows[0] | null>(null)
@@ -106,18 +107,6 @@ export default function Monthly() {
       if (snackbarTimerRef.current) clearTimeout(snackbarTimerRef.current)
     }
   }, [])
-
-  // Past entries for quick-add, fetched once and cached by `api`. A failure is
-  // silent on purpose: without suggestions the box still parses what you type,
-  // so this is an enhancement and never a reason the form cannot open.
-  useEffect(() => {
-    let cancelled = false
-    void api
-      .getQuickAddSuggestions()
-      .then(rows => { if (!cancelled) setQuickAddSuggestions(rows) })
-      .catch(() => { if (!cancelled) setQuickAddSuggestions([]) })
-    return () => { cancelled = true }
-  }, [state.fintracker])
 
   const loadMonth = useCallback(async (month: string, year: string, forceRefresh = false) => {
     dispatch({ type: 'SET_LOADING', payload: true })
@@ -246,20 +235,68 @@ export default function Monthly() {
         {tab === 'bud'  && <Budget showStatus={showStatus} onCategoryClick={cat => { dispatch({ type:'SET_CAT_FILTER', payload:cat }); goTab('txns') }} />}
       </main>
 
-      {/* FAB */}
-      <button
-        onClick={() => {
-          if (tab === 'bud') {
-            setBudgetAddOpen(true)
-            return
-          }
-          setEditRow(null)
-          setModalOpen(true)
-          setModalNonce(n => n + 1)
-        }}
-        style={{ position:'fixed', bottom:24, right:20, width:52, height:52, borderRadius:'50%', background:'var(--navy-dark)', color:'#fff', fontSize:24, border:'none', boxShadow:'0 4px 16px rgba(0,0,0,.2)', cursor:'pointer', zIndex:100, display:'flex', alignItems:'center', justifyContent:'center' }}
-        title={tab === 'bud' ? 'Add budget' : 'Add transaction'}
-      >+</button>
+      {/* Quick add, floating. Rendered here rather than inside a tab so it is
+          reachable from the dashboard, which is where you usually are when you
+          remember a spend. */}
+      {quickOpen && tab !== 'bud' && (
+        <div className="quickadd-pop">
+          <QuickAddBar
+            month={state.month}
+            year={state.year}
+            categories={expenseCategoryOptions}
+            incomeCategories={incomeCategoryOptions}
+            modes={paymentModeOptions}
+            showStatus={showStatus}
+            onClose={() => setQuickOpen(false)}
+            onSaved={async savedDate => {
+              await loadMonth(state.month, state.year, true)
+              showStatus(savedStatus(savedDate))
+            }}
+            onExpand={draft => {
+              setQuickOpen(false)
+              setEditRow(draft)
+              setModalOpen(true)
+              setModalNonce(n => n + 1)
+            }}
+          />
+        </div>
+      )}
+
+      {/* Two buttons rather than one that opens a menu: quick add and the full
+          form are both one tap, and neither hides behind the other. The stack
+          collapses to the single plus on Budget, which has no quick path. */}
+      {!(quickOpen && tab !== 'bud') && (
+        <div className="fab-stack">
+          {tab !== 'bud' && (
+            <button
+              type="button"
+              className="fab fab--mini"
+              onClick={() => setQuickOpen(true)}
+              title="Quick add"
+              aria-label="Quick add a transaction"
+            >
+              <Zap size={18} />
+            </button>
+        )}
+        <button
+          type="button"
+          className="fab"
+          onClick={() => {
+            if (tab === 'bud') {
+              setBudgetAddOpen(true)
+              return
+            }
+            setEditRow(null)
+            setModalOpen(true)
+            setModalNonce(n => n + 1)
+          }}
+          title={tab === 'bud' ? 'Add budget' : 'Add transaction'}
+          aria-label={tab === 'bud' ? 'Add budget' : 'Add transaction'}
+        >
+          <Plus size={24} />
+        </button>
+      </div>
+      )}
 
       {budgetAddOpen && (
         <div className="modal-bg open" onClick={closeBudgetAdd}>
@@ -317,7 +354,6 @@ export default function Monthly() {
           amountLabel={`Amount (${money.currency})`}
           amountPlaceholder={money.zeroPlaceholder}
           refOptions={refOptions}
-          quickAddSuggestions={quickAddSuggestions}
           onClose={() => setModalOpen(false)}
           onSaved={async (saved) => {
             setModalOpen(false)

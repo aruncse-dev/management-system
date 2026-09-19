@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { and, desc, eq, isNull, lte, gte, ne, or, sql } from 'drizzle-orm'
+import { and, desc, eq, isNull, lte, gte, ne, or } from 'drizzle-orm'
 import type { FtSessionData } from '@fintracker-vault/auth'
 import type { Transaction } from '../types'
 import { MNS } from '../config'
@@ -1433,78 +1433,6 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
           .where(and(whereOrgFilter(transactions, budgetScope), eq(transactions.monthYear, my)))
           .orderBy(desc(transactions.date))
         return ok(res, rows.map(rowFromDb), traceId)
-      }
-
-      /**
-       * Distinct entries the user has made before, for quick-add autocomplete.
-       *
-       * This is what replaced the Repeat sheet. Repeat inferred which rows were
-       * recurring from two cycles of history and got it wrong in both
-       * directions — a round-figure fuel stop on the same day twice looked
-       * exactly like a bill, while every bill whose price moved was dropped.
-       * Nothing here decides what recurs. It returns what you have typed
-       * before, most-used first, and typing three letters finds it.
-       *
-       * Linked rows are excluded deliberately. A past premium copied from here
-       * would write the transaction but no `insurance_premiums` row, because
-       * quick-add does not carry `ref_kind` — so the policy's paid count would
-       * silently stand still. Offering a copy that half-works is worse than
-       * not offering it; those are entered on the form until the mirror moves
-       * into the db package.
-       */
-      if (action === 'quickAddSuggestions') {
-        const monthsBack = Math.min(Math.max(parseInt(String(req.query.months ?? '6'), 10) || 6, 1), 24)
-        const cutoff = new Date()
-        cutoff.setMonth(cutoff.getMonth() - monthsBack)
-        const since = cutoff.toISOString().slice(0, 10)
-
-        const rows = await db
-          .select({
-            description: transactions.description,
-            category: transactions.category,
-            mode: transactions.mode,
-            type: transactions.type,
-            uses: sql<number>`count(*)::int`,
-            lastUsed: sql<string>`max(${transactions.date})`,
-            // The most recent amount, not every amount ever paid. Grouping on
-            // the amount column instead would return one suggestion per price,
-            // so a year of groceries would bury every other entry under its own
-            // history. One row per thing you buy, priced as you last bought it.
-            lastAmount: sql<string>`(array_agg(${transactions.amount} ORDER BY ${transactions.date} DESC))[1]`,
-          })
-          .from(transactions)
-          .where(
-            and(
-              whereOrgFilter(transactions, budgetScope),
-              gte(transactions.date, since),
-              isNull(transactions.refKind),
-              ne(transactions.type, 'Transfer'),
-            ),
-          )
-          .groupBy(
-            transactions.description,
-            transactions.category,
-            transactions.mode,
-            transactions.type,
-          )
-          .orderBy(desc(sql`count(*)`), desc(sql`max(${transactions.date})`))
-          .limit(400)
-
-        return ok(
-          res,
-          rows
-            .filter((r) => (r.description ?? '').trim())
-            .map((r) => ({
-              desc: r.description ?? '',
-              category: r.category ?? '',
-              mode: r.mode ?? '',
-              type: r.type ?? 'Expense',
-              amount: num(r.lastAmount),
-              uses: Number(r.uses) || 0,
-              last_used: r.lastUsed ?? '',
-            })),
-          traceId,
-        )
       }
 
       if (action === 'summary') {
