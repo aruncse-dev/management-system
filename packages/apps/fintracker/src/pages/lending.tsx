@@ -1,4 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useMemo, memo } from 'react'
+import { localIsoDate } from '@fintracker-vault/utils'
 import { useRouter } from 'next/router'
 import { Search, LayoutDashboard, Handshake, ArrowDownLeft, BarChart3, Shield, User, ArrowUpRight, Plus } from 'lucide-react'
 import { api, RawLendingRow } from '../api'
@@ -40,7 +41,7 @@ interface PersonDetails {
   outstanding: number
 }
 
-function todayISO() { return new Date().toISOString().split('T')[0] }
+function todayISO() { return localIsoDate() }
 function toDateInput(dateStr: string): string {
   const clean = String(dateStr ?? '').trim()
   if (!clean) return todayISO()

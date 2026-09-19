@@ -40,7 +40,8 @@ interface Props {
   month: string
   year: string
   onClose: () => void
-  onSaved: () => void
+  /** `saved.date` is the row's date as `DD-MMM-YY`; absent after a delete. */
+  onSaved: (saved?: { date: string }) => void
   showStatus: (msg: string) => void
   api: TransactionModalApi
   /** Accounts + credit sources allowed as transaction `mode` (payment source). */
@@ -59,8 +60,10 @@ interface Props {
   refOptions?: readonly TransactionRefOption[]
 }
 
+/** Local-time today. `toISOString()` is UTC and reads as yesterday until 05:30 IST. */
 function todayISO() {
-  return new Date().toISOString().split('T')[0]
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 function gasDate(iso: string) {
@@ -239,7 +242,7 @@ export default function TransactionModal({
     try {
       if (isEdit && row?.id) await api.updateRow({ ...p, id: row.id })
       else await api.addRow(p)
-      onSaved()
+      onSaved({ date: p.date })
     } catch (e) {
       showStatus('⚠ ' + (e instanceof Error ? e.message : 'Save failed'))
     } finally {

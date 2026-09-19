@@ -96,6 +96,32 @@ export function cycleDateRange(
     : regularCycleRange(month, year)
 }
 
+/**
+ * The cycle label a dated transaction files under.
+ *
+ * Regular mode: the calendar month. Custom mode: a date on or after the anchor
+ * day rolls into the *next* label (anchor 19 → 19 Sep files under "Oct", the
+ * cycle 19 Sep – 18 Oct). This is the write-time counterpart of
+ * `customCycleRange`, so a row's stored `month_year` always agrees with the
+ * date window the summary endpoint and the MCP compute for that label.
+ */
+export function cycleMonthYearForDate(
+  isoDate: string,
+  prefs: FintrackerPrefs,
+): { month: string; year: string } {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate)
+  if (!m) throw new Error('Invalid date')
+  const y = Number(m[1])
+  const mi = Number(m[2]) - 1
+  const d = Number(m[3])
+  if (mi < 0 || mi > 11 || d < 1 || d > 31) throw new Error('Invalid date')
+  if (prefs.expenseCycle.mode !== 'custom' || d < prefs.expenseCycle.anchorDay) {
+    return { month: MNS[mi], year: String(y) }
+  }
+  const next = new Date(y, mi + 1, 1)
+  return { month: MNS[next.getMonth()], year: String(next.getFullYear()) }
+}
+
 export function monthYearKey(month: string, year: string): string {
   const i = MNS.indexOf(month as (typeof MNS)[number])
   if (i < 0) throw new Error('Invalid month')

@@ -17,6 +17,7 @@ export {
   buildCycleRanges,
   customCycleRange,
   cycleDateRange,
+  cycleMonthYearForDate,
   parseFintrackerPrefs,
   regularCycleRange,
   type ExpenseCycleMode,

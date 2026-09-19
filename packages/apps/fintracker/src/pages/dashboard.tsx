@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { localIsoDate } from '@fintracker-vault/utils'
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -179,7 +180,7 @@ export default function Dashboard({ onCategoryClick }: Props) {
 
   // ---- Cycle position -------------------------------------------------------
   const totalDays = cycle ? daysBetween(cycle.start, cycle.end) : 0
-  const todayIso = new Date().toISOString().slice(0, 10)
+  const todayIso = localIsoDate()
   let elapsedDays = totalDays
   if (cycle && totalDays > 0) {
     if (todayIso < cycle.start) elapsedDays = 0

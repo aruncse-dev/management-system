@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { localIsoDate } from '@fintracker-vault/utils'
 import { Plus, LayoutDashboard, List, BarChart3, Wallet, Search, ArrowUpRight, ArrowDownRight, Repeat2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { api, RawSavingsRow, type AccountRow } from '../api'
 import { CATEGORIES, THEME_COLORS, accountKindMeta } from '../config'
@@ -55,7 +56,7 @@ interface SavingsFormState {
 }
 
 function todayISO() {
-  return new Date().toISOString().split('T')[0]
+  return localIsoDate()
 }
 
 /**
@@ -433,9 +434,11 @@ export default function SavingsPage({
           const maturity =
             a.rd.startDate && a.rd.months
               ? (() => {
-                  const d = new Date(a.rd.startDate)
-                  d.setMonth(d.getMonth() + (a.rd.months as number))
-                  return d.toISOString().split('T')[0]
+                  // Build in local time so the maturity day matches the start day
+                  // regardless of the viewer's UTC offset.
+                  const [sy, sm, sd] = a.rd.startDate.split('-').map(Number)
+                  const d = new Date(sy, sm - 1 + (a.rd.months as number), sd)
+                  return localIsoDate(d)
                 })()
               : null
           return { id: a.id, name: a.name, paid, done, total, maturity, instalment: a.rd.instalment }
