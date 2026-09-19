@@ -11,9 +11,9 @@ import Budget from './budget'
 import { MNS } from '../config'
 import { BudgetMonthRangeFields } from '../components/BudgetMonthRangeFields'
 import RepeatSheet from '../components/RepeatSheet'
-import { expenseCategoriesWithBudget, incomeCategoriesWithBudget, monthYearApiKey } from '../utils'
+import { expenseCategoriesWithBudget, incomeCategoriesWithBudget, isoDate, monthYearApiKey } from '../utils'
 import { useFintrackerModes } from '../context/FintrackerModesContext'
-import { cycleSubtitle } from '../expenseCycle'
+import { cycleMonthYearForDate, cycleSubtitle } from '../expenseCycle'
 import { useMoneyFormatting } from '../hooks/useFormatMoney'
 import { useTransactionRefOptions } from '../hooks/useTransactionRefOptions'
 
@@ -147,6 +147,25 @@ export default function Monthly() {
     const newMonth = MNS[newIdx]
     dispatch({ type: 'SET_MONTH', payload: { month: newMonth, year: String(newYear) } })
   }, [state.month, state.year, dispatch])
+
+  /**
+   * "✓ Saved", or "✓ Saved to Oct 2026 (19 Sep – 18 Oct)" when the date files
+   * the row under a different cycle than the one on screen. Without this the
+   * row simply never appears in the open list and looks lost.
+   */
+  const savedStatus = useCallback(
+    (dateUi?: string) => {
+      if (!dateUi) return '✓ Saved'
+      try {
+        const { month, year } = cycleMonthYearForDate(isoDate(dateUi), state.fintracker)
+        if (month === state.month && year === state.year) return '✓ Saved'
+        return `✓ Saved to ${month} ${year} (${cycleSubtitle(month, year, state.fintracker)})`
+      } catch {
+        return '✓ Saved'
+      }
+    },
+    [state.fintracker, state.month, state.year],
+  )
 
   const budgetMonthOptions = useMemo(() => {
     const now = new Date(parseInt(state.year, 10), MNS.indexOf(state.month as typeof MNS[number]))
@@ -300,10 +319,10 @@ export default function Monthly() {
           amountPlaceholder={money.zeroPlaceholder}
           refOptions={refOptions}
           onClose={() => setModalOpen(false)}
-          onSaved={async () => {
+          onSaved={async (saved) => {
             setModalOpen(false)
             await loadMonth(state.month, state.year, true)
-            showStatus('✓ Saved')
+            showStatus(savedStatus(saved?.date))
           }}
           showStatus={showStatus}
         />

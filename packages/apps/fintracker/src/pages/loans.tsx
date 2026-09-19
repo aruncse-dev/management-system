@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { localIsoDate } from '@fintracker-vault/utils'
 import { useRouter } from 'next/router'
 import { Banknote, BarChart3, CalendarClock, CreditCard, HandCoins, Landmark, Clock, Layers3, ArrowDownLeft, ArrowUpRight, Plus, Search } from 'lucide-react'
 import { api, RawCashLoanHistoryRow, RawCashLoanRow, RawEmiLoanHistoryRow, RawEmiRow, RawJewelLoanHistoryRow, RawJewelLoanRow } from '../api'
@@ -141,7 +142,7 @@ function normalizeDateForInput(dateStr: string) {
     return `${y}-${m}-${d}`
   }
 
-  return new Date().toISOString().split('T')[0]
+  return localIsoDate()
 }
 
 function fmtDate(dateStr: string) {
@@ -232,7 +233,7 @@ function emptyEmiForm(): EmiFormState {
     bank: '',
     principal: '',
     rate: '',
-    start_date: new Date().toISOString().split('T')[0],
+    start_date: localIsoDate(),
     tenure_months: '',
     emi_amount: '',
     paid_emis: '0',
@@ -246,7 +247,7 @@ function emptyJewelForm(): JewelFormState {
     bank: '',
     principal: '',
     rate: '',
-    start_date: new Date().toISOString().split('T')[0],
+    start_date: localIsoDate(),
     // A loan taken today does not end today. Left blank rather than defaulted
     // to a date that is always wrong and easy to save by accident.
     end_date: '',
@@ -258,7 +259,7 @@ function emptyCashForm(): CashFormState {
   return {
     person_name: '',
     amount_received: '',
-    start_date: new Date().toISOString().split('T')[0],
+    start_date: localIsoDate(),
     status: 'Ongoing',
   }
 }
@@ -266,7 +267,7 @@ function emptyCashForm(): CashFormState {
 function emptyPaymentForm(): PaymentFormState {
   return {
     loan_id: '',
-    date: new Date().toISOString().split('T')[0],
+    date: localIsoDate(),
     amount: '',
     note: '',
   }
@@ -1073,7 +1074,7 @@ export default function Loans() {
     if (target) setRepayType(type)
     setRepayForm({
       loan_id: loanId,
-      date: new Date().toISOString().split('T')[0],
+      date: localIsoDate(),
       amount: defaultRepayAmount(type, loanId),
       note: '',
     })

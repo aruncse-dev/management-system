@@ -4,7 +4,7 @@ import type { FtSessionData } from '@fintracker-vault/auth'
 import type { Transaction } from '../types'
 import { MNS } from '../config'
 import { currentMonthYear, isoDate } from '../utils'
-import { budgetAppliesToLabelMonth, parseFintrackerPrefs } from '../expenseCycle'
+import { budgetAppliesToLabelMonth, cycleMonthYearForDate, parseFintrackerPrefs } from '../expenseCycle'
 import {
   getDb,
   budget,
@@ -793,6 +793,18 @@ async function mergeUserSettings(
       updatedAt: new Date(),
     })
     .where(eq(users.email, email))
+}
+
+/** `YYYY-MM` cycle label for a stored ISO date under the scope's current anchor. */
+async function cycleLabelForIsoDate(
+  db: ReturnType<typeof getDb>,
+  email: string,
+  scope: BudgetScope,
+  iso: string,
+): Promise<string> {
+  const prefs = parseFintrackerPrefs(await loadFintrackerSettingsJson(db, email, scope))
+  const { month, year } = cycleMonthYearForDate(iso, prefs)
+  return monthYearKey(month, year)
 }
 
 async function loadFintrackerSettingsJson(
@@ -2571,14 +2583,17 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
       }
 
       if (action === 'addRow') {
-        const month = typeof body.month === 'string' ? body.month : ''
-        const year = typeof body.year === 'string' ? body.year : ''
         const dateUi = typeof body.date === 'string' ? body.date : ''
-        if (!month || !year || !dateUi) return fail(res, 400, 'Invalid transaction', traceId)
-        const my = monthYearKey(month, year)
+        if (!dateUi) return fail(res, 400, 'Invalid transaction', traceId)
         const id = crypto.randomUUID()
         const iso = isoDate(dateUi)
         if (!iso) return fail(res, 400, 'Invalid date', traceId)
+        // The cycle label comes from the date, not from the month the client was
+        // viewing: with a custom anchor, "today" can already belong to next
+        // month's cycle, and filing it under the open view hid it from the
+        // cycle its date falls in. `getData` filters on this stored label, so
+        // this is the one place the anchor is applied to a transaction.
+        const my = await cycleLabelForIsoDate(db, em, budgetScope, iso)
         const typeStr = String(body.t ?? 'Expense')
         const xferTo = readTransferToFromBody(body, typeStr)
         const posted = readRefFromBody(body)
@@ -2620,13 +2635,13 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
 
       if (action === 'updateRow') {
         const id = typeof body.id === 'string' ? body.id : ''
-        const month = typeof body.month === 'string' ? body.month : ''
-        const year = typeof body.year === 'string' ? body.year : ''
         const dateUi = typeof body.date === 'string' ? body.date : ''
-        if (!id || !month || !year || !dateUi) return fail(res, 400, 'Invalid transaction', traceId)
-        const my = monthYearKey(month, year)
+        if (!id || !dateUi) return fail(res, 400, 'Invalid transaction', traceId)
         const iso = isoDate(dateUi)
         if (!iso) return fail(res, 400, 'Invalid date', traceId)
+        // Re-derived on every save so changing the date moves the row to the
+        // cycle the new date belongs to (see `addRow`).
+        const my = await cycleLabelForIsoDate(db, em, budgetScope, iso)
         const typeStr = String(body.t ?? 'Expense')
         const xferTo = readTransferToFromBody(body, typeStr)
         const posted = readRefFromBody(body)

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import { localIsoDate } from '@fintracker-vault/utils'
 import { Plus, SlidersHorizontal, LayoutDashboard, List, Clock, BarChart3, MapPin, Shield, Gem, Package, Users, Home, Building2, ArrowDownRight, ArrowUpRight } from 'lucide-react';
 import { api, RawGoldRow, RawGoldHistoryRow, GoldResource } from '../api';
 import { useFormatMoney } from '../hooks/useFormatMoney';
@@ -107,7 +108,7 @@ function createEmptyGoldForm(person_id = '', location_id = ''): GoldFormState {
 
 function emptyHistoryForm(): GoldHistoryFormState {
   return {
-    date: new Date().toISOString().split('T')[0],
+    date: localIsoDate(),
     type: 'IN',
     name: '',
     weight_g: '',
@@ -136,22 +137,22 @@ function parseRow(raw: RawGoldRow, map: Map<string, GoldResource>): GoldItem | n
 }
 
 function normalizeDate(dateStr: string): string {
-  if (!dateStr) return new Date().toISOString().split('T')[0];
+  if (!dateStr) return localIsoDate();
 
-  // Try to parse and normalize to YYYY-MM-DD
-  const date = new Date(dateStr);
-  if (!isNaN(date.getTime())) {
-    return date.toISOString().split('T')[0];
-  }
-
-  // If parsing fails, try to extract YYYY-MM-DD pattern
+  // An ISO day is taken verbatim: parsing it through `Date` would treat it as
+  // UTC midnight and, once formatted, could land on the neighbouring day.
   const match = dateStr.match(/(\d{4})-(\d{2})-(\d{2})/);
   if (match) {
     return `${match[1]}-${match[2]}-${match[3]}`;
   }
 
-  // Fallback to today's date
-  return new Date().toISOString().split('T')[0];
+  // Anything else is parsed as local time and formatted as local time.
+  const date = new Date(dateStr);
+  if (!isNaN(date.getTime())) {
+    return localIsoDate(date);
+  }
+
+  return localIsoDate();
 }
 
 function parseHistoryRow(raw: RawGoldHistoryRow): GoldHistoryItem | null {
