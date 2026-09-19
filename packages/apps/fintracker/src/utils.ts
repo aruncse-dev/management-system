@@ -22,6 +22,19 @@ export function isoDate(s: string) {
   return `20${m[3]}-${String(mo + 1).padStart(2, '0')}-${m[1].padStart(2, '0')}`
 }
 
+/**
+ * Inverse of `isoDate`: `yyyy-mm-dd` → `DD-MMM-YY`, the shape the API stores.
+ * Empty for anything unparseable, so a caller can tell a cleared date from a
+ * valid one rather than silently posting today.
+ */
+export function gasDate(iso: string) {
+  const m = (iso || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!m) return ''
+  const mo = parseInt(m[2], 10) - 1
+  if (mo < 0 || mo > 11) return ''
+  return `${m[3]}-${MNS[mo]}-${m[1].slice(2)}`
+}
+
 export function dateKey(s: string) {
   const m = s.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2})$/)
   if (!m) return 0

@@ -1857,6 +1857,136 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
   cursor: pointer;
 }
 
+/* Floating action buttons, stacked bottom-right.
+   Two buttons rather than one that fans open: quick add and the full form are
+   each worth one tap, and a speed-dial would put an extra tap in front of the
+   thing the stack exists to make fast. */
+.fab-stack {
+  position: fixed;
+  z-index: 100;
+  right: 20px;
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.fab {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: none;
+  background: var(--navy-dark);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .2);
+  cursor: pointer;
+}
+/* Smaller and outlined, so the plus stays the primary of the two.
+   Tinted rather than white: the page is full of white cards and this floats
+   over them, so a `--card` fill would leave the button visible only by its
+   1px border — invisible exactly where it usually sits. `--navy-lt` separates
+   from both the cards and the blue-tinted page behind them. */
+.fab--mini {
+  width: 42px;
+  height: 42px;
+  background: var(--navy-lt);
+  color: var(--navy);
+  border: 1.5px solid var(--navy);
+  box-shadow: 0 3px 12px rgba(30, 92, 199, .18);
+}
+
+/* Quick add — the floating one-line entry (QuickAddBar.tsx).
+   A card with margin on every side, not a bar welded to the bottom edge: this
+   is a thing you opened, and it should look like it sits above the page rather
+   than having become part of it. */
+.quickadd-pop {
+  position: fixed;
+  z-index: 110;
+  right: 12px;
+  left: 12px;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  max-width: 520px;
+  margin-left: auto;
+  padding: 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .18);
+}
+.quickadd {
+  display: grid;
+  gap: 8px;
+}
+.quickadd-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.quickadd-icon {
+  position: absolute;
+  left: 11px;
+  color: var(--navy);
+  pointer-events: none;
+}
+.quickadd-field .form-inp {
+  flex: 1;
+  min-width: 0;
+  padding-left: 34px;
+  padding-right: 36px;
+  font-size: 16px; /* 16px or iOS zooms the page on focus. */
+  font-weight: 600;
+}
+.quickadd-close {
+  position: absolute;
+  right: 6px;
+  display: flex;
+  padding: 6px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.quickadd-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+/* The split, restated. The point is not the values — those are in what you
+   typed — but the *cuts*: which words became the category and which the
+   account. That is the only part the grammar decides for you. */
+.quickadd-preview,
+.quickadd-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+  font-size: 12px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.quickadd-split { color: var(--navy); }
+.quickadd-missing { color: var(--rm); font-weight: 800; }
+.quickadd-hint { color: var(--muted); font-weight: 600; }
+.quickadd-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.quickadd-go {
+  background: var(--navy-dark);
+  color: #fff;
+  border: none;
+  font-weight: 700;
+}
+.quickadd-go:disabled { opacity: .45; cursor: default; }
+
 /* Dashboard "Over budget" rows.
    One line per category inside a card: name, how far over, and what was spent.
    The section is an exception report, so every row is over by definition —
