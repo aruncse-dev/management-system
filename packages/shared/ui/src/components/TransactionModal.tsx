@@ -1,7 +1,8 @@
-import { useState } from 'react'
-import { X } from 'lucide-react'
+import { useMemo, useRef, useState } from 'react'
+import { X, Zap } from 'lucide-react'
 import type { Transaction, TransactionForm } from '@fintracker-vault/types'
 import { CATEGORIES, INCOME_CATS } from '@fintracker-vault/config'
+import { parseQuickAdd, quickAddSummary } from '@fintracker-vault/utils'
 import { OptionCombobox } from './OptionCombobox'
 import { RefCombobox } from './RefCombobox'
 
@@ -27,6 +28,22 @@ export type TransactionRefOption = {
   types?: readonly string[]
   /** Pre-fills the amount when it is still empty (fixed EMIs). */
   amount?: number
+}
+
+/**
+ * An entry the user has made before, offered under the quick-add box.
+ *
+ * `amount` is what it last cost, not an average: for rent or an EMI that is
+ * the figure you want, and for groceries you overtype it.
+ */
+export type QuickAddSuggestion = {
+  desc: string
+  category: string
+  mode: string
+  type: string
+  amount: number
+  uses: number
+  last_used: string
 }
 
 export type TransactionModalApi = {
@@ -58,6 +75,8 @@ interface Props {
   amountPlaceholder?: string
   /** Module rows this transaction can be linked to. Empty hides the field entirely. */
   refOptions?: readonly TransactionRefOption[]
+  /** Past entries for the quick-add box. Empty simply hides the suggestion list. */
+  quickAddSuggestions?: readonly QuickAddSuggestion[]
 }
 
 /** Local-time today. `toISOString()` is UTC and reads as yesterday until 05:30 IST. */
@@ -159,6 +178,7 @@ export default function TransactionModal({
   amountLabel = 'Amount',
   amountPlaceholder = '0',
   refOptions = [],
+  quickAddSuggestions = [],
 }: Props) {
   const isEdit = Boolean(row?.id)
   const defaultMode = paymentModeOptions[0] ?? 'Cash'
@@ -169,6 +189,11 @@ export default function TransactionModal({
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [delConfirm, setDelConfirm] = useState(false)
+  /** The one-line entry. Only offered when adding — an edit is a correction. */
+  const [quick, setQuick] = useState('')
+  const [quickTouched, setQuickTouched] = useState<Set<string>>(new Set())
+  const [suggestOpen, setSuggestOpen] = useState(false)
+  const amountRef = useRef<HTMLInputElement>(null)
 
   const isTransfer = form.t === 'Transfer'
   // A target only offers itself for the types it can represent — a loan
@@ -185,6 +210,85 @@ export default function TransactionModal({
 
   function set(k: keyof TransactionForm, v: string) {
     setForm(f => ({ ...f, [k]: v }))
+    // A field the user has corrected is never overwritten by re-parsing the
+    // quick-add line. Typing one more word must not undo the fix you just made.
+    setQuickTouched(t => (t.has(k) ? t : new Set(t).add(k)))
+  }
+
+  /**
+   * Both category lists at once, so the parser recognises "Salary" while the
+   * form still says Expense — matching it is what flips the type.
+   */
+  const quickLists = useMemo(() => {
+    const expense = expenseCategoryOptions ?? CATEGORIES
+    const income = incomeCategoryOptions ?? ALL_CATS
+    return {
+      categories: [...new Set([...expense, ...income])],
+      modes: paymentModeOptions,
+      incomeCategories: incomeCategoryOptions ?? INCOME_CATS,
+    }
+  }, [expenseCategoryOptions, incomeCategoryOptions, paymentModeOptions])
+
+  const parsed = useMemo(
+    () => (quick.trim() ? parseQuickAdd(quick, quickLists) : null),
+    [quick, quickLists],
+  )
+
+  /**
+   * Past entries matching what has been typed, most-used first.
+   *
+   * A leading amount is stripped before matching: you type the figure first, so
+   * "500 veg" must still find the vegetables entries rather than searching for
+   * a suggestion whose text contains "500".
+   */
+  const suggestions = useMemo(() => {
+    const q = quick.trim().replace(/^[₹$]?[\d,.]+(?:rs|inr)?\.?\s*/i, '').trim().toLowerCase()
+    if (!q) return []
+    return quickAddSuggestions
+      .filter(sug =>
+        `${sug.desc} ${sug.category} ${sug.mode}`.toLowerCase().includes(q),
+      )
+      .slice(0, 6)
+  }, [quick, quickAddSuggestions])
+
+  /**
+   * Fill the form from the typed line, leaving hand-corrected fields alone.
+   *
+   * The form below is the preview: there is no separate confirm step because
+   * every field that will be saved is already visible and editable.
+   */
+  function onQuick(text: string) {
+    setQuick(text)
+    const r = text.trim() ? parseQuickAdd(text, quickLists) : null
+    if (!r || !r.matched) return
+    setForm(f => ({
+      ...f,
+      a: r.amount && !quickTouched.has('a') ? r.amount : f.a,
+      desc: r.desc && !quickTouched.has('desc') ? r.desc : f.desc,
+      c: r.category && !quickTouched.has('c') ? r.category : f.c,
+      m: r.mode && !quickTouched.has('m') ? r.mode : f.m,
+      date: r.date && !quickTouched.has('date') ? r.date : f.date,
+      // Only on a positive signal. Without this the parser's Expense default
+      // would quietly undo an Income the user had selected by hand.
+      t: !quickTouched.has('t') && (r.category || r.type === 'Income') ? r.type : f.t,
+    }))
+  }
+
+  /** An explicit pick wins outright, including over earlier hand edits. */
+  function pickSuggestion(sug: QuickAddSuggestion) {
+    setQuick([sug.amount || '', sug.desc, sug.category, sug.mode].filter(Boolean).join(' '))
+    setQuickTouched(new Set())
+    setSuggestOpen(false)
+    setForm(f => ({
+      ...f,
+      a: sug.amount ? String(sug.amount) : f.a,
+      desc: sug.desc || f.desc,
+      c: sug.category || f.c,
+      m: sug.mode || f.m,
+      t: sug.type || f.t,
+    }))
+    amountRef.current?.focus()
+    amountRef.current?.select()
   }
 
   /**
@@ -212,6 +316,9 @@ export default function TransactionModal({
       const keep = !opt || !opt.types || opt.types.includes(v)
       return { ...f, t: v, ref: keep ? f.ref : '' }
     })
+    // Type has its own setter rather than going through `set`, so it needs the
+    // same guard: picking Income by hand must survive the next keystroke.
+    setQuickTouched(t => (t.has('t') ? t : new Set(t).add('t')))
   }
 
   async function save() {
@@ -286,6 +393,69 @@ export default function TransactionModal({
           </button>
         </div>
         <div className="modal-body transaction-modal-body">
+          {/* Quick add. Only when adding: an edit is a correction to one field,
+              not a line to retype. The form below doubles as the preview, so
+              there is no second save path and nothing new to validate — a line
+              that parses badly just leaves the form as it always was. */}
+          {!isEdit && (
+            <div className="ui-kit-quick">
+              <div className="ui-kit-quick-field">
+                <Zap size={14} className="ui-kit-quick-icon" />
+                <input
+                  className="form-inp"
+                  type="text"
+                  autoFocus
+                  autoComplete="off"
+                  aria-label="Quick add"
+                  placeholder="500 Vegetables Cash"
+                  value={quick}
+                  onChange={e => { onQuick(e.target.value); setSuggestOpen(true) }}
+                  onFocus={() => setSuggestOpen(true)}
+                  onBlur={() => window.setTimeout(() => setSuggestOpen(false), 120)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      if (suggestOpen && suggestions.length === 1) pickSuggestion(suggestions[0])
+                      else void save()
+                    } else if (e.key === 'Escape' && suggestOpen) {
+                      e.preventDefault()
+                      setSuggestOpen(false)
+                    }
+                  }}
+                />
+              </div>
+
+              {parsed?.matched ? (
+                <div className="ui-kit-quick-preview">{quickAddSummary(parsed, '')}</div>
+              ) : (
+                <div className="ui-kit-quick-hint">amount · what it was · category · account</div>
+              )}
+
+              {suggestOpen && suggestions.length > 0 && (
+                <div className="ui-kit-quick-list" role="listbox">
+                  {suggestions.map(sug => (
+                    <button
+                      key={`${sug.desc}|${sug.category}|${sug.mode}|${sug.amount}`}
+                      type="button"
+                      role="option"
+                      aria-selected={false}
+                      className="ui-kit-quick-opt"
+                      onMouseDown={e => { e.preventDefault(); pickSuggestion(sug) }}
+                    >
+                      <span className="ui-kit-quick-opt-amt">{sug.amount || '—'}</span>
+                      <span className="ui-kit-quick-opt-body">
+                        <span className="ui-kit-quick-opt-desc">{sug.desc}</span>
+                        <span className="ui-kit-quick-opt-meta">
+                          {[sug.category, sug.mode].filter(Boolean).join(' · ')}
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="form-row">
             <label className="form-lbl">Date</label>
             <input className="form-inp" type="date" value={form.date} onChange={e => set('date', e.target.value)} />
@@ -293,6 +463,7 @@ export default function TransactionModal({
           <div className="form-row">
             <label className="form-lbl">{amountLabel}</label>
             <input
+              ref={amountRef}
               className="form-inp"
               type="number"
               min="0"

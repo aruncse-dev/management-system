@@ -384,6 +384,21 @@ export interface RawVaultAppRow {
  * to it. No policy number, no nominee, no notes — widening this is how a
  * records app leaks into a money app.
  */
+/**
+ * A past entry offered by quick-add, already grouped by what makes it distinct.
+ * `amount` is last-used, not an average — for rent or an EMI it is the figure
+ * you want; for groceries you overtype it.
+ */
+export interface QuickAddSuggestion {
+  desc: string;
+  category: string;
+  mode: string;
+  type: string;
+  amount: number;
+  uses: number;
+  last_used: string;
+}
+
 export interface RawInsuranceRow {
   id: string;
   plan_name: string;
@@ -521,6 +536,9 @@ export const api = {
   getDashboardSummary: (month: string, year: string, months = 6) =>
     get<DashboardSummary>('summary', { month, year, months: String(months) }),
   getData:       (month: string, year: string)  => get<Transaction[]>('getData', { month, year }),
+  /** Past entries for quick-add autocomplete. Cached like the other reads. */
+  getQuickAddSuggestions: (months = 6) =>
+    get<QuickAddSuggestion[]>('quickAddSuggestions', { months: String(months) }),
   addRow:        (p: Record<string, unknown>)   => post<string>({ action: 'addRow', ...p }),
   updateRow:     (p: Record<string, unknown>)   => post<boolean>({ action: 'updateRow', ...p }),
   deleteRow:     (month: string, year: string, id: string) => post<boolean>({ action: 'deleteRow', month, year, id }),

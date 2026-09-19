@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useRouter } from 'next/router'
-import { Copy, Pencil } from 'lucide-react'
+import { Pencil } from 'lucide-react'
 import { useStore, usePage } from '../store'
 import { Transaction } from '../types'
 import { dateKey, fd, isoDate, transactionTransferDestination } from '../utils'
@@ -32,7 +32,6 @@ const TYPE_FILTERS = ['All', 'Expense', 'Income', 'Transfer'] as const
 interface Props {
   onEdit: (r: Transaction) => void
   onDuplicate?: (r: Transaction) => void
-  onRepeat?: () => void
 }
 
 function toneForTransaction(row: Transaction): 'green' | 'red' | 'amber' | 'navy' {
@@ -61,7 +60,7 @@ function dayLabel(gasDate: string): string {
  * every row, so they are noise. Type is carried by the tone and the sign, date
  * by the day header — which also earns its place by showing the day's net.
  */
-export default function Transactions({ onEdit, onDuplicate, onRepeat }: Props) {
+export default function Transactions({ onEdit, onDuplicate }: Props) {
   const router = useRouter()
   const { state, dispatch } = useStore()
   const fmt = useFormatMoney()
@@ -104,16 +103,9 @@ export default function Transactions({ onEdit, onDuplicate, onRepeat }: Props) {
         icon={<Pencil size={14} />}
         subtitle={state.catFilter ? `Filtered to ${state.catFilter}` : undefined}
         right={
-          <span className="txn-head-actions">
-            {onRepeat ? (
-              <button type="button" className="btn btn-sm btn-cancel" onClick={onRepeat}>
-                <Copy size={13} /> Repeat
-              </button>
-            ) : null}
-            <SectionChip>
-              {shown} / {total}
-            </SectionChip>
-          </span>
+          <SectionChip>
+            {shown} / {total}
+          </SectionChip>
         }
       >
         <div className="ui-stack">

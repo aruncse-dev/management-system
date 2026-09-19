@@ -10,12 +10,12 @@ import Transactions from './transactions'
 import Budget from './budget'
 import { MNS } from '../config'
 import { BudgetMonthRangeFields } from '../components/BudgetMonthRangeFields'
-import RepeatSheet from '../components/RepeatSheet'
 import { expenseCategoriesWithBudget, incomeCategoriesWithBudget, isoDate, monthYearApiKey } from '../utils'
 import { useFintrackerModes } from '../context/FintrackerModesContext'
 import { cycleMonthYearForDate, cycleSubtitle } from '../expenseCycle'
 import { useMoneyFormatting } from '../hooks/useFormatMoney'
 import { useTransactionRefOptions } from '../hooks/useTransactionRefOptions'
+import type { QuickAddSuggestion } from '../api'
 
 type TabId = 'dash' | 'txns' | 'bud'
 
@@ -39,11 +39,11 @@ export default function Monthly() {
   const money = useMoneyFormatting()
   const { paymentModeOptions, transferTargetOptions } = useFintrackerModes()
   const refOptions = useTransactionRefOptions()
+  const [quickAddSuggestions, setQuickAddSuggestions] = useState<QuickAddSuggestion[]>([])
   const [tab, setTab] = useState<TabId>('dash')
   const [modalOpen, setModalOpen] = useState(false)
   /** Forces TransactionModal to remount; duplicated rows all share id ''. */
   const [modalNonce, setModalNonce] = useState(0)
-  const [repeatOpen, setRepeatOpen] = useState(false)
   const [editRow, setEditRow] = useState<typeof state.rows[0] | null>(null)
   const [snackbar, setSnackbar] = useState<{ msg: string; variant: 'success' | 'error' | 'info' } | null>(null)
   const snackbarTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -106,6 +106,18 @@ export default function Monthly() {
       if (snackbarTimerRef.current) clearTimeout(snackbarTimerRef.current)
     }
   }, [])
+
+  // Past entries for quick-add, fetched once and cached by `api`. A failure is
+  // silent on purpose: without suggestions the box still parses what you type,
+  // so this is an enhancement and never a reason the form cannot open.
+  useEffect(() => {
+    let cancelled = false
+    void api
+      .getQuickAddSuggestions()
+      .then(rows => { if (!cancelled) setQuickAddSuggestions(rows) })
+      .catch(() => { if (!cancelled) setQuickAddSuggestions([]) })
+    return () => { cancelled = true }
+  }, [state.fintracker])
 
   const loadMonth = useCallback(async (month: string, year: string, forceRefresh = false) => {
     dispatch({ type: 'SET_LOADING', payload: true })
@@ -228,7 +240,6 @@ export default function Monthly() {
         {tab === 'txns' && (
           <Transactions
             onEdit={r => { setEditRow(r); setModalOpen(true); setModalNonce(n => n + 1) }}
-            onRepeat={() => setRepeatOpen(true)}
             onDuplicate={r => { setEditRow(duplicateOf(r)); setModalOpen(true); setModalNonce(n => n + 1) }}
           />
         )}
@@ -293,18 +304,6 @@ export default function Monthly() {
         </div>
       )}
 
-      {repeatOpen && (
-        <RepeatSheet
-          month={state.month}
-          year={state.year}
-          onClose={() => setRepeatOpen(false)}
-          onCopied={async (count) => {
-            await loadMonth(state.month, state.year, true)
-            showStatus(`✓ Copied ${count} transaction${count === 1 ? '' : 's'}`)
-          }}
-        />
-      )}
-
       {modalOpen && (
         <TransactionModal
           key={`${editRow?.id || 'new'}-${modalNonce}-${paymentModeOptions.join('|')}--${transferTargetOptions.join('|')}`}
@@ -318,6 +317,7 @@ export default function Monthly() {
           amountLabel={`Amount (${money.currency})`}
           amountPlaceholder={money.zeroPlaceholder}
           refOptions={refOptions}
+          quickAddSuggestions={quickAddSuggestions}
           onClose={() => setModalOpen(false)}
           onSaved={async (saved) => {
             setModalOpen(false)
