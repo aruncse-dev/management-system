@@ -54,16 +54,18 @@ export function QuickAddBar({
     inputRef.current?.focus()
   }, [])
 
-  const lists = useMemo(
-    () => ({
-      // Both lists at once, so "Salary" is recognised while the default type is
-      // still Expense — matching it is what flips the row to Income.
+  const lists = useMemo(() => {
+    // `incomeCategories` is everything an Income row may be filed under, which
+    // includes every expense category too. Only the names that are income and
+    // nothing else may flip the row — otherwise "500 Vegetables Cash" saves as
+    // Income, as it did. Expense is the default; "Salary" is what changes it.
+    const expense = new Set(categories.map(c => c.trim().toLowerCase()))
+    return {
       categories: [...new Set([...categories, ...incomeCategories])],
       modes,
-      incomeCategories,
-    }),
-    [categories, incomeCategories, modes],
-  )
+      incomeCategories: incomeCategories.filter(c => !expense.has(c.trim().toLowerCase())),
+    }
+  }, [categories, incomeCategories, modes])
 
   const parsed = useMemo(
     () => (text.trim() ? parseQuickAdd(text, lists) : null),
