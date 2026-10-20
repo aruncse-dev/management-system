@@ -1915,6 +1915,9 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
   border: 1px solid var(--border);
   border-radius: 16px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, .18);
+  /* `bottom` is overridden inline while the on-screen keyboard is up
+     (useKeyboardInset), so the Add button sits above it rather than under it. */
+  transition: bottom .12s ease-out;
 }
 .quickadd {
   display: grid;

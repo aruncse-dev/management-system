@@ -16,6 +16,7 @@ import { useFintrackerModes } from '../context/FintrackerModesContext'
 import { cycleMonthYearForDate, cycleSubtitle } from '../expenseCycle'
 import { useMoneyFormatting } from '../hooks/useFormatMoney'
 import { useTransactionRefOptions } from '../hooks/useTransactionRefOptions'
+import { useKeyboardInset } from '../hooks/useKeyboardInset'
 
 type TabId = 'dash' | 'txns' | 'bud'
 
@@ -43,6 +44,7 @@ export default function Monthly() {
   const [modalOpen, setModalOpen] = useState(false)
   /** The floating one-line entry. Opened by the plus button on every tab but Budget. */
   const [quickOpen, setQuickOpen] = useState(false)
+  const keyboardInset = useKeyboardInset(quickOpen)
   /** Forces TransactionModal to remount; duplicated rows all share id ''. */
   const [modalNonce, setModalNonce] = useState(0)
   const [editRow, setEditRow] = useState<typeof state.rows[0] | null>(null)
@@ -239,7 +241,10 @@ export default function Monthly() {
           reachable from the dashboard, which is where you usually are when you
           remember a spend. */}
       {quickOpen && tab !== 'bud' && (
-        <div className="quickadd-pop">
+        <div
+          className="quickadd-pop"
+          style={keyboardInset ? { bottom: keyboardInset + 8 } : undefined}
+        >
           <QuickAddBar
             month={state.month}
             year={state.year}
