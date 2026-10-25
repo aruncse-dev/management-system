@@ -1,0 +1,3 @@
+# Checked out on Windows and opened in Notepad / PowerShell 5.1.
+*.ps1 text eol=crlf
+*.example text eol=crlf
