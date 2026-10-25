@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Check, Copy, Globe, GraduationCap, Layers3, Lock, Plus, Search, AppWindow } from 'lucide-react'
 import { api, type RawVaultAppRow } from '../api'
-import { FormField, ModalActions, ModalShell, SearchField, SectionBlock, SectionChip, Spacer } from '../ui'
+import { FormField, ModalActions, ModalShell, SearchField, SectionBlock, SectionChip, Spacer, openExternal } from '../ui'
 
 type AppFormState = {
   app_uuid: string
@@ -383,7 +383,7 @@ export default function VaultAppsPage() {
                 startEdit(detail)
               }}
               onPrimary={() => {
-                if (detail.app_link) window.open(detail.app_link, '_blank', 'noopener,noreferrer')
+                if (detail.app_link) openExternal(detail.app_link)
               }}
               leading={<button type="button" className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={() => void remove(detail.app_uuid)} disabled={saving}>{saving ? 'Deleting…' : deleteConfirm && deleteUuid === detail.app_uuid ? 'Confirm delete?' : 'Delete'}</button>}
             />

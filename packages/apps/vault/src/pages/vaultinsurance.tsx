@@ -7,6 +7,7 @@ import { api, type PersonRow, type RawInsuranceRow, type RawInsurancePremiumRow 
 import {
   FilterChips, FormField, HoldingCard, KpiCard, KpiGrid, LoadingState,
   ModalActions, ModalShell, SearchField, SectionBlock, SectionChip, Spacer,
+  openExternal,
 } from '../ui'
 import {
   POLICY_TYPES, POLICY_TYPE_LABELS, PREMIUM_MODES, PREMIUM_MODE_LABELS,
@@ -216,7 +217,7 @@ function calcPolicyTerm(issueDate: string, maturityDate: string): string {
 }
 
 function openInNewTab(url: string) {
-  window.open(url, '_blank', 'noopener,noreferrer')
+  openExternal(url)
 }
 
 type AppRow = { app_uuid: string; app_name: string; app_link?: string; logo?: string }

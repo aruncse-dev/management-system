@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Check, Copy, ExternalLink, Landmark, Plus, Search } from 'lucide-react'
 import { api, type RawBankingRow } from '../api'
-import { FormField, HoldingCard, ModalActions, ModalShell, SearchField, SectionBlock, SectionChip, Spacer } from '../ui'
+import { FormField, HoldingCard, ModalActions, ModalShell, SearchField, SectionBlock, SectionChip, Spacer, openExternal } from '../ui'
 
 type BankingFormState = {
   account_holder_name: string
@@ -71,7 +71,7 @@ function summaryText(row: RawBankingRow) {
 }
 
 function openBankingUrl(url: string) {
-  window.open(url, '_blank', 'noopener,noreferrer')
+  openExternal(url)
 }
 
 export function VaultBankingPage() {
