@@ -77,6 +77,11 @@ export function isGoldPledgeKind(v: unknown): v is GoldPledgeKind {
   return typeof v === 'string' && (GOLD_PLEDGE_KINDS as readonly string[]).includes(v)
 }
 
+/** How a lend is named in messages: the person, plus the purpose when there is one. */
+export function lendLabel(lentTo: string | null, purpose: string | null): string {
+  return [lentTo?.trim(), purpose?.trim()].filter(Boolean).join(' · ') || 'Lend'
+}
+
 /** `open` = an Ongoing jewel loan or an unreturned lend — the only kind that holds an item. */
 export type GoldPledgeTarget = { id: string; name: string; open: boolean }
 
@@ -96,7 +101,7 @@ export async function loadGoldPledgeTargets(
       .from(jewelLoans)
       .where(orgId ? eq(jewelLoans.orgId, orgId) : isNull(jewelLoans.orgId)),
     db
-      .select({ id: goldLends.id, name: goldLends.name, returnedOn: goldLends.returnedOn })
+      .select({ id: goldLends.id, lentTo: goldLends.lentTo, purpose: goldLends.purpose, returnedOn: goldLends.returnedOn })
       .from(goldLends)
       .where(orgId ? eq(goldLends.orgId, orgId) : isNull(goldLends.orgId)),
   ])
@@ -105,7 +110,12 @@ export async function loadGoldPledgeTargets(
     loans: new Map(
       loanRows.map((r) => [r.id, { id: r.id, name: r.name, open: String(r.status ?? '').trim() !== 'Closed' }]),
     ),
-    lends: new Map(lendRows.map((r) => [r.id, { id: r.id, name: r.name, open: r.returnedOn === null }])),
+    lends: new Map(
+      lendRows.map((r) => [
+        r.id,
+        { id: r.id, name: lendLabel(r.lentTo, r.purpose), open: r.returnedOn === null },
+      ]),
+    ),
   }
 }
 

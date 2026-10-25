@@ -34,9 +34,14 @@ export const goldItems = pgTable('gold_items', {
 export const goldLends = pgTable('gold_lends', {
   id: text('id').primaryKey(),
   orgId: text('org_id'),
-  name: text('name').notNull(),
+  /** Required by the API (it is the card title); nullable only for the column rename. */
   lentTo: text('lent_to'),
+  /** Why they needed it — "Plot purchase". The person and items have their own fields. */
+  purpose: text('purpose'),
+  /** What they raised on our jewels, if known. */
+  amount: numeric('amount', { precision: 12, scale: 2 }),
   lentOn: date('lent_on').notNull(),
+  expectedOn: date('expected_on'),
   /** Null while the jewels are still with them. */
   returnedOn: date('returned_on'),
   note: text('note'),

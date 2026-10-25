@@ -137,9 +137,11 @@ CREATE TABLE "gold_items" (
 CREATE TABLE "gold_lends" (
 	"id" text PRIMARY KEY NOT NULL,
 	"org_id" text,
-	"name" text NOT NULL,
 	"lent_to" text,
+	"purpose" text,
+	"amount" numeric(12, 2),
 	"lent_on" date NOT NULL,
+	"expected_on" date,
 	"returned_on" date,
 	"note" text
 );

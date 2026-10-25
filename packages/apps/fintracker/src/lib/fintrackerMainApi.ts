@@ -1058,9 +1058,11 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
           res,
           rows.map((r) => ({
             id: r.id,
-            name: r.name,
             lent_to: r.lentTo ?? '',
+            purpose: r.purpose ?? '',
+            amount: r.amount === null ? null : num(r.amount),
             lent_on: String(r.lentOn),
+            expected_on: r.expectedOn ? String(r.expectedOn) : null,
             returned_on: r.returnedOn ? String(r.returnedOn) : null,
             note: r.note ?? '',
           })),
@@ -2001,21 +2003,40 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
           const id = isUpdate ? (typeof body.id === 'string' ? body.id : '') : crypto.randomUUID()
           if (isUpdate && !id) return fail(res, 400, 'Missing id', traceId)
 
-          let existing: { lentOn: string; returnedOn: string | null } | undefined
+          let existing: { lentOn: string; returnedOn: string | null; expectedOn: string | null } | undefined
           if (isUpdate) {
             const rows = await db
-              .select({ lentOn: goldLends.lentOn, returnedOn: goldLends.returnedOn })
+              .select({ lentOn: goldLends.lentOn, returnedOn: goldLends.returnedOn, expectedOn: goldLends.expectedOn })
               .from(goldLends)
               .where(and(whereOrgFilter(goldLends, budgetScope), eq(goldLends.id, id)))
             existing = rows[0]
             if (!existing) return fail(res, 404, 'Lend not found', traceId)
           }
 
-          let name: string | undefined
-          if (!isUpdate || body.name !== undefined) {
-            const parsed = reqText(body.name)
-            if (!parsed) return fail(res, 400, 'Describe the lend, e.g. who and what for', traceId)
-            name = parsed
+          let lentTo: string | undefined
+          if (!isUpdate || body.lent_to !== undefined) {
+            const parsed = reqText(body.lent_to)
+            if (!parsed) return fail(res, 400, 'Who has the jewels?', traceId)
+            lentTo = parsed
+          }
+
+          // Optional: '' or null clears it, anything else must be a positive amount.
+          let amount: string | null | undefined
+          if (body.amount !== undefined) {
+            if (body.amount === null || body.amount === '') amount = null
+            else {
+              amount = moneyAmount(body.amount)
+              if (!amount) return fail(res, 400, 'Amount must be a number greater than 0', traceId)
+            }
+          }
+
+          let expectedOn: string | null | undefined
+          if (body.expected_on !== undefined) {
+            if (body.expected_on === null || body.expected_on === '') expectedOn = null
+            else {
+              expectedOn = strictIsoDate(body.expected_on)
+              if (!expectedOn) return fail(res, 400, 'Expected back must be a date (YYYY-MM-DD)', traceId)
+            }
           }
 
           let lentOn: string | undefined
@@ -2038,8 +2059,12 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
           if (finalLentOn && finalReturnedOn && finalReturnedOn < finalLentOn) {
             return fail(res, 400, 'Returned on cannot be before lent on', traceId)
           }
+          const finalExpectedOn = expectedOn === undefined ? existing?.expectedOn ?? null : expectedOn
+          if (finalLentOn && finalExpectedOn && finalExpectedOn < finalLentOn) {
+            return fail(res, 400, 'Expected back cannot be before lent on', traceId)
+          }
 
-          const lentTo = body.lent_to !== undefined ? reqText(body.lent_to) : undefined
+          const purpose = body.purpose !== undefined ? reqText(body.purpose) : undefined
           const note = body.note !== undefined ? reqText(body.note) : undefined
 
           // A new lend needs items. An existing one may be saved empty: its last
@@ -2073,14 +2098,16 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
               await tx.insert(goldLends).values({
                 orgId: scopeOrgId,
                 id,
-                name: name as string,
-                lentTo: lentTo ?? null,
+                lentTo: lentTo as string,
+                purpose: purpose ?? null,
+                amount: amount ?? null,
                 lentOn: lentOn as string,
+                expectedOn: expectedOn ?? null,
                 returnedOn: returnedOn ?? null,
                 note: note ?? null,
               })
             } else {
-              const patch = { name, lentTo, lentOn, returnedOn, note }
+              const patch = { lentTo, purpose, amount, lentOn, expectedOn, returnedOn, note }
               // drizzle rejects an all-undefined SET, e.g. a call that only moves items.
               if (Object.values(patch).some((v) => v !== undefined)) {
                 await tx

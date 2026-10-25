@@ -37,12 +37,16 @@ interface GoldItem {
 
 interface GoldLend {
   id: string;
-  name: string;
   lent_to: string;
+  purpose: string;
+  amount: number | null;
   lent_on: string;
+  expected_on: string | null;
   returned_on: string | null;
   note: string;
   open: boolean;
+  /** "Person · purpose" — how the lend is named in pickers and on item cards. */
+  label: string;
 }
 
 interface JewelLoanRef {
@@ -53,9 +57,11 @@ interface JewelLoanRef {
 }
 
 interface GoldLendFormState {
-  name: string;
   lent_to: string;
+  purpose: string;
+  amount: string;
   lent_on: string;
+  expected_on: string;
   returned_on: string;
   note: string;
   item_ids: string[];
@@ -169,9 +175,11 @@ function createEmptyGoldForm(person_id = '', location_id = ''): GoldFormState {
 
 function emptyLendForm(): GoldLendFormState {
   return {
-    name: '',
     lent_to: '',
+    purpose: '',
+    amount: '',
     lent_on: localIsoDate(),
+    expected_on: '',
     returned_on: '',
     note: '',
     item_ids: [],
@@ -186,15 +194,39 @@ function pledgeRef(f: Pick<GoldFormState, 'pledge' | 'jewel_loan_id' | 'lend_id'
 }
 
 function parseLend(raw: RawGoldLendRow): GoldLend {
+  const lent_to = String(raw.lent_to ?? '').trim();
+  const purpose = String(raw.purpose ?? '').trim();
+  const amount = raw.amount === null || raw.amount === undefined ? NaN : Number(raw.amount);
   return {
     id: raw.id,
-    name: String(raw.name ?? '').trim(),
-    lent_to: String(raw.lent_to ?? '').trim(),
+    lent_to,
+    purpose,
+    amount: Number.isFinite(amount) && amount > 0 ? amount : null,
     lent_on: normalizeDate(String(raw.lent_on ?? '')),
+    expected_on: raw.expected_on ? normalizeDate(String(raw.expected_on)) : null,
     returned_on: raw.returned_on ? normalizeDate(String(raw.returned_on)) : null,
     note: String(raw.note ?? '').trim(),
     open: !raw.returned_on,
+    label: [lent_to, purpose].filter(Boolean).join(' · ') || 'Lend',
   };
+}
+
+/** Whole days from one ISO day to another, counted on the calendar (no timezone drift). */
+function daysBetween(from: string, to: string): number {
+  const [fy, fm, fd] = from.split('-').map(Number);
+  const [ty, tm, td] = to.split('-').map(Number);
+  return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86_400_000);
+}
+
+/** "12 Oct" — the year only when it isn't this one. */
+function shortDate(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  const sameYear = y === new Date().getFullYear();
+  return new Date(y, m - 1, d).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    ...(sameYear ? {} : { year: 'numeric' }),
+  });
 }
 
 /** Same rule as the Loans page: anything that isn't explicitly Closed is Ongoing. */
@@ -246,7 +278,7 @@ function parseRow(
     jewel_loan_id,
     lend_id,
     pledge,
-    pledgeName: pledge === 'lent' ? lend?.name ?? '' : pledge === 'loan' ? loan?.name ?? '' : '',
+    pledgeName: pledge === 'lent' ? lend?.label ?? '' : pledge === 'loan' ? loan?.name ?? '' : '',
   }
 }
 
@@ -380,29 +412,57 @@ const ItemCard = memo(function ItemCard({
 const LendCard = memo(function LendCard({
   lend,
   items,
+  goldRate,
+  fmt,
   onClick,
 }: {
   lend: GoldLend;
   items: GoldItem[];
+  goldRate: number;
+  fmt: (n: number) => string;
   onClick: () => void;
 }) {
   const totalGrams = items.reduce((s, i) => s + i.weight_g, 0);
-  const subtitle = [lend.lent_to, items.map((i) => i.name).join(', ')].filter(Boolean).join(' · ');
+  const today = localIsoDate();
+  const subtitle = [lend.purpose, items.map((i) => i.name).join(', ')].filter(Boolean).join(' · ');
+  const daysOut = daysBetween(lend.lent_on, lend.returned_on ?? today);
+  const dueIn = lend.open && lend.expected_on ? daysBetween(today, lend.expected_on) : null;
+  const overdue = dueIn !== null && dueIn < 0;
+  // The tag answers "do I need to chase this?" — so only overdue or done get one.
+  const tag = !lend.open
+    ? <span className="gold-tag gold-tag--done">Returned</span>
+    : overdue
+      ? <span className="gold-tag gold-tag--late">Overdue {-(dueIn as number)}d</span>
+      : undefined;
+  const backBy = lend.open
+    ? lend.expected_on
+      ? `${shortDate(lend.expected_on)}${dueIn !== null && dueIn >= 0 ? ` · ${dueIn}d` : ''}`
+      : '—'
+    : lend.returned_on ? shortDate(lend.returned_on) : '—';
   return (
     <HoldingCard
       className="txn-entry-card"
-      title={lend.name}
+      title={lend.lent_to || 'Lend'}
       subtitle={subtitle}
       icon={<Handshake size={14} />}
       iconBackground
-      accentTone={lend.open ? 'amber' : 'green'}
-      rightTop={lend.open ? undefined : <span className="gold-tag gold-tag--done">Returned</span>}
+      accentTone={!lend.open ? 'green' : overdue ? 'red' : 'amber'}
+      rightTop={tag}
       leftLabel="Weight"
       leftValue={grams(totalGrams)}
-      centerLabel="Items"
-      centerValue={items.length}
-      rightLabel={lend.open ? 'Since' : 'Returned'}
-      rightValue={lend.open ? lend.lent_on : lend.returned_on}
+      centerLabel="Loan"
+      centerValue={lend.amount !== null ? fmt(lend.amount) : '—'}
+      rightLabel="Since"
+      rightValue={shortDate(lend.lent_on)}
+      secondaryGrid={{
+        // Weight at today's rate, beside what they raised on it.
+        leftLabel: 'Worth today',
+        leftValue: goldRate > 0 ? fmt(totalGrams * goldRate) : '—',
+        centerLabel: lend.open ? 'Days out' : 'Was out',
+        centerValue: `${daysOut}d`,
+        rightLabel: lend.open ? 'Back by' : 'Returned',
+        rightValue: backBy,
+      }}
       onClick={onClick}
     />
   );
@@ -554,6 +614,16 @@ export default function Gold() {
 
   const openLoans = useMemo(() => jewelLoans.filter((l) => l.open), [jewelLoans]);
   const openLends = useMemo(() => lends.filter((l) => l.open), [lends]);
+  /** What borrowers raised on our jewels, across open lends that recorded it. */
+  const lentAmount = useMemo(() => openLends.reduce((s, l) => s + (l.amount ?? 0), 0), [openLends]);
+  const lentSubtitle = useMemo(() => {
+    if (lentGrams <= 0) return undefined;
+    return [
+      `${grams(lentGrams)} lent`,
+      goldRate > 0 ? `worth ${fmt(lentGrams * goldRate)}` : '',
+      lentAmount > 0 ? `${fmt(lentAmount)} raised on it` : '',
+    ].filter(Boolean).join(' · ');
+  }, [lentGrams, goldRate, lentAmount, fmt]);
   /** By raw link, so a returned lend still lists what went out with it. */
   const itemsByLend = useMemo(() => {
     const m = new Map<string, GoldItem[]>();
@@ -569,7 +639,7 @@ export default function Gold() {
   const filteredLends = useMemo(() => {
     const q = lendSearch.trim().toLowerCase();
     const match = (l: GoldLend) =>
-      !q || l.name.toLowerCase().includes(q)
+      !q || l.purpose.toLowerCase().includes(q)
         || l.lent_to.toLowerCase().includes(q)
         || l.note.toLowerCase().includes(q)
         || (itemsByLend.get(l.id) ?? []).some(i => i.name.toLowerCase().includes(q));
@@ -1040,9 +1110,11 @@ export default function Gold() {
   function openEditLend(l: GoldLend) {
     setEditLend(l);
     setLendForm({
-      name: l.name,
       lent_to: l.lent_to,
+      purpose: l.purpose,
+      amount: l.amount !== null ? String(l.amount) : '',
       lent_on: l.lent_on,
+      expected_on: l.expected_on ?? '',
       returned_on: l.returned_on ?? '',
       note: l.note,
       item_ids: (itemsByLend.get(l.id) ?? []).map(i => i.id),
@@ -1067,8 +1139,17 @@ export default function Gold() {
   async function saveLend() {
     if (savingLend || deletingLend) return;
     setLendError('');
-    if (!lendForm.name.trim()) { setLendError('Describe the lend, e.g. who and what for.'); return; }
+    if (!lendForm.lent_to.trim()) { setLendError('Who has the jewels?'); return; }
     if (!lendForm.lent_on) { setLendError('Enter the date the jewels went out.'); return; }
+    const amount = lendForm.amount.trim() ? parseFloat(lendForm.amount) : null;
+    if (amount !== null && (!Number.isFinite(amount) || amount <= 0)) {
+      setLendError('Amount must be a number greater than 0, or left blank.');
+      return;
+    }
+    if (lendForm.expected_on && lendForm.expected_on < lendForm.lent_on) {
+      setLendError('Expected back cannot be before lent on.');
+      return;
+    }
     // An existing lend may be saved empty (its last item was deleted or moved),
     // so it can still be marked returned instead of only deleted.
     if (lendForm.item_ids.length === 0 && !editLend) { setLendError('Pick at least one item.'); return; }
@@ -1079,9 +1160,11 @@ export default function Gold() {
     setSavingLend(true);
     setError('');
     const payload = {
-      name: lendForm.name.trim(),
       lent_to: lendForm.lent_to.trim(),
+      purpose: lendForm.purpose.trim(),
+      amount,
       lent_on: lendForm.lent_on,
+      expected_on: lendForm.expected_on || null,
       returned_on: lendForm.returned_on || null,
       note: lendForm.note.trim(),
       item_ids: lendForm.item_ids,
@@ -1326,11 +1409,11 @@ export default function Gold() {
             <SectionBlock
               title="Lent out"
               icon={<Handshake size={14} />}
-              subtitle={lentGrams > 0 ? `${grams(lentGrams)} with others · not in Estimated value` : undefined}
+              subtitle={lentSubtitle}
               right={<SectionChip>{openLends.length}</SectionChip>}
             >
               {lends.length > 0 && (
-                <SearchField value={lendSearch} placeholder="Search description, person, item…" onChange={setLendSearch} onClear={() => setLendSearch('')} />
+                <SearchField value={lendSearch} placeholder="Search person, purpose, item…" onChange={setLendSearch} onClear={() => setLendSearch('')} />
               )}
             </SectionBlock>
 
@@ -1352,7 +1435,7 @@ export default function Gold() {
                 {filteredLends.open.length > 0 && (
                   <ListStack>
                     {filteredLends.open.map(l => (
-                      <LendCard key={l.id} lend={l} items={itemsByLend.get(l.id) ?? []} onClick={() => openEditLend(l)} />
+                      <LendCard key={l.id} lend={l} items={itemsByLend.get(l.id) ?? []} goldRate={goldRate} fmt={fmt} onClick={() => openEditLend(l)} />
                     ))}
                   </ListStack>
                 )}
@@ -1364,7 +1447,7 @@ export default function Gold() {
                     </div>
                     <ListStack>
                       {filteredLends.returned.map(l => (
-                        <LendCard key={l.id} lend={l} items={itemsByLend.get(l.id) ?? []} onClick={() => openEditLend(l)} />
+                        <LendCard key={l.id} lend={l} items={itemsByLend.get(l.id) ?? []} goldRate={goldRate} fmt={fmt} onClick={() => openEditLend(l)} />
                       ))}
                     </ListStack>
                   </div>
@@ -1604,7 +1687,7 @@ export default function Gold() {
                     <select className="form-sel" value={form.lend_id} onChange={e => setField('lend_id', e.target.value)}>
                       <option value="">Select a lend…</option>
                       {openLends.map((l) => (
-                        <option key={l.id} value={l.id}>{l.name}{l.lent_to ? ` · ${l.lent_to}` : ''}</option>
+                        <option key={l.id} value={l.id}>{l.label}</option>
                       ))}
                     </select>
                   </FormField>
@@ -1639,7 +1722,7 @@ export default function Gold() {
                 onClick={() => void deleteLend()}
                 disabled={savingLend || deletingLend}
               >
-                {deletingLend ? 'Deleting…' : deleteLendConfirm ? `Delete "${editLend.name}"?` : 'Delete'}
+                {deletingLend ? 'Deleting…' : deleteLendConfirm ? `Delete "${editLend.label}"?` : 'Delete'}
               </button>
             ) : null}
           />
@@ -1647,15 +1730,23 @@ export default function Gold() {
           <form onSubmit={e => { e.preventDefault(); void saveLend(); }}>
             <div className="ui-stack">
               {lendError ? <p className="gold-modal-error" role="alert">{lendError}</p> : null}
-              <FormField label="Description *">
-                <input className="form-inp" type="text" placeholder="Ravi, pledged at IOB…" value={lendForm.name} onChange={e => setLendField('name', e.target.value)} />
-              </FormField>
-              <FormField label="Lent to">
+              <FormField label="Lent to *">
                 <input className="form-inp" type="text" placeholder="Person" value={lendForm.lent_to} onChange={e => setLendField('lent_to', e.target.value)} />
               </FormField>
-              <FormField label="Lent on *">
-                <input className="form-inp" type="date" value={lendForm.lent_on} onChange={e => setLendField('lent_on', e.target.value)} />
+              <FormField label="Purpose">
+                <input className="form-inp" type="text" placeholder="Plot purchase, emergency…" value={lendForm.purpose} onChange={e => setLendField('purpose', e.target.value)} />
               </FormField>
+              <FormField label="Loan amount">
+                <input className="form-inp" type="number" min="0" step="1" inputMode="numeric" placeholder="What they raised on it" value={lendForm.amount} onChange={e => setLendField('amount', e.target.value)} />
+              </FormField>
+              <div className="gold-lend-dates">
+                <FormField label="Lent on *">
+                  <input className="form-inp" type="date" value={lendForm.lent_on} onChange={e => setLendField('lent_on', e.target.value)} />
+                </FormField>
+                <FormField label="Expected back">
+                  <input className="form-inp" type="date" value={lendForm.expected_on} min={lendForm.lent_on || undefined} onChange={e => setLendField('expected_on', e.target.value)} />
+                </FormField>
+              </div>
               <FormField label={`Items * ${lendForm.item_ids.length ? `(${lendForm.item_ids.length} · ${grams(lendFormGrams)})` : ''}`}>
                 {lendCandidates.length === 0 ? (
                   <p className="gold-lend-hint">Every item is already on a jewel loan or lent out.</p>
@@ -1687,7 +1778,7 @@ export default function Gold() {
                 </p>
               )}
               <FormField label="Note">
-                <input className="form-inp" type="text" placeholder="Loan amount, bank, expected return…" value={lendForm.note} onChange={e => setLendField('note', e.target.value)} />
+                <input className="form-inp" type="text" placeholder="Bank, loan number…" value={lendForm.note} onChange={e => setLendField('note', e.target.value)} />
               </FormField>
             </div>
             <button type="submit" hidden aria-hidden="true" tabIndex={-1} />

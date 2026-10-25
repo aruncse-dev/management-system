@@ -143,9 +143,12 @@ export interface RawGoldRow {
 /** Jewels handed to someone else; items point back via `RawGoldRow.lend_id`. */
 export interface RawGoldLendRow {
   id: string;
-  name: string;
   lent_to: string;
+  purpose: string;
+  /** What they raised on the jewels; null when not recorded. */
+  amount: number | null;
   lent_on: string;
+  expected_on: string | null;
   /** Null while the jewels are still with them. */
   returned_on: string | null;
   note: string;

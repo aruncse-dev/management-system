@@ -2153,6 +2153,19 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
   color: var(--green);
   background: color-mix(in srgb, var(--green) 12%, transparent);
 }
+.gold-tag--late {
+  color: var(--rm);
+  background: color-mix(in srgb, var(--rm) 12%, transparent);
+}
+/* Lent on / Expected back side by side — they're read together. */
+.gold-lend-dates {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.gold-lend-dates > * {
+  min-width: 0;
+}
 .gold-lend-hint {
   margin: 0;
   font-size: 12px;
