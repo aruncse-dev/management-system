@@ -13,11 +13,11 @@
  * `expenseCycle.ts`). Keeping the cycle math with the caller means the trend
  * buckets always match what the Monthly tab shows.
  */
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, isNull } from 'drizzle-orm'
 import type { getDb } from '../neon'
 import { paymentSources, transactions } from '../schema/transactions'
 import { savings } from '../schema/savings'
-import { goldItems, goldResources } from '../schema/gold'
+import { goldItems, goldLends, goldResources } from '../schema/gold'
 import { stocks, mutualFunds } from '../schema/portfolio'
 import { cashLoanRepayments, cashLoans, emiLoanRepayments, emiLoans, jewelLoanRepayments, jewelLoans } from '../schema/loans'
 import { subscriptions } from '../schema/subscriptions'
@@ -274,13 +274,17 @@ export async function getNetWorth(
   orgId: string | null,
   opts: { goldRatePerGram: number },
 ): Promise<NetWorth> {
-  const [savingsRows, items, resources, stockRows, mfRows, loans] = await Promise.all([
+  const [savingsRows, items, resources, openLends, stockRows, mfRows, loans] = await Promise.all([
     db
       .select({ amount: savings.amount, type: savings.type })
       .from(savings)
       .where(scopeOf(savings, orgId)),
     db.select().from(goldItems).where(scopeOf(goldItems, orgId)),
     db.select().from(goldResources).where(scopeOf(goldResources, orgId)),
+    db
+      .select({ id: goldLends.id })
+      .from(goldLends)
+      .where(and(scopeOf(goldLends, orgId), isNull(goldLends.returnedOn))),
     db.select({ qty: stocks.qty, lastPrice: stocks.lastPrice }).from(stocks).where(scopeOf(stocks, orgId)),
     db
       .select({ currentValue: mutualFunds.currentValue })
@@ -298,8 +302,13 @@ export async function getNetWorth(
   }, 0)
 
   const skipped = new Set(resources.filter((r) => r.skip).map((r) => r.id))
+  // Jewels lent out are still ours but not in hand — left out until returned.
+  const lent = new Set(openLends.map((l) => l.id))
   const grams = items.reduce(
-    (sum, i) => (i.locationId && skipped.has(i.locationId) ? sum : sum + num(i.weightG)),
+    (sum, i) =>
+      (i.locationId && skipped.has(i.locationId)) || (i.lendId && lent.has(i.lendId))
+        ? sum
+        : sum + num(i.weightG),
     0,
   )
   const goldTotal = grams * opts.goldRatePerGram

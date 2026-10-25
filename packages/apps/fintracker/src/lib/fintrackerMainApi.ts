@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { and, desc, eq, isNull, lte, gte, ne, or } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNull, lte, gte, ne, notInArray, or } from 'drizzle-orm'
 import type { FtSessionData } from '@fintracker-vault/auth'
 import type { Transaction } from '../types'
 import { MNS } from '../config'
@@ -13,6 +13,7 @@ import {
   emiLoans,
   goldHistory,
   goldItems,
+  goldLends,
   goldResources,
   jewelLoanRepayments,
   emiLoanRepayments,
@@ -54,7 +55,10 @@ import {
 } from './savingsAccounts'
 import {
   countGoldItemsUsingResource,
+  goldPledgeConflict,
+  isGoldPledgeKind,
   isGoldResourceType,
+  loadGoldPledgeTargets,
   loadGoldResourceLookup,
   resolveGoldResourceId,
 } from './goldResources'
@@ -1037,8 +1041,29 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
               weight_g: wg,
               person_id: r.personId ?? null,
               location_id: r.locationId ?? null,
+              jewel_loan_id: r.jewelLoanId ?? null,
+              lend_id: r.lendId ?? null,
             }
           }),
+        )
+      }
+
+      if (mod === 'gold' && action === 'getLends') {
+        const rows = await db
+          .select()
+          .from(goldLends)
+          .where(whereOrgFilter(goldLends, budgetScope))
+          .orderBy(desc(goldLends.lentOn))
+        return ok(
+          res,
+          rows.map((r) => ({
+            id: r.id,
+            name: r.name,
+            lent_to: r.lentTo ?? '',
+            lent_on: String(r.lentOn),
+            returned_on: r.returnedOn ? String(r.returnedOn) : null,
+            note: r.note ?? '',
+          })),
         )
       }
 
@@ -1852,6 +1877,33 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
             }
           }
 
+          // Status is sent as a kind plus the one id it needs; the other link is
+          // cleared so an item is never both on our loan and with someone else.
+          // Absent = unchanged, which is how the page keeps a link to a closed
+          // loan or returned lend as the item's record.
+          let jewelLoanId: string | null | undefined
+          let lendId: string | null | undefined
+          if (body.pledge_kind !== undefined) {
+            const kind = body.pledge_kind
+            if (!isGoldPledgeKind(kind)) return fail(res, 400, 'Status must be none, loan or lent', traceId)
+            jewelLoanId = null
+            lendId = null
+            if (kind !== 'none') {
+              const targets = await loadGoldPledgeTargets(db, scopeOrgId)
+              if (kind === 'loan') {
+                const loan = targets.loans.get(typeof body.jewel_loan_id === 'string' ? body.jewel_loan_id : '')
+                if (!loan) return fail(res, 400, 'Pick the jewel loan this item is pledged under', traceId)
+                if (!loan.open) return fail(res, 400, `Jewel loan "${loan.name}" is closed`, traceId)
+                jewelLoanId = loan.id
+              } else {
+                const lend = targets.lends.get(typeof body.lend_id === 'string' ? body.lend_id : '')
+                if (!lend) return fail(res, 400, 'Pick the lend this item went out with', traceId)
+                if (!lend.open) return fail(res, 400, `"${lend.name}" is already marked returned`, traceId)
+                lendId = lend.id
+              }
+            }
+          }
+
           if (!isUpdate) {
             await db.insert(goldItems).values({
               orgId: scopeOrgId,
@@ -1860,13 +1912,15 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
               weightG: weightG as string,
               personId: personId ?? null,
               locationId: locationId ?? null,
+              jewelLoanId: jewelLoanId ?? null,
+              lendId: lendId ?? null,
             })
             return ok(res, id, traceId)
           }
 
           const updated = await db
             .update(goldItems)
-            .set({ name, weightG, personId, locationId })
+            .set({ name, weightG, personId, locationId, jewelLoanId, lendId })
             .where(and(whereOrgFilter(goldItems, budgetScope), eq(goldItems.id, id)))
             .returning({ id: goldItems.id })
           if (!updated.length) return fail(res, 404, 'Gold item not found', traceId)
@@ -1940,6 +1994,134 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
             .where(and(whereOrgFilter(goldResources, budgetScope), eq(goldResources.id, id)))
             .returning({ id: goldResources.id })
           if (!removed.length) return fail(res, 404, 'Resource not found', traceId)
+          return ok(res, true, traceId)
+        }
+        if (action === 'addLend' || action === 'updateLend') {
+          const isUpdate = action === 'updateLend'
+          const id = isUpdate ? (typeof body.id === 'string' ? body.id : '') : crypto.randomUUID()
+          if (isUpdate && !id) return fail(res, 400, 'Missing id', traceId)
+
+          let existing: { lentOn: string; returnedOn: string | null } | undefined
+          if (isUpdate) {
+            const rows = await db
+              .select({ lentOn: goldLends.lentOn, returnedOn: goldLends.returnedOn })
+              .from(goldLends)
+              .where(and(whereOrgFilter(goldLends, budgetScope), eq(goldLends.id, id)))
+            existing = rows[0]
+            if (!existing) return fail(res, 404, 'Lend not found', traceId)
+          }
+
+          let name: string | undefined
+          if (!isUpdate || body.name !== undefined) {
+            const parsed = reqText(body.name)
+            if (!parsed) return fail(res, 400, 'Describe the lend, e.g. who and what for', traceId)
+            name = parsed
+          }
+
+          let lentOn: string | undefined
+          if (!isUpdate || body.lent_on !== undefined) {
+            const parsed = strictIsoDate(body.lent_on)
+            if (!parsed) return fail(res, 400, 'Lent on must be a date (YYYY-MM-DD)', traceId)
+            lentOn = parsed
+          }
+
+          let returnedOn: string | null | undefined
+          if (body.returned_on !== undefined) {
+            if (body.returned_on === null || body.returned_on === '') returnedOn = null
+            else {
+              returnedOn = strictIsoDate(body.returned_on)
+              if (!returnedOn) return fail(res, 400, 'Returned on must be a date (YYYY-MM-DD)', traceId)
+            }
+          }
+          const finalLentOn = lentOn ?? existing?.lentOn
+          const finalReturnedOn = returnedOn === undefined ? existing?.returnedOn ?? null : returnedOn
+          if (finalLentOn && finalReturnedOn && finalReturnedOn < finalLentOn) {
+            return fail(res, 400, 'Returned on cannot be before lent on', traceId)
+          }
+
+          const lentTo = body.lent_to !== undefined ? reqText(body.lent_to) : undefined
+          const note = body.note !== undefined ? reqText(body.note) : undefined
+
+          // A new lend needs items. An existing one may be saved empty: its last
+          // item can be deleted or re-pledged elsewhere, and the lend must still
+          // be editable (e.g. to mark it returned) rather than stuck.
+          let itemIds: string[] | undefined
+          if (!isUpdate || body.item_ids !== undefined) {
+            const raw = body.item_ids
+            if (!Array.isArray(raw) || !raw.every((v) => typeof v === 'string' && v.trim())) {
+              return fail(res, 400, 'Pick at least one item', traceId)
+            }
+            itemIds = [...new Set(raw.map((v: string) => v.trim()))]
+            if (!itemIds.length && !isUpdate) return fail(res, 400, 'Pick at least one item', traceId)
+
+            const [rows, targets] = itemIds.length === 0 ? [[], null] : await Promise.all([
+              db
+                .select({ id: goldItems.id, name: goldItems.name, jewelLoanId: goldItems.jewelLoanId, lendId: goldItems.lendId })
+                .from(goldItems)
+                .where(and(whereOrgFilter(goldItems, budgetScope), inArray(goldItems.id, itemIds))),
+              loadGoldPledgeTargets(db, scopeOrgId),
+            ])
+            if (rows.length !== itemIds.length) return fail(res, 400, 'One of those items no longer exists', traceId)
+            for (const row of rows) {
+              const conflict = targets ? goldPledgeConflict(row, targets, id) : null
+              if (conflict) return fail(res, 409, conflict, traceId)
+            }
+          }
+
+          await db.transaction(async (tx) => {
+            if (!isUpdate) {
+              await tx.insert(goldLends).values({
+                orgId: scopeOrgId,
+                id,
+                name: name as string,
+                lentTo: lentTo ?? null,
+                lentOn: lentOn as string,
+                returnedOn: returnedOn ?? null,
+                note: note ?? null,
+              })
+            } else {
+              const patch = { name, lentTo, lentOn, returnedOn, note }
+              // drizzle rejects an all-undefined SET, e.g. a call that only moves items.
+              if (Object.values(patch).some((v) => v !== undefined)) {
+                await tx
+                  .update(goldLends)
+                  .set(patch)
+                  .where(and(whereOrgFilter(goldLends, budgetScope), eq(goldLends.id, id)))
+              }
+            }
+            if (itemIds) {
+              await tx
+                .update(goldItems)
+                .set({ lendId: null })
+                .where(
+                  itemIds.length
+                    ? and(whereOrgFilter(goldItems, budgetScope), eq(goldItems.lendId, id), notInArray(goldItems.id, itemIds))
+                    : and(whereOrgFilter(goldItems, budgetScope), eq(goldItems.lendId, id)),
+                )
+              if (itemIds.length) {
+                await tx
+                  .update(goldItems)
+                  .set({ lendId: id, jewelLoanId: null })
+                  .where(and(whereOrgFilter(goldItems, budgetScope), inArray(goldItems.id, itemIds)))
+              }
+            }
+          })
+          return ok(res, isUpdate ? true : id, traceId)
+        }
+        if (action === 'deleteLend') {
+          const id = typeof body.id === 'string' ? body.id : ''
+          if (!id) return fail(res, 400, 'Missing id', traceId)
+          const removed = await db.transaction(async (tx) => {
+            await tx
+              .update(goldItems)
+              .set({ lendId: null })
+              .where(and(whereOrgFilter(goldItems, budgetScope), eq(goldItems.lendId, id)))
+            return tx
+              .delete(goldLends)
+              .where(and(whereOrgFilter(goldLends, budgetScope), eq(goldLends.id, id)))
+              .returning({ id: goldLends.id })
+          })
+          if (!removed.length) return fail(res, 404, 'Lend not found', traceId)
           return ok(res, true, traceId)
         }
         if (action === 'addHistory' || action === 'updateHistory') {
@@ -2049,7 +2231,14 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         if (action === 'deleteEntry' && typ === 'jewel') {
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
-          await db.delete(jewelLoans).where(and(whereOrgFilter(jewelLoans, budgetScope), eq(jewelLoans.id, id)))
+          await db.transaction(async (tx) => {
+            // No FK: without this, items keep pointing at a loan that no longer exists.
+            await tx
+              .update(goldItems)
+              .set({ jewelLoanId: null })
+              .where(and(whereOrgFilter(goldItems, budgetScope), eq(goldItems.jewelLoanId, id)))
+            await tx.delete(jewelLoans).where(and(whereOrgFilter(jewelLoans, budgetScope), eq(jewelLoans.id, id)))
+          })
           return ok(res, true, traceId)
         }
         if (action === 'addEntry' && typ === 'cash') {

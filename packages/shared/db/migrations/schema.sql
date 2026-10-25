@@ -129,7 +129,19 @@ CREATE TABLE "gold_items" (
 	"name" text NOT NULL,
 	"weight_g" numeric(10, 3) NOT NULL,
 	"person_id" text,
-	"location_id" text
+	"location_id" text,
+	"jewel_loan_id" text,
+	"lend_id" text
+);
+
+CREATE TABLE "gold_lends" (
+	"id" text PRIMARY KEY NOT NULL,
+	"org_id" text,
+	"name" text NOT NULL,
+	"lent_to" text,
+	"lent_on" date NOT NULL,
+	"returned_on" date,
+	"note" text
 );
 
 CREATE TABLE "gold_resources" (
@@ -259,6 +271,11 @@ CREATE TABLE "insurance" (
 	"owner" text,
 	"premium" numeric(12, 2),
 	"premium_mode" text,
+	"status" text DEFAULT 'active' NOT NULL,
+	"paid_premiums_opening" integer DEFAULT 0 NOT NULL,
+	"premium_payment_term_years" integer,
+	"renews" boolean DEFAULT false NOT NULL,
+	"ecard_url" text,
 	"payment_method" text,
 	"issue_date" date,
 	"maturity_date" date,
@@ -268,6 +285,23 @@ CREATE TABLE "insurance" (
 	"notes" text,
 	"person_uuid" text,
 	"updated_at" timestamp DEFAULT now() NOT NULL
+);
+
+CREATE TABLE "insurance_members" (
+	"id" text PRIMARY KEY NOT NULL,
+	"org_id" text,
+	"policy_id" text NOT NULL,
+	"person_uuid" text NOT NULL,
+	"role" text DEFAULT 'insured' NOT NULL
+);
+
+CREATE TABLE "insurance_premiums" (
+	"id" text PRIMARY KEY NOT NULL,
+	"org_id" text,
+	"policy_id" text NOT NULL,
+	"date" date NOT NULL,
+	"amount" numeric(12, 2) NOT NULL,
+	"note" text
 );
 
 CREATE TABLE "persons" (

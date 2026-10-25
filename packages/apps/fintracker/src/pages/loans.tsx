@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { localIsoDate } from '@fintracker-vault/utils'
 import { useRouter } from 'next/router'
 import { Banknote, BarChart3, CalendarClock, CreditCard, HandCoins, Landmark, Clock, Layers3, ArrowDownLeft, ArrowUpRight, Plus, Search } from 'lucide-react'
-import { api, RawCashLoanHistoryRow, RawCashLoanRow, RawEmiLoanHistoryRow, RawEmiRow, RawJewelLoanHistoryRow, RawJewelLoanRow } from '../api'
+import { api, RawCashLoanHistoryRow, RawCashLoanRow, RawEmiLoanHistoryRow, RawEmiRow, RawGoldRow, RawJewelLoanHistoryRow, RawJewelLoanRow } from '../api'
 import { isMirroredRow, MIRRORED_ROW_BADGE, MIRRORED_ROW_NOTE } from '../lib/mirroredRows'
 import { useFormatMoney } from '../hooks/useFormatMoney'
 import { FilterChips, FormField, HoldingCard, KpiCard, KpiGrid, LoadingState, ModalActions, ModalShell, ProgressBar, RightLegendDonut, SearchField, SectionBlock, SectionChip, Spacer, UiCard } from '../ui'
@@ -631,13 +631,15 @@ export default function Loans() {
   const [cashLoans, setCashLoans] = useState<CombinedLoan[]>([])
   const [emiHistory, setEmiHistory] = useState<RawEmiLoanHistoryRow[]>([])
   const [jewelHistory, setJewelHistory] = useState<RawJewelLoanHistoryRow[]>([])
+  /** Gold items mapped to a jewel loan (Gold → item → Status: Jewel loan). */
+  const [goldRows, setGoldRows] = useState<RawGoldRow[]>([])
   const [cashHistory, setCashHistory] = useState<RawCashLoanHistoryRow[]>([])
 
   async function loadData() {
     setLoading(true)
     setError('')
     try {
-      const [emiRows, emiPayments, jewelRows, jewelPayments, cashRows, cashPayments] = await Promise.all([
+      const [emiRows, emiPayments, jewelRows, jewelPayments, cashRows, cashPayments, gold] = await Promise.all([
         api.getEmi(),
         // An empty list is a valid state, not an error: a loan with no recorded
         // repayments still shows its opening count.
@@ -646,7 +648,10 @@ export default function Loans() {
         api.getJewelLoanHistory(),
         api.getCashLoans(),
         api.getCashLoanHistory(),
+        // Only feeds the "pledged" line on jewel cards; a failure there shouldn't hide the loans.
+        api.getGold().catch(() => [] as RawGoldRow[]),
       ])
+      setGoldRows(gold)
 
       setEmiLoans(buildEmiLoans(emiRows, emiPayments))
       setEmiHistory(emiPayments)
@@ -693,6 +698,19 @@ export default function Loans() {
 
   const activeEmiRows = useMemo(() => emiRows.filter(isActiveLoan), [emiRows])
   const activeJewelRows = useMemo(() => jewelRows.filter(isActiveLoan), [jewelRows])
+  const pledgedByLoan = useMemo(() => {
+    const m = new Map<string, { count: number; grams: number }>()
+    // Reads "pledged" — present tense — so only Ongoing loans get the line; on a
+    // closed loan the link is history, not jewels still at the bank.
+    const ongoing = new Set(jewelRows.filter(l => l.status !== 'Closed').map(l => l.id))
+    for (const g of goldRows) {
+      if (!g.jewel_loan_id || !ongoing.has(g.jewel_loan_id)) continue
+      const w = parseFloat(String(g.weight_g))
+      const cur = m.get(g.jewel_loan_id) ?? { count: 0, grams: 0 }
+      m.set(g.jewel_loan_id, { count: cur.count + 1, grams: cur.grams + (Number.isFinite(w) ? w : 0) })
+    }
+    return m
+  }, [goldRows, jewelRows])
   const activeCashRows = useMemo(() => cashRows.filter(isActiveLoan), [cashRows])
   const activeLoans = useMemo(() => allLoans.filter(isActiveLoan), [allLoans])
 
@@ -1647,6 +1665,10 @@ export default function Loans() {
                   {filteredJewelRows.map(loan => {
                     const jewelLoan = loan as Extract<CombinedLoan, { kind: 'Jewel' }>
                     const totalPayable = jewelLoan.principal + jewelLoan.interest
+                    const pledged = pledgedByLoan.get(jewelLoan.id)
+                    const pledgedLabel = pledged
+                      ? `${pledged.count} item${pledged.count === 1 ? '' : 's'} · ${Number(pledged.grams.toFixed(1))}g pledged`
+                      : ''
                     return (
                       <div
                         key={jewelLoan.id}
@@ -1663,7 +1685,7 @@ export default function Loans() {
                             <div className="ui-kit-holding-card-title">
                               <span>{jewelLoan.name}</span>
                             </div>
-                            <div className="ui-kit-holding-card-subtitle">{jewelLoan.bank}</div>
+                            <div className="ui-kit-holding-card-subtitle">{[jewelLoan.bank, pledgedLabel].filter(Boolean).join(' · ')}</div>
                           </div>
                           <div className="ui-kit-holding-card-head-right">
                             {jewelLoan.status === 'Closed' ? <SectionChip tone="muted">Closed</SectionChip> : null}

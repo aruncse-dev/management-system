@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { localIsoDate } from '@fintracker-vault/utils'
-import { Plus, SlidersHorizontal, LayoutDashboard, List, Clock, BarChart3, MapPin, Shield, Gem, Package, Users, Home, Building2, ArrowDownRight, ArrowUpRight } from 'lucide-react';
-import { api, RawGoldRow, RawGoldHistoryRow, GoldResource } from '../api';
+import { Plus, SlidersHorizontal, LayoutDashboard, List, Clock, BarChart3, MapPin, Shield, Gem, Package, Users, Home, Building2, ArrowDownRight, ArrowUpRight, Handshake, Landmark } from 'lucide-react';
+import { api, RawGoldRow, RawGoldHistoryRow, RawGoldLendRow, RawJewelLoanRow, GoldResource } from '../api';
 import { useFormatMoney } from '../hooks/useFormatMoney';
 import { THEME_COLORS } from '../config';
 import { RightLegendDonut } from '../ui'
@@ -13,6 +13,8 @@ import { FormField, HoldingCard, ModalActions, ModalShell, InfoCallout, KpiCard,
 
 type GoldTab = 'dashboard' | 'items' | 'history';
 type GoldGroupBy = 'location' | 'person' | 'none';
+/** What an item is tied up in right now. Only an Ongoing loan or an open lend counts. */
+type GoldPledge = 'none' | 'loan' | 'lent';
 
 interface GoldItem {
   id: string;
@@ -25,6 +27,38 @@ interface GoldItem {
   location: string;
   /** True when the linked location resource has `skip` (e.g. Bank) — excluded from estimated personal value. */
   locationSkip: boolean;
+  /** Raw links — may point at a closed loan or returned lend, kept as history. */
+  jewel_loan_id: string | null;
+  lend_id: string | null;
+  pledge: GoldPledge;
+  /** Name of the loan or lend behind `pledge`; '' when none. */
+  pledgeName: string;
+}
+
+interface GoldLend {
+  id: string;
+  name: string;
+  lent_to: string;
+  lent_on: string;
+  returned_on: string | null;
+  note: string;
+  open: boolean;
+}
+
+interface JewelLoanRef {
+  id: string;
+  name: string;
+  bank: string;
+  open: boolean;
+}
+
+interface GoldLendFormState {
+  name: string;
+  lent_to: string;
+  lent_on: string;
+  returned_on: string;
+  note: string;
+  item_ids: string[];
 }
 
 interface GoldHistoryItem {
@@ -42,6 +76,9 @@ interface GoldFormState {
   pavan: string;
   person_id: string;
   location_id: string;
+  pledge: GoldPledge;
+  jewel_loan_id: string;
+  lend_id: string;
 }
 
 interface GoldHistoryFormState {
@@ -60,6 +97,12 @@ const UNASSIGNED_LABEL = 'Unassigned';
 const EXCLUDED = 'Excluded';
 /** Neutral grey, deliberately not from THEME_COLORS so a new resource can't collide with it. */
 const UNASSIGNED_COLOR = 'var(--other)';
+/**
+ * Where an actively lent item shows up instead of its usual location. The item
+ * keeps `location_id`, so it goes straight back there once the lend is returned.
+ */
+const LENT_OUT_LABEL = 'Lent out';
+const LENT_OUT_COLOR = 'var(--amber)';
 
 type Slice = { label: string; value: number; color: string };
 
@@ -74,6 +117,14 @@ function withUnassigned(slices: Slice[], groups: Record<string, GoldItem[]>): Sl
   const orphan = (groups[''] ?? []).reduce((s, i) => s + i.weight_g, 0);
   return orphan > 0
     ? [...slices, { label: UNASSIGNED_LABEL, value: orphan, color: UNASSIGNED_COLOR }]
+    : slices;
+}
+
+/** Same reason as `withUnassigned`: lent grams are no location resource's, but still Total gold. */
+function withLentOut(slices: Slice[], groups: Record<string, GoldItem[]>): Slice[] {
+  const lent = (groups[LENT_OUT_LABEL] ?? []).reduce((s, i) => s + i.weight_g, 0);
+  return lent > 0
+    ? [...slices, { label: LENT_OUT_LABEL, value: lent, color: LENT_OUT_COLOR }]
     : slices;
 }
 
@@ -103,6 +154,49 @@ function createEmptyGoldForm(person_id = '', location_id = ''): GoldFormState {
     pavan: '',
     person_id,
     location_id,
+    pledge: 'none',
+    jewel_loan_id: '',
+    lend_id: '',
+  };
+}
+
+function emptyLendForm(): GoldLendFormState {
+  return {
+    name: '',
+    lent_to: '',
+    lent_on: localIsoDate(),
+    returned_on: '',
+    note: '',
+    item_ids: [],
+  };
+}
+
+/** The id the form's status points at, or '' — the one value worth comparing. */
+function pledgeRef(f: Pick<GoldFormState, 'pledge' | 'jewel_loan_id' | 'lend_id'>): string {
+  if (f.pledge === 'loan') return f.jewel_loan_id;
+  if (f.pledge === 'lent') return f.lend_id;
+  return '';
+}
+
+function parseLend(raw: RawGoldLendRow): GoldLend {
+  return {
+    id: raw.id,
+    name: String(raw.name ?? '').trim(),
+    lent_to: String(raw.lent_to ?? '').trim(),
+    lent_on: normalizeDate(String(raw.lent_on ?? '')),
+    returned_on: raw.returned_on ? normalizeDate(String(raw.returned_on)) : null,
+    note: String(raw.note ?? '').trim(),
+    open: !raw.returned_on,
+  };
+}
+
+/** Same rule as the Loans page: anything that isn't explicitly Closed is Ongoing. */
+function parseJewelLoan(raw: RawJewelLoanRow): JewelLoanRef {
+  return {
+    id: raw.id,
+    name: String(raw.name ?? '').trim(),
+    bank: String(raw.bank ?? '').trim(),
+    open: String(raw.status ?? '').trim() !== 'Closed',
   };
 }
 
@@ -116,13 +210,22 @@ function emptyHistoryForm(): GoldHistoryFormState {
   };
 }
 
-function parseRow(raw: RawGoldRow, map: Map<string, GoldResource>): GoldItem | null {
+function parseRow(
+  raw: RawGoldRow,
+  map: Map<string, GoldResource>,
+  loans: Map<string, JewelLoanRef>,
+  lends: Map<string, GoldLend>,
+): GoldItem | null {
   const weight_g = parseFloat(String(raw.weight_g))
   if (isNaN(weight_g)) return null
   const person_id = raw.person_id && String(raw.person_id).trim() ? String(raw.person_id).trim() : null
   const location_id = raw.location_id && String(raw.location_id).trim() ? String(raw.location_id).trim() : null
+  const jewel_loan_id = raw.jewel_loan_id || null
+  const lend_id = raw.lend_id || null
+  const lend = lend_id ? lends.get(lend_id) : undefined
+  const loan = jewel_loan_id ? loans.get(jewel_loan_id) : undefined
+  const pledge: GoldPledge = lend?.open ? 'lent' : loan?.open ? 'loan' : 'none'
   const person = resourceName(map, person_id)
-  const location = resourceName(map, location_id)
   return {
     id: raw.id,
     name: String(raw.name ?? '').trim(),
@@ -131,8 +234,12 @@ function parseRow(raw: RawGoldRow, map: Map<string, GoldResource>): GoldItem | n
     person_id,
     location_id,
     person,
-    location,
+    location: pledge === 'lent' ? LENT_OUT_LABEL : resourceName(map, location_id),
     locationSkip: locationSkipped(map, location_id),
+    jewel_loan_id,
+    lend_id,
+    pledge,
+    pledgeName: pledge === 'lent' ? lend?.name ?? '' : pledge === 'loan' ? loan?.name ?? '' : '',
   }
 }
 
@@ -233,21 +340,62 @@ const ItemCard = memo(function ItemCard({
   // rows, so name matching silently fell back to Home for anything but the
   // three hardcoded strings — and `skip` is what actually changes valuation.
   const excluded = item.locationSkip;
+  const lent = item.pledge === 'lent';
+  const onLoan = item.pledge === 'loan';
+  const tag = lent ? 'Lent' : onLoan ? 'Loan' : excluded ? EXCLUDED : '';
+  const icon = lent
+    ? <Handshake size={12} />
+    : onLoan
+      ? <Landmark size={12} />
+      : excluded ? <Building2 size={12} /> : <Home size={12} />;
+  // The loan or lend name is what makes the mapping visible from the list.
+  const subtitle = [item.person, item.pledgeName].filter(Boolean).join(' · ');
   return (
     <HoldingCard
       className="txn-entry-card"
       title={item.name}
-      subtitle={item.person}
-      icon={excluded ? <Building2 size={12} /> : <Home size={12} />}
+      subtitle={subtitle}
+      icon={icon}
       iconBackground
-      accentTone={excluded ? 'amber' : 'navy'}
-      rightTop={excluded ? <span className="gold-tag">{EXCLUDED}</span> : undefined}
+      accentTone={excluded || lent ? 'amber' : 'navy'}
+      rightTop={tag ? <span className="gold-tag">{tag}</span> : undefined}
       leftLabel="Weight"
       leftValue={grams(item.weight_g)}
       centerLabel="Location"
       centerValue={item.location || UNASSIGNED_LABEL}
       rightLabel="Pavan"
       rightValue={item.pavan.toFixed(2)}
+      onClick={onClick}
+    />
+  );
+});
+
+const LendCard = memo(function LendCard({
+  lend,
+  items,
+  onClick,
+}: {
+  lend: GoldLend;
+  items: GoldItem[];
+  onClick: () => void;
+}) {
+  const totalGrams = items.reduce((s, i) => s + i.weight_g, 0);
+  const subtitle = [lend.lent_to, items.map((i) => i.name).join(', ')].filter(Boolean).join(' · ');
+  return (
+    <HoldingCard
+      className="txn-entry-card"
+      title={lend.name}
+      subtitle={subtitle}
+      icon={<Handshake size={14} />}
+      iconBackground
+      accentTone={lend.open ? 'amber' : 'green'}
+      rightTop={lend.open ? undefined : <span className="gold-tag gold-tag--done">Returned</span>}
+      leftLabel="Weight"
+      leftValue={grams(totalGrams)}
+      centerLabel="Items"
+      centerValue={items.length}
+      rightLabel={lend.open ? 'Since' : 'Returned'}
+      rightValue={lend.open ? lend.lent_on : lend.returned_on}
       onClick={onClick}
     />
   );
@@ -293,6 +441,8 @@ export default function Gold() {
   const [items, setItems] = useState<GoldItem[]>([]);
   const [history, setHistory] = useState<GoldHistoryItem[]>([]);
   const [resources, setResources] = useState<GoldResource[]>([]);
+  const [lends, setLends] = useState<GoldLend[]>([]);
+  const [jewelLoans, setJewelLoans] = useState<JewelLoanRef[]>([]);
   const [goldRate, setGoldRate] = useState(0);
   /** Until settings resolve, show '—' rather than a plausible-but-invented value. */
   const [rateLoaded, setRateLoaded] = useState(false);
@@ -331,6 +481,15 @@ export default function Gold() {
   const [deleteHistoryConfirm, setDeleteHistoryConfirm] = useState(false);
   const [historyError, setHistoryError] = useState('');
 
+  // Lend modal
+  const [lendModalOpen, setLendModalOpen] = useState(false);
+  const [editLend, setEditLend] = useState<GoldLend | null>(null);
+  const [lendForm, setLendForm] = useState<GoldLendFormState>(emptyLendForm());
+  const [savingLend, setSavingLend] = useState(false);
+  const [deletingLend, setDeletingLend] = useState(false);
+  const [deleteLendConfirm, setDeleteLendConfirm] = useState(false);
+  const [lendError, setLendError] = useState('');
+
   const personResources = useMemo(() => resources.filter((r) => r.type === 'person'), [resources]);
   const locationResources = useMemo(() => resources.filter((r) => r.type === 'location'), [resources]);
   const hasGoldResources = personResources.length > 0 || locationResources.length > 0;
@@ -360,13 +519,56 @@ export default function Gold() {
   const totalGrams = useMemo(() => items.reduce((s, i) => s + i.weight_g, 0), [items]);
   const totalPavan = useMemo(() => items.reduce((s, i) => s + i.pavan, 0), [items]);
 
-  // Estimated value excludes locations marked `skip` on the resource (e.g. Bank).
+  // Estimated value excludes locations marked `skip` on the resource (e.g. Bank)
+  // and anything lent out — still ours, but not in hand until it comes back.
+  // Net worth (getNetWorth) applies the same two rules.
+  const lentGrams = useMemo(
+    () => items.filter((i) => i.pledge === 'lent').reduce((s, i) => s + i.weight_g, 0),
+    [items],
+  );
   const personalGrams = useMemo(
-    () => items.filter((i) => !i.locationSkip).reduce((s, i) => s + i.weight_g, 0),
+    () => items.filter((i) => !i.locationSkip && i.pledge !== 'lent').reduce((s, i) => s + i.weight_g, 0),
     [items],
   );
   const estimatedValue = useMemo(() => personalGrams * goldRate, [personalGrams, goldRate]);
-  const excludedGrams = useMemo(() => totalGrams - personalGrams, [totalGrams, personalGrams]);
+  /** Skipped-location grams only; a lent item is reported as lent even if its home location is skipped. */
+  const excludedGrams = useMemo(() => totalGrams - personalGrams - lentGrams, [totalGrams, personalGrams, lentGrams]);
+  const estimatedValueSubtitle = useMemo(() => {
+    const rate = goldRate.toLocaleString('en-IN');
+    if (excludedGrams <= 0 && lentGrams <= 0) return `${grams(totalGrams)} @ ${rate} INR/g`;
+    return [
+      `${grams(personalGrams)} counted`,
+      lentGrams > 0 ? `${grams(lentGrams)} lent` : '',
+      excludedGrams > 0 ? `${grams(excludedGrams)} excluded` : '',
+      `${rate}/g`,
+    ].filter(Boolean).join(' · ');
+  }, [goldRate, excludedGrams, lentGrams, totalGrams, personalGrams]);
+
+  const openLoans = useMemo(() => jewelLoans.filter((l) => l.open), [jewelLoans]);
+  const openLends = useMemo(() => lends.filter((l) => l.open), [lends]);
+  /** By raw link, so a returned lend still lists what went out with it. */
+  const itemsByLend = useMemo(() => {
+    const m = new Map<string, GoldItem[]>();
+    for (const i of items) {
+      if (!i.lend_id) continue;
+      const bucket = m.get(i.lend_id);
+      if (bucket) bucket.push(i);
+      else m.set(i.lend_id, [i]);
+    }
+    return m;
+  }, [items]);
+  /** What the lend sheet can offer: free items plus this lend's own. Items on a live loan or another open lend stay put. */
+  const lendCandidates = useMemo(
+    () =>
+      items
+        .filter((i) => i.pledge === 'none' || (editLend !== null && i.lend_id === editLend.id))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [items, editLend],
+  );
+  const lendFormGrams = useMemo(() => {
+    const picked = new Set(lendForm.item_ids);
+    return items.filter((i) => picked.has(i.id)).reduce((s, i) => s + i.weight_g, 0);
+  }, [items, lendForm.item_ids]);
 
   const groupedByPerson = useMemo(() => {
     const groups: Record<string, GoldItem[]> = {};
@@ -404,13 +606,16 @@ export default function Gold() {
   const locationBreakdown = useMemo(
     () =>
       withUnassigned(
-        locationResources
-          .map((location) => ({
-            label: location.name,
-            value: groupedByLocation[location.name]?.reduce((s, item) => s + item.weight_g, 0) ?? 0,
-            color: LOCATION_COLORS[location.name] ?? THEME_COLORS[0],
-          }))
-          .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label)),
+        withLentOut(
+          locationResources
+            .map((location) => ({
+              label: location.name,
+              value: groupedByLocation[location.name]?.reduce((s, item) => s + item.weight_g, 0) ?? 0,
+              color: LOCATION_COLORS[location.name] ?? THEME_COLORS[0],
+            }))
+            .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label)),
+          groupedByLocation,
+        ),
         groupedByLocation,
       ),
     [groupedByLocation, locationResources, LOCATION_COLORS],
@@ -434,7 +639,8 @@ export default function Gold() {
         const q = itemsSearch.toLowerCase();
         return !q || i.name.toLowerCase().includes(q)
           || i.person.toLowerCase().includes(q)
-          || i.location.toLowerCase().includes(q);
+          || i.location.toLowerCase().includes(q)
+          || i.pledgeName.toLowerCase().includes(q);
       })
       .sort((a, b) => b.weight_g - a.weight_g);
   }, [items, itemsSearch, personFilter, locationFilter, matchesFilter]);
@@ -471,6 +677,9 @@ export default function Gold() {
       .sort((a, b) => {
         if (a.label === UNASSIGNED_LABEL) return 1;
         if (b.label === UNASSIGNED_LABEL) return -1;
+        // Lent out sits just above Unassigned: it isn't a real place either.
+        if (a.label === LENT_OUT_LABEL) return 1;
+        if (b.label === LENT_OUT_LABEL) return -1;
         return b.grams - a.grams || a.label.localeCompare(b.label);
       });
   }, [filteredItems, filteredGrams, groupBy]);
@@ -487,6 +696,7 @@ export default function Gold() {
 
   const locationFilterOptions = useMemo(() => {
     const names = locationResources.filter(r => groupedByLocation[r.name]?.length).map(r => r.name);
+    if (groupedByLocation[LENT_OUT_LABEL]?.length) names.push(LENT_OUT_LABEL);
     return hasUnassignedLocation ? [...names, UNASSIGNED_LABEL] : names;
   }, [locationResources, groupedByLocation, hasUnassignedLocation]);
 
@@ -533,15 +743,23 @@ export default function Gold() {
     setLoading(true);
     setError('');
     try {
-      const [rows, resRows, settings, historyRows] = await Promise.all([
+      const [rows, resRows, settings, historyRows, lendRows, loanRows] = await Promise.all([
         api.getGold(),
         api.getGoldResources(),
         api.getSettings(),
         api.getGoldHistory(),
+        api.getGoldLends(),
+        api.getJewelLoans(),
       ]);
       setResources(resRows);
       const map = resourceMap(resRows)
-      setItems(rows.map((r) => parseRow(r, map)).filter((i): i is GoldItem => i !== null));
+      const parsedLends = lendRows.map(parseLend);
+      const parsedLoans = loanRows.map(parseJewelLoan);
+      setLends(parsedLends);
+      setJewelLoans(parsedLoans);
+      const lendMap = new Map(parsedLends.map((l) => [l.id, l]));
+      const loanMap = new Map(parsedLoans.map((l) => [l.id, l]));
+      setItems(rows.map((r) => parseRow(r, map, loanMap, lendMap)).filter((i): i is GoldItem => i !== null));
       setGoldRate(settings.goldRate);
       setRateLoaded(true);
       setHistory(historyRows.map(parseHistoryRow).filter((h): h is GoldHistoryItem => h !== null));
@@ -565,6 +783,10 @@ export default function Gold() {
       pavan: String(i.pavan.toFixed(2)),
       person_id: i.person_id ?? '',
       location_id: i.location_id ?? '',
+      // Only a current pledge is shown; a closed loan or returned lend reads as None.
+      pledge: i.pledge,
+      jewel_loan_id: i.pledge === 'loan' ? i.jewel_loan_id ?? '' : '',
+      lend_id: i.pledge === 'lent' ? i.lend_id ?? '' : '',
     });
     setItemsModalOpen(true);
     setDeleteItemConfirm(false);
@@ -613,6 +835,17 @@ export default function Gold() {
       setItemError('Enter a weight in grams greater than 0.');
       return;
     }
+    if (form.pledge === 'loan' && !form.jewel_loan_id) { setItemError('Pick the jewel loan this item is pledged under.'); return; }
+    if (form.pledge === 'lent' && !form.lend_id) { setItemError('Pick the lend this item went out with.'); return; }
+    // Status goes out only when it changed. An item whose loan closed opens as
+    // None; re-saving it unchanged must not wipe that link, which is its history.
+    const pledgeChanged = editItem
+      ? form.pledge !== editItem.pledge || pledgeRef(form) !== pledgeRef({
+          pledge: editItem.pledge,
+          jewel_loan_id: editItem.jewel_loan_id ?? '',
+          lend_id: editItem.lend_id ?? '',
+        })
+      : form.pledge !== 'none';
     setSavingItem(true);
     setError('');
     const payload = {
@@ -622,6 +855,11 @@ export default function Gold() {
       // so clearing a link back to Unassigned has to be sent explicitly.
       person_id: form.person_id.trim() || null,
       location_id: form.location_id.trim() || null,
+      ...(pledgeChanged && {
+        pledge_kind: form.pledge,
+        jewel_loan_id: form.pledge === 'loan' ? form.jewel_loan_id : null,
+        lend_id: form.pledge === 'lent' ? form.lend_id : null,
+      }),
     };
     try {
       if (editItem) {
@@ -754,6 +992,113 @@ export default function Gold() {
     }
   }
 
+  // Lend handlers
+  function setLendField<K extends keyof GoldLendFormState>(k: K, v: GoldLendFormState[K]) {
+    setLendForm(f => ({ ...f, [k]: v }));
+  }
+
+  function toggleLendItem(id: string) {
+    setLendForm(f => ({
+      ...f,
+      item_ids: f.item_ids.includes(id) ? f.item_ids.filter(x => x !== id) : [...f.item_ids, id],
+    }));
+  }
+
+  function openAddLend() {
+    setEditLend(null);
+    setLendForm(emptyLendForm());
+    setSavingLend(false);
+    setDeletingLend(false);
+    setDeleteLendConfirm(false);
+    setLendError('');
+    setLendModalOpen(true);
+  }
+
+  function openEditLend(l: GoldLend) {
+    setEditLend(l);
+    setLendForm({
+      name: l.name,
+      lent_to: l.lent_to,
+      lent_on: l.lent_on,
+      returned_on: l.returned_on ?? '',
+      note: l.note,
+      item_ids: (itemsByLend.get(l.id) ?? []).map(i => i.id),
+    });
+    setSavingLend(false);
+    setDeletingLend(false);
+    setDeleteLendConfirm(false);
+    setLendError('');
+    setLendModalOpen(true);
+  }
+
+  function closeLendModal() {
+    setLendModalOpen(false);
+    setEditLend(null);
+    setLendForm(emptyLendForm());
+    setSavingLend(false);
+    setDeletingLend(false);
+    setDeleteLendConfirm(false);
+    setLendError('');
+  }
+
+  async function saveLend() {
+    if (savingLend || deletingLend) return;
+    setLendError('');
+    if (!lendForm.name.trim()) { setLendError('Describe the lend, e.g. who and what for.'); return; }
+    if (!lendForm.lent_on) { setLendError('Enter the date the jewels went out.'); return; }
+    // An existing lend may be saved empty (its last item was deleted or moved),
+    // so it can still be marked returned instead of only deleted.
+    if (lendForm.item_ids.length === 0 && !editLend) { setLendError('Pick at least one item.'); return; }
+    if (lendForm.returned_on && lendForm.returned_on < lendForm.lent_on) {
+      setLendError('Returned on cannot be before lent on.');
+      return;
+    }
+    setSavingLend(true);
+    setError('');
+    const payload = {
+      name: lendForm.name.trim(),
+      lent_to: lendForm.lent_to.trim(),
+      lent_on: lendForm.lent_on,
+      returned_on: lendForm.returned_on || null,
+      note: lendForm.note.trim(),
+      item_ids: lendForm.item_ids,
+    };
+    try {
+      if (editLend) {
+        await api.updateGoldLend({ ...payload, id: editLend.id });
+      } else {
+        await api.addGoldLend(payload);
+      }
+      closeLendModal();
+      await loadData();
+    } catch (e) {
+      setLendError(e instanceof Error ? e.message : 'Save failed');
+    } finally {
+      setSavingLend(false);
+    }
+  }
+
+  async function deleteLend() {
+    if (!editLend) return;
+    if (savingLend || deletingLend) return;
+    if (!deleteLendConfirm) {
+      setDeleteLendConfirm(true);
+      return;
+    }
+    setDeletingLend(true);
+    setError('');
+    try {
+      await api.deleteGoldLend(editLend.id);
+      closeLendModal();
+      await loadData();
+    } catch (e) {
+      setDeleteLendConfirm(false);
+      setLendError(e instanceof Error ? e.message : 'Delete failed');
+    } finally {
+      setDeletingLend(false);
+    }
+  }
+
   // ────────────────────────────────────────────────────────────────────────────
   // RENDER
   // ────────────────────────────────────────────────────────────────────────────
@@ -803,11 +1148,7 @@ export default function Gold() {
                   value={rateLoaded ? fmt(estimatedValue) : '—'}
                   tone="amber"
                   icon={<Shield size={14} />}
-                  subtitle={
-                    excludedGrams > 0
-                      ? `${grams(personalGrams)} counted · ${grams(excludedGrams)} excluded · ${goldRate.toLocaleString('en-IN')}/g`
-                      : `${grams(totalGrams)} @ ${goldRate.toLocaleString('en-IN')} INR/g`
-                  }
+                  subtitle={estimatedValueSubtitle}
                 />
                 <KpiCard label="Items" value={totalItems} tone="muted" icon={<Package size={14} />} subtitle="Tracked pieces" />
                 <KpiCard label="People" value={totalPeople} tone="muted" icon={<Users size={14} />} subtitle="Ownership groups" />
@@ -840,8 +1181,51 @@ export default function Gold() {
                     />
                   ) : null,
                 )}
+                {groupedByLocation[LENT_OUT_LABEL] ? (
+                  <KpiCard
+                    label={LENT_OUT_LABEL}
+                    value={grams(lentGrams)}
+                    subtitle={`${(lentGrams * PAVAN_CONVERSION).toFixed(2)} pavan · ${EXCLUDED.toLowerCase()}`}
+                    tone="muted"
+                    icon={<Handshake size={14} />}
+                    onClick={() => showItemsFor({ location: LENT_OUT_LABEL })}
+                  />
+                ) : null}
               </div>
             </SectionBlock>
+
+            {items.length > 0 && (
+              <SectionBlock
+                title="Lent out"
+                icon={<Handshake size={14} />}
+                subtitle={lentGrams > 0 ? `${grams(lentGrams)} with others · not in Estimated value` : undefined}
+                right={
+                  <div className="gold-section-right">
+                    <button type="button" className="gold-filter-btn" onClick={openAddLend}>
+                      <Plus size={13} />
+                      Lend items
+                    </button>
+                    <SectionChip>{openLends.length}</SectionChip>
+                  </div>
+                }
+              >
+                {lends.length === 0 ? (
+                  <p className="gold-lend-hint">
+                    Nothing lent out. When you hand jewels to someone, for their loan or otherwise,
+                    record it here. One lend can cover several items.
+                  </p>
+                ) : (
+                  <ListStack>
+                    {openLends.map(l => (
+                      <LendCard key={l.id} lend={l} items={itemsByLend.get(l.id) ?? []} onClick={() => openEditLend(l)} />
+                    ))}
+                    {lends.filter(l => !l.open).map(l => (
+                      <LendCard key={l.id} lend={l} items={itemsByLend.get(l.id) ?? []} onClick={() => openEditLend(l)} />
+                    ))}
+                  </ListStack>
+                )}
+              </SectionBlock>
+            )}
 
             <SectionBlock title="By person" icon={<Users size={14} />}>
               <UiCard>
@@ -1136,8 +1520,125 @@ export default function Gold() {
                   ))}
                 </select>
               </FormField>
+              <FormField label="Status">
+                <select
+                  className="form-sel"
+                  value={form.pledge}
+                  onChange={e => setField('pledge', e.target.value as GoldPledge)}
+                >
+                  <option value="none">None</option>
+                  <option value="loan">Jewel loan</option>
+                  <option value="lent">Lent</option>
+                </select>
+              </FormField>
+              {form.pledge === 'loan' && (
+                openLoans.length > 0 ? (
+                  <FormField label="Jewel loan *">
+                    <select className="form-sel" value={form.jewel_loan_id} onChange={e => setField('jewel_loan_id', e.target.value)}>
+                      <option value="">Select a loan…</option>
+                      {openLoans.map((l) => (
+                        <option key={l.id} value={l.id}>{l.name}{l.bank ? ` · ${l.bank}` : ''}</option>
+                      ))}
+                    </select>
+                  </FormField>
+                ) : (
+                  <InfoCallout title="No ongoing jewel loans">
+                    Add the loan under All Loans → Jewel first, then map this item to it.
+                  </InfoCallout>
+                )
+              )}
+              {form.pledge === 'lent' && (
+                openLends.length > 0 ? (
+                  <FormField label="Lend *">
+                    <select className="form-sel" value={form.lend_id} onChange={e => setField('lend_id', e.target.value)}>
+                      <option value="">Select a lend…</option>
+                      {openLends.map((l) => (
+                        <option key={l.id} value={l.id}>{l.name}{l.lent_to ? ` · ${l.lent_to}` : ''}</option>
+                      ))}
+                    </select>
+                  </FormField>
+                ) : (
+                  <InfoCallout title="Nothing lent out yet">
+                    Use Lend items on the Dashboard to record who has them; one lend can cover several items.
+                  </InfoCallout>
+                )
+              )}
+              {form.pledge === 'lent' && (
+                <p className="gold-lend-hint">Lent gold is left out of Estimated value and net worth until it&apos;s returned.</p>
+              )}
             </div>
             {/* Lets Enter submit without duplicating the ModalActions button. */}
+            <button type="submit" hidden aria-hidden="true" tabIndex={-1} />
+          </form>
+        </ModalShell>
+      )}
+
+      {/* LEND MODAL */}
+      {lendModalOpen && (
+        <ModalShell title={editLend ? 'Edit lend' : 'Lend items'} onClose={closeLendModal} footer={
+          <ModalActions
+            primaryLabel={savingLend ? 'Saving…' : editLend ? 'Save' : 'Lend'}
+            onPrimary={() => void saveLend()}
+            onSecondary={closeLendModal}
+            disabled={savingLend || deletingLend}
+            leading={editLend ? (
+              <button
+                type="button"
+                className="ui-kit-btn ui-kit-btn--solid btn-red"
+                onClick={() => void deleteLend()}
+                disabled={savingLend || deletingLend}
+              >
+                {deletingLend ? 'Deleting…' : deleteLendConfirm ? `Delete "${editLend.name}"?` : 'Delete'}
+              </button>
+            ) : null}
+          />
+        }>
+          <form onSubmit={e => { e.preventDefault(); void saveLend(); }}>
+            <div className="ui-stack">
+              {lendError ? <p className="gold-modal-error" role="alert">{lendError}</p> : null}
+              <FormField label="Description *">
+                <input className="form-inp" type="text" placeholder="Ravi, pledged at IOB…" value={lendForm.name} onChange={e => setLendField('name', e.target.value)} />
+              </FormField>
+              <FormField label="Lent to">
+                <input className="form-inp" type="text" placeholder="Person" value={lendForm.lent_to} onChange={e => setLendField('lent_to', e.target.value)} />
+              </FormField>
+              <FormField label="Lent on *">
+                <input className="form-inp" type="date" value={lendForm.lent_on} onChange={e => setLendField('lent_on', e.target.value)} />
+              </FormField>
+              <FormField label={`Items * ${lendForm.item_ids.length ? `(${lendForm.item_ids.length} · ${grams(lendFormGrams)})` : ''}`}>
+                {lendCandidates.length === 0 ? (
+                  <p className="gold-lend-hint">Every item is already on a jewel loan or lent out.</p>
+                ) : (
+                  <div className="gold-lend-items">
+                    {lendCandidates.map(i => (
+                      <label key={i.id} className="gold-lend-item">
+                        <input
+                          type="checkbox"
+                          checked={lendForm.item_ids.includes(i.id)}
+                          onChange={() => toggleLendItem(i.id)}
+                        />
+                        <span className="gold-lend-item-name">{i.name}</span>
+                        <span className="gold-lend-item-meta">{grams(i.weight_g)}{i.person ? ` · ${i.person}` : ''}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </FormField>
+              {editLend && (
+                <FormField label="Returned on">
+                  <input className="form-inp" type="date" value={lendForm.returned_on} onChange={e => setLendField('returned_on', e.target.value)} />
+                </FormField>
+              )}
+              {editLend && (
+                <p className="gold-lend-hint">
+                  Leave blank while the jewels are still with them. Once set, the items count toward
+                  Estimated value again and the lend stays here as a record.
+                </p>
+              )}
+              <FormField label="Note">
+                <input className="form-inp" type="text" placeholder="Loan amount, bank, expected return…" value={lendForm.note} onChange={e => setLendField('note', e.target.value)} />
+              </FormField>
+            </div>
             <button type="submit" hidden aria-hidden="true" tabIndex={-1} />
           </form>
         </ModalShell>
