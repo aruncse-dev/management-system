@@ -2149,6 +2149,61 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
   padding: 2px 7px;
   white-space: nowrap;
 }
+.gold-tag--done {
+  color: var(--green);
+  background: color-mix(in srgb, var(--green) 12%, transparent);
+}
+.gold-tag--late {
+  color: var(--rm);
+  background: color-mix(in srgb, var(--rm) 12%, transparent);
+}
+/* Lent on / Expected back side by side — they're read together. */
+.gold-lend-dates {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.gold-lend-dates > * {
+  min-width: 0;
+}
+.gold-lend-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+/* Checkbox list in the lend sheet: one row per item, so several pieces can go
+   out under a single lend. Capped so a long collection scrolls inside the sheet. */
+.gold-lend-items {
+  display: flex;
+  flex-direction: column;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.gold-lend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.gold-lend-item + .gold-lend-item {
+  border-top: 1px solid var(--border);
+}
+.gold-lend-item-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gold-lend-item-meta {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
 /* Filter trigger sits beside the count chip in the section header; the controls
    themselves live in a sheet so they cost no vertical space in the list. */
 .gold-section-right {

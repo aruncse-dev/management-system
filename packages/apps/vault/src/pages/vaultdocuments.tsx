@@ -15,7 +15,7 @@ import {
   Wallet,
 } from 'lucide-react'
 import { api, type DocumentRow, type PersonRow } from '../api'
-import { FormField, ModalActions, ModalShell, SearchField, SectionBlock, SectionChip, Spacer, TransactionCard } from '../ui'
+import { FormField, ModalActions, ModalShell, SearchField, SectionBlock, SectionChip, Spacer, TransactionCard, externalLinkClick, openExternal } from '../ui'
 
 const DOC_TYPES = ['Aadhaar', 'PAN', 'Passport', 'DL', 'Voter ID', 'Birth Certificate', 'Other'] as const
 
@@ -88,13 +88,13 @@ function DocumentDrivePreview({ url }: { url: string }) {
   }
   const open = (e: MouseEvent) => {
     e.stopPropagation()
-    window.open(t, '_blank', 'noopener,noreferrer')
+    openExternal(t)
   }
   const onKey = (e: KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
       e.stopPropagation()
-      window.open(t, '_blank', 'noopener,noreferrer')
+      openExternal(t)
     }
   }
   return (
@@ -368,6 +368,7 @@ export default function VaultDocumentsPage() {
                     download
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={externalLinkClick}
                     className="ui-kit-btn ui-kit-btn--soft"
                     style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}
                     title="Open / download"

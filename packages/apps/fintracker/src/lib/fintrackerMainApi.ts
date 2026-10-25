@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { and, desc, eq, isNull, lte, gte, ne, or } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNull, lte, gte, ne, notInArray, or } from 'drizzle-orm'
 import type { FtSessionData } from '@fintracker-vault/auth'
 import type { Transaction } from '../types'
 import { MNS } from '../config'
@@ -13,6 +13,7 @@ import {
   emiLoans,
   goldHistory,
   goldItems,
+  goldLends,
   goldResources,
   jewelLoanRepayments,
   emiLoanRepayments,
@@ -20,6 +21,8 @@ import {
   lending,
   mutualFunds,
   organizations,
+  otherInvestmentTxns,
+  otherInvestments,
   paymentSources,
   savings,
   stocks,
@@ -54,7 +57,10 @@ import {
 } from './savingsAccounts'
 import {
   countGoldItemsUsingResource,
+  goldPledgeConflict,
+  isGoldPledgeKind,
   isGoldResourceType,
+  loadGoldPledgeTargets,
   loadGoldResourceLookup,
   resolveGoldResourceId,
 } from './goldResources'
@@ -269,6 +275,11 @@ function num(v: string | number | boolean | null | undefined): number {
   if (v === null || v === undefined || typeof v === 'boolean') return 0
   const n = typeof v === 'number' ? v : parseFloat(v)
   return Number.isFinite(n) ? n : 0
+}
+
+const OTHER_INVESTMENT_TYPES = ['land', 'shares', 'chit', 'business', 'other'] as const
+function isOtherInvestmentType(v: unknown): v is (typeof OTHER_INVESTMENT_TYPES)[number] {
+  return typeof v === 'string' && (OTHER_INVESTMENT_TYPES as readonly string[]).includes(v)
 }
 
 /** Largest value `numeric(10,3)` can hold: 10 digits total, 3 after the point. */
@@ -1037,8 +1048,65 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
               weight_g: wg,
               person_id: r.personId ?? null,
               location_id: r.locationId ?? null,
+              jewel_loan_id: r.jewelLoanId ?? null,
+              lend_id: r.lendId ?? null,
             }
           }),
+        )
+      }
+
+      if (mod === 'otherInvestments' && action === 'getEntries') {
+        const rows = await db.select().from(otherInvestments).where(whereOrgFilter(otherInvestments, budgetScope)).orderBy(otherInvestments.name)
+        return ok(
+          res,
+          rows.map((r) => ({
+            id: r.id,
+            name: r.name,
+            type: isOtherInvestmentType(r.type) ? r.type : 'other',
+            area_sqft: r.areaSqft === null ? null : num(r.areaSqft),
+            price: r.price === null ? null : num(r.price),
+            current_value: r.currentValue === null ? null : num(r.currentValue),
+            status: r.status === 'sold' ? 'sold' : 'active',
+          })),
+        )
+      }
+
+      if (mod === 'otherInvestments' && action === 'getTxns') {
+        const rows = await db
+          .select()
+          .from(otherInvestmentTxns)
+          .where(whereOrgFilter(otherInvestmentTxns, budgetScope))
+          .orderBy(desc(otherInvestmentTxns.date))
+        return ok(
+          res,
+          rows.map((r) => ({
+            id: r.id,
+            investment_id: r.investmentId,
+            date: String(r.date),
+            kind: r.kind,
+            amount: num(r.amount),
+            description: r.description ?? '',
+          })),
+        )
+      }
+
+      if (mod === 'gold' && action === 'getLends') {
+        const rows = await db
+          .select()
+          .from(goldLends)
+          .where(whereOrgFilter(goldLends, budgetScope))
+          .orderBy(desc(goldLends.lentOn))
+        return ok(
+          res,
+          rows.map((r) => ({
+            id: r.id,
+            lent_to: r.lentTo ?? '',
+            purpose: r.purpose ?? '',
+            amount: r.amount === null ? null : num(r.amount),
+            lent_on: String(r.lentOn),
+            expected_on: r.expectedOn ? String(r.expectedOn) : null,
+            returned_on: r.returnedOn ? String(r.returnedOn) : null,
+          })),
         )
       }
 
@@ -1805,6 +1873,155 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         }
       }
 
+      if (mod === 'otherInvestments') {
+        // Optional money/area fields: absent = unchanged, '' or null = clear,
+        // anything else must be a positive number that fits numeric(12,2).
+        const optionalPositive = (v: unknown): { ok: true; value: string | null | undefined } | { ok: false } => {
+          if (v === undefined) return { ok: true, value: undefined }
+          if (v === null || v === '') return { ok: true, value: null }
+          const parsed = moneyAmount(v)
+          return parsed ? { ok: true, value: parsed } : { ok: false }
+        }
+
+        if (action === 'addInvestment' || action === 'updateInvestment') {
+          const isUpdate = action === 'updateInvestment'
+          const id = isUpdate ? (typeof body.id === 'string' ? body.id : '') : crypto.randomUUID()
+          if (isUpdate && !id) return fail(res, 400, 'Missing id', traceId)
+
+          let name: string | undefined
+          if (!isUpdate || body.name !== undefined) {
+            const parsed = reqText(body.name)
+            if (!parsed) return fail(res, 400, 'Name is required', traceId)
+            name = parsed
+          }
+          const area = optionalPositive(body.area_sqft)
+          if (!area.ok) return fail(res, 400, 'Area must be a number greater than 0', traceId)
+          const price = optionalPositive(body.price)
+          if (!price.ok) return fail(res, 400, 'Agreed price must be a number greater than 0', traceId)
+          const value = optionalPositive(body.current_value)
+          if (!value.ok) return fail(res, 400, 'Current value must be a number greater than 0', traceId)
+          let type: string | undefined
+          if (!isUpdate || body.type !== undefined) {
+            const raw = body.type === undefined ? 'land' : body.type
+            if (!isOtherInvestmentType(raw)) return fail(res, 400, 'Unknown investment type', traceId)
+            type = raw
+          }
+          let status: string | undefined
+          if (!isUpdate || body.status !== undefined) {
+            const raw = body.status === undefined ? 'active' : body.status
+            if (raw !== 'active' && raw !== 'sold') return fail(res, 400, 'Status must be active or sold', traceId)
+            status = raw
+          }
+
+          if (!isUpdate) {
+            await db.insert(otherInvestments).values({
+              orgId: scopeOrgId,
+              id,
+              name: name as string,
+              type: type as string,
+              areaSqft: area.value ?? null,
+              price: price.value ?? null,
+              currentValue: value.value ?? null,
+              status: status as string,
+            })
+            return ok(res, id, traceId)
+          }
+          const patch = { name, type, areaSqft: area.value, price: price.value, currentValue: value.value, status }
+          if (!Object.values(patch).some((v) => v !== undefined)) return ok(res, true, traceId)
+          const updated = await db
+            .update(otherInvestments)
+            .set(patch)
+            .where(and(whereOrgFilter(otherInvestments, budgetScope), eq(otherInvestments.id, id)))
+            .returning({ id: otherInvestments.id })
+          if (!updated.length) return fail(res, 404, 'Investment not found', traceId)
+          return ok(res, true, traceId)
+        }
+        if (action === 'deleteInvestment') {
+          const id = typeof body.id === 'string' ? body.id : ''
+          if (!id) return fail(res, 400, 'Missing id', traceId)
+          // No FK: the ledger goes with the investment, or it'd be orphaned rows nothing shows.
+          const removed = await db.transaction(async (tx) => {
+            await tx.delete(otherInvestmentTxns).where(and(whereOrgFilter(otherInvestmentTxns, budgetScope), eq(otherInvestmentTxns.investmentId, id)))
+            return tx
+              .delete(otherInvestments)
+              .where(and(whereOrgFilter(otherInvestments, budgetScope), eq(otherInvestments.id, id)))
+              .returning({ id: otherInvestments.id })
+          })
+          if (!removed.length) return fail(res, 404, 'Investment not found', traceId)
+          return ok(res, true, traceId)
+        }
+        if (action === 'addTxn' || action === 'updateTxn') {
+          const isUpdate = action === 'updateTxn'
+          const id = isUpdate ? (typeof body.id === 'string' ? body.id : '') : crypto.randomUUID()
+          if (isUpdate && !id) return fail(res, 400, 'Missing id', traceId)
+
+          let investmentId: string | undefined
+          if (!isUpdate || body.investment_id !== undefined) {
+            const raw = typeof body.investment_id === 'string' ? body.investment_id : ''
+            const owner = raw
+              ? await db
+                  .select({ id: otherInvestments.id })
+                  .from(otherInvestments)
+                  .where(and(whereOrgFilter(otherInvestments, budgetScope), eq(otherInvestments.id, raw)))
+              : []
+            if (!owner.length) return fail(res, 400, 'Pick an investment', traceId)
+            investmentId = raw
+          }
+          let date: string | undefined
+          if (!isUpdate || body.date !== undefined) {
+            const parsed = strictIsoDate(body.date)
+            if (!parsed) return fail(res, 400, 'Date must be YYYY-MM-DD', traceId)
+            date = parsed
+          }
+          let kind: string | undefined
+          if (!isUpdate || body.kind !== undefined) {
+            if (body.kind !== 'paid' && body.kind !== 'expense' && body.kind !== 'received') {
+              return fail(res, 400, 'Type must be paid, expense or received', traceId)
+            }
+            kind = body.kind
+          }
+          let amount: string | undefined
+          if (!isUpdate || body.amount !== undefined) {
+            const parsed = moneyAmount(body.amount)
+            if (!parsed) return fail(res, 400, 'Amount must be a number greater than 0', traceId)
+            amount = parsed
+          }
+          const description = body.description !== undefined ? reqText(body.description) : undefined
+
+          if (!isUpdate) {
+            await db.insert(otherInvestmentTxns).values({
+              orgId: scopeOrgId,
+              id,
+              investmentId: investmentId as string,
+              date: date as string,
+              kind: kind as string,
+              amount: amount as string,
+              description: description ?? null,
+            })
+            return ok(res, id, traceId)
+          }
+          const patch = { investmentId, date, kind, amount, description }
+          if (!Object.values(patch).some((v) => v !== undefined)) return ok(res, true, traceId)
+          const updated = await db
+            .update(otherInvestmentTxns)
+            .set(patch)
+            .where(and(whereOrgFilter(otherInvestmentTxns, budgetScope), eq(otherInvestmentTxns.id, id)))
+            .returning({ id: otherInvestmentTxns.id })
+          if (!updated.length) return fail(res, 404, 'Transaction not found', traceId)
+          return ok(res, true, traceId)
+        }
+        if (action === 'deleteTxn') {
+          const id = typeof body.id === 'string' ? body.id : ''
+          if (!id) return fail(res, 400, 'Missing id', traceId)
+          const removed = await db
+            .delete(otherInvestmentTxns)
+            .where(and(whereOrgFilter(otherInvestmentTxns, budgetScope), eq(otherInvestmentTxns.id, id)))
+            .returning({ id: otherInvestmentTxns.id })
+          if (!removed.length) return fail(res, 404, 'Transaction not found', traceId)
+          return ok(res, true, traceId)
+        }
+      }
+
       if (mod === 'gold') {
         if (action === 'addEntry' || action === 'updateEntry') {
           const isUpdate = action === 'updateEntry'
@@ -1852,6 +2069,33 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
             }
           }
 
+          // Status is sent as a kind plus the one id it needs; the other link is
+          // cleared so an item is never both on our loan and with someone else.
+          // Absent = unchanged, which is how the page keeps a link to a closed
+          // loan or returned lend as the item's record.
+          let jewelLoanId: string | null | undefined
+          let lendId: string | null | undefined
+          if (body.pledge_kind !== undefined) {
+            const kind = body.pledge_kind
+            if (!isGoldPledgeKind(kind)) return fail(res, 400, 'Status must be none, loan or lent', traceId)
+            jewelLoanId = null
+            lendId = null
+            if (kind !== 'none') {
+              const targets = await loadGoldPledgeTargets(db, scopeOrgId)
+              if (kind === 'loan') {
+                const loan = targets.loans.get(typeof body.jewel_loan_id === 'string' ? body.jewel_loan_id : '')
+                if (!loan) return fail(res, 400, 'Pick the jewel loan this item is pledged under', traceId)
+                if (!loan.open) return fail(res, 400, `Jewel loan "${loan.name}" is closed`, traceId)
+                jewelLoanId = loan.id
+              } else {
+                const lend = targets.lends.get(typeof body.lend_id === 'string' ? body.lend_id : '')
+                if (!lend) return fail(res, 400, 'Pick the lend this item went out with', traceId)
+                if (!lend.open) return fail(res, 400, `"${lend.name}" is already marked returned`, traceId)
+                lendId = lend.id
+              }
+            }
+          }
+
           if (!isUpdate) {
             await db.insert(goldItems).values({
               orgId: scopeOrgId,
@@ -1860,13 +2104,15 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
               weightG: weightG as string,
               personId: personId ?? null,
               locationId: locationId ?? null,
+              jewelLoanId: jewelLoanId ?? null,
+              lendId: lendId ?? null,
             })
             return ok(res, id, traceId)
           }
 
           const updated = await db
             .update(goldItems)
-            .set({ name, weightG, personId, locationId })
+            .set({ name, weightG, personId, locationId, jewelLoanId, lendId })
             .where(and(whereOrgFilter(goldItems, budgetScope), eq(goldItems.id, id)))
             .returning({ id: goldItems.id })
           if (!updated.length) return fail(res, 404, 'Gold item not found', traceId)
@@ -1940,6 +2186,157 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
             .where(and(whereOrgFilter(goldResources, budgetScope), eq(goldResources.id, id)))
             .returning({ id: goldResources.id })
           if (!removed.length) return fail(res, 404, 'Resource not found', traceId)
+          return ok(res, true, traceId)
+        }
+        if (action === 'addLend' || action === 'updateLend') {
+          const isUpdate = action === 'updateLend'
+          const id = isUpdate ? (typeof body.id === 'string' ? body.id : '') : crypto.randomUUID()
+          if (isUpdate && !id) return fail(res, 400, 'Missing id', traceId)
+
+          let existing: { lentOn: string; returnedOn: string | null; expectedOn: string | null } | undefined
+          if (isUpdate) {
+            const rows = await db
+              .select({ lentOn: goldLends.lentOn, returnedOn: goldLends.returnedOn, expectedOn: goldLends.expectedOn })
+              .from(goldLends)
+              .where(and(whereOrgFilter(goldLends, budgetScope), eq(goldLends.id, id)))
+            existing = rows[0]
+            if (!existing) return fail(res, 404, 'Lend not found', traceId)
+          }
+
+          let lentTo: string | undefined
+          if (!isUpdate || body.lent_to !== undefined) {
+            const parsed = reqText(body.lent_to)
+            if (!parsed) return fail(res, 400, 'Who has the jewels?', traceId)
+            lentTo = parsed
+          }
+
+          // Optional: '' or null clears it, anything else must be a positive amount.
+          let amount: string | null | undefined
+          if (body.amount !== undefined) {
+            if (body.amount === null || body.amount === '') amount = null
+            else {
+              amount = moneyAmount(body.amount)
+              if (!amount) return fail(res, 400, 'Amount must be a number greater than 0', traceId)
+            }
+          }
+
+          let expectedOn: string | null | undefined
+          if (body.expected_on !== undefined) {
+            if (body.expected_on === null || body.expected_on === '') expectedOn = null
+            else {
+              expectedOn = strictIsoDate(body.expected_on)
+              if (!expectedOn) return fail(res, 400, 'Expected back must be a date (YYYY-MM-DD)', traceId)
+            }
+          }
+
+          let lentOn: string | undefined
+          if (!isUpdate || body.lent_on !== undefined) {
+            const parsed = strictIsoDate(body.lent_on)
+            if (!parsed) return fail(res, 400, 'Lent on must be a date (YYYY-MM-DD)', traceId)
+            lentOn = parsed
+          }
+
+          let returnedOn: string | null | undefined
+          if (body.returned_on !== undefined) {
+            if (body.returned_on === null || body.returned_on === '') returnedOn = null
+            else {
+              returnedOn = strictIsoDate(body.returned_on)
+              if (!returnedOn) return fail(res, 400, 'Returned on must be a date (YYYY-MM-DD)', traceId)
+            }
+          }
+          const finalLentOn = lentOn ?? existing?.lentOn
+          const finalReturnedOn = returnedOn === undefined ? existing?.returnedOn ?? null : returnedOn
+          if (finalLentOn && finalReturnedOn && finalReturnedOn < finalLentOn) {
+            return fail(res, 400, 'Returned on cannot be before lent on', traceId)
+          }
+          const finalExpectedOn = expectedOn === undefined ? existing?.expectedOn ?? null : expectedOn
+          if (finalLentOn && finalExpectedOn && finalExpectedOn < finalLentOn) {
+            return fail(res, 400, 'Expected back cannot be before lent on', traceId)
+          }
+
+          const purpose = body.purpose !== undefined ? reqText(body.purpose) : undefined
+
+          // A new lend needs items. An existing one may be saved empty: its last
+          // item can be deleted or re-pledged elsewhere, and the lend must still
+          // be editable (e.g. to mark it returned) rather than stuck.
+          let itemIds: string[] | undefined
+          if (!isUpdate || body.item_ids !== undefined) {
+            const raw = body.item_ids
+            if (!Array.isArray(raw) || !raw.every((v) => typeof v === 'string' && v.trim())) {
+              return fail(res, 400, 'Pick at least one item', traceId)
+            }
+            itemIds = [...new Set(raw.map((v: string) => v.trim()))]
+            if (!itemIds.length && !isUpdate) return fail(res, 400, 'Pick at least one item', traceId)
+
+            const [rows, targets] = itemIds.length === 0 ? [[], null] : await Promise.all([
+              db
+                .select({ id: goldItems.id, name: goldItems.name, jewelLoanId: goldItems.jewelLoanId, lendId: goldItems.lendId })
+                .from(goldItems)
+                .where(and(whereOrgFilter(goldItems, budgetScope), inArray(goldItems.id, itemIds))),
+              loadGoldPledgeTargets(db, scopeOrgId),
+            ])
+            if (rows.length !== itemIds.length) return fail(res, 400, 'One of those items no longer exists', traceId)
+            for (const row of rows) {
+              const conflict = targets ? goldPledgeConflict(row, targets, id) : null
+              if (conflict) return fail(res, 409, conflict, traceId)
+            }
+          }
+
+          await db.transaction(async (tx) => {
+            if (!isUpdate) {
+              await tx.insert(goldLends).values({
+                orgId: scopeOrgId,
+                id,
+                lentTo: lentTo as string,
+                purpose: purpose ?? null,
+                amount: amount ?? null,
+                lentOn: lentOn as string,
+                expectedOn: expectedOn ?? null,
+                returnedOn: returnedOn ?? null,
+              })
+            } else {
+              const patch = { lentTo, purpose, amount, lentOn, expectedOn, returnedOn }
+              // drizzle rejects an all-undefined SET, e.g. a call that only moves items.
+              if (Object.values(patch).some((v) => v !== undefined)) {
+                await tx
+                  .update(goldLends)
+                  .set(patch)
+                  .where(and(whereOrgFilter(goldLends, budgetScope), eq(goldLends.id, id)))
+              }
+            }
+            if (itemIds) {
+              await tx
+                .update(goldItems)
+                .set({ lendId: null })
+                .where(
+                  itemIds.length
+                    ? and(whereOrgFilter(goldItems, budgetScope), eq(goldItems.lendId, id), notInArray(goldItems.id, itemIds))
+                    : and(whereOrgFilter(goldItems, budgetScope), eq(goldItems.lendId, id)),
+                )
+              if (itemIds.length) {
+                await tx
+                  .update(goldItems)
+                  .set({ lendId: id, jewelLoanId: null })
+                  .where(and(whereOrgFilter(goldItems, budgetScope), inArray(goldItems.id, itemIds)))
+              }
+            }
+          })
+          return ok(res, isUpdate ? true : id, traceId)
+        }
+        if (action === 'deleteLend') {
+          const id = typeof body.id === 'string' ? body.id : ''
+          if (!id) return fail(res, 400, 'Missing id', traceId)
+          const removed = await db.transaction(async (tx) => {
+            await tx
+              .update(goldItems)
+              .set({ lendId: null })
+              .where(and(whereOrgFilter(goldItems, budgetScope), eq(goldItems.lendId, id)))
+            return tx
+              .delete(goldLends)
+              .where(and(whereOrgFilter(goldLends, budgetScope), eq(goldLends.id, id)))
+              .returning({ id: goldLends.id })
+          })
+          if (!removed.length) return fail(res, 404, 'Lend not found', traceId)
           return ok(res, true, traceId)
         }
         if (action === 'addHistory' || action === 'updateHistory') {
@@ -2049,7 +2446,14 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         if (action === 'deleteEntry' && typ === 'jewel') {
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
-          await db.delete(jewelLoans).where(and(whereOrgFilter(jewelLoans, budgetScope), eq(jewelLoans.id, id)))
+          await db.transaction(async (tx) => {
+            // No FK: without this, items keep pointing at a loan that no longer exists.
+            await tx
+              .update(goldItems)
+              .set({ jewelLoanId: null })
+              .where(and(whereOrgFilter(goldItems, budgetScope), eq(goldItems.jewelLoanId, id)))
+            await tx.delete(jewelLoans).where(and(whereOrgFilter(jewelLoans, budgetScope), eq(jewelLoans.id, id)))
+          })
           return ok(res, true, traceId)
         }
         if (action === 'addEntry' && typ === 'cash') {

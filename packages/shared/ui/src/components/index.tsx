@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { ExternalLink, Link2, Loader2, Copy } from 'lucide-react'
 import type { UiTone } from './uiTone'
 import { UiCard } from './UiCard'
+import { externalLinkClick } from './openExternal'
 
 export type { UiTone } from './uiTone'
 export { KpiCard, KPI_ICON_SIZE, type KpiCardProps } from './KpiCard'
@@ -985,7 +986,7 @@ export function TransactionCard({
         target="_blank"
         rel="noopener noreferrer"
         title={trimmedLink}
-        onClick={e => e.stopPropagation()}
+        onClick={externalLinkClick}
       >
         <ExternalLink size={14} className="ui-kit-holding-card-linkrow-icon" aria-hidden />
         <span className="ui-kit-holding-card-preview-label">Preview</span>
@@ -1033,6 +1034,7 @@ export {
   type GoogleAuthCardProps,
 } from './GoogleAuthCard'
 export { ConfirmDialog } from './ConfirmDialog'
+export { openExternal, externalLinkClick } from './openExternal'
 export { FabButton, FormCard, DataPageHeader, AdminDataListSearch } from './AdminShell'
 export { UpstoxIcon } from './UpstoxIcon'
 export { IntegrationIcon } from './IntegrationIcon'

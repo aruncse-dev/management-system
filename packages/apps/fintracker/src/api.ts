@@ -135,6 +135,46 @@ export interface RawGoldRow {
   weight_g: number | string;
   person_id: string | null;
   location_id: string | null;
+  /** At most one is set. A closed loan / returned lend link is kept as history. */
+  jewel_loan_id: string | null;
+  lend_id: string | null;
+}
+
+/** Jewels handed to someone else; items point back via `RawGoldRow.lend_id`. */
+export interface RawGoldLendRow {
+  id: string;
+  lent_to: string;
+  purpose: string;
+  /** What they raised on the jewels; null when not recorded. */
+  amount: number | null;
+  lent_on: string;
+  expected_on: string | null;
+  /** Null while the jewels are still with them. */
+  returned_on: string | null;
+}
+
+export type InvestmentTxnKind = 'paid' | 'expense' | 'received';
+export type OtherInvestmentType = 'land' | 'shares' | 'chit' | 'business' | 'other';
+
+export interface RawOtherInvestmentRow {
+  id: string;
+  name: string;
+  type: OtherInvestmentType;
+  area_sqft: number | null;
+  /** Agreed purchase price; null when not bought in installments / not recorded. */
+  price: number | null;
+  /** Today's estimate for the whole holding; null = not valued yet. */
+  current_value: number | null;
+  status: 'active' | 'sold';
+}
+
+export interface RawOtherInvestmentTxnRow {
+  id: string;
+  investment_id: string;
+  date: string;
+  kind: InvestmentTxnKind;
+  amount: number;
+  description: string;
 }
 
 export interface GoldResource {
@@ -571,6 +611,18 @@ export const api = {
   addGoldHistory:    (p: Record<string, unknown>) => post<string>({ module: 'gold', action: 'addHistory', ...p }),
   updateGoldHistory: (p: Record<string, unknown>) => post<boolean>({ module: 'gold', action: 'updateHistory', ...p }),
   deleteGoldHistory: (id: string)                 => post<boolean>({ module: 'gold', action: 'deleteHistory', id }),
+  getOtherInvestments:      ()                           => get<RawOtherInvestmentRow[]>('getEntries', { module: 'otherInvestments' }),
+  addOtherInvestment:       (p: Record<string, unknown>) => post<string>({ module: 'otherInvestments', action: 'addInvestment', ...p }),
+  updateOtherInvestment:    (p: Record<string, unknown>) => post<boolean>({ module: 'otherInvestments', action: 'updateInvestment', ...p }),
+  deleteOtherInvestment:    (id: string)                 => post<boolean>({ module: 'otherInvestments', action: 'deleteInvestment', id }),
+  getOtherInvestmentTxns:   ()                           => get<RawOtherInvestmentTxnRow[]>('getTxns', { module: 'otherInvestments' }),
+  addOtherInvestmentTxn:    (p: Record<string, unknown>) => post<string>({ module: 'otherInvestments', action: 'addTxn', ...p }),
+  updateOtherInvestmentTxn: (p: Record<string, unknown>) => post<boolean>({ module: 'otherInvestments', action: 'updateTxn', ...p }),
+  deleteOtherInvestmentTxn: (id: string)                 => post<boolean>({ module: 'otherInvestments', action: 'deleteTxn', id }),
+  getGoldLends:      ()                           => get<RawGoldLendRow[]>('getLends', { module: 'gold' }),
+  addGoldLend:       (p: Record<string, unknown>) => post<string>({ module: 'gold', action: 'addLend', ...p }),
+  updateGoldLend:    (p: Record<string, unknown>) => post<boolean>({ module: 'gold', action: 'updateLend', ...p }),
+  deleteGoldLend:    (id: string)                 => post<boolean>({ module: 'gold', action: 'deleteLend', id }),
   getEmi:    ()                            => get<RawEmiRow[]>('getEntries', { module: 'loans' }),
   addEmi:    (p: Record<string, unknown>) => post<string>({ module: 'loans', action: 'addEntry', ...p }),
   updateEmi: (p: Record<string, unknown>) => post<boolean>({ module: 'loans', action: 'updateEntry', ...p }),
