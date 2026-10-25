@@ -43,7 +43,6 @@ interface GoldLend {
   lent_on: string;
   expected_on: string | null;
   returned_on: string | null;
-  note: string;
   open: boolean;
   /** "Person · purpose" — how the lend is named in pickers and on item cards. */
   label: string;
@@ -63,7 +62,6 @@ interface GoldLendFormState {
   lent_on: string;
   expected_on: string;
   returned_on: string;
-  note: string;
   item_ids: string[];
 }
 
@@ -181,7 +179,6 @@ function emptyLendForm(): GoldLendFormState {
     lent_on: localIsoDate(),
     expected_on: '',
     returned_on: '',
-    note: '',
     item_ids: [],
   };
 }
@@ -205,7 +202,6 @@ function parseLend(raw: RawGoldLendRow): GoldLend {
     lent_on: normalizeDate(String(raw.lent_on ?? '')),
     expected_on: raw.expected_on ? normalizeDate(String(raw.expected_on)) : null,
     returned_on: raw.returned_on ? normalizeDate(String(raw.returned_on)) : null,
-    note: String(raw.note ?? '').trim(),
     open: !raw.returned_on,
     label: [lent_to, purpose].filter(Boolean).join(' · ') || 'Lend',
   };
@@ -641,7 +637,6 @@ export default function Gold() {
     const match = (l: GoldLend) =>
       !q || l.purpose.toLowerCase().includes(q)
         || l.lent_to.toLowerCase().includes(q)
-        || l.note.toLowerCase().includes(q)
         || (itemsByLend.get(l.id) ?? []).some(i => i.name.toLowerCase().includes(q));
     const shown = lends.filter(match);
     return {
@@ -1116,7 +1111,6 @@ export default function Gold() {
       lent_on: l.lent_on,
       expected_on: l.expected_on ?? '',
       returned_on: l.returned_on ?? '',
-      note: l.note,
       item_ids: (itemsByLend.get(l.id) ?? []).map(i => i.id),
     });
     setSavingLend(false);
@@ -1166,7 +1160,6 @@ export default function Gold() {
       lent_on: lendForm.lent_on,
       expected_on: lendForm.expected_on || null,
       returned_on: lendForm.returned_on || null,
-      note: lendForm.note.trim(),
       item_ids: lendForm.item_ids,
     };
     try {
@@ -1777,9 +1770,6 @@ export default function Gold() {
                   Estimated value again and the lend stays here as a record.
                 </p>
               )}
-              <FormField label="Note">
-                <input className="form-inp" type="text" placeholder="Bank, loan number…" value={lendForm.note} onChange={e => setLendField('note', e.target.value)} />
-              </FormField>
             </div>
             <button type="submit" hidden aria-hidden="true" tabIndex={-1} />
           </form>

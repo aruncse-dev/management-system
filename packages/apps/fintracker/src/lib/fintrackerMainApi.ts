@@ -1064,7 +1064,6 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
             lent_on: String(r.lentOn),
             expected_on: r.expectedOn ? String(r.expectedOn) : null,
             returned_on: r.returnedOn ? String(r.returnedOn) : null,
-            note: r.note ?? '',
           })),
         )
       }
@@ -2065,7 +2064,6 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
           }
 
           const purpose = body.purpose !== undefined ? reqText(body.purpose) : undefined
-          const note = body.note !== undefined ? reqText(body.note) : undefined
 
           // A new lend needs items. An existing one may be saved empty: its last
           // item can be deleted or re-pledged elsewhere, and the lend must still
@@ -2104,10 +2102,9 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
                 lentOn: lentOn as string,
                 expectedOn: expectedOn ?? null,
                 returnedOn: returnedOn ?? null,
-                note: note ?? null,
               })
             } else {
-              const patch = { lentTo, purpose, amount, lentOn, expectedOn, returnedOn, note }
+              const patch = { lentTo, purpose, amount, lentOn, expectedOn, returnedOn }
               // drizzle rejects an all-undefined SET, e.g. a call that only moves items.
               if (Object.values(patch).some((v) => v !== undefined)) {
                 await tx

@@ -44,6 +44,7 @@ export const goldLends = pgTable('gold_lends', {
   expectedOn: date('expected_on'),
   /** Null while the jewels are still with them. */
   returnedOn: date('returned_on'),
+  /** No longer written or shown — person, purpose and amount cover it. Kept so old rows aren't lost. */
   note: text('note'),
 })
 

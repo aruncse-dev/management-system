@@ -151,7 +151,6 @@ export interface RawGoldLendRow {
   expected_on: string | null;
   /** Null while the jewels are still with them. */
   returned_on: string | null;
-  note: string;
 }
 
 export interface GoldResource {
