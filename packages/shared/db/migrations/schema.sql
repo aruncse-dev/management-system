@@ -435,6 +435,25 @@ CREATE TABLE "stocks" (
 	"synced_at" timestamp
 );
 
+CREATE TABLE "plot_txns" (
+	"id" text PRIMARY KEY NOT NULL,
+	"org_id" text,
+	"plot_id" text NOT NULL,
+	"date" date NOT NULL,
+	"kind" text NOT NULL,
+	"amount" numeric(12, 2) NOT NULL,
+	"description" text
+);
+
+CREATE TABLE "plots" (
+	"id" text PRIMARY KEY NOT NULL,
+	"org_id" text,
+	"name" text NOT NULL,
+	"area_sqft" numeric(12, 2),
+	"current_value" numeric(12, 2),
+	"status" text DEFAULT 'active' NOT NULL
+);
+
 CREATE TABLE "integration_providers" (
 	"slug" text PRIMARY KEY NOT NULL,
 	"name" text NOT NULL,

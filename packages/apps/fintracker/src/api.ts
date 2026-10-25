@@ -153,6 +153,26 @@ export interface RawGoldLendRow {
   returned_on: string | null;
 }
 
+export type PlotTxnKind = 'paid' | 'expense' | 'received';
+
+export interface RawPlotRow {
+  id: string;
+  name: string;
+  area_sqft: number | null;
+  /** Today's estimate for the whole plot; null = not valued yet. */
+  current_value: number | null;
+  status: 'active' | 'sold';
+}
+
+export interface RawPlotTxnRow {
+  id: string;
+  plot_id: string;
+  date: string;
+  kind: PlotTxnKind;
+  amount: number;
+  description: string;
+}
+
 export interface GoldResource {
   id: string;
   type: 'person' | 'location';
@@ -587,6 +607,14 @@ export const api = {
   addGoldHistory:    (p: Record<string, unknown>) => post<string>({ module: 'gold', action: 'addHistory', ...p }),
   updateGoldHistory: (p: Record<string, unknown>) => post<boolean>({ module: 'gold', action: 'updateHistory', ...p }),
   deleteGoldHistory: (id: string)                 => post<boolean>({ module: 'gold', action: 'deleteHistory', id }),
+  getPlots:          ()                           => get<RawPlotRow[]>('getEntries', { module: 'plots' }),
+  addPlot:           (p: Record<string, unknown>) => post<string>({ module: 'plots', action: 'addPlot', ...p }),
+  updatePlot:        (p: Record<string, unknown>) => post<boolean>({ module: 'plots', action: 'updatePlot', ...p }),
+  deletePlot:        (id: string)                 => post<boolean>({ module: 'plots', action: 'deletePlot', id }),
+  getPlotTxns:       ()                           => get<RawPlotTxnRow[]>('getTxns', { module: 'plots' }),
+  addPlotTxn:        (p: Record<string, unknown>) => post<string>({ module: 'plots', action: 'addTxn', ...p }),
+  updatePlotTxn:     (p: Record<string, unknown>) => post<boolean>({ module: 'plots', action: 'updateTxn', ...p }),
+  deletePlotTxn:     (id: string)                 => post<boolean>({ module: 'plots', action: 'deleteTxn', id }),
   getGoldLends:      ()                           => get<RawGoldLendRow[]>('getLends', { module: 'gold' }),
   addGoldLend:       (p: Record<string, unknown>) => post<string>({ module: 'gold', action: 'addLend', ...p }),
   updateGoldLend:    (p: Record<string, unknown>) => post<boolean>({ module: 'gold', action: 'updateLend', ...p }),

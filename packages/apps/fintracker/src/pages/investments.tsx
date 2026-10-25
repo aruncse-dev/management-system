@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { BarChart3, LayoutDashboard, PieChart, RefreshCw, Shield, TrendingUp, Wallet } from 'lucide-react';
+import { BarChart3, LandPlot, LayoutDashboard, PieChart, RefreshCw, Shield, TrendingUp, Wallet } from 'lucide-react';
 import { api, type RawHolding } from '../api';
 import { readEnabledIntegrations } from '../lib/profileMenuCache';
 import { KpiCard, KpiGrid, LoadingState, SectionBlock, Spacer } from '../ui';
 import { useFormatMoney } from '../hooks/useFormatMoney';
 import Stocks, { clearStocksCache } from './stocks';
 import MutualFunds, { clearMutualFundsCache } from './mutualfunds';
+import Plots, { PlotsMetrics } from './plots';
 
-type InvestmentTab = 'dashboard' | 'stocks' | 'mutualFunds';
+type InvestmentTab = 'dashboard' | 'stocks' | 'mutualFunds' | 'plots';
 
 type HoldingsGroup = {
   stocks: RawHolding[];
@@ -202,6 +203,8 @@ function DashboardView() {
         <div>
           <MetricsSection title="Stocks" holdings={data.stocks} icon={<TrendingUp size={14} />} />
           <MetricsSection title="Mutual Funds" holdings={data.mutualFunds} icon={<PieChart size={14} />} />
+          {/* Not in the totals above: those are synced market holdings, plots are hand-entered. */}
+          <PlotsMetrics />
         </div>
       )}
     </div>
@@ -238,12 +241,21 @@ export default function Investments() {
           <span className="bottom-nav-icon"><PieChart size={19} /></span>
           <span>Mutual Funds</span>
         </button>
+        <button
+          type="button"
+          className={`bottom-nav-item${activeTab === 'plots' ? ' active' : ''}`}
+          onClick={() => setActiveTab('plots')}
+        >
+          <span className="bottom-nav-icon"><LandPlot size={19} /></span>
+          <span>Plots</span>
+        </button>
       </nav>
 
       <div className="pg">
         {activeTab === 'dashboard' && <DashboardView />}
         {activeTab === 'stocks' && <Stocks key="stocks-tab" embedded alwaysLoadFromDb />}
         {activeTab === 'mutualFunds' && <MutualFunds key="mf-tab" embedded alwaysLoadFromDb />}
+        {activeTab === 'plots' && <Plots />}
       </div>
     </div>
   );

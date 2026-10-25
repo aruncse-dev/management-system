@@ -21,6 +21,8 @@ import {
   lending,
   mutualFunds,
   organizations,
+  plotTxns,
+  plots,
   paymentSources,
   savings,
   stocks,
@@ -1048,6 +1050,39 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         )
       }
 
+      if (mod === 'plots' && action === 'getEntries') {
+        const rows = await db.select().from(plots).where(whereOrgFilter(plots, budgetScope)).orderBy(plots.name)
+        return ok(
+          res,
+          rows.map((r) => ({
+            id: r.id,
+            name: r.name,
+            area_sqft: r.areaSqft === null ? null : num(r.areaSqft),
+            current_value: r.currentValue === null ? null : num(r.currentValue),
+            status: r.status === 'sold' ? 'sold' : 'active',
+          })),
+        )
+      }
+
+      if (mod === 'plots' && action === 'getTxns') {
+        const rows = await db
+          .select()
+          .from(plotTxns)
+          .where(whereOrgFilter(plotTxns, budgetScope))
+          .orderBy(desc(plotTxns.date))
+        return ok(
+          res,
+          rows.map((r) => ({
+            id: r.id,
+            plot_id: r.plotId,
+            date: String(r.date),
+            kind: r.kind,
+            amount: num(r.amount),
+            description: r.description ?? '',
+          })),
+        )
+      }
+
       if (mod === 'gold' && action === 'getLends') {
         const rows = await db
           .select()
@@ -1827,6 +1862,145 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
           // Deleting a mirrored row unlinks the transaction that made it.
           // Without this the row returns on that transaction's next save.
           await unlinkMirrorSource(db, budgetScope, id)
+          return ok(res, true, traceId)
+        }
+      }
+
+      if (mod === 'plots') {
+        // Optional money/area fields: absent = unchanged, '' or null = clear,
+        // anything else must be a positive number that fits numeric(12,2).
+        const optionalPositive = (v: unknown): { ok: true; value: string | null | undefined } | { ok: false } => {
+          if (v === undefined) return { ok: true, value: undefined }
+          if (v === null || v === '') return { ok: true, value: null }
+          const parsed = moneyAmount(v)
+          return parsed ? { ok: true, value: parsed } : { ok: false }
+        }
+
+        if (action === 'addPlot' || action === 'updatePlot') {
+          const isUpdate = action === 'updatePlot'
+          const id = isUpdate ? (typeof body.id === 'string' ? body.id : '') : crypto.randomUUID()
+          if (isUpdate && !id) return fail(res, 400, 'Missing id', traceId)
+
+          let name: string | undefined
+          if (!isUpdate || body.name !== undefined) {
+            const parsed = reqText(body.name)
+            if (!parsed) return fail(res, 400, 'Plot name is required', traceId)
+            name = parsed
+          }
+          const area = optionalPositive(body.area_sqft)
+          if (!area.ok) return fail(res, 400, 'Area must be a number greater than 0', traceId)
+          const value = optionalPositive(body.current_value)
+          if (!value.ok) return fail(res, 400, 'Current value must be a number greater than 0', traceId)
+          let status: string | undefined
+          if (!isUpdate || body.status !== undefined) {
+            const raw = body.status === undefined ? 'active' : body.status
+            if (raw !== 'active' && raw !== 'sold') return fail(res, 400, 'Status must be active or sold', traceId)
+            status = raw
+          }
+
+          if (!isUpdate) {
+            await db.insert(plots).values({
+              orgId: scopeOrgId,
+              id,
+              name: name as string,
+              areaSqft: area.value ?? null,
+              currentValue: value.value ?? null,
+              status: status as string,
+            })
+            return ok(res, id, traceId)
+          }
+          const patch = { name, areaSqft: area.value, currentValue: value.value, status }
+          if (!Object.values(patch).some((v) => v !== undefined)) return ok(res, true, traceId)
+          const updated = await db
+            .update(plots)
+            .set(patch)
+            .where(and(whereOrgFilter(plots, budgetScope), eq(plots.id, id)))
+            .returning({ id: plots.id })
+          if (!updated.length) return fail(res, 404, 'Plot not found', traceId)
+          return ok(res, true, traceId)
+        }
+        if (action === 'deletePlot') {
+          const id = typeof body.id === 'string' ? body.id : ''
+          if (!id) return fail(res, 400, 'Missing id', traceId)
+          // No FK: the ledger goes with the plot, or it'd be orphaned rows nothing shows.
+          const removed = await db.transaction(async (tx) => {
+            await tx.delete(plotTxns).where(and(whereOrgFilter(plotTxns, budgetScope), eq(plotTxns.plotId, id)))
+            return tx
+              .delete(plots)
+              .where(and(whereOrgFilter(plots, budgetScope), eq(plots.id, id)))
+              .returning({ id: plots.id })
+          })
+          if (!removed.length) return fail(res, 404, 'Plot not found', traceId)
+          return ok(res, true, traceId)
+        }
+        if (action === 'addTxn' || action === 'updateTxn') {
+          const isUpdate = action === 'updateTxn'
+          const id = isUpdate ? (typeof body.id === 'string' ? body.id : '') : crypto.randomUUID()
+          if (isUpdate && !id) return fail(res, 400, 'Missing id', traceId)
+
+          let plotId: string | undefined
+          if (!isUpdate || body.plot_id !== undefined) {
+            const raw = typeof body.plot_id === 'string' ? body.plot_id : ''
+            const owner = raw
+              ? await db
+                  .select({ id: plots.id })
+                  .from(plots)
+                  .where(and(whereOrgFilter(plots, budgetScope), eq(plots.id, raw)))
+              : []
+            if (!owner.length) return fail(res, 400, 'Pick a plot', traceId)
+            plotId = raw
+          }
+          let date: string | undefined
+          if (!isUpdate || body.date !== undefined) {
+            const parsed = strictIsoDate(body.date)
+            if (!parsed) return fail(res, 400, 'Date must be YYYY-MM-DD', traceId)
+            date = parsed
+          }
+          let kind: string | undefined
+          if (!isUpdate || body.kind !== undefined) {
+            if (body.kind !== 'paid' && body.kind !== 'expense' && body.kind !== 'received') {
+              return fail(res, 400, 'Type must be paid, expense or received', traceId)
+            }
+            kind = body.kind
+          }
+          let amount: string | undefined
+          if (!isUpdate || body.amount !== undefined) {
+            const parsed = moneyAmount(body.amount)
+            if (!parsed) return fail(res, 400, 'Amount must be a number greater than 0', traceId)
+            amount = parsed
+          }
+          const description = body.description !== undefined ? reqText(body.description) : undefined
+
+          if (!isUpdate) {
+            await db.insert(plotTxns).values({
+              orgId: scopeOrgId,
+              id,
+              plotId: plotId as string,
+              date: date as string,
+              kind: kind as string,
+              amount: amount as string,
+              description: description ?? null,
+            })
+            return ok(res, id, traceId)
+          }
+          const patch = { plotId, date, kind, amount, description }
+          if (!Object.values(patch).some((v) => v !== undefined)) return ok(res, true, traceId)
+          const updated = await db
+            .update(plotTxns)
+            .set(patch)
+            .where(and(whereOrgFilter(plotTxns, budgetScope), eq(plotTxns.id, id)))
+            .returning({ id: plotTxns.id })
+          if (!updated.length) return fail(res, 404, 'Transaction not found', traceId)
+          return ok(res, true, traceId)
+        }
+        if (action === 'deleteTxn') {
+          const id = typeof body.id === 'string' ? body.id : ''
+          if (!id) return fail(res, 400, 'Missing id', traceId)
+          const removed = await db
+            .delete(plotTxns)
+            .where(and(whereOrgFilter(plotTxns, budgetScope), eq(plotTxns.id, id)))
+            .returning({ id: plotTxns.id })
+          if (!removed.length) return fail(res, 404, 'Transaction not found', traceId)
           return ok(res, true, traceId)
         }
       }
