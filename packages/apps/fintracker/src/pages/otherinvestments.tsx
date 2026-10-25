@@ -1,7 +1,13 @@
-import { useCallback, useEffect, useMemo, useState, memo } from 'react';
+import { useCallback, useEffect, useMemo, useState, memo, type ReactNode } from 'react';
 import { localIsoDate } from '@fintracker-vault/utils';
-import { ArrowDownLeft, ArrowUpRight, BarChart3, LandPlot, Plus, Receipt, Shield, TrendingUp, Wallet } from 'lucide-react';
-import { api, type PlotTxnKind, type RawPlotRow, type RawPlotTxnRow } from '../api';
+import { ArrowDownLeft, ArrowUpRight, BarChart3, Briefcase, Coins, Layers, LandPlot, Package, Plus, Receipt, Shield, TrendingUp, Wallet } from 'lucide-react';
+import {
+  api,
+  type InvestmentTxnKind,
+  type OtherInvestmentType,
+  type RawOtherInvestmentRow,
+  type RawOtherInvestmentTxnRow,
+} from '../api';
 import { useFormatMoney, useMoneyFormatting } from '../hooks/useFormatMoney';
 import { FormField, HoldingCard, InfoCallout, KpiCard, KpiGrid, ListStack, LoadingState, ModalActions, ModalShell, SectionBlock, SectionChip } from '../ui';
 
@@ -9,19 +15,27 @@ import { FormField, HoldingCard, InfoCallout, KpiCard, KpiGrid, ListStack, Loadi
 // TYPES & MATH
 // ──────────────────────────────────────────────────────────────────────────────
 
-interface PlotTxn {
+/**
+ * Investments tracked by hand: a holding (name + a few optional facts) and a
+ * ledger, the same shape as Lending. Every figure on this page is derived from
+ * the ledger; the optional facts only add value, balance-due and per-sqft lines.
+ */
+
+interface InvestmentTxn {
   id: string;
-  plot_id: string;
+  investment_id: string;
   date: string;
-  kind: PlotTxnKind;
+  kind: InvestmentTxnKind;
   amount: number;
   description: string;
 }
 
-export interface PlotSummary {
+export interface InvestmentSummary {
   id: string;
   name: string;
+  type: OtherInvestmentType;
   area_sqft: number | null;
+  price: number | null;
   current_value: number | null;
   status: 'active' | 'sold';
   paid: number;
@@ -29,28 +43,39 @@ export interface PlotSummary {
   received: number;
   /** Paid + expenses: everything that went in. */
   invested: number;
+  /** Agreed price − paid, while held; null when no price is recorded. */
+  balanceDue: number | null;
   /** What it counts for today: the estimate while held, nothing once sold. Null = not valued. */
   worth: number | null;
   /** Sold: received − invested. Held: worth + received − invested. Null while held and not valued. */
   gain: number | null;
   costPerSqft: number | null;
-  txns: PlotTxn[];
+  txns: InvestmentTxn[];
 }
 
-const KIND_LABEL: Record<PlotTxnKind, string> = { paid: 'Paid', expense: 'Expense', received: 'Received' };
-const KIND_HINT: Record<PlotTxnKind, string> = {
+const TYPE_META: Record<OtherInvestmentType, { label: string; icon: (size: number) => ReactNode }> = {
+  land: { label: 'Land / Plot', icon: (n) => <LandPlot size={n} /> },
+  shares: { label: 'Shares', icon: (n) => <TrendingUp size={n} /> },
+  chit: { label: 'Chit fund', icon: (n) => <Coins size={n} /> },
+  business: { label: 'Business', icon: (n) => <Briefcase size={n} /> },
+  other: { label: 'Other', icon: (n) => <Package size={n} /> },
+};
+const TYPES = Object.keys(TYPE_META) as OtherInvestmentType[];
+
+const KIND_LABEL: Record<InvestmentTxnKind, string> = { paid: 'Paid', expense: 'Expense', received: 'Received' };
+const KIND_HINT: Record<InvestmentTxnKind, string> = {
   paid: 'Advance, installment 2…',
   expense: 'Broker commission, registration…',
-  received: 'Sale advance, refund…',
+  received: 'Sale amount, payout, refund…',
 };
 
-function parseTxn(raw: RawPlotTxnRow): PlotTxn | null {
+function parseTxn(raw: RawOtherInvestmentTxnRow): InvestmentTxn | null {
   const amount = Number(raw.amount);
   if (!Number.isFinite(amount)) return null;
   if (raw.kind !== 'paid' && raw.kind !== 'expense' && raw.kind !== 'received') return null;
   return {
     id: raw.id,
-    plot_id: raw.plot_id,
+    investment_id: raw.investment_id,
     date: String(raw.date ?? '').slice(0, 10),
     kind: raw.kind,
     amount,
@@ -62,45 +87,51 @@ function positiveOrNull(v: number | null | undefined): number | null {
   return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null;
 }
 
-export function summarizePlots(plotRows: RawPlotRow[], txnRows: RawPlotTxnRow[]): PlotSummary[] {
-  const txns = txnRows.map(parseTxn).filter((t): t is PlotTxn => t !== null);
-  return plotRows.map((p) => {
-    const own = txns.filter((t) => t.plot_id === p.id).sort((a, b) => b.date.localeCompare(a.date));
-    const sum = (k: PlotTxnKind) => own.filter((t) => t.kind === k).reduce((s, t) => s + t.amount, 0);
+export function summarizeInvestments(rows: RawOtherInvestmentRow[], txnRows: RawOtherInvestmentTxnRow[]): InvestmentSummary[] {
+  const txns = txnRows.map(parseTxn).filter((t): t is InvestmentTxn => t !== null);
+  return rows.map((r) => {
+    const own = txns.filter((t) => t.investment_id === r.id).sort((a, b) => b.date.localeCompare(a.date));
+    const sum = (k: InvestmentTxnKind) => own.filter((t) => t.kind === k).reduce((s, t) => s + t.amount, 0);
     const paid = sum('paid');
     const expenses = sum('expense');
     const received = sum('received');
     const invested = paid + expenses;
-    const area = positiveOrNull(p.area_sqft);
-    const value = positiveOrNull(p.current_value);
-    const sold = p.status === 'sold';
-    const worth = sold ? 0 : value;
-    const gain = sold ? received - invested : value !== null ? value + received - invested : null;
+    const type: OtherInvestmentType = r.type in TYPE_META ? r.type : 'other';
+    // Area only means something for land; a stale value on another type is ignored.
+    const area = type === 'land' ? positiveOrNull(r.area_sqft) : null;
+    const price = positiveOrNull(r.price);
+    const value = positiveOrNull(r.current_value);
+    const sold = r.status === 'sold';
     return {
-      id: p.id,
-      name: String(p.name ?? '').trim(),
+      id: r.id,
+      name: String(r.name ?? '').trim(),
+      type,
       area_sqft: area,
+      price,
       current_value: value,
       status: sold ? 'sold' : 'active',
       paid,
       expenses,
       received,
       invested,
-      worth,
-      gain,
+      // Expenses aren't part of the price, so only Paid reduces what's due.
+      balanceDue: !sold && price !== null ? Math.max(price - paid, 0) : null,
+      worth: sold ? 0 : value,
+      gain: sold ? received - invested : value !== null ? value + received - invested : null,
       costPerSqft: area !== null && invested > 0 ? invested / area : null,
       txns: own,
     };
   });
 }
 
-/** Portfolio totals. Gain only adds up plots that have one, so an unvalued plot never reads as a loss. */
-export function plotTotals(rows: PlotSummary[]) {
+/** Totals. Gain only adds holdings that have one, so an unvalued holding never reads as a loss. */
+export function investmentTotals(rows: InvestmentSummary[]) {
   const held = rows.filter((r) => r.status === 'active');
   return {
     invested: held.reduce((s, r) => s + r.invested, 0),
     worth: held.reduce((s, r) => s + (r.worth ?? 0), 0),
     unvalued: held.filter((r) => r.worth === null).length,
+    due: held.reduce((s, r) => s + (r.balanceDue ?? 0), 0),
     gain: rows.reduce((s, r) => s + (r.gain ?? 0), 0),
     hasGain: rows.some((r) => r.gain !== null),
     held: held.length,
@@ -116,35 +147,36 @@ function signed(fmt: (n: number) => string, n: number): string {
 // SUB-COMPONENTS
 // ──────────────────────────────────────────────────────────────────────────────
 
-const PlotCard = memo(function PlotCard({ plot, onClick }: { plot: PlotSummary; onClick: () => void }) {
+const InvestmentCard = memo(function InvestmentCard({ inv, onClick }: { inv: InvestmentSummary; onClick: () => void }) {
   const fmt = useFormatMoney();
   const subtitle = [
-    plot.area_sqft !== null ? `${plot.area_sqft.toLocaleString('en-IN')} sqft` : '',
-    plot.costPerSqft !== null ? `${fmt(Math.round(plot.costPerSqft))}/sqft cost` : '',
-    `${plot.txns.length} txn${plot.txns.length === 1 ? '' : 's'}`,
+    TYPE_META[inv.type].label,
+    inv.area_sqft !== null ? `${inv.area_sqft.toLocaleString('en-IN')} sqft` : '',
+    inv.balanceDue ? `${fmt(inv.balanceDue)} due` : '',
   ].filter(Boolean).join(' · ');
-  const tone = plot.gain === null ? 'navy' : plot.gain >= 0 ? 'green' : 'red';
+  const tone = inv.gain === null ? 'navy' : inv.gain >= 0 ? 'green' : 'red';
+  const sold = inv.status === 'sold';
   return (
     <HoldingCard
       className="stock-entry-card"
-      title={plot.name}
+      title={inv.name}
       subtitle={subtitle}
-      icon={<LandPlot size={14} />}
+      icon={TYPE_META[inv.type].icon(14)}
       iconBackground
       accentTone={tone}
-      rightTop={plot.status === 'sold' ? <SectionChip tone="muted">Sold</SectionChip> : undefined}
+      rightTop={sold ? <SectionChip tone="muted">Sold</SectionChip> : undefined}
       leftLabel="Invested"
-      leftValue={fmt(plot.invested)}
-      centerLabel={plot.status === 'sold' ? 'Received' : 'Worth today'}
-      centerValue={plot.status === 'sold' ? fmt(plot.received) : plot.worth !== null ? fmt(plot.worth) : '—'}
+      leftValue={fmt(inv.invested)}
+      centerLabel={sold ? 'Received' : 'Worth today'}
+      centerValue={sold ? fmt(inv.received) : inv.worth !== null ? fmt(inv.worth) : '—'}
       rightLabel="Gain"
-      rightValue={plot.gain !== null ? signed(fmt, plot.gain) : '—'}
+      rightValue={inv.gain !== null ? signed(fmt, inv.gain) : '—'}
       onClick={onClick}
     />
   );
 });
 
-const TxnCard = memo(function TxnCard({ txn, onClick }: { txn: PlotTxn; onClick: () => void }) {
+const TxnCard = memo(function TxnCard({ txn, onClick }: { txn: InvestmentTxn; onClick: () => void }) {
   const fmt = useFormatMoney();
   const incoming = txn.kind === 'received';
   return (
@@ -165,40 +197,51 @@ const TxnCard = memo(function TxnCard({ txn, onClick }: { txn: PlotTxn; onClick:
   );
 });
 
-/** Plot KPIs for the Investments dashboard; loads on its own so that tab stays independent. */
-export function PlotsMetrics() {
+function TotalsGrid({ totals }: { totals: ReturnType<typeof investmentTotals> }) {
   const fmt = useFormatMoney();
-  const [rows, setRows] = useState<PlotSummary[] | null>(null);
+  return (
+    <KpiGrid>
+      <KpiCard
+        label="Invested"
+        value={fmt(totals.invested)}
+        icon={<Wallet size={14} />}
+        tone="navy"
+        subtitle={totals.due > 0 ? `${fmt(totals.due)} still due` : 'Paid + expenses'}
+      />
+      <KpiCard
+        label="Worth today"
+        value={fmt(totals.worth)}
+        icon={<TrendingUp size={14} />}
+        tone="muted"
+        subtitle={totals.unvalued ? `${totals.unvalued} not valued yet` : undefined}
+      />
+      <KpiCard
+        label="Gain"
+        value={totals.hasGain ? signed(fmt, totals.gain) : '—'}
+        subtitle={totals.sold ? 'Incl. sold' : undefined}
+        icon={<Shield size={14} />}
+        tone="muted"
+        accentTone={totals.gain >= 0 ? 'green' : 'red'}
+      />
+      <KpiCard label="Holdings" value={totals.held} subtitle={totals.sold ? `${totals.sold} sold` : 'Held'} icon={<Layers size={14} />} tone="muted" />
+    </KpiGrid>
+  );
+}
+
+/** For the Investments dashboard; loads on its own so that tab stays independent. Hidden until something exists. */
+export function OtherInvestmentsMetrics() {
+  const [rows, setRows] = useState<InvestmentSummary[] | null>(null);
   useEffect(() => {
     let live = true;
-    Promise.all([api.getPlots(), api.getPlotTxns()])
-      .then(([p, t]) => { if (live) setRows(summarizePlots(p, t)); })
+    Promise.all([api.getOtherInvestments(), api.getOtherInvestmentTxns()])
+      .then(([r, t]) => { if (live) setRows(summarizeInvestments(r, t)); })
       .catch(() => { if (live) setRows([]); });
     return () => { live = false; };
   }, []);
   if (!rows || rows.length === 0) return null;
-  const t = plotTotals(rows);
   return (
-    <SectionBlock title="Plots" icon={<LandPlot size={14} />}>
-      <KpiGrid>
-        <KpiCard label="Invested" value={fmt(t.invested)} icon={<Wallet size={14} />} tone="muted" />
-        <KpiCard
-          label="Worth today"
-          value={fmt(t.worth)}
-          subtitle={t.unvalued ? `${t.unvalued} not valued` : undefined}
-          icon={<TrendingUp size={14} />}
-          tone="muted"
-        />
-        <KpiCard
-          label="Gain"
-          value={t.hasGain ? signed(fmt, t.gain) : '—'}
-          subtitle={t.sold ? 'Incl. sold plots' : undefined}
-          icon={<Shield size={14} />}
-          tone="muted"
-          accentTone={t.gain >= 0 ? 'green' : 'red'}
-        />
-        <KpiCard label="Plots" value={t.held} subtitle={t.sold ? `${t.sold} sold` : undefined} icon={<LandPlot size={14} />} tone="muted" />
-      </KpiGrid>
+    <SectionBlock title="Other investments" icon={<Layers size={14} />}>
+      <TotalsGrid totals={investmentTotals(rows)} />
     </SectionBlock>
   );
 }
@@ -207,11 +250,18 @@ export function PlotsMetrics() {
 // MAIN COMPONENT
 // ──────────────────────────────────────────────────────────────────────────────
 
-interface PlotForm { name: string; area_sqft: string; current_value: string; status: 'active' | 'sold' }
-interface TxnForm { plot_id: string; kind: PlotTxnKind; amount: string; date: string; description: string }
+interface InvestmentForm {
+  name: string;
+  type: OtherInvestmentType;
+  area_sqft: string;
+  price: string;
+  current_value: string;
+  status: 'active' | 'sold';
+}
+interface TxnForm { investment_id: string; kind: InvestmentTxnKind; amount: string; date: string; description: string }
 
-const emptyPlotForm = (): PlotForm => ({ name: '', area_sqft: '', current_value: '', status: 'active' });
-const emptyTxnForm = (plot_id = ''): TxnForm => ({ plot_id, kind: 'paid', amount: '', date: localIsoDate(), description: '' });
+const emptyInvestmentForm = (): InvestmentForm => ({ name: '', type: 'land', area_sqft: '', price: '', current_value: '', status: 'active' });
+const emptyTxnForm = (investment_id = ''): TxnForm => ({ investment_id, kind: 'paid', amount: '', date: localIsoDate(), description: '' });
 
 /** '' → null (clear), otherwise a positive number or an error string. */
 function optionalPositive(raw: string, label: string): number | null | string {
@@ -220,20 +270,20 @@ function optionalPositive(raw: string, label: string): number | null | string {
   return Number.isFinite(n) && n > 0 ? n : `${label} must be a number greater than 0, or left blank.`;
 }
 
-export default function Plots() {
+export default function OtherInvestments() {
   const { format: fmt, currency, zeroPlaceholder } = useMoneyFormatting();
-  const [rows, setRows] = useState<PlotSummary[]>([]);
+  const [rows, setRows] = useState<InvestmentSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   const [detailId, setDetailId] = useState<string | null>(null);
 
-  const [plotModalOpen, setPlotModalOpen] = useState(false);
-  const [editPlotId, setEditPlotId] = useState<string | null>(null);
-  const [plotForm, setPlotForm] = useState<PlotForm>(emptyPlotForm());
+  const [invModalOpen, setInvModalOpen] = useState(false);
+  const [editInvId, setEditInvId] = useState<string | null>(null);
+  const [invForm, setInvForm] = useState<InvestmentForm>(emptyInvestmentForm());
 
   const [txnModalOpen, setTxnModalOpen] = useState(false);
-  const [editTxn, setEditTxn] = useState<PlotTxn | null>(null);
+  const [editTxn, setEditTxn] = useState<InvestmentTxn | null>(null);
   const [txnForm, setTxnForm] = useState<TxnForm>(emptyTxnForm());
 
   const [saving, setSaving] = useState(false);
@@ -245,10 +295,10 @@ export default function Plots() {
     setLoading(true);
     setError('');
     try {
-      const [p, t] = await Promise.all([api.getPlots(), api.getPlotTxns()]);
-      setRows(summarizePlots(p, t));
+      const [r, t] = await Promise.all([api.getOtherInvestments(), api.getOtherInvestmentTxns()]);
+      setRows(summarizeInvestments(r, t));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load plots');
+      setError(e instanceof Error ? e.message : 'Failed to load investments');
     } finally {
       setLoading(false);
     }
@@ -256,14 +306,14 @@ export default function Plots() {
 
   useEffect(() => { void loadData(); }, [loadData]);
 
-  const totals = useMemo(() => plotTotals(rows), [rows]);
-  // Held plots first, then sold; each by most invested.
+  const totals = useMemo(() => investmentTotals(rows), [rows]);
+  // Held first, then sold; each by most invested.
   const ordered = useMemo(
     () => [...rows].sort((a, b) => (a.status === b.status ? b.invested - a.invested : a.status === 'active' ? -1 : 1)),
     [rows],
   );
   const detail = detailId ? rows.find((r) => r.id === detailId) ?? null : null;
-  const editPlot = editPlotId ? rows.find((r) => r.id === editPlotId) ?? null : null;
+  const editInv = editInvId ? rows.find((r) => r.id === editInvId) ?? null : null;
 
   function resetModalState() {
     setSaving(false);
@@ -271,49 +321,50 @@ export default function Plots() {
     setFormError('');
   }
 
-  // ── plot modal ──
-  function openAddPlot() {
-    setEditPlotId(null);
-    setPlotForm(emptyPlotForm());
+  // ── holding modal ──
+  function openAddInvestment() {
+    setEditInvId(null);
+    setInvForm(emptyInvestmentForm());
     resetModalState();
-    setPlotModalOpen(true);
+    setInvModalOpen(true);
   }
 
-  function openEditPlot(p: PlotSummary) {
-    setEditPlotId(p.id);
-    setPlotForm({
-      name: p.name,
-      area_sqft: p.area_sqft !== null ? String(p.area_sqft) : '',
-      current_value: p.current_value !== null ? String(p.current_value) : '',
-      status: p.status,
+  function openEditInvestment(inv: InvestmentSummary) {
+    setEditInvId(inv.id);
+    setInvForm({
+      name: inv.name,
+      type: inv.type,
+      area_sqft: inv.area_sqft !== null ? String(inv.area_sqft) : '',
+      price: inv.price !== null ? String(inv.price) : '',
+      current_value: inv.current_value !== null ? String(inv.current_value) : '',
+      status: inv.status,
     });
     resetModalState();
-    setPlotModalOpen(true);
+    setInvModalOpen(true);
   }
 
-  function closePlotModal() {
-    setPlotModalOpen(false);
-    setEditPlotId(null);
+  function closeInvestmentModal() {
+    setInvModalOpen(false);
+    setEditInvId(null);
     resetModalState();
   }
 
-  async function savePlot() {
+  async function saveInvestment() {
     if (saving) return;
-    if (!plotForm.name.trim()) { setFormError('Enter a plot name.'); return; }
-    const area = optionalPositive(plotForm.area_sqft, 'Area');
+    if (!invForm.name.trim()) { setFormError('Enter a name.'); return; }
+    const area = invForm.type === 'land' ? optionalPositive(invForm.area_sqft, 'Area') : null;
     if (typeof area === 'string') { setFormError(area); return; }
-    const value = optionalPositive(plotForm.current_value, 'Current value');
+    const price = optionalPositive(invForm.price, 'Agreed price');
+    if (typeof price === 'string') { setFormError(price); return; }
+    const value = optionalPositive(invForm.current_value, 'Current value');
     if (typeof value === 'string') { setFormError(value); return; }
     setSaving(true);
     setFormError('');
-    const payload = { name: plotForm.name.trim(), area_sqft: area, current_value: value, status: plotForm.status };
+    const payload = { name: invForm.name.trim(), type: invForm.type, area_sqft: area, price, current_value: value, status: invForm.status };
     try {
-      if (editPlotId) await api.updatePlot({ ...payload, id: editPlotId });
-      else {
-        const id = await api.addPlot(payload);
-        setDetailId(id);
-      }
-      closePlotModal();
+      if (editInvId) await api.updateOtherInvestment({ ...payload, id: editInvId });
+      else setDetailId(await api.addOtherInvestment(payload));
+      closeInvestmentModal();
       await loadData();
     } catch (e) {
       setFormError(e instanceof Error ? e.message : 'Save failed');
@@ -321,14 +372,14 @@ export default function Plots() {
     }
   }
 
-  async function deletePlot() {
-    if (!editPlotId || saving) return;
+  async function deleteInvestment() {
+    if (!editInvId || saving) return;
     if (!deleteConfirm) { setDeleteConfirm(true); return; }
     setSaving(true);
     try {
-      await api.deletePlot(editPlotId);
+      await api.deleteOtherInvestment(editInvId);
       setDetailId(null);
-      closePlotModal();
+      closeInvestmentModal();
       await loadData();
     } catch (e) {
       setFormError(e instanceof Error ? e.message : 'Delete failed');
@@ -338,17 +389,17 @@ export default function Plots() {
   }
 
   // ── transaction modal ──
-  function openAddTxn(plotId?: string) {
+  function openAddTxn(investmentId?: string) {
     setEditTxn(null);
-    // One plot (or a plot already open) needs no picking.
-    setTxnForm(emptyTxnForm(plotId ?? (rows.length === 1 ? rows[0].id : '')));
+    // One holding (or one already open) needs no picking.
+    setTxnForm(emptyTxnForm(investmentId ?? (rows.length === 1 ? rows[0].id : '')));
     resetModalState();
     setTxnModalOpen(true);
   }
 
-  function openEditTxn(t: PlotTxn) {
+  function openEditTxn(t: InvestmentTxn) {
     setEditTxn(t);
-    setTxnForm({ plot_id: t.plot_id, kind: t.kind, amount: String(t.amount), date: t.date, description: t.description });
+    setTxnForm({ investment_id: t.investment_id, kind: t.kind, amount: String(t.amount), date: t.date, description: t.description });
     resetModalState();
     setTxnModalOpen(true);
   }
@@ -361,22 +412,22 @@ export default function Plots() {
 
   async function saveTxn() {
     if (saving) return;
-    if (!txnForm.plot_id) { setFormError('Pick a plot.'); return; }
+    if (!txnForm.investment_id) { setFormError('Pick an investment.'); return; }
     const amount = parseFloat(txnForm.amount);
     if (!Number.isFinite(amount) || amount <= 0) { setFormError('Enter an amount greater than 0.'); return; }
     if (!txnForm.date) { setFormError('Enter a date.'); return; }
     setSaving(true);
     setFormError('');
     const payload = {
-      plot_id: txnForm.plot_id,
+      investment_id: txnForm.investment_id,
       kind: txnForm.kind,
       amount,
       date: txnForm.date,
       description: txnForm.description.trim(),
     };
     try {
-      if (editTxn) await api.updatePlotTxn({ ...payload, id: editTxn.id });
-      else await api.addPlotTxn(payload);
+      if (editTxn) await api.updateOtherInvestmentTxn({ ...payload, id: editTxn.id });
+      else await api.addOtherInvestmentTxn(payload);
       closeTxnModal();
       await loadData();
     } catch (e) {
@@ -390,7 +441,7 @@ export default function Plots() {
     if (!deleteConfirm) { setDeleteConfirm(true); return; }
     setSaving(true);
     try {
-      await api.deletePlotTxn(editTxn.id);
+      await api.deleteOtherInvestmentTxn(editTxn.id);
       closeTxnModal();
       await loadData();
     } catch (e) {
@@ -407,34 +458,16 @@ export default function Plots() {
   return (
     <div className="ui-kit-page-shell">
       <SectionBlock title="Metrics" icon={<BarChart3 size={14} />} right={loading ? <LoadingState variant="inline" /> : null}>
-        <KpiGrid>
-          <KpiCard label="Invested" value={fmt(totals.invested)} icon={<Wallet size={14} />} tone="navy" subtitle="Paid + expenses, held plots" />
-          <KpiCard
-            label="Worth today"
-            value={fmt(totals.worth)}
-            icon={<TrendingUp size={14} />}
-            tone="muted"
-            subtitle={totals.unvalued ? `${totals.unvalued} not valued yet` : undefined}
-          />
-          <KpiCard
-            label="Gain"
-            value={totals.hasGain ? signed(fmt, totals.gain) : '—'}
-            subtitle={totals.sold ? 'Incl. sold plots' : undefined}
-            icon={<Shield size={14} />}
-            tone="muted"
-            accentTone={totals.gain >= 0 ? 'green' : 'red'}
-          />
-          <KpiCard label="Plots" value={totals.held} subtitle={totals.sold ? `${totals.sold} sold` : 'Held'} icon={<LandPlot size={14} />} tone="muted" />
-        </KpiGrid>
+        <TotalsGrid totals={totals} />
       </SectionBlock>
 
       <SectionBlock
-        title="Plots"
-        icon={<LandPlot size={14} />}
+        title="Holdings"
+        icon={<Layers size={14} />}
         right={
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button type="button" className="settings-action-btn" onClick={openAddPlot}>
-              <Plus size={14} /> Add plot
+            <button type="button" className="settings-action-btn" onClick={openAddInvestment}>
+              <Plus size={14} /> Add
             </button>
             <SectionChip>{rows.length}</SectionChip>
           </div>
@@ -446,12 +479,13 @@ export default function Plots() {
           <LoadingState variant="section" />
         ) : rows.length === 0 ? (
           <p style={{ color: 'var(--muted)', fontSize: 14, margin: 0 }}>
-            No plots yet. Add one, then record each payment, commission and sale against it.
+            Nothing yet. Add a plot, land, shares or a chit, then record each payment,
+            commission and sale against it.
           </p>
         ) : (
           <ListStack>
-            {ordered.map((p) => (
-              <PlotCard key={p.id} plot={p} onClick={() => setDetailId(p.id)} />
+            {ordered.map((inv) => (
+              <InvestmentCard key={inv.id} inv={inv} onClick={() => setDetailId(inv.id)} />
             ))}
           </ListStack>
         )}
@@ -469,15 +503,15 @@ export default function Plots() {
             cursor: 'pointer', zIndex: 100,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
-          title="Add plot transaction"
-          aria-label="Add plot transaction"
+          title="Add transaction"
+          aria-label="Add transaction"
         >
           <Plus size={22} strokeWidth={2.5} />
         </button>
       )}
 
-      {/* PLOT DETAIL */}
-      {detail && !plotModalOpen && !txnModalOpen && (
+      {/* DETAIL — one holding and its ledger */}
+      {detail && !invModalOpen && !txnModalOpen && (
         <ModalShell
           title={detail.name}
           onClose={() => setDetailId(null)}
@@ -488,8 +522,8 @@ export default function Plots() {
               secondaryLabel="Close"
               onSecondary={() => setDetailId(null)}
               leading={
-                <button type="button" className="ui-kit-btn ui-kit-btn--soft" onClick={() => openEditPlot(detail)}>
-                  Edit plot
+                <button type="button" className="ui-kit-btn ui-kit-btn--soft" onClick={() => openEditInvestment(detail)}>
+                  Edit
                 </button>
               }
             />
@@ -497,7 +531,13 @@ export default function Plots() {
         >
           <div className="ui-stack">
             <KpiGrid>
-              <KpiCard label="Paid" value={fmt(detail.paid)} tone="navy" icon={<ArrowUpRight size={14} />} />
+              <KpiCard
+                label="Paid"
+                value={fmt(detail.paid)}
+                tone="navy"
+                icon={<ArrowUpRight size={14} />}
+                subtitle={detail.price !== null ? `of ${fmt(detail.price)} agreed` : undefined}
+              />
               <KpiCard label="Expenses" value={fmt(detail.expenses)} tone="amber" icon={<Receipt size={14} />} />
               <KpiCard label="Received" value={fmt(detail.received)} tone="green" icon={<ArrowDownLeft size={14} />} />
               <KpiCard
@@ -513,12 +553,18 @@ export default function Plots() {
                 }
               />
             </KpiGrid>
-            {detail.costPerSqft !== null && (
+            {(detail.balanceDue !== null || detail.costPerSqft !== null) && (
               <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>
-                {detail.area_sqft!.toLocaleString('en-IN')} sqft · cost {fmt(Math.round(detail.costPerSqft))}/sqft
-                {detail.current_value !== null && detail.area_sqft
-                  ? ` · worth ${fmt(Math.round(detail.current_value / detail.area_sqft))}/sqft`
-                  : ''}
+                {[
+                  detail.balanceDue !== null
+                    ? detail.balanceDue > 0 ? `${fmt(detail.balanceDue)} still to pay` : 'Fully paid'
+                    : '',
+                  detail.area_sqft !== null ? `${detail.area_sqft.toLocaleString('en-IN')} sqft` : '',
+                  detail.costPerSqft !== null ? `cost ${fmt(Math.round(detail.costPerSqft))}/sqft` : '',
+                  detail.area_sqft !== null && detail.current_value !== null
+                    ? `worth ${fmt(Math.round(detail.current_value / detail.area_sqft))}/sqft`
+                    : '',
+                ].filter(Boolean).join(' · ')}
               </p>
             )}
             {detail.txns.length === 0 ? (
@@ -536,41 +582,51 @@ export default function Plots() {
         </ModalShell>
       )}
 
-      {/* PLOT MODAL */}
-      {plotModalOpen && (
+      {/* HOLDING MODAL */}
+      {invModalOpen && (
         <ModalShell
-          title={editPlot ? 'Edit plot' : 'Add plot'}
-          onClose={closePlotModal}
+          title={editInv ? 'Edit investment' : 'Add investment'}
+          onClose={closeInvestmentModal}
           footer={
             <ModalActions
-              primaryLabel={saving ? 'Saving…' : editPlot ? 'Save' : 'Add'}
-              onPrimary={() => void savePlot()}
-              onSecondary={closePlotModal}
+              primaryLabel={saving ? 'Saving…' : editInv ? 'Save' : 'Add'}
+              onPrimary={() => void saveInvestment()}
+              onSecondary={closeInvestmentModal}
               disabled={saving}
-              leading={editPlot ? (
-                <button type="button" className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={() => void deletePlot()} disabled={saving}>
+              leading={editInv ? (
+                <button type="button" className="ui-kit-btn ui-kit-btn--solid btn-red" onClick={() => void deleteInvestment()} disabled={saving}>
                   {deleteConfirm
-                    ? `Delete with ${editPlot.txns.length} txn${editPlot.txns.length === 1 ? '' : 's'}?`
+                    ? `Delete with ${editInv.txns.length} txn${editInv.txns.length === 1 ? '' : 's'}?`
                     : 'Delete'}
                 </button>
               ) : null}
             />
           }
         >
-          <form onSubmit={(e) => { e.preventDefault(); void savePlot(); }}>
+          <form onSubmit={(e) => { e.preventDefault(); void saveInvestment(); }}>
             <div className="ui-stack">
               {formError && <p className="ui-kit-callout ui-tone-red" role="alert">{formError}</p>}
-              <FormField label="Plot name *">
-                <input className="form-inp" type="text" placeholder="Place, survey no…" value={plotForm.name} onChange={(e) => setPlotForm((f) => ({ ...f, name: e.target.value }))} />
+              <FormField label="Name *">
+                <input className="form-inp" type="text" placeholder="Place / survey no, company, chit group…" value={invForm.name} onChange={(e) => setInvForm((f) => ({ ...f, name: e.target.value }))} />
               </FormField>
-              <FormField label="Area (sqft)">
-                <input className="form-inp" type="number" min="0" step="any" inputMode="decimal" placeholder="Optional" value={plotForm.area_sqft} onChange={(e) => setPlotForm((f) => ({ ...f, area_sqft: e.target.value }))} />
+              <FormField label="Type">
+                <select className="form-sel" value={invForm.type} onChange={(e) => setInvForm((f) => ({ ...f, type: e.target.value as OtherInvestmentType }))}>
+                  {TYPES.map((t) => <option key={t} value={t}>{TYPE_META[t].label}</option>)}
+                </select>
+              </FormField>
+              {invForm.type === 'land' && (
+                <FormField label="Area (sqft)">
+                  <input className="form-inp" type="number" min="0" step="any" inputMode="decimal" placeholder="Optional" value={invForm.area_sqft} onChange={(e) => setInvForm((f) => ({ ...f, area_sqft: e.target.value }))} />
+                </FormField>
+              )}
+              <FormField label={`Agreed price (${currency})`}>
+                <input className="form-inp" type="number" min="0" step="1" inputMode="numeric" placeholder="If paying in installments" value={invForm.price} onChange={(e) => setInvForm((f) => ({ ...f, price: e.target.value }))} />
               </FormField>
               <FormField label={`Current value (${currency})`}>
-                <input className="form-inp" type="number" min="0" step="1" inputMode="numeric" placeholder="Today's estimate for the whole plot" value={plotForm.current_value} onChange={(e) => setPlotForm((f) => ({ ...f, current_value: e.target.value }))} />
+                <input className="form-inp" type="number" min="0" step="1" inputMode="numeric" placeholder="Today's estimate" value={invForm.current_value} onChange={(e) => setInvForm((f) => ({ ...f, current_value: e.target.value }))} />
               </FormField>
               <FormField label="Status">
-                <select className="form-sel" value={plotForm.status} onChange={(e) => setPlotForm((f) => ({ ...f, status: e.target.value === 'sold' ? 'sold' : 'active' }))}>
+                <select className="form-sel" value={invForm.status} onChange={(e) => setInvForm((f) => ({ ...f, status: e.target.value === 'sold' ? 'sold' : 'active' }))}>
                   <option value="active">Held</option>
                   <option value="sold">Sold</option>
                 </select>
@@ -603,17 +659,17 @@ export default function Plots() {
           <form onSubmit={(e) => { e.preventDefault(); void saveTxn(); }}>
             <div className="ui-stack">
               {formError && <p className="ui-kit-callout ui-tone-red" role="alert">{formError}</p>}
-              <FormField label="Plot *">
-                <select className="form-sel" value={txnForm.plot_id} onChange={(e) => setTxnForm((f) => ({ ...f, plot_id: e.target.value }))}>
-                  <option value="">Select a plot…</option>
-                  {rows.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              <FormField label="Investment *">
+                <select className="form-sel" value={txnForm.investment_id} onChange={(e) => setTxnForm((f) => ({ ...f, investment_id: e.target.value }))}>
+                  <option value="">Select…</option>
+                  {rows.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                 </select>
               </FormField>
               <FormField label="Type">
-                <select className="form-sel" value={txnForm.kind} onChange={(e) => setTxnForm((f) => ({ ...f, kind: e.target.value as PlotTxnKind }))}>
-                  <option value="paid">Paid (toward the plot)</option>
+                <select className="form-sel" value={txnForm.kind} onChange={(e) => setTxnForm((f) => ({ ...f, kind: e.target.value as InvestmentTxnKind }))}>
+                  <option value="paid">Paid (toward the investment)</option>
                   <option value="expense">Expense (commission, registration…)</option>
-                  <option value="received">Received (sale, refund)</option>
+                  <option value="received">Received (sale, payout, refund)</option>
                 </select>
               </FormField>
               <FormField label={`Amount (${currency}) *`}>

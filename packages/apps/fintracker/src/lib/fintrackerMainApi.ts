@@ -21,8 +21,8 @@ import {
   lending,
   mutualFunds,
   organizations,
-  plotTxns,
-  plots,
+  otherInvestmentTxns,
+  otherInvestments,
   paymentSources,
   savings,
   stocks,
@@ -275,6 +275,11 @@ function num(v: string | number | boolean | null | undefined): number {
   if (v === null || v === undefined || typeof v === 'boolean') return 0
   const n = typeof v === 'number' ? v : parseFloat(v)
   return Number.isFinite(n) ? n : 0
+}
+
+const OTHER_INVESTMENT_TYPES = ['land', 'shares', 'chit', 'business', 'other'] as const
+function isOtherInvestmentType(v: unknown): v is (typeof OTHER_INVESTMENT_TYPES)[number] {
+  return typeof v === 'string' && (OTHER_INVESTMENT_TYPES as readonly string[]).includes(v)
 }
 
 /** Largest value `numeric(10,3)` can hold: 10 digits total, 3 after the point. */
@@ -1050,31 +1055,33 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         )
       }
 
-      if (mod === 'plots' && action === 'getEntries') {
-        const rows = await db.select().from(plots).where(whereOrgFilter(plots, budgetScope)).orderBy(plots.name)
+      if (mod === 'otherInvestments' && action === 'getEntries') {
+        const rows = await db.select().from(otherInvestments).where(whereOrgFilter(otherInvestments, budgetScope)).orderBy(otherInvestments.name)
         return ok(
           res,
           rows.map((r) => ({
             id: r.id,
             name: r.name,
+            type: isOtherInvestmentType(r.type) ? r.type : 'other',
             area_sqft: r.areaSqft === null ? null : num(r.areaSqft),
+            price: r.price === null ? null : num(r.price),
             current_value: r.currentValue === null ? null : num(r.currentValue),
             status: r.status === 'sold' ? 'sold' : 'active',
           })),
         )
       }
 
-      if (mod === 'plots' && action === 'getTxns') {
+      if (mod === 'otherInvestments' && action === 'getTxns') {
         const rows = await db
           .select()
-          .from(plotTxns)
-          .where(whereOrgFilter(plotTxns, budgetScope))
-          .orderBy(desc(plotTxns.date))
+          .from(otherInvestmentTxns)
+          .where(whereOrgFilter(otherInvestmentTxns, budgetScope))
+          .orderBy(desc(otherInvestmentTxns.date))
         return ok(
           res,
           rows.map((r) => ({
             id: r.id,
-            plot_id: r.plotId,
+            investment_id: r.investmentId,
             date: String(r.date),
             kind: r.kind,
             amount: num(r.amount),
@@ -1866,7 +1873,7 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
         }
       }
 
-      if (mod === 'plots') {
+      if (mod === 'otherInvestments') {
         // Optional money/area fields: absent = unchanged, '' or null = clear,
         // anything else must be a positive number that fits numeric(12,2).
         const optionalPositive = (v: unknown): { ok: true; value: string | null | undefined } | { ok: false } => {
@@ -1876,21 +1883,29 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
           return parsed ? { ok: true, value: parsed } : { ok: false }
         }
 
-        if (action === 'addPlot' || action === 'updatePlot') {
-          const isUpdate = action === 'updatePlot'
+        if (action === 'addInvestment' || action === 'updateInvestment') {
+          const isUpdate = action === 'updateInvestment'
           const id = isUpdate ? (typeof body.id === 'string' ? body.id : '') : crypto.randomUUID()
           if (isUpdate && !id) return fail(res, 400, 'Missing id', traceId)
 
           let name: string | undefined
           if (!isUpdate || body.name !== undefined) {
             const parsed = reqText(body.name)
-            if (!parsed) return fail(res, 400, 'Plot name is required', traceId)
+            if (!parsed) return fail(res, 400, 'Name is required', traceId)
             name = parsed
           }
           const area = optionalPositive(body.area_sqft)
           if (!area.ok) return fail(res, 400, 'Area must be a number greater than 0', traceId)
+          const price = optionalPositive(body.price)
+          if (!price.ok) return fail(res, 400, 'Agreed price must be a number greater than 0', traceId)
           const value = optionalPositive(body.current_value)
           if (!value.ok) return fail(res, 400, 'Current value must be a number greater than 0', traceId)
+          let type: string | undefined
+          if (!isUpdate || body.type !== undefined) {
+            const raw = body.type === undefined ? 'land' : body.type
+            if (!isOtherInvestmentType(raw)) return fail(res, 400, 'Unknown investment type', traceId)
+            type = raw
+          }
           let status: string | undefined
           if (!isUpdate || body.status !== undefined) {
             const raw = body.status === undefined ? 'active' : body.status
@@ -1899,38 +1914,40 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
           }
 
           if (!isUpdate) {
-            await db.insert(plots).values({
+            await db.insert(otherInvestments).values({
               orgId: scopeOrgId,
               id,
               name: name as string,
+              type: type as string,
               areaSqft: area.value ?? null,
+              price: price.value ?? null,
               currentValue: value.value ?? null,
               status: status as string,
             })
             return ok(res, id, traceId)
           }
-          const patch = { name, areaSqft: area.value, currentValue: value.value, status }
+          const patch = { name, type, areaSqft: area.value, price: price.value, currentValue: value.value, status }
           if (!Object.values(patch).some((v) => v !== undefined)) return ok(res, true, traceId)
           const updated = await db
-            .update(plots)
+            .update(otherInvestments)
             .set(patch)
-            .where(and(whereOrgFilter(plots, budgetScope), eq(plots.id, id)))
-            .returning({ id: plots.id })
-          if (!updated.length) return fail(res, 404, 'Plot not found', traceId)
+            .where(and(whereOrgFilter(otherInvestments, budgetScope), eq(otherInvestments.id, id)))
+            .returning({ id: otherInvestments.id })
+          if (!updated.length) return fail(res, 404, 'Investment not found', traceId)
           return ok(res, true, traceId)
         }
-        if (action === 'deletePlot') {
+        if (action === 'deleteInvestment') {
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
-          // No FK: the ledger goes with the plot, or it'd be orphaned rows nothing shows.
+          // No FK: the ledger goes with the investment, or it'd be orphaned rows nothing shows.
           const removed = await db.transaction(async (tx) => {
-            await tx.delete(plotTxns).where(and(whereOrgFilter(plotTxns, budgetScope), eq(plotTxns.plotId, id)))
+            await tx.delete(otherInvestmentTxns).where(and(whereOrgFilter(otherInvestmentTxns, budgetScope), eq(otherInvestmentTxns.investmentId, id)))
             return tx
-              .delete(plots)
-              .where(and(whereOrgFilter(plots, budgetScope), eq(plots.id, id)))
-              .returning({ id: plots.id })
+              .delete(otherInvestments)
+              .where(and(whereOrgFilter(otherInvestments, budgetScope), eq(otherInvestments.id, id)))
+              .returning({ id: otherInvestments.id })
           })
-          if (!removed.length) return fail(res, 404, 'Plot not found', traceId)
+          if (!removed.length) return fail(res, 404, 'Investment not found', traceId)
           return ok(res, true, traceId)
         }
         if (action === 'addTxn' || action === 'updateTxn') {
@@ -1938,17 +1955,17 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
           const id = isUpdate ? (typeof body.id === 'string' ? body.id : '') : crypto.randomUUID()
           if (isUpdate && !id) return fail(res, 400, 'Missing id', traceId)
 
-          let plotId: string | undefined
-          if (!isUpdate || body.plot_id !== undefined) {
-            const raw = typeof body.plot_id === 'string' ? body.plot_id : ''
+          let investmentId: string | undefined
+          if (!isUpdate || body.investment_id !== undefined) {
+            const raw = typeof body.investment_id === 'string' ? body.investment_id : ''
             const owner = raw
               ? await db
-                  .select({ id: plots.id })
-                  .from(plots)
-                  .where(and(whereOrgFilter(plots, budgetScope), eq(plots.id, raw)))
+                  .select({ id: otherInvestments.id })
+                  .from(otherInvestments)
+                  .where(and(whereOrgFilter(otherInvestments, budgetScope), eq(otherInvestments.id, raw)))
               : []
-            if (!owner.length) return fail(res, 400, 'Pick a plot', traceId)
-            plotId = raw
+            if (!owner.length) return fail(res, 400, 'Pick an investment', traceId)
+            investmentId = raw
           }
           let date: string | undefined
           if (!isUpdate || body.date !== undefined) {
@@ -1972,10 +1989,10 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
           const description = body.description !== undefined ? reqText(body.description) : undefined
 
           if (!isUpdate) {
-            await db.insert(plotTxns).values({
+            await db.insert(otherInvestmentTxns).values({
               orgId: scopeOrgId,
               id,
-              plotId: plotId as string,
+              investmentId: investmentId as string,
               date: date as string,
               kind: kind as string,
               amount: amount as string,
@@ -1983,13 +2000,13 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
             })
             return ok(res, id, traceId)
           }
-          const patch = { plotId, date, kind, amount, description }
+          const patch = { investmentId, date, kind, amount, description }
           if (!Object.values(patch).some((v) => v !== undefined)) return ok(res, true, traceId)
           const updated = await db
-            .update(plotTxns)
+            .update(otherInvestmentTxns)
             .set(patch)
-            .where(and(whereOrgFilter(plotTxns, budgetScope), eq(plotTxns.id, id)))
-            .returning({ id: plotTxns.id })
+            .where(and(whereOrgFilter(otherInvestmentTxns, budgetScope), eq(otherInvestmentTxns.id, id)))
+            .returning({ id: otherInvestmentTxns.id })
           if (!updated.length) return fail(res, 404, 'Transaction not found', traceId)
           return ok(res, true, traceId)
         }
@@ -1997,9 +2014,9 @@ export async function handleFintrackerMainApi(req: NextApiRequest, res: NextApiR
           const id = typeof body.id === 'string' ? body.id : ''
           if (!id) return fail(res, 400, 'Missing id', traceId)
           const removed = await db
-            .delete(plotTxns)
-            .where(and(whereOrgFilter(plotTxns, budgetScope), eq(plotTxns.id, id)))
-            .returning({ id: plotTxns.id })
+            .delete(otherInvestmentTxns)
+            .where(and(whereOrgFilter(otherInvestmentTxns, budgetScope), eq(otherInvestmentTxns.id, id)))
+            .returning({ id: otherInvestmentTxns.id })
           if (!removed.length) return fail(res, 404, 'Transaction not found', traceId)
           return ok(res, true, traceId)
         }

@@ -153,22 +153,26 @@ export interface RawGoldLendRow {
   returned_on: string | null;
 }
 
-export type PlotTxnKind = 'paid' | 'expense' | 'received';
+export type InvestmentTxnKind = 'paid' | 'expense' | 'received';
+export type OtherInvestmentType = 'land' | 'shares' | 'chit' | 'business' | 'other';
 
-export interface RawPlotRow {
+export interface RawOtherInvestmentRow {
   id: string;
   name: string;
+  type: OtherInvestmentType;
   area_sqft: number | null;
-  /** Today's estimate for the whole plot; null = not valued yet. */
+  /** Agreed purchase price; null when not bought in installments / not recorded. */
+  price: number | null;
+  /** Today's estimate for the whole holding; null = not valued yet. */
   current_value: number | null;
   status: 'active' | 'sold';
 }
 
-export interface RawPlotTxnRow {
+export interface RawOtherInvestmentTxnRow {
   id: string;
-  plot_id: string;
+  investment_id: string;
   date: string;
-  kind: PlotTxnKind;
+  kind: InvestmentTxnKind;
   amount: number;
   description: string;
 }
@@ -607,14 +611,14 @@ export const api = {
   addGoldHistory:    (p: Record<string, unknown>) => post<string>({ module: 'gold', action: 'addHistory', ...p }),
   updateGoldHistory: (p: Record<string, unknown>) => post<boolean>({ module: 'gold', action: 'updateHistory', ...p }),
   deleteGoldHistory: (id: string)                 => post<boolean>({ module: 'gold', action: 'deleteHistory', id }),
-  getPlots:          ()                           => get<RawPlotRow[]>('getEntries', { module: 'plots' }),
-  addPlot:           (p: Record<string, unknown>) => post<string>({ module: 'plots', action: 'addPlot', ...p }),
-  updatePlot:        (p: Record<string, unknown>) => post<boolean>({ module: 'plots', action: 'updatePlot', ...p }),
-  deletePlot:        (id: string)                 => post<boolean>({ module: 'plots', action: 'deletePlot', id }),
-  getPlotTxns:       ()                           => get<RawPlotTxnRow[]>('getTxns', { module: 'plots' }),
-  addPlotTxn:        (p: Record<string, unknown>) => post<string>({ module: 'plots', action: 'addTxn', ...p }),
-  updatePlotTxn:     (p: Record<string, unknown>) => post<boolean>({ module: 'plots', action: 'updateTxn', ...p }),
-  deletePlotTxn:     (id: string)                 => post<boolean>({ module: 'plots', action: 'deleteTxn', id }),
+  getOtherInvestments:      ()                           => get<RawOtherInvestmentRow[]>('getEntries', { module: 'otherInvestments' }),
+  addOtherInvestment:       (p: Record<string, unknown>) => post<string>({ module: 'otherInvestments', action: 'addInvestment', ...p }),
+  updateOtherInvestment:    (p: Record<string, unknown>) => post<boolean>({ module: 'otherInvestments', action: 'updateInvestment', ...p }),
+  deleteOtherInvestment:    (id: string)                 => post<boolean>({ module: 'otherInvestments', action: 'deleteInvestment', id }),
+  getOtherInvestmentTxns:   ()                           => get<RawOtherInvestmentTxnRow[]>('getTxns', { module: 'otherInvestments' }),
+  addOtherInvestmentTxn:    (p: Record<string, unknown>) => post<string>({ module: 'otherInvestments', action: 'addTxn', ...p }),
+  updateOtherInvestmentTxn: (p: Record<string, unknown>) => post<boolean>({ module: 'otherInvestments', action: 'updateTxn', ...p }),
+  deleteOtherInvestmentTxn: (id: string)                 => post<boolean>({ module: 'otherInvestments', action: 'deleteTxn', id }),
   getGoldLends:      ()                           => get<RawGoldLendRow[]>('getLends', { module: 'gold' }),
   addGoldLend:       (p: Record<string, unknown>) => post<string>({ module: 'gold', action: 'addLend', ...p }),
   updateGoldLend:    (p: Record<string, unknown>) => post<boolean>({ module: 'gold', action: 'updateLend', ...p }),

@@ -435,21 +435,23 @@ CREATE TABLE "stocks" (
 	"synced_at" timestamp
 );
 
-CREATE TABLE "plot_txns" (
+CREATE TABLE "other_investment_txns" (
 	"id" text PRIMARY KEY NOT NULL,
 	"org_id" text,
-	"plot_id" text NOT NULL,
+	"investment_id" text NOT NULL,
 	"date" date NOT NULL,
 	"kind" text NOT NULL,
 	"amount" numeric(12, 2) NOT NULL,
 	"description" text
 );
 
-CREATE TABLE "plots" (
+CREATE TABLE "other_investments" (
 	"id" text PRIMARY KEY NOT NULL,
 	"org_id" text,
 	"name" text NOT NULL,
+	"type" text DEFAULT 'land' NOT NULL,
 	"area_sqft" numeric(12, 2),
+	"price" numeric(12, 2),
 	"current_value" numeric(12, 2),
 	"status" text DEFAULT 'active' NOT NULL
 );
