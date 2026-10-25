@@ -11,7 +11,7 @@ import { FormField, HoldingCard, ModalActions, ModalShell, InfoCallout, KpiCard,
 // TYPES & CONSTANTS
 // ──────────────────────────────────────────────────────────────────────────────
 
-type GoldTab = 'dashboard' | 'items' | 'history';
+type GoldTab = 'dashboard' | 'items' | 'lent' | 'history';
 type GoldGroupBy = 'location' | 'person' | 'none';
 /** What an item is tied up in right now. Only an Ongoing loan or an open lend counts. */
 type GoldPledge = 'none' | 'loan' | 'lent';
@@ -103,6 +103,13 @@ const UNASSIGNED_COLOR = 'var(--other)';
  */
 const LENT_OUT_LABEL = 'Lent out';
 const LENT_OUT_COLOR = 'var(--amber)';
+
+const FAB_LABEL: Record<GoldTab, string> = {
+  dashboard: '',
+  items: 'Add gold item',
+  lent: 'Lend items',
+  history: 'Add gold movement',
+};
 
 type Slice = { label: string; value: number; color: string };
 
@@ -461,6 +468,7 @@ export default function Gold() {
   const [draftLocation, setDraftLocation] = useState('');
   const [draftGroupBy, setDraftGroupBy] = useState<GoldGroupBy>('location');
   const [historySearch, setHistorySearch] = useState('');
+  const [lendSearch, setLendSearch] = useState('');
 
   // Items modal
   const [itemsModalOpen, setItemsModalOpen] = useState(false);
@@ -557,6 +565,21 @@ export default function Gold() {
     }
     return m;
   }, [items]);
+  /** Open first (newest out first), then returned (newest back first). Search spans the lend and its items. */
+  const filteredLends = useMemo(() => {
+    const q = lendSearch.trim().toLowerCase();
+    const match = (l: GoldLend) =>
+      !q || l.name.toLowerCase().includes(q)
+        || l.lent_to.toLowerCase().includes(q)
+        || l.note.toLowerCase().includes(q)
+        || (itemsByLend.get(l.id) ?? []).some(i => i.name.toLowerCase().includes(q));
+    const shown = lends.filter(match);
+    return {
+      open: shown.filter(l => l.open).sort((a, b) => b.lent_on.localeCompare(a.lent_on)),
+      returned: shown.filter(l => !l.open).sort((a, b) => (b.returned_on ?? '').localeCompare(a.returned_on ?? '')),
+    };
+  }, [lends, lendSearch, itemsByLend]);
+
   /** What the lend sheet can offer: free items plus this lend's own. Items on a live loan or another open lend stay put. */
   const lendCandidates = useMemo(
     () =>
@@ -1124,6 +1147,14 @@ export default function Gold() {
         </button>
         <button
           type="button"
+          className={`bottom-nav-item${activeTab === 'lent' ? ' active' : ''}`}
+          onClick={() => setActiveTab('lent')}
+        >
+          <span className="bottom-nav-icon"><Handshake size={19} /></span>
+          <span>Lent</span>
+        </button>
+        <button
+          type="button"
           className={`bottom-nav-item${activeTab === 'history' ? ' active' : ''}`}
           onClick={() => setActiveTab('history')}
         >
@@ -1188,44 +1219,12 @@ export default function Gold() {
                     subtitle={`${(lentGrams * PAVAN_CONVERSION).toFixed(2)} pavan · ${EXCLUDED.toLowerCase()}`}
                     tone="muted"
                     icon={<Handshake size={14} />}
-                    onClick={() => showItemsFor({ location: LENT_OUT_LABEL })}
+                    onClick={() => setActiveTab('lent')}
                   />
                 ) : null}
               </div>
             </SectionBlock>
 
-            {items.length > 0 && (
-              <SectionBlock
-                title="Lent out"
-                icon={<Handshake size={14} />}
-                subtitle={lentGrams > 0 ? `${grams(lentGrams)} with others · not in Estimated value` : undefined}
-                right={
-                  <div className="gold-section-right">
-                    <button type="button" className="gold-filter-btn" onClick={openAddLend}>
-                      <Plus size={13} />
-                      Lend items
-                    </button>
-                    <SectionChip>{openLends.length}</SectionChip>
-                  </div>
-                }
-              >
-                {lends.length === 0 ? (
-                  <p className="gold-lend-hint">
-                    Nothing lent out. When you hand jewels to someone, for their loan or otherwise,
-                    record it here. One lend can cover several items.
-                  </p>
-                ) : (
-                  <ListStack>
-                    {openLends.map(l => (
-                      <LendCard key={l.id} lend={l} items={itemsByLend.get(l.id) ?? []} onClick={() => openEditLend(l)} />
-                    ))}
-                    {lends.filter(l => !l.open).map(l => (
-                      <LendCard key={l.id} lend={l} items={itemsByLend.get(l.id) ?? []} onClick={() => openEditLend(l)} />
-                    ))}
-                  </ListStack>
-                )}
-              </SectionBlock>
-            )}
 
             <SectionBlock title="By person" icon={<Users size={14} />}>
               <UiCard>
@@ -1321,6 +1320,60 @@ export default function Gold() {
           </>
         )}
 
+        {/* LENT TAB */}
+        {activeTab === 'lent' && (
+          <>
+            <SectionBlock
+              title="Lent out"
+              icon={<Handshake size={14} />}
+              subtitle={lentGrams > 0 ? `${grams(lentGrams)} with others · not in Estimated value` : undefined}
+              right={<SectionChip>{openLends.length}</SectionChip>}
+            >
+              {lends.length > 0 && (
+                <SearchField value={lendSearch} placeholder="Search description, person, item…" onChange={setLendSearch} onClear={() => setLendSearch('')} />
+              )}
+            </SectionBlock>
+
+            {loading && <LoadingState variant="section" />}
+
+            {!loading && filteredLends.open.length === 0 && filteredLends.returned.length === 0 && (
+              <div className="gold-empty">
+                <Handshake size={28} />
+                <p>
+                  {lendSearch
+                    ? 'No lends match that search.'
+                    : 'Nothing lent out. When you hand jewels to someone, for their loan or otherwise, tap + to record it. One lend can cover several items.'}
+                </p>
+              </div>
+            )}
+
+            {!loading && (filteredLends.open.length > 0 || filteredLends.returned.length > 0) && (
+              <div className="ui-stack">
+                {filteredLends.open.length > 0 && (
+                  <ListStack>
+                    {filteredLends.open.map(l => (
+                      <LendCard key={l.id} lend={l} items={itemsByLend.get(l.id) ?? []} onClick={() => openEditLend(l)} />
+                    ))}
+                  </ListStack>
+                )}
+                {filteredLends.returned.length > 0 && (
+                  <div>
+                    <div className="ui-kit-txn-daybar">
+                      <span>Returned</span>
+                      <strong>{filteredLends.returned.length}</strong>
+                    </div>
+                    <ListStack>
+                      {filteredLends.returned.map(l => (
+                        <LendCard key={l.id} lend={l} items={itemsByLend.get(l.id) ?? []} onClick={() => openEditLend(l)} />
+                      ))}
+                    </ListStack>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+
         {/* HISTORY TAB */}
         {activeTab === 'history' && (
           <>
@@ -1369,14 +1422,12 @@ export default function Gold() {
       </div>
 
       {/* FAB — context-sensitive */}
-      {(activeTab === 'items' || activeTab === 'history') && (
+      {(activeTab === 'items' || activeTab === 'lent' || activeTab === 'history') && (
         <button
           onClick={() => {
-            if (activeTab === 'items') {
-              openAddItem();
-            } else {
-              openAddHistory();
-            }
+            if (activeTab === 'items') openAddItem();
+            else if (activeTab === 'lent') openAddLend();
+            else openAddHistory();
           }}
           style={{
             position: 'fixed', bottom: 24, right: 20,
@@ -1387,8 +1438,8 @@ export default function Gold() {
             cursor: 'pointer', zIndex: 100,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
-          title={activeTab === 'items' ? 'Add gold item' : 'Add gold movement'}
-          aria-label={activeTab === 'items' ? 'Add gold item' : 'Add gold movement'}
+          title={FAB_LABEL[activeTab]}
+          aria-label={FAB_LABEL[activeTab]}
         >
           <Plus size={22} strokeWidth={2.5} />
         </button>
@@ -1559,7 +1610,7 @@ export default function Gold() {
                   </FormField>
                 ) : (
                   <InfoCallout title="Nothing lent out yet">
-                    Use Lend items on the Dashboard to record who has them; one lend can cover several items.
+                    Record it on the Lent tab first; one lend can cover several items.
                   </InfoCallout>
                 )
               )}
