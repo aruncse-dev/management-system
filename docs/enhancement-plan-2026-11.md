@@ -293,3 +293,45 @@ clears an old install.
 - `pnpm lint`: no package has an ESLint config, so lint (and `prepush`) fails everywhere — independent of this change. Add a root `.eslintrc` extending `next/core-web-vitals`.
 - `migrations/schema.sql` needs regenerating with `export-schema` once both new
   migrations are applied.
+
+---
+
+## 7. Round 2 (same day)
+
+### Done
+- **FinTracker launch and quick add.**
+  - The month rows, settings and dashboard summary are cached on the device
+    per org, so the app paints immediately and refreshes in the background.
+  - The menu cache survives the app being killed.
+  - Quick add is optimistic, and several entries can be in flight at once.
+  - Saves refresh in the background without the spinner.
+  - The link-option requests load only when the full form opens.
+  - Home-screen shortcut: **Add expense**.
+  - Measured with a mocked 6s server: the dashboard repainted in about 160 ms;
+    3 entries took 70 ms against a 1.5s server.
+- **Opening month fixed.** From the 19th, regular-cycle orgs used to open on
+  next month.
+- **Coming up.** Renewals and premiums due within 7 days. When dues within 2
+  days exceed the paying account's balance, it shows a "Top up" alert.
+  Opt-in system notifications appear once per item per day when the app is
+  opened.
+- **Forecast.** Projected spend, daily pace, what is left per day,
+  categories running fast, dues before the cycle ends, and expected savings.
+- **daynest and github-dashboard** (branch `ccr-59063f54-nyv4at` in each):
+  - github-dashboard: page loads fall back to the cached shell after 3.5s, and
+    GitHub reads time out.
+  - daynest: a startup gate covers the database open, with a quiet retry,
+    then "Still opening… / Try again". Google and push waits are bounded.
+
+### Next
+- **Background push.** Reminders today fire only when the app is opened. To
+  alert while it is closed:
+  1. VAPID keys in the Vercel env.
+  2. A `push_subscriptions` table.
+  3. A daily Vercel Cron route that runs `buildReminders` per org and sends
+     with `web-push`.
+  - DayNest already has a push worker that could serve as the pattern.
+- **EMI due dates in Coming up** (the day of month from `emi_loans.start_date`).
+- **Style.** Recommended: Direction A, one shared kit with an accent per app
+  (FinTracker blue, Vault indigo, Staff green), then night mode on the same
+  tokens. Not Astryx for now: it is in beta and needs React 19 and StyleX.
