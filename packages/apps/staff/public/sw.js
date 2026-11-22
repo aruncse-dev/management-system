@@ -9,13 +9,14 @@
  * Why it exists: a cold launch of the installed app re-downloaded every script
  * and waited on the network for the HTML with no upper bound, so a phone whose
  * radio was still waking sat on the splash screen. Now:
- *   - /_next/static/* (content-hashed, immutable) and icons: cache-first.
+ *   - /_next/static/* (content-hashed, immutable): cache-first.
+ *   - icons and other /public files (same name, new content): stale-while-revalidate.
  *   - page navigations: network-first, but give up after NAV_TIMEOUT_MS and
  *     serve the last good copy of THAT page (never another page's). Page HTML here is a static
  *     shell with no user data in it; data always comes from /api.
  *   - /api/*, auth and anything cross-origin: never touched, never cached.
  */
-const VERSION = 'v3'
+const VERSION = 'v4'
 const STATIC_CACHE = `ft-static-${VERSION}`
 const PAGE_CACHE = `ft-pages-${VERSION}`
 const NAV_TIMEOUT_MS = 4000
@@ -37,11 +38,20 @@ self.addEventListener('activate', event => {
   )
 })
 
-function isStaticAsset(url) {
-  return (
-    url.pathname.startsWith('/_next/static/') ||
-    /\.(?:png|svg|ico|webp|woff2?)$/i.test(url.pathname)
-  )
+/** Build output: the file name changes whenever the content does, so a cached copy is never stale. */
+function isHashedAsset(url) {
+  return url.pathname.startsWith('/_next/static/')
+}
+
+/**
+ * Files from /public (app icons, favicons, images) keep the same name when
+ * their content changes. Serving them cache-first kept a recoloured icon blue
+ * forever on any phone that had cached the old one, so they are
+ * stale-while-revalidate: shown from cache at once, refreshed in the
+ * background, and the new version is used from the next load.
+ */
+function isPublicAsset(url) {
+  return /\.(?:png|svg|ico|webp|jpg|jpeg|woff2?)$/i.test(url.pathname)
 }
 
 async function trimCache(cache, max) {
@@ -58,6 +68,22 @@ async function cacheFirst(request) {
     cache.put(request, res.clone()).then(() => trimCache(cache, MAX_STATIC_ENTRIES)).catch(() => {})
   }
   return res
+}
+
+async function staleWhileRevalidate(event) {
+  const request = event.request
+  const cache = await caches.open(STATIC_CACHE)
+  const hit = await cache.match(request)
+  const refresh = fetch(request)
+    .then(res => {
+      if (res.ok && res.type === 'basic') cache.put(request, res.clone()).catch(() => {})
+      return res
+    })
+  if (hit) {
+    event.waitUntil(refresh.catch(() => {}))
+    return hit
+  }
+  return refresh
 }
 
 function offlineResponse() {
@@ -122,8 +148,12 @@ self.addEventListener('fetch', event => {
     event.respondWith(networkFirstPage(event))
     return
   }
-  if (isStaticAsset(url)) {
+  if (isHashedAsset(url)) {
     event.respondWith(cacheFirst(request))
+    return
+  }
+  if (isPublicAsset(url)) {
+    event.respondWith(staleWhileRevalidate(event))
   }
 })
 
