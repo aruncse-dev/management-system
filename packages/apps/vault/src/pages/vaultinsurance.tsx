@@ -832,7 +832,7 @@ export default function VaultInsurancePage() {
           width: 56,
           height: 56,
           padding: 0,
-          boxShadow: '0 16px 32px rgba(30, 92, 199, .24)',
+          boxShadow: '0 16px 32px rgba(var(--accent-rgb), .24)',
         }}
         aria-label={tab === 'premiums' ? 'Record premium' : 'Add insurance policy'}
         title={tab === 'premiums' ? 'Record premium' : 'Add insurance policy'}

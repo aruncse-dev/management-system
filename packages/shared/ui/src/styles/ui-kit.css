@@ -1,3 +1,6 @@
+/* Default accent (FinTracker blue). Each app overrides --navy / --accent-rgb in its own globals.css. */
+:root { --accent-rgb: 30, 92, 199; }
+
 .ui-kit-section {
   display: flex;
   align-items: center;
@@ -31,7 +34,7 @@
 .ui-kit-section-chip.ui-tone-navy {
   background: var(--navy-lt);
   color: var(--navy);
-  border-color: rgba(30, 92, 199, .14);
+  border-color: rgba(var(--accent-rgb), .14);
 }
 .ui-kit-section-chip.ui-tone-green {
   background: rgba(34, 197, 94, .12);
@@ -311,11 +314,11 @@
   line-height: 1.35;
   color: var(--navy);
   text-decoration: none;
-  background: rgba(30, 92, 199, 0.06);
+  background: rgba(var(--accent-rgb), 0.06);
   border-top: 1px solid var(--border);
 }
 .ui-kit-holding-card-linkrow:hover {
-  background: rgba(30, 92, 199, 0.1);
+  background: rgba(var(--accent-rgb), 0.1);
 }
 .ui-kit-holding-card-previewlink {
   font-weight: 600;
@@ -867,7 +870,7 @@
 .ui-kit-btn--cancel {
   background: var(--bg);
   color: var(--navy);
-  border-color: rgba(30, 92, 199, .22);
+  border-color: rgba(var(--accent-rgb), .22);
 }
 .ui-kit-btn--solid {
   background: var(--navy);
@@ -1572,7 +1575,7 @@
 }
 .ui-kit-ref-opt:last-child { border-bottom: none; }
 .ui-kit-ref-opt.is-active { background: var(--navy-lt); }
-.ui-kit-ref-opt.is-selected { background: rgba(30, 92, 199, .08); }
+.ui-kit-ref-opt.is-selected { background: rgba(var(--accent-rgb), .08); }
 /* Wraps rather than truncating. "Baskar · Activ One MAX" is longer than the
    row is wide on a phone, and an ellipsis there hides the very part that
    distinguishes one policy from the other. */

@@ -17,7 +17,7 @@ button, input, select, textarea {
 
 :root {
   --bg: #F0F5FF; --card: #FFF; --border: #BFDBFE; --text: #0F1C3F; --muted: #4B6080;
-  --navy: #1e5cc7; --navy-lt: #eaf1ff; --navy-dark: #1e5cc7;
+  --navy: #1e5cc7; --accent-rgb: 30, 92, 199; --navy-lt: #eaf1ff; --navy-dark: #1e5cc7;
   --green: #166534; --green-lt: #F0FDF4; --gm: #22C55E;
   --red: var(--rm); --red-lt: #FEF2F2; --rm: #EF4444;
   --amber: #D97706; --amber-lt: #FFFBEB;
@@ -27,7 +27,7 @@ button, input, select, textarea {
 }
 
 /* NAV */
-.nav { background: var(--navy-dark); height: calc(54px + env(safe-area-inset-top)); display: flex; align-items: center; justify-content: space-between; padding: env(safe-area-inset-top) 14px 0; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 12px rgba(30,92,199,.35); gap: 10px; will-change: transform; transform: translateZ(0); }
+.nav { background: var(--navy-dark); height: calc(54px + env(safe-area-inset-top)); display: flex; align-items: center; justify-content: space-between; padding: env(safe-area-inset-top) 14px 0; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 12px rgba(var(--accent-rgb),.35); gap: 10px; will-change: transform; transform: translateZ(0); }
 .nav-b { color: #fff; font-weight: 700; font-size: 13px; letter-spacing: 0; white-space: nowrap; }
 .nav-b em { color: #A5B4FC; font-style: normal; }
 .nav-app-icon-wrap {
@@ -124,7 +124,7 @@ button, input, select, textarea {
 .nav-drawer-item:active { background: rgba(255,255,255,.08); }
 
 /* MONTHLY SUB-NAV (month controls below global nav) */
-.nav-sub { background: var(--navy-dark); height: 46px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; position: sticky; top: 0; z-index: 95; gap: 10px; box-shadow: 0 1px 6px rgba(30,92,199,.2); }
+.nav-sub { background: var(--navy-dark); height: 46px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; position: sticky; top: 0; z-index: 95; gap: 10px; box-shadow: 0 1px 6px rgba(var(--accent-rgb),.2); }
 
 /* MONTHLY BOTTOM NAV */
 .bottom-nav {
@@ -891,7 +891,7 @@ tr:last-child td { border-bottom: none; }
   font-size: 12px;
   min-height: 32px;
   border-radius: 10px;
-  border: 1px solid rgba(30, 92, 199, .22);
+  border: 1px solid rgba(var(--accent-rgb), .22);
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -907,11 +907,11 @@ tr:last-child td { border-bottom: none; }
   color: #fff;
 }
 .modal-foot .btn,
-.modal-foot .ui-kit-btn--soft { background: var(--bg); color: var(--navy); border: 1px solid rgba(30, 92, 199, .22); }
+.modal-foot .ui-kit-btn--soft { background: var(--bg); color: var(--navy); border: 1px solid rgba(var(--accent-rgb), .22); }
 .modal-foot .btn-cancel {
   background: var(--bg);
   color: var(--navy);
-  border: 1px solid rgba(30, 92, 199, .22);
+  border: 1px solid rgba(var(--accent-rgb), .22);
 }
 .modal-foot .btn-green,
 .modal-foot .btn.btn-green {
@@ -1636,9 +1636,9 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
   overflow: hidden;
   background:
     radial-gradient(circle at 18% 18%, rgba(255,255,255,.14), transparent 24%),
-    radial-gradient(circle at 82% 12%, rgba(147,197,253,.16), transparent 22%),
+    radial-gradient(circle at 82% 12%, rgba(255,255,255,.12), transparent 22%),
     radial-gradient(circle at 50% 108%, rgba(255,255,255,.08), transparent 34%),
-    linear-gradient(180deg, #1e5cc7 0%, #2b67c9 48%, #174aa3 100%);
+    linear-gradient(180deg, var(--navy) 0%, color-mix(in srgb, var(--navy) 88%, #fff) 48%, color-mix(in srgb, var(--navy) 78%, #000) 100%);
 }
 .login-title { font-size: 24px; font-weight: 800; color: #fff; letter-spacing: -0.03em; }
 .login-sub { font-size: 15px; color: rgba(255,255,255,.76); text-align: center; line-height: 1.45; max-width: 320px; }
@@ -1895,7 +1895,7 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
   background: var(--navy-lt);
   color: var(--navy);
   border: 1.5px solid var(--navy);
-  box-shadow: 0 3px 12px rgba(30, 92, 199, .18);
+  box-shadow: 0 3px 12px rgba(var(--accent-rgb), .18);
 }
 
 /* Quick add — the floating one-line entry (QuickAddBar.tsx).

@@ -160,7 +160,7 @@ export function OptionCombobox({
                   fontSize: 14,
                   border: 'none',
                   borderBottom: i < filtered.length - 1 ? '1px solid var(--border)' : undefined,
-                  background: i === highlight ? 'var(--navy-lt)' : c === value ? 'rgba(30, 92, 199, 0.08)' : 'transparent',
+                  background: i === highlight ? 'var(--navy-lt)' : c === value ? 'rgba(var(--accent-rgb), 0.08)' : 'transparent',
                   color: 'var(--text)',
                   cursor: 'pointer',
                 }}
