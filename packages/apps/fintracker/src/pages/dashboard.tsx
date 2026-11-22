@@ -306,9 +306,6 @@ export default function Dashboard({ onCategoryClick }: Props) {
 
   return (
     <div className="pg dashboard-page ui-kit-page-shell monthly-subpage">
-      {/* 0 — What is about to be debited, and whether the account can cover it. */}
-      {isCurrent && <RemindersCard reminders={reminders} fmt={fmt} />}
-
       {/* 1 — The cycle's cash flow. */}
       <SectionBlock
         title="This Cycle"
@@ -337,8 +334,6 @@ export default function Dashboard({ onCategoryClick }: Props) {
           />
         </KpiGrid>
       </SectionBlock>
-
-      {forecast && <ForecastCard forecast={forecast} fmt={fmt} />}
 
       {/* 2 — Two figures: what is left in the accounts, and how much of this
           cycle went on borrowed money. Per-source detail is not repeated here;
@@ -369,6 +364,12 @@ export default function Dashboard({ onCategoryClick }: Props) {
           </KpiGrid>
         </div>
       </SectionBlock>
+
+      {/* The KPIs above stay first. Then what is about to be debited (and
+          whether the paying account can cover it), and where the cycle is
+          heading — both compact, expandable. */}
+      {isCurrent && <RemindersCard reminders={reminders} fmt={fmt} />}
+      {forecast && <ForecastCard forecast={forecast} fmt={fmt} />}
 
       {/* 3 — The cycle as a shape, below the figures it summarises.
 

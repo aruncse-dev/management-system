@@ -80,7 +80,11 @@ function useDueNotifications(reminders: Reminders, fmt: Fmt) {
  * account they are paid from cannot cover them. Renders nothing when there is
  * nothing to say.
  */
+/** Rows shown before "Show more" — the card sits under the KPIs and must stay short. */
+const COLLAPSED_ROWS = 3
+
 export function RemindersCard({ reminders, fmt }: { reminders: Reminders; fmt: Fmt }) {
+  const [expanded, setExpanded] = useState(false)
   const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>('default')
   useEffect(() => {
     setPermission(typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported')
@@ -110,7 +114,7 @@ export function RemindersCard({ reminders, fmt }: { reminders: Reminders; fmt: F
             </div>
           </div>
         ))}
-        {reminders.items.map(i => (
+        {(expanded ? reminders.items : reminders.items.slice(0, COLLAPSED_ROWS)).map(i => (
           <div key={i.key} className={`reminder${i.daysLeft < 0 ? ' reminder--overdue' : i.daysLeft <= ALERT_DAYS ? ' reminder--soon' : ''}`}>
             {i.kind === 'insurance' ? <Shield size={16} aria-hidden /> : <RefreshCw size={16} aria-hidden />}
             <div className="reminder-main">
@@ -124,6 +128,11 @@ export function RemindersCard({ reminders, fmt }: { reminders: Reminders; fmt: F
             <div className="reminder-amt">{fmt(i.amount)}</div>
           </div>
         ))}
+        {reminders.items.length > COLLAPSED_ROWS && (
+          <button type="button" className="reminder-more" onClick={() => setExpanded(e => !e)} aria-expanded={expanded}>
+            {expanded ? 'Show less' : `Show ${reminders.items.length - COLLAPSED_ROWS} more`}
+          </button>
+        )}
         {permission === 'default' && (
           <button
             type="button"
