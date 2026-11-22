@@ -374,7 +374,10 @@ export default function Nav({
             </div>
           </>
         )}
-      {buildLabel ? <div className="nav-drawer-build">Build {buildLabel}</div> : null}
+      <div className="nav-drawer-build">
+        {buildLabel ? <span>Build {buildLabel} · </span> : null}
+        <a href="/launch-log.html">Launch log</a>
+      </div>
       </div>
 
       {logoutConfirmOpen && onLogout && (

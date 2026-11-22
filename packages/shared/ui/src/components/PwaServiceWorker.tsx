@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { launchLog } from './launchLog'
 
 /** "f215a3f · 22 Nov, 16:47" from the build's commit and time (local time of the viewer). */
 export function formatBuildLabel(sha: string | undefined, iso: string | undefined): string {
@@ -66,9 +67,13 @@ export function PwaServiceWorker({ build }: { build?: string } = {}) {
     }
 
     const register = () => {
-      navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {
-        /* no worker just means no offline shell — never break the app over it */
-      })
+      navigator.serviceWorker
+        .register('/sw.js', { scope: '/' })
+        .then(reg => launchLog(`worker registered (${reg?.active ? 'active' : reg?.installing ? 'installing' : 'waiting'})`))
+        .catch(e => {
+          /* no worker just means no offline shell — never break the app over it */
+          launchLog(`worker registration failed: ${e instanceof Error ? e.message : String(e)}`)
+        })
     }
     if (document.readyState === 'complete') register()
     else {
@@ -85,7 +90,9 @@ export function PwaServiceWorker({ build }: { build?: string } = {}) {
 
     const check = async () => {
       const live = await deployedBuild()
-      if (cancelled || !live || live === build) return
+      if (cancelled) return
+      launchLog(`update check: running ${build}, server has ${live ?? 'no answer'}`)
+      if (!live || live === build) return
       const justOpened = Date.now() - openedAt < LAUNCH_WINDOW_MS
       const triedKey = `ft_update_tried_${live}`
       let tried = false
@@ -97,10 +104,12 @@ export function PwaServiceWorker({ build }: { build?: string } = {}) {
         tried = true
       }
       if (justOpened && !tried) {
+        launchLog('newer version on the server: reloading once')
         await dropSavedPages()
         window.location.reload()
         return
       }
+      launchLog('newer version on the server: showing the update bar')
       setUpdateReady(true)
     }
 

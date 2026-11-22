@@ -1,3 +1,4 @@
+import { launchLogScript } from '@fintracker-vault/ui'
 import Document, { DocumentContext, DocumentProps, Head, Html, Main, NextScript } from 'next/document'
 import type { ClientAuthEnv } from '../clientAuthEnv'
 
@@ -23,6 +24,8 @@ export default class MyDocument extends Document<Props> {
     return (
       <Html lang="en" className="with-app-shell">
         <Head>
+          {/* First thing on the page: records each launch step so a hang can be diagnosed. */}
+          <script dangerouslySetInnerHTML={{ __html: launchLogScript('staff') }} />
           <link rel="manifest" href="/manifest.json" />
           <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
           <link rel="apple-touch-icon" href="/icon-192.png" />

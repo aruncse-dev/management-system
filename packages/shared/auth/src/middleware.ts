@@ -40,6 +40,9 @@ export function defaultIsPublicPath(pathname: string): boolean {
   // The service worker must load without a session, or a signed-out device
   // could never install (or update) it.
   if (pathname === '/sw.js') return true
+  // Static page that only reads this device's own launch log; it must open
+  // even when the session or the app itself is the thing that is stuck.
+  if (pathname === '/launch-log.html') return true
   if (/\.(svg|png|jpg|jpeg|gif|webp|ico|json|txt|webmanifest)$/i.test(pathname)) return true
   return false
 }
