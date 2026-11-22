@@ -67,7 +67,7 @@ export default function ErrorScreen({ error, onRetry, iconSrc = '/icon-192.png' 
               type="button"
               onClick={onRetry}
               style={{
-                background: '#2563EB',
+                background: 'var(--navy, #1e5cc7)',
                 color: '#FFF',
                 border: 'none',
                 borderRadius: 8,
@@ -78,10 +78,10 @@ export default function ErrorScreen({ error, onRetry, iconSrc = '/icon-192.png' 
                 transition: 'background 0.15s',
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.background = '#1d4ed8'
+                e.currentTarget.style.opacity = '0.9'
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.background = '#2563EB'
+                e.currentTarget.style.opacity = '1'
               }}
             >
               🔄 Retry

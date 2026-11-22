@@ -282,7 +282,7 @@ export default function VaultAppsPage() {
                   }}
                 >
                   <div style={{ display: 'grid', placeItems: 'center', gap: 8, minWidth: 0, textAlign: 'center', width: '100%' }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', padding: 0, margin: 0, color: '#1D4ED8', flexShrink: 0, lineHeight: 0, width: 52, height: 52 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', padding: 0, margin: 0, color: 'var(--navy)', flexShrink: 0, lineHeight: 0, width: 52, height: 52 }}>
                       {appIcon(row, 52)}
                     </span>
                     <div style={{ minWidth: 0, width: '100%', paddingInline: 4 }}>

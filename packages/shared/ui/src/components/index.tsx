@@ -124,7 +124,7 @@ export function DonutSummaryCard({
       <div className="ui-kit-donut-summary">
         <div className="ui-kit-donut-summary-ring">
           <svg viewBox="0 0 120 120" width="100%" height="100%" aria-label="Summary donut chart">
-            <circle cx="60" cy="60" r="44" fill="none" stroke="rgba(59,130,246,.22)" strokeWidth="16" />
+            <circle cx="60" cy="60" r="44" fill="none" style={{ stroke: 'rgba(var(--accent-rgb), .2)' }} strokeWidth="16" />
             {slices.map(slice => (
               <circle
                 key={slice.label}
