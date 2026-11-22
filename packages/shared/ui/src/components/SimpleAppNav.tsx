@@ -89,7 +89,7 @@ export default function SimpleAppNav({
               style={{
                 fontSize: 12,
                 fontWeight: 600,
-                color: 'rgba(255, 255, 255, 0.5)',
+                color: 'var(--muted)',
                 textTransform: 'uppercase',
                 letterSpacing: '.04em',
                 padding: '8px 14px 4px 14px',

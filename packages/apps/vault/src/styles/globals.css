@@ -49,17 +49,15 @@ button, input, select, textarea {
   display: block;
   filter: brightness(0) invert(1);
 }
-/* In the drawer (which keeps the app colour) the tile flips: white tile, coloured glyph. */
+/* Drawer icon: same coloured tile as the header, a little smaller. */
 .nav-app-icon-wrap--drawer {
   width: 30px;
   height: 30px;
   border-radius: 9px;
-  background: #fff;
 }
 .nav-app-icon-wrap--drawer .nav-app-icon {
-  width: 22px;
-  height: 22px;
-  filter: none;
+  width: 21px;
+  height: 21px;
 }
 .nav-month { display: flex; align-items: center; gap: 6px; flex: 1; justify-content: center; }
 .nav-arrow { background: #fff; border: 1px solid var(--border); color: var(--navy); width: 28px; height: 28px; border-radius: 50%; cursor: pointer; font-size: 15px; display: flex; align-items: center; justify-content: center; line-height: 1; touch-action: manipulation; }
@@ -76,15 +74,20 @@ button, input, select, textarea {
 .nav-modules { display: none; align-items: center; gap: 4px; flex-shrink: 1; overflow-x: auto; }
 
 /* DRAWER OVERLAY */
-.nav-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 150; }
+.nav-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, .32); z-index: 150; }
 
 /* DRAWER PANEL */
-.nav-drawer { position: fixed; top: 0; left: 0; height: 100dvh; width: 260px; background: var(--navy-dark); z-index: 160; transform: translateX(-100%); transition: transform .25s ease; display: flex; flex-direction: column; box-shadow: none; overflow-y: auto; }
-.nav-drawer.open { transform: translateX(0); box-shadow: 4px 0 24px rgba(0,0,0,.25); }
-.nav-drawer-hd { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,.1); }
-.nav-drawer-item { display: flex; align-items: center; gap: 12px; padding: 11px 16px; margin: 0; border: none; background: transparent; color: rgba(255,255,255,.94); font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer; width: 100%; text-align: left; transition: background .15s, color .15s; touch-action: manipulation; }
-.nav-drawer-item.active { color: #fff; background: rgba(255,255,255,.14); font-weight: 700; }
-.nav-drawer-item:active { background: rgba(255,255,255,.08); }
+.nav-drawer { position: fixed; top: 0; left: 0; height: 100dvh; width: 264px; background: var(--card); border-right: 1px solid var(--border); z-index: 160; transform: translateX(-100%); transition: transform .25s ease; display: flex; flex-direction: column; box-shadow: none; overflow-y: auto; }
+.nav-drawer.open { transform: translateX(0); box-shadow: 6px 0 28px rgba(15, 23, 42, .12); }
+.nav-drawer-hd { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+/* Light sidebar: the close button sits on white, not on the app colour. */
+.nav-drawer .modal-close { position: static; color: var(--muted); }
+.nav-drawer .nav-b { font-size: 16px; font-weight: 600; }
+.nav-drawer-item { display: flex; align-items: center; gap: 12px; padding: 11px 12px; margin: 1px 8px; width: calc(100% - 16px); border-radius: 10px; border: none; background: transparent; color: var(--text); font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer; text-align: left; transition: background .15s, color .15s; touch-action: manipulation; }
+.nav-drawer-item svg { color: var(--muted); flex-shrink: 0; }
+.nav-drawer-item.active { color: var(--navy); background: var(--navy-lt); font-weight: 600; }
+.nav-drawer-item.active svg { color: var(--navy); }
+.nav-drawer-item:active { background: rgba(var(--accent-rgb), .08); }
 
 /* MONTHLY SUB-NAV (month controls below global nav) */
 .nav-sub { background: var(--navy-lt); border-bottom: 1px solid var(--border); height: 46px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; position: sticky; top: 0; z-index: 95; gap: 10px; box-shadow: none; }
