@@ -23,7 +23,7 @@ button, input, select, textarea {
 
 :root {
   /* Staff accent: Teal (green belongs to DayNest). Shared kit, own identity. */
-  --bg: #F3FAF9; --card: #FFF; --border: #CDE8E4; --text: #0F1C2A; --muted: #4B6068;
+  --bg: #FAFDFD; --card: #FFF; --border: #CDE8E4; --text: #0F1C2A; --muted: #4B6068;
   --navy: #0D9488; --accent-rgb: 13, 148, 136; --navy-lt: #E6F6F4; --navy-dark: #0D9488;
   --green: #166534; --green-lt: #F0FDF4; --gm: #22C55E;
   --red: var(--rm); --red-lt: #FEF2F2; --rm: #EF4444;
