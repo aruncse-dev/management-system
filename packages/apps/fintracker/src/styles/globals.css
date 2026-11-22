@@ -2300,5 +2300,11 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
 .ui-kit-holding-card[class*="ui-kit-holding-card--accent-"] { border: 1px solid var(--border); box-shadow: var(--sh); }
 .forecast-line.is-over { box-shadow: var(--sh), inset 0 0 0 1px var(--rm); }
 
+/* Google Sans: always use the text optical size. With automatic optical
+   sizing, 20px+ figures switched to the narrower display cut and looked
+   stretched next to 14px numbers; pinning `opsz` keeps one digit shape at
+   every size. Weight is still set by font-weight. */
+html { font-optical-sizing: none; font-variation-settings: 'opsz' 14; }
+
 /* Bold steps sit one notch lighter than before (Nov 2026). */
 b, strong, th { font-weight: 600; }

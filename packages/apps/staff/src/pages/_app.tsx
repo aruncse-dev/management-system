@@ -6,9 +6,9 @@ import { AppAuthGate, PwaServiceWorker, formatBuildLabel, SimpleAppNav, type Sim
 import { getClientAuthEnv } from '../clientAuthEnv'
 import { StaffWorkspaceProvider } from '../StaffWorkspaceContext'
 import '@fintracker-vault/ui/styles/ui-kit'
-// Google Sans (Gboard / Google apps), self-hosted as a variable font with
-// optical sizing: headline digits get their wider display shapes, small text
-// its open text shapes. Only the Latin + ₹ subsets are fetched.
+// Google Sans (Gboard / Google apps), self-hosted as a variable font (weight +
+// optical-size axes; globals.css pins the text optical size). Only the Latin
+// + ₹ subsets are fetched.
 import '@fontsource-variable/google-sans/opsz.css'
 import '../styles/globals.css'
 
