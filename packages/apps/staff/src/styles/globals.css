@@ -2055,5 +2055,11 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
 .att-row { border-color: transparent; box-shadow: var(--sh); }
 .att-row.is-present { border-color: var(--navy); }
 
+/* Google Sans: always use the text optical size. With automatic optical
+   sizing, 20px+ figures switched to the narrower display cut and looked
+   stretched next to 14px numbers; pinning `opsz` keeps one digit shape at
+   every size. Weight is still set by font-weight. */
+html { font-optical-sizing: none; font-variation-settings: 'opsz' 14; }
+
 /* Bold steps sit one notch lighter than before (Nov 2026). */
 b, strong, th { font-weight: 600; }
