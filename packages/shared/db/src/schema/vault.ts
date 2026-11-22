@@ -1,4 +1,4 @@
-import { boolean, date, integer, numeric, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
+import { boolean, date, index, integer, numeric, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
 
 export const vaultApps = pgTable('vault_apps', {
   id: text('id').primaryKey(),
@@ -12,7 +12,10 @@ export const vaultApps = pgTable('vault_apps', {
   twoFactor: boolean('two_factor').default(false),
   notes: text('notes'),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-})
+}, (t) => [
+  // Applied 2026-11-22: migrations/20261122100000_perf_indexes.sql
+  index('vault_apps_org_idx').on(t.orgId),
+])
 
 export const bankingRecords = pgTable('banking_records', {
   id: text('id').primaryKey(),
@@ -29,7 +32,10 @@ export const bankingRecords = pgTable('banking_records', {
   mpinEnc: text('mpin_enc'),
   appUuid: text('app_uuid'),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-})
+}, (t) => [
+  // Applied 2026-11-22: migrations/20261122100000_perf_indexes.sql
+  index('banking_records_org_idx').on(t.orgId),
+])
 
 export const persons = pgTable('persons', {
   uuid: text('uuid').primaryKey(),
@@ -41,7 +47,10 @@ export const persons = pgTable('persons', {
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-})
+}, (t) => [
+  // Applied 2026-11-22: migrations/20261122100000_perf_indexes.sql
+  index('persons_org_idx').on(t.orgId),
+])
 
 export const insurance = pgTable('insurance', {
   id: text('id').primaryKey(),
@@ -98,7 +107,10 @@ export const insurance = pgTable('insurance', {
   notes: text('notes'),
   personUuid: text('person_uuid'),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-})
+}, (t) => [
+  // Applied 2026-11-22: migrations/20261122100000_perf_indexes.sql
+  index('insurance_org_updated_idx').on(t.orgId, t.updatedAt.desc()),
+])
 
 /**
  * Premiums actually paid for a policy — mirrors `subscriptionCharges` and the
@@ -151,4 +163,7 @@ export const vaultDocuments = pgTable('vault_documents', {
   expiry: date('expiry'),
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
-})
+}, (t) => [
+  // Applied 2026-11-22: migrations/20261122100000_perf_indexes.sql
+  index('vault_documents_org_person_idx').on(t.orgId, t.personUuid),
+])

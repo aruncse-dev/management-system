@@ -48,33 +48,54 @@ function norm(s: string): string {
   return s.trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
+const CARD_WORDS = /\b(card|credit|cc|amex|visa|mastercard|rupay)\b/
+
+function words(s: string): string[] {
+  return norm(s).split(/[^a-z0-9]+/).filter(Boolean)
+}
+
 /**
  * Match a free-text payment method ("HDFC", "HDFC Bank a/c") to an account.
- * Exact name first; otherwise a single account whose name contains, or is
- * contained in, the text. Ambiguous or credit-card methods resolve to null —
- * a card has a limit, not a balance, so a balance check would be wrong.
+ * Exact name first; otherwise a single account matched on whole words.
+ * Ambiguous, credit-source or card-like methods resolve to null — a card has a
+ * limit, not a balance, so a balance check would be wrong.
  */
-export function matchAccount(method: string, accounts: AccountBalanceRow[]): AccountBalanceRow | null {
+export function matchAccount(
+  method: string,
+  accounts: AccountBalanceRow[],
+  creditSources: readonly string[] = [],
+): AccountBalanceRow | null {
   const m = norm(method)
   if (!m) return null
+  // A configured card or informal credit, or anything that reads like a card,
+  // is charged against a limit — never balance-check it against a bank account.
+  if (creditSources.some(c => norm(c) === m) || CARD_WORDS.test(m)) return null
   const open = accounts.filter(a => !a.closedOn)
   const exact = open.find(a => norm(a.name) === m)
   if (exact) return exact
+  // Whole words only: every word of the account name appears in the method
+  // ("HDFC Bank" in "HDFC Bank a/c"), or the reverse.
+  const mw = new Set(words(m))
   const loose = open.filter(a => {
-    const n = norm(a.name)
-    return n.length >= 3 && (m.includes(n) || n.includes(m))
+    const aw = words(a.name)
+    if (!aw.length) return false
+    const amw = new Set(aw)
+    return aw.every(w => mw.has(w)) || [...mw].every(w => amw.has(w))
   })
   return loose.length === 1 ? loose[0] : null
 }
 
-export function buildReminders(summary: Pick<DashboardSummary, 'committed' | 'accounts'> | null): Reminders {
+export function buildReminders(
+  summary: Pick<DashboardSummary, 'committed' | 'accounts'> | null,
+  creditSources: readonly string[] = [],
+): Reminders {
   if (!summary) return { items: [], imminent: [], lowBalance: [] }
   const accounts = summary.accounts ?? []
 
   const items: DueItem[] = summary.committed.upcomingRenewals
     .filter(r => r.daysLeft <= SHOW_DAYS)
     .map(r => {
-      const acct = matchAccount(r.paymentMethod ?? '', accounts)
+      const acct = matchAccount(r.paymentMethod ?? '', accounts, creditSources)
       return {
         key: `${r.kind}:${r.id ?? r.name}:${r.dueDate}`,
         name: r.name,

@@ -19,21 +19,22 @@ function generateTraceId() {
  */
 const READ_TIMEOUT_MS = 20000
 
-function readSignal(): AbortSignal | undefined {
-  if (typeof AbortController === 'undefined') return undefined
-  const ctrl = new AbortController()
-  setTimeout(() => ctrl.abort(), READ_TIMEOUT_MS)
-  return ctrl.signal
-}
-
-async function timedRead(input: string, init: RequestInit): Promise<Response> {
+/**
+ * Run a read (request AND body) under one timeout. The body read is inside the
+ * window so a stalled download is caught too, and the timer is always cleared.
+ */
+async function withReadTimeout<T>(run: (signal: AbortSignal | undefined) => Promise<T>): Promise<T> {
+  const ctrl = typeof AbortController === 'undefined' ? null : new AbortController()
+  const timer = ctrl ? setTimeout(() => ctrl.abort(), READ_TIMEOUT_MS) : undefined
   try {
-    return await fetch(input, { ...init, signal: readSignal() })
+    return await run(ctrl?.signal)
   } catch (e) {
     if (e instanceof Error && e.name === 'AbortError') {
       throw new Error('Request timed out — check your connection and try again.')
     }
     throw e
+  } finally {
+    if (timer !== undefined) clearTimeout(timer)
   }
 }
 
@@ -66,6 +67,8 @@ const GET_CACHE_TTL_MS = 60_000;
 type CacheEntry = { at: number; data: unknown };
 const getCache = new Map<string, CacheEntry>();
 const inflightGets = new Map<string, Promise<unknown>>();
+/** Bumped on every invalidation; a response from an older generation is not cached. */
+let cacheGeneration = 0;
 
 function cacheKey(action: string, params: Record<string, string>) {
   const sorted = Object.entries(params).sort(([a], [b]) => a.localeCompare(b));
@@ -93,6 +96,12 @@ function invalidateModule(module: string) {
   for (const key of [...getCache.keys()]) {
     if (key.includes(needle)) getCache.delete(key)
   }
+  // A read already in flight started before this write; let it finish for its
+  // caller, but never let it refill the cache or be reused.
+  for (const key of [...inflightGets.keys()]) {
+    if (key.includes(needle)) inflightGets.delete(key)
+  }
+  cacheGeneration += 1
 }
 
 function invalidateInsurance() {
@@ -101,6 +110,7 @@ function invalidateInsurance() {
 }
 
 function invalidateCache(matcher?: { action?: string; params?: Record<string, string> }) {
+  cacheGeneration += 1;
   if (!matcher) {
     getCache.clear();
     return;
@@ -135,6 +145,7 @@ async function get<T>(
     if (pending) return pending as Promise<T>;
   }
 
+  const startedGen = cacheGeneration;
   const run = (async () => {
     const url = new URL(BASE, window.location.origin);
     const traceId = generateTraceId();
@@ -142,9 +153,10 @@ async function get<T>(
     url.searchParams.set('traceId', traceId);
     if (DEBUG) url.searchParams.set('debug', 'true');
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-    const res = await timedRead(url.toString(), { credentials: 'same-origin', redirect: 'follow', cache: 'no-store' });
-    const data = await parseResponse<T>(res);
-    if (useCache) {
+    const data = await withReadTimeout(async signal =>
+      parseResponse<T>(await fetch(url.toString(), { credentials: 'same-origin', redirect: 'follow', cache: 'no-store', signal })),
+    )
+    if (useCache && startedGen === cacheGeneration) {
       getCache.set(key, { at: Date.now(), data });
     }
     return data;
@@ -155,7 +167,7 @@ async function get<T>(
     try {
       return await run;
     } finally {
-      inflightGets.delete(key);
+      if (inflightGets.get(key) === run) inflightGets.delete(key);
     }
   }
 

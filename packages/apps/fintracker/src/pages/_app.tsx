@@ -252,7 +252,15 @@ export default function App({ Component, pageProps }: AppProps) {
         <style dangerouslySetInnerHTML={{ __html: `:root{--font-sans:${GeistSans.style.fontFamily}}` }} />
       </Head>
       <PwaServiceWorker />
-      <AppAuthGate appKind="fintracker" googleClientId={googleClientId}>
+      <AppAuthGate
+        appKind="fintracker"
+        googleClientId={googleClientId}
+        onSignedOut={() => {
+          clearSnapshots()
+          clearMenuCache()
+          clearSettingsPageCache()
+        }}
+      >
         {({ onLogout }) => {
           const handleLogout = () => {
             clearMenuCache()

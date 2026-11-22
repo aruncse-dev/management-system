@@ -73,7 +73,13 @@ function reducer(state: AppState, action: Action): AppState {
         catFilter: '',
         search: '',
       };
-    case 'SET_ROWS':        return { ...state, rows: action.payload.map(r => ({ ...r, _k: dateKey(r.date) })).sort((a,b) => (b._k||0)-(a._k||0)) };
+    case 'SET_ROWS': {
+      // Rows still saving (quick add) are not on the server yet; a reload that
+      // started before they landed must not wipe them from the list.
+      const saving = state.rows.filter(r => r.id.startsWith('pending-'));
+      const rows = [...saving, ...action.payload.map(r => ({ ...r, _k: dateKey(r.date) }))];
+      return { ...state, rows: rows.sort((a,b) => (b._k||0)-(a._k||0)) };
+    }
     case 'ADD_ROW': {
       const r = { ...action.payload, _k: dateKey(action.payload.date) };
       return { ...state, rows: [r, ...state.rows].sort((a, b) => (b._k || 0) - (a._k || 0)) };
@@ -104,6 +110,7 @@ const Ctx = createContext<{ state: AppState; dispatch: React.Dispatch<Action> } 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initial);
   const [prefsTick, setPrefsTick] = React.useState(0);
+  const lastPrefsTick = React.useRef(prefsTick);
 
   React.useEffect(() => {
     const bump = () => setPrefsTick((n) => n + 1);
@@ -131,7 +138,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     // Last-known settings first, so budgets and the cycle are right on the
     // first frame instead of after a round trip.
     const snapKey = `init:${state.month}-${state.year}`;
-    const snap = readSnapshot<InitData>(snapKey);
+    // After a settings change the snapshot is the OLD settings: skip it and
+    // wait for the server, or the old budget/cycle would flash back.
+    const prefsChanged = lastPrefsTick.current !== prefsTick;
+    lastPrefsTick.current = prefsTick;
+    const snap = prefsChanged ? null : readSnapshot<InitData>(snapKey);
     if (snap) apply(snap);
     void loadInitDataDeduped(state.month, state.year)
       .then((init) => {

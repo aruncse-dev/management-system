@@ -1,4 +1,4 @@
-import { date, numeric, pgTable, text } from 'drizzle-orm/pg-core'
+import { date, index, numeric, pgTable, text } from 'drizzle-orm/pg-core'
 
 /**
  * Investments tracked by hand — land, a plot, unlisted shares, a chit, a
@@ -20,7 +20,10 @@ export const otherInvestments = pgTable('other_investments', {
   currentValue: numeric('current_value', { precision: 12, scale: 2 }),
   /** 'active' | 'sold' */
   status: text('status').default('active').notNull(),
-})
+}, (t) => [
+  // Applied 2026-11-22: migrations/20261122100000_perf_indexes.sql
+  index('other_investments_org_idx').on(t.orgId),
+])
 
 /**
  * The investment's ledger, like `lending`: every rupee in or out is one row.
@@ -34,4 +37,7 @@ export const otherInvestmentTxns = pgTable('other_investment_txns', {
   kind: text('kind').notNull(),
   amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
   description: text('description'),
-})
+}, (t) => [
+  // Applied 2026-11-22: migrations/20261122100000_perf_indexes.sql
+  index('other_investment_txns_org_inv_idx').on(t.orgId, t.investmentId),
+])

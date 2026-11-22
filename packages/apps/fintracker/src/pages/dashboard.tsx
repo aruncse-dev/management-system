@@ -103,16 +103,23 @@ export default function Dashboard({ onCategoryClick }: Props) {
   /** Account-kind filter inside the accounts sheet; `''` shows every kind. */
   const [sheetKind, setSheetKind] = useState('')
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
+  /**
+   * False while `summary` is the device snapshot. Due dates and balances in a
+   * snapshot can be days old, so reminders and notifications wait for a fresh one.
+   */
+  const [summaryFresh, setSummaryFresh] = useState(false)
   useEffect(() => {
     let cancelled = false
     const snapKey = `summary:${month}-${year}`
     // Last copy at once; the fresh summary replaces it when it lands.
     setSummary(readSnapshot<DashboardSummary>(snapKey))
+    setSummaryFresh(false)
     void api
       .getDashboardSummary(month, year, TREND_MONTHS)
       .then((d) => {
         if (cancelled) return
         setSummary(d)
+        setSummaryFresh(true)
         writeSnapshot(snapKey, d)
       })
       .catch(() => {})
@@ -175,7 +182,10 @@ export default function Dashboard({ onCategoryClick }: Props) {
     return { charged, active, sources }
   }, [rows, creditCardNames, informalCreditNames])
 
-  const reminders = useMemo(() => buildReminders(summary), [summary])
+  const reminders = useMemo(
+    () => buildReminders(summaryFresh ? summary : null, [...creditCardNames, ...informalCreditNames]),
+    [summary, summaryFresh, creditCardNames, informalCreditNames],
+  )
 
   if (state.loading) return <div className="pg"><LoadingState /></div>
 
@@ -286,7 +296,7 @@ export default function Dashboard({ onCategoryClick }: Props) {
             totalDays,
             categories: allCategories.filter((c) => c.hasCap).map(({ name, spent, cap }) => ({ name, spent, cap })),
             avgIncome: summary?.income.avgIncome ?? 0,
-            duesBeforeCycleEnd: (summary?.committed.upcomingRenewals ?? [])
+            duesBeforeCycleEnd: (summaryFresh ? summary?.committed.upcomingRenewals ?? [] : [])
               .filter((r) => r.daysLeft >= 0 && r.dueDate <= cycle.end)
               .reduce((t, r) => t + r.amount, 0),
           },

@@ -11,11 +11,11 @@
  * radio was still waking sat on the splash screen. Now:
  *   - /_next/static/* (content-hashed, immutable) and icons: cache-first.
  *   - page navigations: network-first, but give up after NAV_TIMEOUT_MS and
- *     serve the last good copy of the page shell. Page HTML here is a static
+ *     serve the last good copy of THAT page (never another page's). Page HTML here is a static
  *     shell with no user data in it; data always comes from /api.
  *   - /api/*, auth and anything cross-origin: never touched, never cached.
  */
-const VERSION = 'v2'
+const VERSION = 'v3'
 const STATIC_CACHE = `ft-static-${VERSION}`
 const PAGE_CACHE = `ft-pages-${VERSION}`
 const NAV_TIMEOUT_MS = 4000
@@ -94,7 +94,9 @@ async function networkFirstPage(event) {
     /* network failed — fall back below */
   }
 
-  const cached = (await cache.match(key.href)) || (await cache.match(new URL('/', key).href))
+  // Only this exact page's last copy. Serving `/` for a page never cached here
+  // would load the wrong screen under the requested URL.
+  const cached = await cache.match(key.href)
   if (cached) {
     // Let the slow request finish in the background so the next launch is fresh.
     event.waitUntil(network.catch(() => {}))

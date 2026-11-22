@@ -10,6 +10,12 @@ export type AppAuthGateProps = {
   appKind: AppAuthKind
   googleClientId: string
   children: ReactNode | AppAuthGateRender
+  /**
+   * Called when the server says this device is signed out (or the user logs
+   * out). Apps clear device caches here so the next account to sign in never
+   * sees the previous one's data.
+   */
+  onSignedOut?: () => void
 }
 
 function brandName(kind: AppAuthKind) {
@@ -173,7 +179,7 @@ async function readSessionWithRetry(isCancelled: () => boolean): Promise<boolean
   return null
 }
 
-export default function AppAuthGate({ appKind, googleClientId, children }: AppAuthGateProps) {
+export default function AppAuthGate({ appKind, googleClientId, children, onSignedOut }: AppAuthGateProps) {
   const clientId = (googleClientId || '').trim()
   const [authed, setAuthed] = useState(false)
   const [sessionLoading, setSessionLoading] = useState(true)
@@ -188,17 +194,16 @@ export default function AppAuthGate({ appKind, googleClientId, children }: AppAu
   }, [authed, sessionLoading])
 
   /**
-   * Paint the app straight away when we have good reason to think the user is
-   * signed in, and confirm in the background:
-   *  - any path other than `/` was already let through by the middleware, which
-   *    only does that for a valid session cookie;
-   *  - on `/` we go by the hint left by the last successful check.
-   * This takes a full network round trip off every launch. If the background
-   * check comes back signed-out, the login screen replaces the app.
+   * Paint the app straight away when this device was signed in at the last
+   * successful check, and confirm in the background. This takes a full network
+   * round trip off every launch. If the background check comes back
+   * signed-out, the login screen replaces the app.
+   *
+   * The URL path is deliberately not used as evidence: a page served from the
+   * service worker's cache never passed through the middleware.
    */
   useIsoLayoutEffect(() => {
-    const verifiedByMiddleware = window.location.pathname !== '/'
-    if (verifiedByMiddleware || readAuthHint(appKind)) {
+    if (readAuthHint(appKind)) {
       showingAppRef.current = true
       setAuthed(true)
       setSessionLoading(false)
@@ -219,6 +224,7 @@ export default function AppAuthGate({ appKind, googleClientId, children }: AppAu
         setSessionUnreachable(false)
         setAuthed(result)
         writeAuthHint(appKind, result)
+        if (!result) onSignedOut?.()
       }
       setSessionLoading(false)
     })()
@@ -226,6 +232,7 @@ export default function AppAuthGate({ appKind, googleClientId, children }: AppAu
     return () => {
       cancelled = true
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reloadKey, appKind])
 
   const handleUnlock = () => {
@@ -237,6 +244,7 @@ export default function AppAuthGate({ appKind, googleClientId, children }: AppAu
   const handleLogout = async () => {
     setOauthScriptError(null)
     writeAuthHint(appKind, false)
+    onSignedOut?.()
     try {
       await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' })
     } catch {

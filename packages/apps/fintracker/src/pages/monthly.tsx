@@ -112,6 +112,10 @@ export default function Monthly() {
   /** The cycle on screen, for discarding responses that arrive after the user moved on. */
   const viewRef = useRef({ month: state.month, year: state.year })
   viewRef.current = { month: state.month, year: state.year }
+  /** Latest loadMonth call; an older response that lands later is ignored. */
+  const loadSeq = useRef(0)
+  /** Quick-add saves in flight; the reconciling reload waits for the last one. */
+  const savingCount = useRef(0)
 
   const showStatus = useCallback((msg: string) => {
     if (snackbarTimerRef.current) clearTimeout(snackbarTimerRef.current)
@@ -143,6 +147,7 @@ export default function Monthly() {
    * of adding a spend.
    */
   const loadMonth = useCallback(async (month: string, year: string, opts: { quiet?: boolean } = {}) => {
+    const seq = ++loadSeq.current
     const snapKey = `rows:${month}-${year}`
     const snap = opts.quiet ? null : readSnapshot<Transaction[]>(snapKey)
     if (snap) {
@@ -153,8 +158,10 @@ export default function Monthly() {
     }
     try {
       const rows = await api.getData(month, year)
-      // Ignore a response for a month that is no longer on screen.
+      // Ignore a response for a month that is no longer on screen, or one
+      // overtaken by a newer load.
       if (viewRef.current.month !== month || viewRef.current.year !== year) return
+      if (seq !== loadSeq.current) return
       dispatch({ type: 'SET_ROWS', payload: rows })
       writeSnapshot(snapKey, rows)
     } catch (e) {
@@ -310,6 +317,7 @@ export default function Monthly() {
                 /* unparseable date: let the server decide */
               }
               if (here) dispatch({ type: 'ADD_ROW', payload: row })
+              savingCount.current += 1
               try {
                 const id = await api.addRow(payload)
                 if (here) dispatch({ type: 'REPLACE_ROW_ID', payload: { from: row.id, to: id } })
@@ -317,9 +325,12 @@ export default function Monthly() {
               } catch (e) {
                 if (here) dispatch({ type: 'REMOVE_ROW', payload: row.id })
                 throw e
+              } finally {
+                savingCount.current -= 1
               }
-              // Reconcile quietly (server-side mirrors, other devices).
-              void loadMonth(state.month, state.year, { quiet: true })
+              // Reconcile quietly (server-side mirrors, other devices) once the
+              // last entry in a burst has landed.
+              if (savingCount.current === 0) void loadMonth(state.month, state.year, { quiet: true })
             }}
             onExpand={draft => {
               setQuickOpen(false)

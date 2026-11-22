@@ -21,21 +21,22 @@ function generateTraceId() {
  */
 const READ_TIMEOUT_MS = 20000
 
-function readSignal(): AbortSignal | undefined {
-  if (typeof AbortController === 'undefined') return undefined
-  const ctrl = new AbortController()
-  setTimeout(() => ctrl.abort(), READ_TIMEOUT_MS)
-  return ctrl.signal
-}
-
-async function timedRead(input: string, init: RequestInit): Promise<Response> {
+/**
+ * Run a read (request AND body) under one timeout. The body read is inside the
+ * window so a stalled download is caught too, and the timer is always cleared.
+ */
+async function withReadTimeout<T>(run: (signal: AbortSignal | undefined) => Promise<T>): Promise<T> {
+  const ctrl = typeof AbortController === 'undefined' ? null : new AbortController()
+  const timer = ctrl ? setTimeout(() => ctrl.abort(), READ_TIMEOUT_MS) : undefined
   try {
-    return await fetch(input, { ...init, signal: readSignal() })
+    return await run(ctrl?.signal)
   } catch (e) {
     if (e instanceof Error && e.name === 'AbortError') {
       throw new Error('Request timed out — check your connection and try again.')
     }
     throw e
+  } finally {
+    if (timer !== undefined) clearTimeout(timer)
   }
 }
 
@@ -83,8 +84,9 @@ async function get<T>(
   url.searchParams.set('traceId', traceId);
   if (DEBUG) url.searchParams.set('debug', 'true');
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-  const res = await timedRead(url.toString(), { credentials: 'same-origin', redirect: 'follow', cache: 'no-store' });
-  return parseResponse<T>(res);
+  return await withReadTimeout(async signal =>
+    parseResponse<T>(await fetch(url.toString(), { credentials: 'same-origin', redirect: 'follow', cache: 'no-store', signal })),
+  )
 }
 
 async function post<T>(body: Record<string, unknown>): Promise<T> {
