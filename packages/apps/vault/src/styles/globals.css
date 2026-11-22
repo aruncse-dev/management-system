@@ -16,9 +16,9 @@ button, input, select, textarea {
 .with-app-shell { overflow-x: hidden; background: var(--bg); min-height: 100vh; }
 
 :root {
-  /* Vault accent: indigo. Shared kit, own identity (see docs/enhancement-plan-2026-11.md §7). */
-  --bg: #F5F5FF; --card: #FFF; --border: #DCDBF8; --text: #0F1C3F; --muted: #4B5578;
-  --navy: #5E5CE6; --accent-rgb: 94, 92, 230; --navy-lt: #EFEFFE; --navy-dark: #5E5CE6;
+  /* Vault accent: Slate. Shared kit, own identity. */
+  --bg: #F4F6F8; --card: #FFF; --border: #D5DCE4; --text: #0F172A; --muted: #526070;
+  --navy: #475569; --accent-rgb: 71, 85, 105; --navy-lt: #EEF1F5; --navy-dark: #475569;
   --green: #166534; --green-lt: #F0FDF4; --gm: #22C55E;
   --red: var(--rm); --red-lt: #FEF2F2; --rm: #EF4444;
   --amber: var(--rm); --amber-lt: var(--red-lt);
