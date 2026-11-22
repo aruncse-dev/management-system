@@ -67,7 +67,7 @@ export default function SimpleAppNav({
           <span className="nav-app-icon-wrap" aria-hidden={!iconAlt}>
             <img src={iconSrc} alt={iconAlt} className="nav-app-icon" />
           </span>
-          <span style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-0.015em' }}>{barTitle}</span>
+          <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{barTitle}</span>
         </span>
         <button type="button" className="nav-hamburger" onClick={() => setDrawerOpen(true)} aria-label="Open menu">
           ☰
