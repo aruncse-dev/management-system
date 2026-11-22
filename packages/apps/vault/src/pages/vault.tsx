@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Check, Copy, ExternalLink, Landmark, Plus, Search } from 'lucide-react'
 import { api, type RawBankingRow } from '../api'
 import { FormField, HoldingCard, ModalActions, ModalShell, SearchField, SectionBlock, SectionChip, Spacer, openExternal } from '../ui'
+import { maskTail } from '../utils'
 
 type BankingFormState = {
   account_holder_name: string
@@ -283,7 +284,7 @@ export function VaultBankingPage() {
                     title={row.account_holder_name || 'Untitled'}
                     subtitle={row.bank_name || 'Bank'}
                     leftLabel="Account No."
-                    leftValue={row.account_no || '-'}
+                    leftValue={maskTail(row.account_no) || '-'}
                     centerLabel=" "
                     centerValue=" "
                     rightLabel="IFSC"
