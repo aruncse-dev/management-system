@@ -16,7 +16,7 @@ button, input, select, textarea {
 .with-app-shell { overflow-x: hidden; background: var(--bg); min-height: 100vh; }
 
 :root {
-  --bg: #F0F5FF; --card: #FFF; --border: #BFDBFE; --text: #0F1C3F; --muted: #4B6080;
+  --bg: #FAFCFE; --card: #FFF; --border: #BFDBFE; --text: #0F1C3F; --muted: #4B6080;
   --navy: #1e5cc7; --accent-rgb: 30, 92, 199; --navy-lt: #eaf1ff; --navy-dark: #1e5cc7;
   --green: #166534; --green-lt: #F0FDF4; --gm: #22C55E;
   --red: var(--rm); --red-lt: #FEF2F2; --rm: #EF4444;
