@@ -171,6 +171,24 @@ pnpm dev:fintracker:fresh
 
 ---
 
+## Symptom: Installed app stuck on the splash screen
+
+Each app keeps an on-device launch log (last 15 launches, steps and timings only).
+
+1. When it hangs, wait ~10 s, close the app fully, reopen it.
+2. Side menu → **Launch log** (next to the build stamp), or open `/launch-log.html`
+   on the app's address (works signed out and when the app itself won't start).
+3. **Copy** / **Share** it. The stuck launch is marked `DID NOT REACH THE SCREEN`;
+   its "still waiting" lines name the script it was waiting for and whether app
+   code started. The service-worker section shows how long the page request took.
+
+Code: `packages/shared/ui/src/components/launchLog.ts` (page side),
+`packages/shared/config/pwa/sw.js` (worker side), `packages/shared/config/pwa/launch-log.html`
+(viewer; `pnpm pwa:sync` copies it to each app).
+
+If the build stamp in the drawer is older than `main`, check Vercel → Deployments for a
+build stuck on "Building"/"Queued": cancel it and deploy `main` again.
+
 ## Env file rules (avoid repeat incidents)
 
 | Do | Don’t |
