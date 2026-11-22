@@ -265,7 +265,7 @@ export default function VaultAppsPage() {
                   onClick={() => setDetail(row)}
                   style={{
                     textAlign: 'left',
-                    border: '1px solid rgba(30, 92, 199, .12)',
+                    border: '1px solid rgba(var(--accent-rgb), .12)',
                     borderRadius: 18,
                     background: 'linear-gradient(180deg, rgba(255,255,255,.96), rgba(243,248,255,.92))',
                     padding: 10,
@@ -315,7 +315,7 @@ export default function VaultAppsPage() {
           width: 56,
           height: 56,
           padding: 0,
-          boxShadow: '0 16px 32px rgba(30, 92, 199, .24)',
+          boxShadow: '0 16px 32px rgba(var(--accent-rgb), .24)',
         }}
         aria-label="Add app"
         title="Add app"

@@ -87,7 +87,7 @@ export function ConfirmDialog({
             style={
               tone === 'danger'
                 ? { borderColor: 'rgba(239,68,68,.25)', color: 'var(--red)' }
-                : { borderColor: 'rgba(30,92,199,.25)', color: 'var(--navy)' }
+                : { borderColor: 'rgba(var(--accent-rgb),.25)', color: 'var(--navy)' }
             }
           >
             {busy ? 'Working…' : confirmText}
