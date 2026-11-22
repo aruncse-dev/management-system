@@ -2288,6 +2288,10 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
   font-size: 20px; font-weight: 650; letter-spacing: -0.01em; font-variant-numeric: tabular-nums;
 }
 :root { --sh: 0 1px 2px rgba(var(--accent-rgb), .10), 0 8px 18px -10px rgba(var(--accent-rgb), .35); }
-.kpi-card, .ui-kit-card, .ui-kit-holding-card, .ui-kit-kpi, .settings-card { border-color: transparent; box-shadow: var(--sh); }
-.reminders, .forecast-line { border-color: transparent; box-shadow: var(--sh); }
+/* Every card wears the transaction card's edge: 1px var(--border) all round
+   plus the lift. Shorthand because holding cards start at `border: none`, and
+   the accent selectors outrank ui-kit's `border-left: 0` on those modifiers. */
+.kpi-card, .ui-kit-card, .ui-kit-holding-card, .ui-kit-kpi, .settings-card, .settings-item-card,
+.reminders, .forecast-line,
+.ui-kit-holding-card[class*="ui-kit-holding-card--accent-"] { border: 1px solid var(--border); box-shadow: var(--sh); }
 .forecast-line.is-over { box-shadow: var(--sh), inset 0 0 0 1px var(--rm); }
