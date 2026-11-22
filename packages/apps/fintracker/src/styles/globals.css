@@ -27,7 +27,7 @@ button, input, select, textarea {
 }
 
 /* NAV */
-.nav { background: var(--navy-lt); height: calc(54px + env(safe-area-inset-top)); display: flex; align-items: center; justify-content: space-between; padding: env(safe-area-inset-top) 14px 0; position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 0 var(--border); gap: 10px; will-change: transform; transform: translateZ(0); }
+.nav { background: var(--navy-lt); height: calc(54px + env(safe-area-inset-top)); display: flex; align-items: center; justify-content: space-between; padding: env(safe-area-inset-top) 14px 0; position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 0 var(--border), 0 4px 10px -8px rgba(var(--accent-rgb), .45); gap: 10px; will-change: transform; transform: translateZ(0); }
 .nav-b { color: var(--text); font-weight: 500; font-size: 13px; letter-spacing: 0; white-space: nowrap; }
 .nav-b em { color: #A5B4FC; font-style: normal; }
 /* App icon: white glyph on a solid tile of the app's colour (header style B). */
@@ -2270,3 +2270,26 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
 .forecast-line.is-over { border-color: var(--rm); }
 .forecast-line.is-over span:first-child b { color: var(--rm); }
 .dash-chart-row--single { grid-template-columns: 1fr; }
+
+/* ───────── Type and surfaces (chosen Nov 2026: font B + style A) ─────────
+   Font B: same font (Geist); sentence case instead of ALL CAPS, darker section
+   titles, larger amounts with aligned digits.
+   Style A: light tint kept; cards drop their outline and lift on a soft shadow
+   in the app colour. Appended last so it wins over the older rules above. */
+.ui-kit-section-title { text-transform: none; letter-spacing: 0; font-size: 15px; font-weight: 600; color: var(--text); }
+.ui-kit-kpi-label,
+.kpi-card-l, .monthly-subpage .kpi-card-l, .dashboard-page .kpi-card-l,
+.holding-label, .ui-kit-holding-detail-label, .ui-kit-holding-pnl-label, .ui-kit-holding-stat span, .ui-kit-summary-metric-label,
+.ui-metric-label, .ui-section-title, .ui-mini-title, .sec-h, .form-lbl, .settings-row-label, .budget-mini-lbl {
+  text-transform: none; letter-spacing: 0;
+}
+.ui-kit-kpi-label, .kpi-card-l, .monthly-subpage .kpi-card-l, .dashboard-page .kpi-card-l { font-size: 12.5px; font-weight: 500; }
+.holding-label, .ui-kit-holding-detail-label, .ui-kit-holding-stat span, .ui-kit-holding-pnl-label { font-size: 11.5px; font-weight: 500; }
+.kpi-card-v, .kpi-card-v-soft,
+.monthly-subpage .kpi-card-v, .monthly-subpage .kpi-card-v-soft, .dashboard-page .kpi-card-v, .dashboard-page .kpi-card-v-soft {
+  font-size: 20px; font-weight: 650; letter-spacing: -0.01em; font-variant-numeric: tabular-nums;
+}
+:root { --sh: 0 1px 2px rgba(var(--accent-rgb), .10), 0 8px 18px -10px rgba(var(--accent-rgb), .35); }
+.kpi-card, .ui-kit-card, .ui-kit-holding-card, .ui-kit-kpi, .settings-card { border-color: transparent; box-shadow: var(--sh); }
+.reminders, .forecast-line { border-color: transparent; box-shadow: var(--sh); }
+.forecast-line.is-over { box-shadow: var(--sh), inset 0 0 0 1px var(--rm); }
