@@ -26,7 +26,7 @@ button, input, select, textarea {
 }
 
 /* NAV */
-.nav { background: var(--navy-lt); height: calc(54px + env(safe-area-inset-top)); display: flex; align-items: center; justify-content: space-between; padding: env(safe-area-inset-top) 14px 0; position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 0 rgba(var(--accent-rgb), .24), 0 4px 14px -4px rgba(15, 23, 42, .16); gap: 10px; will-change: transform; transform: translateZ(0); }
+.nav { background: #fff; height: calc(54px + env(safe-area-inset-top)); display: flex; align-items: center; justify-content: space-between; padding: env(safe-area-inset-top) 14px 0; position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 0 rgba(var(--accent-rgb), .24), 0 4px 14px -4px rgba(15, 23, 42, .16); gap: 10px; will-change: transform; transform: translateZ(0); }
 .nav-b { color: var(--text); font-weight: 700; font-size: 13px; letter-spacing: 0; white-space: nowrap; }
 .nav-b em { color: #A5B4FC; font-style: normal; }
 /* App icon: white glyph on a solid tile of the app's colour (header style B). */
