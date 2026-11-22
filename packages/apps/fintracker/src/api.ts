@@ -13,6 +13,32 @@ function generateTraceId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
+/**
+ * Reads give up after this long. On a phone resuming from the background the
+ * first request can stall instead of failing; without a cap the page spins
+ * forever. Writes are not capped: a POST that "times out" may still have saved,
+ * and a retry would then duplicate it.
+ */
+const READ_TIMEOUT_MS = 20000
+
+function readSignal(): AbortSignal | undefined {
+  if (typeof AbortController === 'undefined') return undefined
+  const ctrl = new AbortController()
+  setTimeout(() => ctrl.abort(), READ_TIMEOUT_MS)
+  return ctrl.signal
+}
+
+async function timedRead(input: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(input, { ...init, signal: readSignal() })
+  } catch (e) {
+    if (e instanceof Error && e.name === 'AbortError') {
+      throw new Error('Request timed out — check your connection and try again.')
+    }
+    throw e
+  }
+}
+
 async function parseResponse<T>(res: Response): Promise<T> {
   const text = await res.text();
   if (text.trim().startsWith('<')) {
@@ -57,7 +83,7 @@ async function get<T>(
   url.searchParams.set('traceId', traceId);
   if (DEBUG) url.searchParams.set('debug', 'true');
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-  const res = await fetch(url.toString(), { credentials: 'same-origin', redirect: 'follow', cache: 'no-store' });
+  const res = await timedRead(url.toString(), { credentials: 'same-origin', redirect: 'follow', cache: 'no-store' });
   return parseResponse<T>(res);
 }
 

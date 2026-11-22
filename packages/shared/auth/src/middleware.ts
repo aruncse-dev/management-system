@@ -37,6 +37,9 @@ async function slideSession(session: FtSessionData & { save: () => Promise<void>
 export function defaultIsPublicPath(pathname: string): boolean {
   if (pathname === '/') return true
   if (pathname.startsWith('/api/auth/')) return true
+  // The service worker must load without a session, or a signed-out device
+  // could never install (or update) it.
+  if (pathname === '/sw.js') return true
   if (/\.(svg|png|jpg|jpeg|gif|webp|ico|json|txt|webmanifest)$/i.test(pathname)) return true
   return false
 }
