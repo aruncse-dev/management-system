@@ -61,12 +61,6 @@ function shortMonth(key: string): string {
   return Number.isFinite(d.getTime()) ? d.toLocaleString('en-US', { month: 'short' }) : key
 }
 
-/** `2026-09-18` → `18 Sep`. */
-function shortDate(iso: string): string {
-  const d = new Date(iso + 'T00:00:00')
-  if (!Number.isFinite(d.getTime())) return iso
-  return `${d.getDate()} ${d.toLocaleString('en-US', { month: 'short' })}`
-}
 
 type Props = {
   onCategoryClick?: (category: string) => void
@@ -213,8 +207,8 @@ export default function Dashboard({ onCategoryClick }: Props) {
     totalBudget <= 0
       ? undefined
       : overBudget
-        ? `of ${fmt(totalBudget)} · over ${fmt(exp - totalBudget)}`
-        : `of ${fmt(totalBudget)} · ${fmt(totalBudget - exp)} left`
+        ? `${fmt(exp - totalBudget)} over budget`
+        : `${fmt(totalBudget - exp)} left`
 
   // ---- vs previous cycle ----------------------------------------------------
   const trend = summary?.trend ?? []
@@ -308,9 +302,8 @@ export default function Dashboard({ onCategoryClick }: Props) {
     <div className="pg dashboard-page ui-kit-page-shell monthly-subpage">
       {/* 1 — The cycle's cash flow. */}
       <SectionBlock
-        title="This Cycle"
+        title="This cycle"
         icon={<Gauge size={14} />}
-        subtitle={cycle ? `${shortDate(cycle.start)} – ${shortDate(cycle.end)}` : undefined}
         right={
           <SectionChip>
             {isCurrent ? `Day ${elapsedDays} of ${totalDays}` : `${totalDays} days · closed`}
@@ -332,19 +325,6 @@ export default function Dashboard({ onCategoryClick }: Props) {
             icon={<ArrowUpRight size={14} />}
             subtitle={budgetNote}
           />
-        </KpiGrid>
-      </SectionBlock>
-
-      {/* 2 — Two figures: what is left in the accounts, and how much of this
-          cycle went on borrowed money. Per-source detail is not repeated here;
-          sources are configured in Settings. */}
-      <SectionBlock
-        title="Sources"
-        icon={<Wallet size={14} />}
-        subtitle="Manage sources in Settings"
-      >
-        <div className="ui-stack">
-          <KpiGrid variant="compact">
             <KpiCard
               label="Available"
               value={`${availableTotal < 0 ? '−' : ''}${fmt(Math.abs(availableTotal))}`}
@@ -358,11 +338,10 @@ export default function Dashboard({ onCategoryClick }: Props) {
               value={fmt(creditTotals.charged)}
               tone="red"
               icon={<CreditCard size={14} />}
-              subtitle={`${creditShare}% of spend · ${creditTotals.active} sources`}
+              subtitle={`${creditShare}% of spend`}
               onClick={() => setSheet('credit')}
             />
-          </KpiGrid>
-        </div>
+        </KpiGrid>
       </SectionBlock>
 
       {/* The KPIs above stay first. Then what is about to be debited (and
@@ -377,13 +356,9 @@ export default function Dashboard({ onCategoryClick }: Props) {
           full-width KPI directly above, so the cycle's headline figure appeared
           twice in one column; and the centre used to show a *different* number
           (income minus credit) under the same "NET" label. */}
-      <SectionBlock
-        title="Cash flow"
-        icon={<PieChart size={14} />}
-        subtitle="What came in, what went out, and how much was borrowed"
-      >
+      <SectionBlock title="Cash flow" icon={<PieChart size={14} />}>
         {inc > 0 || exp > 0 || creditTotals.charged > 0 ? (
-          <div className="dash-chart-row">
+          <div className="dash-chart-row dash-chart-row--single">
             <UiCard title="Income vs expense">
               <RightLegendDonut
                 compact
@@ -402,28 +377,6 @@ export default function Dashboard({ onCategoryClick }: Props) {
               </p>
             </UiCard>
 
-            {/* Own money against borrowed money. The centre names the borrowed
-                figure outright rather than showing a second "NET" — that label
-                already belongs to the donut beside it. */}
-            <UiCard title="Income vs credit">
-              <RightLegendDonut
-                compact
-                items={[
-                  { label: 'Income', value: inc, color: '#22C55E' },
-                  { label: 'On credit', value: creditTotals.charged, color: '#EF4444' },
-                ].filter((d) => d.value > 0)}
-                showCenter
-                centerLabel="ON CREDIT"
-                centerValue={fmt(creditTotals.charged)}
-                legendPosition="bottom"
-                valueFormatter={fmt}
-              />
-              <p className="dash-net-note ui-tone-muted">
-                {inc > 0
-                  ? `${Math.round((creditTotals.charged / inc) * 100)}% of income`
-                  : 'No income this cycle'}
-              </p>
-            </UiCard>
           </div>
         ) : (
           <UiCard>
@@ -438,8 +391,7 @@ export default function Dashboard({ onCategoryClick }: Props) {
         <SectionBlock
           title="Over budget"
           icon={<Layers size={14} />}
-          subtitle={`${fmt(totalOverBy)} over across ${overCategories.length} categor${overCategories.length === 1 ? 'y' : 'ies'}`}
-          right={<SectionChip tone="red">{overCategories.length}</SectionChip>}
+          right={<SectionChip tone="red">+{fmt(totalOverBy)}</SectionChip>}
         >
           <UiCard>
             <div className="dash-cat-list">

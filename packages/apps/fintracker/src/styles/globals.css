@@ -2245,35 +2245,20 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
   outline-offset: 2px;
 }
 
-/* ───────── Reminders ("Coming up") and Forecast ───────── */
-.reminders { display: grid; gap: 8px; }
-.reminder {
-  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px;
-  padding: 10px 12px; border-radius: var(--r); border: 1px solid var(--border); background: var(--card);
-  color: var(--muted);
-}
-.reminder--soon { border-color: var(--amber); }
-.reminder--soon > svg { color: var(--amber); }
-.reminder--overdue, .reminder--alert { border-color: var(--rm); background: var(--red-lt); }
-.reminder--overdue > svg, .reminder--alert > svg { color: var(--rm); }
-.reminder--alert { grid-template-columns: auto 1fr; }
-.reminder-main { min-width: 0; display: grid; gap: 2px; }
-.reminder-title { font-size: 14px; font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.reminder-sub { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.reminder-amt { font-size: 14px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
-.reminder-enable {
-  display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px;
-  border: 1px dashed var(--navy); border-radius: var(--r); background: var(--navy-lt); color: var(--navy);
-  font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
-}
-.reminder-note { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
-
-.forecast-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; }
-.forecast-stats > div { padding: 10px 12px; border-radius: var(--r); background: var(--bg); border: 1px solid var(--border); }
-.forecast-k { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .3px; }
-.forecast-v { font-size: 16px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; margin-top: 2px; }
-
-.reminder-more {
-  min-height: 36px; border: 0; background: none; color: var(--navy); font: inherit;
-  font-size: 13px; font-weight: 600; cursor: pointer; justify-self: start; padding: 4px 2px;
-}
+/* ───────── Coming up and Forecast (compact, under the KPIs) ───────── */
+.reminders { display: grid; gap: 2px; background: var(--card); border: 1px solid var(--border); border-radius: var(--r); padding: 4px 12px; }
+.reminder-line { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 12px; min-height: 40px; font-size: 14px; border-bottom: 1px solid var(--border); }
+.reminder-line:last-of-type { border-bottom: 0; }
+.reminder-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--text); }
+.reminder-when { font-size: 12px; color: var(--muted); }
+.reminder-line.is-soon .reminder-when { color: var(--amber); font-weight: 600; }
+.reminder-line.is-late .reminder-when { color: var(--rm); font-weight: 600; }
+.reminder-amt { font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.reminder-line--alert { grid-template-columns: auto 1fr auto; color: var(--rm); }
+.reminder-line--alert .reminder-name, .reminder-line--alert .reminder-amt { color: var(--rm); }
+.reminder-more { min-height: 36px; border: 0; background: none; color: var(--navy); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; justify-self: start; padding: 4px 0; }
+.forecast-line { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; padding: 12px; border-radius: var(--r); border: 1px solid var(--border); background: var(--card); font-size: 14px; color: var(--muted); }
+.forecast-line b { color: var(--text); font-variant-numeric: tabular-nums; }
+.forecast-line.is-over { border-color: var(--rm); }
+.forecast-line.is-over span:first-child b { color: var(--rm); }
+.dash-chart-row--single { grid-template-columns: 1fr; }
