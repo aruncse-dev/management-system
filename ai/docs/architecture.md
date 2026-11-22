@@ -8,7 +8,7 @@ Turborepo + pnpm workspaces. Three main Next.js 14 (pages router) applications s
 packages/
 ├── apps/
 │   ├── fintracker/    # expense, investments, gold, loans, subscriptions (port 3000)
-│   ├── vault/         # insurance, passwords, documents, health (port 3001)
+│   ├── vault/         # banking, insurance, passwords, persons, documents (port 3001)
 │   ├── staff/         # attendance calendar, staff management (port 3002)
 │   └── admin/         # org/user/integration management (port 3003)
 └── shared/

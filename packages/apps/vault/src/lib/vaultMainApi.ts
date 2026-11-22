@@ -31,23 +31,6 @@ import {
   addDocument,
   updateDocument,
   deleteDocument,
-  getHealthVitals,
-  addHealthVital,
-  deleteHealthVital,
-  getIllnesses,
-  addIllness,
-  updateIllness,
-  deleteIllness,
-  getMedications,
-  addMedication,
-  updateMedication,
-  deleteMedication,
-  getHabits,
-  addHabit,
-  updateHabit,
-  deleteHabit,
-  getHabitLogs,
-  addHabitLog,
   decryptSensitiveField,
   isEncryptedSensitiveField,
 } from '@fintracker-vault/db'
@@ -135,6 +118,28 @@ function ok(res: NextApiResponse, data?: unknown, traceId = '') {
 
 function fail(res: NextApiResponse, code: number, error: string, traceId = '') {
   return res.status(code).json({ ok: false as const, error, ...(traceId ? { traceId } : {}) })
+}
+
+export class BadDateError extends Error {}
+
+/**
+ * Normalise an optional date field from the form.
+ *
+ * Blank inputs arrived as `''` and went straight into Postgres `date` columns,
+ * which rejects them — so a person without a DOB, an ID without an expiry, or a
+ * policy without a maturity date could not be saved at all. `''`/null → NULL;
+ * anything that is not a real `YYYY-MM-DD` date is a 400.
+ */
+function optDate(v: unknown): string | null {
+  if (v === null || v === undefined) return null
+  const s = String(v).trim()
+  if (!s) return null
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
+  const d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null
+  if (!m || !d || d.getMonth() !== Number(m[2]) - 1 || d.getDate() !== Number(m[3])) {
+    throw new BadDateError(`Invalid date: ${s}`)
+  }
+  return s
 }
 
 function num(v: string | number): number {
@@ -404,103 +409,6 @@ export async function handleVaultApi(
         traceId,
       )
     }
-
-    // Health Vitals reads
-    if (mod === 'health' && action === 'getVitals') {
-      const person_uuid = typeof req.query.person_uuid === 'string' ? req.query.person_uuid : undefined
-      const rows = await getHealthVitals(scopeOrgId, person_uuid)
-      return ok(
-        res,
-        rows.map((r) => ({
-          vital_uuid: r.vitalUuid,
-          person_uuid: r.personUuid,
-          recorded_at: r.recordedAt ? r.recordedAt.toISOString() : '',
-          height_cm: num(r.heightCm || 0),
-          weight_kg: num(r.weightKg || 0),
-          systolic: num(r.systolic || 0),
-          diastolic: num(r.diastolic || 0),
-          blood_sugar: num(r.bloodSugar || 0),
-          notes: r.notes ?? '',
-        })),
-        traceId,
-      )
-    }
-
-    // Illnesses reads
-    if (mod === 'health' && action === 'getIllnesses') {
-      const person_uuid = typeof req.query.person_uuid === 'string' ? req.query.person_uuid : undefined
-      const rows = await getIllnesses(scopeOrgId, person_uuid)
-      return ok(
-        res,
-        rows.map((r) => ({
-          illness_uuid: r.illnessUuid,
-          person_uuid: r.personUuid,
-          name: r.name,
-          diagnosed_on: r.diagnosedOn ? String(r.diagnosedOn) : '',
-          status: r.status ?? '',
-          notes: r.notes ?? '',
-        })),
-        traceId,
-      )
-    }
-
-    // Medications reads
-    if (mod === 'health' && action === 'getMedications') {
-      const person_uuid = typeof req.query.person_uuid === 'string' ? req.query.person_uuid : undefined
-      const rows = await getMedications(scopeOrgId, person_uuid)
-      return ok(
-        res,
-        rows.map((r) => ({
-          med_uuid: r.medUuid,
-          person_uuid: r.personUuid,
-          illness_uuid: r.illnessUuid ?? '',
-          name: r.name,
-          dosage: r.dosage ?? '',
-          frequency: r.frequency ?? '',
-          start_date: r.startDate ? String(r.startDate) : '',
-          end_date: r.endDate ? String(r.endDate) : '',
-          reminder_times: r.reminderTimes ?? '',
-          notes: r.notes ?? '',
-        })),
-        traceId,
-      )
-    }
-
-    // Habits reads
-    if (mod === 'habits' && action === 'getHabits') {
-      const person_uuid = typeof req.query.person_uuid === 'string' ? req.query.person_uuid : undefined
-      const rows = await getHabits(scopeOrgId, person_uuid)
-      return ok(
-        res,
-        rows.map((r) => ({
-          habit_uuid: r.habitUuid,
-          person_uuid: r.personUuid,
-          name: r.name,
-          category: r.category ?? '',
-          target_frequency: r.targetFrequency ?? '',
-          created_at: r.createdAt ? r.createdAt.toISOString() : undefined,
-        })),
-        traceId,
-      )
-    }
-
-    // Habit Logs reads
-    if (mod === 'habits' && action === 'getHabitLogs') {
-      const habit_uuid = typeof req.query.habit_uuid === 'string' ? req.query.habit_uuid : undefined
-      const person_uuid = typeof req.query.person_uuid === 'string' ? req.query.person_uuid : undefined
-      const rows = await getHabitLogs(scopeOrgId, { habitUuid: habit_uuid, personUuid: person_uuid })
-      return ok(
-        res,
-        rows.map((r) => ({
-          log_uuid: r.logUuid,
-          habit_uuid: r.habitUuid,
-          person_uuid: r.personUuid,
-          log_date: r.logDate ? String(r.logDate) : '',
-          completed: r.completed,
-        })),
-        traceId,
-      )
-    }
   }
 
   // ============ POST handlers (mutations) ============
@@ -626,8 +534,8 @@ export async function handleVaultApi(
           renews: body.renews === true || body.renews === 'true',
           ecardUrl: typeof body.ecard_url === 'string' && body.ecard_url.trim() ? body.ecard_url.trim() : null,
           paymentMethod: typeof body.payment_method === 'string' ? body.payment_method : null,
-          issueDate: typeof body.issue_date === 'string' ? body.issue_date : null,
-          maturityDate: typeof body.maturity_date === 'string' ? body.maturity_date : null,
+          issueDate: optDate(body.issue_date),
+          maturityDate: optDate(body.maturity_date),
           sumAssured: body.sum_assured !== undefined && body.sum_assured !== '' ? String(num(body.sum_assured as string | number)) : null,
           cashValue: body.cash_value !== undefined && body.cash_value !== '' ? String(num(body.cash_value as string | number)) : null,
           nominee: typeof body.nominee_name === 'string' ? body.nominee_name : null,
@@ -688,8 +596,8 @@ export async function handleVaultApi(
           update.paidPremiumsOpening = opening
         }
         if (body.payment_method !== undefined) update.paymentMethod = body.payment_method
-        if (body.issue_date !== undefined) update.issueDate = body.issue_date
-        if (body.maturity_date !== undefined) update.maturityDate = body.maturity_date
+        if (body.issue_date !== undefined) update.issueDate = optDate(body.issue_date)
+        if (body.maturity_date !== undefined) update.maturityDate = optDate(body.maturity_date)
         if (body.sum_assured !== undefined) update.sumAssured = String(num(body.sum_assured as string | number))
         if (body.cash_value !== undefined) update.cashValue = String(num(body.cash_value as string | number))
         if (body.nominee_name !== undefined) update.nominee = body.nominee_name
@@ -825,7 +733,7 @@ export async function handleVaultApi(
           uuid,
           name: String(body.name ?? ''),
           relation: typeof body.relation === 'string' ? body.relation : undefined,
-          dob: typeof body.dob === 'string' ? body.dob : undefined,
+          dob: optDate(body.dob),
           gender: typeof body.gender === 'string' ? body.gender : undefined,
           notes: typeof body.notes === 'string' ? body.notes : undefined,
         })
@@ -837,7 +745,7 @@ export async function handleVaultApi(
         const update: any = {}
         if (body.name !== undefined) update.name = body.name
         if (body.relation !== undefined) update.relation = body.relation
-        if (body.dob !== undefined) update.dob = typeof body.dob === 'string' ? body.dob : undefined
+        if (body.dob !== undefined) update.dob = optDate(body.dob)
         if (body.gender !== undefined) update.gender = body.gender
         if (body.notes !== undefined) update.notes = body.notes
         await updatePerson(scopeOrgId, uuid, update)
@@ -861,7 +769,7 @@ export async function handleVaultApi(
           docType: String(body.doc_type ?? ''),
           docNumber: typeof body.doc_number === 'string' ? body.doc_number : undefined,
           driveUrl: typeof body.drive_url === 'string' ? body.drive_url : undefined,
-          expiry: typeof body.expiry === 'string' ? body.expiry : undefined,
+          expiry: optDate(body.expiry),
           notes: typeof body.notes === 'string' ? body.notes : undefined,
         })
         return ok(res, docUuid, traceId)
@@ -873,7 +781,7 @@ export async function handleVaultApi(
         if (body.doc_type !== undefined) update.docType = body.doc_type
         if (body.doc_number !== undefined) update.docNumber = body.doc_number
         if (body.drive_url !== undefined) update.driveUrl = body.drive_url
-        if (body.expiry !== undefined) update.expiry = typeof body.expiry === 'string' ? body.expiry : undefined
+        if (body.expiry !== undefined) update.expiry = optDate(body.expiry)
         if (body.notes !== undefined) update.notes = body.notes
         await updateDocument(scopeOrgId, docUuid, update)
         return ok(res, true, traceId)
@@ -882,139 +790,6 @@ export async function handleVaultApi(
         const docUuid = typeof body.doc_uuid === 'string' ? body.doc_uuid : ''
         if (!docUuid) return fail(res, 400, 'Missing doc_uuid', traceId)
         await deleteDocument(scopeOrgId, docUuid)
-        return ok(res, true, traceId)
-      }
-    }
-
-    // Health mutations
-    if (mod === 'health') {
-      if (action === 'addVital') {
-        const vitalUuid = crypto.randomUUID()
-        await addHealthVital(scopeOrgId, {
-          vitalUuid,
-          personUuid: String(body.person_uuid ?? ''),
-          recordedAt: typeof body.recorded_at === 'string' ? body.recorded_at : new Date().toISOString(),
-          heightCm: typeof body.height_cm === 'number' || typeof body.height_cm === 'string' ? num(body.height_cm) : undefined,
-          weightKg: typeof body.weight_kg === 'number' || typeof body.weight_kg === 'string' ? num(body.weight_kg) : undefined,
-          systolic: typeof body.systolic === 'number' || typeof body.systolic === 'string' ? num(body.systolic) : undefined,
-          diastolic: typeof body.diastolic === 'number' || typeof body.diastolic === 'string' ? num(body.diastolic) : undefined,
-          bloodSugar: typeof body.blood_sugar === 'number' || typeof body.blood_sugar === 'string' ? num(body.blood_sugar) : undefined,
-          notes: typeof body.notes === 'string' ? body.notes : undefined,
-        })
-        return ok(res, vitalUuid, traceId)
-      }
-      if (action === 'deleteVital') {
-        const vitalUuid = typeof body.vital_uuid === 'string' ? body.vital_uuid : ''
-        if (!vitalUuid) return fail(res, 400, 'Missing vital_uuid', traceId)
-        await deleteHealthVital(scopeOrgId, vitalUuid)
-        return ok(res, true, traceId)
-      }
-      if (action === 'addIllness') {
-        const illnessUuid = crypto.randomUUID()
-        await addIllness(scopeOrgId, {
-          illnessUuid,
-          personUuid: String(body.person_uuid ?? ''),
-          name: String(body.name ?? ''),
-          diagnosedOn: typeof body.diagnosed_on === 'string' ? body.diagnosed_on : undefined,
-          status: typeof body.status === 'string' ? body.status : undefined,
-          notes: typeof body.notes === 'string' ? body.notes : undefined,
-        })
-        return ok(res, illnessUuid, traceId)
-      }
-      if (action === 'updateIllness') {
-        const illnessUuid = typeof body.illness_uuid === 'string' ? body.illness_uuid : ''
-        if (!illnessUuid) return fail(res, 400, 'Missing illness_uuid', traceId)
-        const update: any = {}
-        if (body.name !== undefined) update.name = body.name
-        if (body.diagnosed_on !== undefined) update.diagnosedOn = typeof body.diagnosed_on === 'string' ? body.diagnosed_on : undefined
-        if (body.status !== undefined) update.status = body.status
-        if (body.notes !== undefined) update.notes = body.notes
-        await updateIllness(scopeOrgId, illnessUuid, update)
-        return ok(res, true, traceId)
-      }
-      if (action === 'deleteIllness') {
-        const illnessUuid = typeof body.illness_uuid === 'string' ? body.illness_uuid : ''
-        if (!illnessUuid) return fail(res, 400, 'Missing illness_uuid', traceId)
-        await deleteIllness(scopeOrgId, illnessUuid)
-        return ok(res, true, traceId)
-      }
-      if (action === 'addMedication') {
-        const medUuid = crypto.randomUUID()
-        await addMedication(scopeOrgId, {
-          medUuid,
-          personUuid: String(body.person_uuid ?? ''),
-          illnessUuid: typeof body.illness_uuid === 'string' ? body.illness_uuid : undefined,
-          name: String(body.name ?? ''),
-          dosage: typeof body.dosage === 'string' ? body.dosage : undefined,
-          frequency: typeof body.frequency === 'string' ? body.frequency : undefined,
-          startDate: typeof body.start_date === 'string' ? body.start_date : undefined,
-          endDate: typeof body.end_date === 'string' ? body.end_date : undefined,
-          reminderTimes: typeof body.reminder_times === 'string' ? body.reminder_times : undefined,
-          notes: typeof body.notes === 'string' ? body.notes : undefined,
-        })
-        return ok(res, medUuid, traceId)
-      }
-      if (action === 'updateMedication') {
-        const medUuid = typeof body.med_uuid === 'string' ? body.med_uuid : ''
-        if (!medUuid) return fail(res, 400, 'Missing med_uuid', traceId)
-        const update: any = {}
-        if (body.illness_uuid !== undefined) update.illnessUuid = body.illness_uuid
-        if (body.name !== undefined) update.name = body.name
-        if (body.dosage !== undefined) update.dosage = body.dosage
-        if (body.frequency !== undefined) update.frequency = body.frequency
-        if (body.start_date !== undefined) update.startDate = typeof body.start_date === 'string' ? body.start_date : undefined
-        if (body.end_date !== undefined) update.endDate = typeof body.end_date === 'string' ? body.end_date : undefined
-        if (body.reminder_times !== undefined) update.reminderTimes = body.reminder_times
-        if (body.notes !== undefined) update.notes = body.notes
-        await updateMedication(scopeOrgId, medUuid, update)
-        return ok(res, true, traceId)
-      }
-      if (action === 'deleteMedication') {
-        const medUuid = typeof body.med_uuid === 'string' ? body.med_uuid : ''
-        if (!medUuid) return fail(res, 400, 'Missing med_uuid', traceId)
-        await deleteMedication(scopeOrgId, medUuid)
-        return ok(res, true, traceId)
-      }
-    }
-
-    // Habits mutations
-    if (mod === 'habits') {
-      if (action === 'addHabit') {
-        const habitUuid = crypto.randomUUID()
-        await addHabit(scopeOrgId, {
-          habitUuid,
-          personUuid: String(body.person_uuid ?? ''),
-          name: String(body.name ?? ''),
-          category: typeof body.category === 'string' ? body.category : undefined,
-          targetFrequency: typeof body.target_frequency === 'string' ? body.target_frequency : undefined,
-        })
-        return ok(res, habitUuid, traceId)
-      }
-      if (action === 'updateHabit') {
-        const habitUuid = typeof body.habit_uuid === 'string' ? body.habit_uuid : ''
-        if (!habitUuid) return fail(res, 400, 'Missing habit_uuid', traceId)
-        const update: any = {}
-        if (body.name !== undefined) update.name = body.name
-        if (body.category !== undefined) update.category = body.category
-        if (body.target_frequency !== undefined) update.targetFrequency = body.target_frequency
-        await updateHabit(scopeOrgId, habitUuid, update)
-        return ok(res, true, traceId)
-      }
-      if (action === 'deleteHabit') {
-        const habitUuid = typeof body.habit_uuid === 'string' ? body.habit_uuid : ''
-        if (!habitUuid) return fail(res, 400, 'Missing habit_uuid', traceId)
-        await deleteHabit(scopeOrgId, habitUuid)
-        return ok(res, true, traceId)
-      }
-      if (action === 'logHabit') {
-        const logUuid = crypto.randomUUID()
-        await addHabitLog(scopeOrgId, {
-          logUuid,
-          habitUuid: String(body.habit_uuid ?? ''),
-          personUuid: String(body.person_uuid ?? ''),
-          logDate: typeof body.log_date === 'string' ? body.log_date : new Date().toISOString().split('T')[0],
-          completed: Boolean(body.completed),
-        })
         return ok(res, true, traceId)
       }
     }

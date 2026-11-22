@@ -362,7 +362,7 @@ export default function VaultDocumentsPage() {
             <FormField label="Drive URL">
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <input className="form-inp" style={{ flex: 1 }} value={form.drive_url} onChange={e => setForm(f => ({ ...f, drive_url: e.target.value }))} placeholder="https://…" />
-                {form.drive_url.trim() ? (
+                {/^https?:\/\//i.test(form.drive_url.trim()) ? (
                   <a
                     href={form.drive_url.trim()}
                     download

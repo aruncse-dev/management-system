@@ -10,7 +10,7 @@ Turborepo + pnpm workspaces. All packages under `packages/`.
 packages/
   apps/
     fintracker/   # expense tracking, investments, gold, loans, subscriptions (port 3000)
-    vault/        # insurance, passwords, documents, health (port 3001)
+    vault/        # banking, insurance, passwords, persons, documents (port 3001)
     staff/        # attendance, staff management (port 3002)
     admin/        # org/user/integration management (port 3003)
   shared/

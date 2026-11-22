@@ -52,6 +52,8 @@ function handOff(target: string, fallbackUrl: string) {
   window.location.href = target
 }
 
+const SAFE_HANDOFF_SCHEMES = new Set(['tel:', 'mailto:', 'sms:', 'upi:', 'whatsapp:'])
+
 export function openExternal(rawUrl: string | null | undefined): void {
   const url = String(rawUrl ?? '').trim()
   if (!url || typeof window === 'undefined') return
@@ -63,7 +65,10 @@ export function openExternal(rawUrl: string | null | undefined): void {
     return
   }
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    window.location.href = url
+    // Links are user-entered (app links, Drive URLs, e-cards). Only hand off
+    // schemes that open another app; `javascript:` and `data:` would run in
+    // this origin with the signed-in session.
+    if (SAFE_HANDOFF_SCHEMES.has(parsed.protocol)) window.location.href = parsed.href
     return
   }
 
