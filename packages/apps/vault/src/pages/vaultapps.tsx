@@ -241,14 +241,14 @@ export default function VaultAppsPage() {
       ) : (
         <div className="ui-stack">
           {filteredRows.length === 0 ? (
-            <div style={{ padding: '18px 14px', color: 'var(--muted)', fontSize: 13, fontWeight: 600, textAlign: 'center' }}>
+            <div style={{ padding: '18px 14px', color: 'var(--muted)', fontSize: 13, fontWeight: 550, textAlign: 'center' }}>
               No apps found. Add one with the plus button.
             </div>
           ) : (
             groupedRows.map(([category, group]) => (
             <div key={category} style={{ display: 'grid', gap: 6 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', padding: '4px 2px' }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)' }}>{category}</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}>{category}</div>
                 <div style={{ fontSize: 11, color: 'var(--muted)' }}>{group.length}</div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 4 }}>
@@ -286,7 +286,7 @@ export default function VaultAppsPage() {
                       {appIcon(row, 52)}
                     </span>
                     <div style={{ minWidth: 0, width: '100%', paddingInline: 4 }}>
-                      <div style={{ fontSize: 13, fontWeight: 750, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'normal', lineHeight: 1.25, textAlign: 'center' }}>
+                      <div style={{ fontSize: 13, fontWeight: 620, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'normal', lineHeight: 1.25, textAlign: 'center' }}>
                         {row.app_name || 'Untitled App'}
                       </div>
                     </div>
@@ -358,7 +358,7 @@ export default function VaultAppsPage() {
               <input className="form-inp" type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} />
             </FormField>
             <FormField label="Two Factor Enabled">
-              <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'var(--text)', fontWeight: 600 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'var(--text)', fontWeight: 550 }}>
                 <input type="checkbox" checked={form.two_factor_enabled} onChange={e => setForm(f => ({ ...f, two_factor_enabled: e.target.checked }))} />
                 Enabled
               </label>
@@ -403,7 +403,7 @@ export default function VaultAppsPage() {
       )}
 
       {toast && (
-        <div style={{ position: 'fixed', left: '50%', bottom: 18, transform: 'translateX(-50%)', zIndex: 500, background: '#ECFDF5', color: '#166534', border: '1px solid #BBF7D0', borderRadius: 999, padding: '10px 14px', fontSize: 12, fontWeight: 700, boxShadow: '0 12px 28px rgba(22, 101, 52, .14)', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ position: 'fixed', left: '50%', bottom: 18, transform: 'translateX(-50%)', zIndex: 500, background: '#ECFDF5', color: '#166534', border: '1px solid #BBF7D0', borderRadius: 999, padding: '10px 14px', fontSize: 12, fontWeight: 600, boxShadow: '0 12px 28px rgba(22, 101, 52, .14)', display: 'flex', alignItems: 'center', gap: 8 }}>
           <Check size={14} />
           <span>{toast}</span>
         </div>
@@ -415,9 +415,9 @@ export default function VaultAppsPage() {
 function RowDetail({ label, value, action }: { label: string; value: string; action?: React.ReactNode }) {
   return (
     <div style={{ display: 'grid', gap: 5, padding: '0 2px', minWidth: 0 }}>
-      <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em' }}>{label}</div>
+      <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.05em' }}>{label}</div>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', wordBreak: 'break-word', whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: 1.45, flex: 1 }}>{value}</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', wordBreak: 'break-word', whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: 1.45, flex: 1 }}>{value}</div>
         {action}
       </div>
     </div>

@@ -1,6 +1,5 @@
 import type { AppProps } from 'next/app'
 import Head from 'next/head'
-import { GeistSans } from 'geist/font/sans'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
 import { AppAuthGate, PwaServiceWorker, formatBuildLabel, Nav, type ModuleId, type NavDynamicMenuSection } from '@fintracker-vault/ui'
@@ -25,6 +24,9 @@ import {
   normalizeLendingSheetSlug,
 } from '../lib/lendingSheetSlug'
 import '@fintracker-vault/ui/styles/ui-kit'
+// Roboto (Android's own typeface), self-hosted as a variable font so every
+// weight renders as designed; only the Latin + ₹ subsets are fetched.
+import '@fontsource-variable/roboto/wght.css'
 import '../styles/globals.css'
 
 /** Which deploy is running, shown at the bottom of the menu drawer. */
@@ -251,8 +253,6 @@ export default function App({ Component, pageProps }: AppProps) {
       <Head>
         <title>{pageTitle}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-        {/* Self-hosted Geist (next/font): preloaded from this origin, no third-party CSS blocking first paint. */}
-        <style dangerouslySetInnerHTML={{ __html: `:root{--font-sans:${GeistSans.style.fontFamily}}` }} />
       </Head>
       <PwaServiceWorker build={process.env.NEXT_PUBLIC_BUILD_SHA} />
       <AppAuthGate

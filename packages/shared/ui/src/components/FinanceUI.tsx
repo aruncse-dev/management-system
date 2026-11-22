@@ -151,7 +151,7 @@ export function UiSheet({
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
             {icon && <span className="ui-sheet-icon">{icon}</span>}
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: '1rem', fontWeight: 700 }}>{title}</div>
+              <div style={{ fontSize: '1rem', fontWeight: 600 }}>{title}</div>
               {subtitle && <div className="dash-credit-summary-sub">{subtitle}</div>}
             </div>
           </div>

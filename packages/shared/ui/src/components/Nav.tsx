@@ -181,7 +181,7 @@ export default function Nav({
         <div
           style={{
             fontSize: 12,
-            fontWeight: 600,
+            fontWeight: 550,
             color: 'var(--muted)',
             textTransform: 'uppercase',
             letterSpacing: '.04em',
@@ -215,7 +215,7 @@ export default function Nav({
         <div
           style={{
             fontSize: 12,
-            fontWeight: 600,
+            fontWeight: 550,
             color: 'var(--muted)',
             textTransform: 'uppercase',
             letterSpacing: '.04em',
@@ -250,7 +250,7 @@ export default function Nav({
           <span className="nav-app-icon-wrap">
             <img src={iconSrc} alt={name} className="nav-app-icon" />
           </span>
-          {title && <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{title}</span>}
+          {title && <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{title}</span>}
         </span>
 
         <button type="button" className="nav-hamburger" onClick={() => setDrawerOpen(true)}>
@@ -306,7 +306,7 @@ export default function Nav({
               <div
                 style={{
                   fontSize: 12,
-                  fontWeight: 600,
+                  fontWeight: 550,
                   color: 'var(--muted)',
                   textTransform: 'uppercase',
                   letterSpacing: '.04em',
@@ -393,7 +393,7 @@ export default function Nav({
           >
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text)', fontWeight: 700, fontSize: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text)', fontWeight: 600, fontSize: 16 }}>
                   <LogOut size={18} />
                   Logout app?
                 </div>

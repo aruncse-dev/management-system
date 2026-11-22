@@ -253,7 +253,7 @@ export default function StaffsPage() {
               padding: '18px 14px',
               color: 'var(--muted)',
               fontSize: 13,
-              fontWeight: 600,
+              fontWeight: 550,
               textAlign: 'center',
               display: 'grid',
               gap: 6,

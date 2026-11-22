@@ -276,7 +276,7 @@ export default function AppAuthGate({ appKind, googleClientId, children, onSigne
         placeItems: 'center',
         padding: 24,
         color: 'var(--muted, #64748b)',
-        fontWeight: 600,
+        fontWeight: 550,
       }}
       role="status"
       aria-live="polite"
@@ -301,7 +301,7 @@ export default function AppAuthGate({ appKind, googleClientId, children, onSigne
       }}
     >
       <div style={{ display: 'grid', gap: 10, maxWidth: 320 }}>
-        <div style={{ fontWeight: 700 }}>Can&apos;t reach the server</div>
+        <div style={{ fontWeight: 600 }}>Can&apos;t reach the server</div>
         <div style={{ fontSize: 13, color: 'var(--muted, #64748b)', lineHeight: 1.5 }}>
           You are probably still signed in — we just couldn&apos;t check. Check your
           connection and try again.

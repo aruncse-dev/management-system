@@ -271,7 +271,7 @@ export function VaultBankingPage() {
             groupedRows.map(([holder, group]) => (
               <div key={holder} style={{ display: 'grid', gap: 6 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', padding: '4px 2px' }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)' }}>{holder}</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}>{holder}</div>
                   <div style={{ fontSize: 11, color: 'var(--muted)' }}>
                     {group.length} {group.length === 1 ? 'account' : 'accounts'}
                   </div>
@@ -410,9 +410,9 @@ export function VaultBankingPage() {
               const canCopy = copyableLabels.has(label)
               return (
                 <div key={label} style={{ display: 'grid', gap: 8, alignContent: 'start', padding: 12, border: '1px solid var(--border)', borderRadius: 12, background: 'var(--card)' }}>
-                  <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em' }}>{label}</div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em' }}>{label}</div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                    <div style={{ color: 'var(--text)', fontWeight: 600, wordBreak: 'break-word', minWidth: 0 }}>{maskedValue(label, value)}</div>
+                    <div style={{ color: 'var(--text)', fontWeight: 550, wordBreak: 'break-word', minWidth: 0 }}>{maskedValue(label, value)}</div>
                     {canCopy && (
                       <button type="button" className="ui-kit-btn ui-kit-btn--soft ui-kit-btn-inline" onClick={() => copy(label, value)} style={{ width: 32, height: 32, padding: 0, justifyContent: 'center', flexShrink: 0 }} aria-label={`Copy ${label}`} title={`Copy ${label}`}>
                         <Copy size={14} />
@@ -427,7 +427,7 @@ export function VaultBankingPage() {
       )}
 
       {toast && (
-        <div style={{ position: 'fixed', left: '50%', bottom: 18, transform: 'translateX(-50%)', zIndex: 500, background: '#ECFDF5', color: '#166534', border: '1px solid #BBF7D0', borderRadius: 999, padding: '10px 14px', fontSize: 12, fontWeight: 700, boxShadow: '0 12px 28px rgba(22, 101, 52, .14)', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ position: 'fixed', left: '50%', bottom: 18, transform: 'translateX(-50%)', zIndex: 500, background: '#ECFDF5', color: '#166534', border: '1px solid #BBF7D0', borderRadius: 999, padding: '10px 14px', fontSize: 12, fontWeight: 600, boxShadow: '0 12px 28px rgba(22, 101, 52, .14)', display: 'flex', alignItems: 'center', gap: 8 }}>
           <Check size={14} />
           <span>{toast}</span>
         </div>

@@ -31,7 +31,7 @@ export default function ErrorScreen({ error, onRetry, iconSrc = '/icon-192.png' 
           </div>
         </div>
         <AlertCircle size={48} style={{ color: '#EF4444', marginBottom: 16 }} />
-        <h1 style={{ fontSize: 24, fontWeight: 700, color: '#FFF', marginBottom: 8 }}>Backend or network error</h1>
+        <h1 style={{ fontSize: 24, fontWeight: 600, color: '#FFF', marginBottom: 8 }}>Backend or network error</h1>
         <p style={{ fontSize: 14, color: '#A5B4FC', marginBottom: 24 }}>{error}</p>
 
         {showApiHints && (
@@ -45,7 +45,7 @@ export default function ErrorScreen({ error, onRetry, iconSrc = '/icon-192.png' 
               textAlign: 'left',
             }}
           >
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#FFF', marginBottom: 10 }}>Things to check</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#FFF', marginBottom: 10 }}>Things to check</div>
             <ol style={{ fontSize: 12, color: '#A5B4FC', margin: 0, paddingLeft: 20, lineHeight: 1.6 }}>
               <li>Sign in with Google on this app (session cookie required for API routes).</li>
               <li>
@@ -73,7 +73,7 @@ export default function ErrorScreen({ error, onRetry, iconSrc = '/icon-192.png' 
                 borderRadius: 8,
                 padding: '12px 20px',
                 fontSize: 14,
-                fontWeight: 600,
+                fontWeight: 550,
                 cursor: 'pointer',
                 transition: 'background 0.15s',
               }}
@@ -97,7 +97,7 @@ export default function ErrorScreen({ error, onRetry, iconSrc = '/icon-192.png' 
               borderRadius: 8,
               padding: '12px 20px',
               fontSize: 14,
-              fontWeight: 600,
+              fontWeight: 550,
               cursor: 'pointer',
               transition: 'all 0.15s',
             }}

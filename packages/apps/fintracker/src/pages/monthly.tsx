@@ -387,7 +387,7 @@ export default function Monthly() {
             </div>
             <div className="modal-body">
               <div>
-                <div style={{fontSize:12,fontWeight:600,color:'var(--muted)',marginBottom:5,textTransform:'uppercase',letterSpacing:.4}}>Budget name</div>
+                <div style={{fontSize:12,fontWeight:550,color:'var(--muted)',marginBottom:5,textTransform:'uppercase',letterSpacing:.4}}>Budget name</div>
                 <input
                   className="form-inp"
                   type="text"
@@ -398,7 +398,7 @@ export default function Monthly() {
                 />
               </div>
               <div>
-                <div style={{fontSize:12,fontWeight:600,color:'var(--muted)',marginBottom:5,textTransform:'uppercase',letterSpacing:.4}}>{`Budget amount (${money.currency})`}</div>
+                <div style={{fontSize:12,fontWeight:550,color:'var(--muted)',marginBottom:5,textTransform:'uppercase',letterSpacing:.4}}>{`Budget amount (${money.currency})`}</div>
                 <input className="form-inp" type="number" placeholder={money.zeroPlaceholder} value={budgetVal} onChange={e => setBudgetVal(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addBudget() }} />
               </div>
               <BudgetMonthRangeFields

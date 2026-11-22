@@ -67,7 +67,7 @@ export default function SimpleAppNav({
           <span className="nav-app-icon-wrap" aria-hidden={!iconAlt}>
             <img src={iconSrc} alt={iconAlt} className="nav-app-icon" />
           </span>
-          <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{barTitle}</span>
+          <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{barTitle}</span>
         </span>
         <button type="button" className="nav-hamburger" onClick={() => setDrawerOpen(true)} aria-label="Open menu">
           ☰
@@ -91,7 +91,7 @@ export default function SimpleAppNav({
             <div
               style={{
                 fontSize: 12,
-                fontWeight: 600,
+                fontWeight: 550,
                 color: 'var(--muted)',
                 textTransform: 'uppercase',
                 letterSpacing: '.04em',
@@ -155,7 +155,7 @@ export default function SimpleAppNav({
           >
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text)', fontWeight: 700, fontSize: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text)', fontWeight: 600, fontSize: 16 }}>
                   <LogOut size={18} />
                   Logout app?
                 </div>

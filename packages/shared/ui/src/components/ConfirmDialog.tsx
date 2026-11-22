@@ -59,7 +59,7 @@ export function ConfirmDialog({
           }}
         >
           <div style={{ minWidth: 0 }}>
-            <div style={{ color: 'var(--text)', fontWeight: 800, fontSize: 16 }}>{title}</div>
+            <div style={{ color: 'var(--text)', fontWeight: 650, fontSize: 16 }}>{title}</div>
             {description ? (
               <div style={{ marginTop: 6, fontSize: 13, lineHeight: 1.5, color: 'var(--muted)' }}>{description}</div>
             ) : null}
