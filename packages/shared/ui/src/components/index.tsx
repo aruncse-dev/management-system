@@ -1034,7 +1034,7 @@ export {
   type GoogleAuthCardProps,
 } from './GoogleAuthCard'
 export { ConfirmDialog } from './ConfirmDialog'
-export { PwaServiceWorker } from './PwaServiceWorker'
+export { PwaServiceWorker, formatBuildLabel } from './PwaServiceWorker'
 export { openExternal, externalLinkClick } from './openExternal'
 export { FabButton, FormCard, DataPageHeader, AdminDataListSearch } from './AdminShell'
 export { UpstoxIcon } from './UpstoxIcon'

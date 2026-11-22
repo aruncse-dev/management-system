@@ -1,10 +1,22 @@
 const path = require('path')
+const fs = require('fs')
+const { PHASE_PRODUCTION_BUILD } = require('next/constants')
+
+/**
+ * Which deploy this is: the commit Vercel built, and when. Baked into the
+ * client (drawer stamp) and published as /version.json so a running app can
+ * tell that a newer deploy is live and stop showing an old cached page.
+ */
+const BUILD_SHA = String(process.env.VERCEL_GIT_COMMIT_SHA || 'local').slice(0, 7)
+const BUILD_TIME = new Date().toISOString()
 const { getGoogleAuthEnv } = require('../resolve-google-env.cjs')
 
 const { googleClientId: resolvedGoogleClientId, allowedEmails: resolvedAllowedEmails } =
   getGoogleAuthEnv(__dirname)
 
 const clientEnv = {
+  NEXT_PUBLIC_BUILD_SHA: BUILD_SHA,
+  NEXT_PUBLIC_BUILD_TIME: BUILD_TIME,
   NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || '/api',
   VITE_GOOGLE_CLIENT_ID: resolvedGoogleClientId,
   NEXT_PUBLIC_GOOGLE_CLIENT_ID: resolvedGoogleClientId,
@@ -38,6 +50,11 @@ const nextConfig = {
         ],
       },
       {
+        // Must never be cached: it is how an open app learns a newer deploy exists.
+        source: '/version.json',
+        headers: [{ key: 'Cache-Control', value: 'no-store' }],
+      },
+      {
         source: '/manifest.json',
         headers: [{ key: 'Cache-Control', value: 'public, max-age=3600' }],
       },
@@ -55,4 +72,16 @@ const nextConfig = {
   ],
 }
 
-module.exports = nextConfig
+module.exports = phase => {
+  if (phase === PHASE_PRODUCTION_BUILD) {
+    try {
+      fs.writeFileSync(
+        path.join(__dirname, 'public', 'version.json'),
+        JSON.stringify({ build: BUILD_SHA, time: BUILD_TIME }) + '\n',
+      )
+    } catch {
+      // A missing version file only disables the update check.
+    }
+  }
+  return nextConfig
+}

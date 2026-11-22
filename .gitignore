@@ -58,3 +58,6 @@ gas/.deployment-id
 
 # Project-scoped GitHub CLI config (holds an auth token)
 .gh/
+
+# Written by next.config.js at build time (deploy stamp)
+packages/apps/*/public/version.json

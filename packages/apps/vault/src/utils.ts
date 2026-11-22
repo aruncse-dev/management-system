@@ -98,3 +98,19 @@ export function currentMonthYear() {
   }
   return { month: MNS[mi], year: String(yr) }
 }
+
+/**
+ * Show only the last four characters of an account or document number on a
+ * list: "50100123454821" → "•••• 4821", "1234 5678 9012" → "•••• 9012".
+ *
+ * Lists are what other people glance at over your shoulder; the full number
+ * stays one tap away on the detail/edit screen (which also offers Copy).
+ * Values of four characters or fewer are shown as they are.
+ */
+export function maskTail(value: string | null | undefined, keep = 4): string {
+  const raw = String(value ?? '').trim()
+  if (!raw) return ''
+  const compact = raw.replace(/[\s-]/g, '')
+  if (compact.length <= keep) return raw
+  return `•••• ${compact.slice(-keep)}`
+}

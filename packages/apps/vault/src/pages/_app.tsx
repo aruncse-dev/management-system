@@ -9,11 +9,14 @@ import {
   Shield,
   Users,
 } from 'lucide-react'
-import { AppAuthGate, PwaServiceWorker, SimpleAppNav, type SimpleAppNavSection } from '@fintracker-vault/ui'
+import { AppAuthGate, PwaServiceWorker, formatBuildLabel, SimpleAppNav, type SimpleAppNavSection } from '@fintracker-vault/ui'
 import { StoreProvider } from '../store'
 import { getClientAuthEnv } from '../clientAuthEnv'
 import '@fintracker-vault/ui/styles/ui-kit'
 import '../styles/globals.css'
+
+/** Which deploy is running, shown at the bottom of the menu drawer. */
+const BUILD_LABEL = formatBuildLabel(process.env.NEXT_PUBLIC_BUILD_SHA, process.env.NEXT_PUBLIC_BUILD_TIME)
 
 const VAULT_PAGE_TITLES: Record<string, string> = {
   '/vault': 'Banking',
@@ -59,7 +62,7 @@ export default function App({ Component, pageProps }: AppProps) {
         {/* Self-hosted Geist (next/font): preloaded from this origin, no third-party CSS blocking first paint. */}
         <style dangerouslySetInnerHTML={{ __html: `:root{--font-sans:${GeistSans.style.fontFamily}}` }} />
       </Head>
-      <PwaServiceWorker />
+      <PwaServiceWorker build={process.env.NEXT_PUBLIC_BUILD_SHA} />
       <AppAuthGate appKind="vault" googleClientId={googleClientId}>
       {({ onLogout }) => (
         <StoreProvider>
@@ -75,6 +78,7 @@ export default function App({ Component, pageProps }: AppProps) {
               }}
               sections={VAULT_NAV_SECTIONS}
               onLogout={onLogout}
+              buildLabel={BUILD_LABEL}
             />
             <Component {...pageProps} />
           </div>

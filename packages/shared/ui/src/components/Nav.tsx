@@ -84,6 +84,8 @@ interface Props {
   activeAsPath?: string
   /** Navigate for `dynamicMenu` items. */
   onNavigatePath?: (path: string) => void
+  /** Shown at the bottom of the drawer, e.g. "f215a3f · 22 Nov, 16:47" — which deploy is running. */
+  buildLabel?: string
 }
 
 const LENDING_SUBMENU = [
@@ -155,6 +157,7 @@ export default function Nav({
   dynamicMenu,
   activeAsPath = '',
   onNavigatePath,
+  buildLabel,
 }: Props) {
   const name = appName ?? brandName(area)
   const iconSrc = getAppAssetUrl(area, getAppIconAsset(area))
@@ -371,6 +374,7 @@ export default function Nav({
             </div>
           </>
         )}
+      {buildLabel ? <div className="nav-drawer-build">Build {buildLabel}</div> : null}
       </div>
 
       {logoutConfirmOpen && onLogout && (

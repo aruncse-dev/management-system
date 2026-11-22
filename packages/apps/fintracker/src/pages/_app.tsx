@@ -3,7 +3,7 @@ import Head from 'next/head'
 import { GeistSans } from 'geist/font/sans'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
-import { AppAuthGate, PwaServiceWorker, Nav, type ModuleId, type NavDynamicMenuSection } from '@fintracker-vault/ui'
+import { AppAuthGate, PwaServiceWorker, formatBuildLabel, Nav, type ModuleId, type NavDynamicMenuSection } from '@fintracker-vault/ui'
 import { getAppArea } from '../appPaths'
 import { StoreProvider } from '../store'
 import { getClientAuthEnv } from '../clientAuthEnv'
@@ -26,6 +26,9 @@ import {
 } from '../lib/lendingSheetSlug'
 import '@fintracker-vault/ui/styles/ui-kit'
 import '../styles/globals.css'
+
+/** Which deploy is running, shown at the bottom of the menu drawer. */
+const BUILD_LABEL = formatBuildLabel(process.env.NEXT_PUBLIC_BUILD_SHA, process.env.NEXT_PUBLIC_BUILD_TIME)
 
 /** Empty array ⇒ drawer shows only Settings, UI Kit, Logout (no org menu items). */
 function groupNavMenu(menu: CachedProfileMenuRow[] | undefined | null): NavDynamicMenuSection[] {
@@ -251,7 +254,7 @@ export default function App({ Component, pageProps }: AppProps) {
         {/* Self-hosted Geist (next/font): preloaded from this origin, no third-party CSS blocking first paint. */}
         <style dangerouslySetInnerHTML={{ __html: `:root{--font-sans:${GeistSans.style.fontFamily}}` }} />
       </Head>
-      <PwaServiceWorker />
+      <PwaServiceWorker build={process.env.NEXT_PUBLIC_BUILD_SHA} />
       <AppAuthGate
         appKind="fintracker"
         googleClientId={googleClientId}
@@ -283,6 +286,7 @@ export default function App({ Component, pageProps }: AppProps) {
                     appName="FinTracker"
                     area={getAppArea(router.asPath)}
                     onLogout={handleLogout}
+                    buildLabel={BUILD_LABEL}
                     dynamicMenu={dynamicMenu}
                     activeAsPath={router.asPath}
                     onNavigatePath={navigateFromMenu}

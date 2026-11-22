@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { api, type DocumentRow, type PersonRow } from '../api'
 import { FormField, ModalActions, ModalShell, SearchField, SectionBlock, SectionChip, Spacer, TransactionCard, externalLinkClick, openExternal } from '../ui'
+import { maskTail } from '../utils'
 
 const DOC_TYPES = ['Aadhaar', 'PAN', 'Passport', 'DL', 'Voter ID', 'Birth Certificate', 'Other'] as const
 
@@ -275,7 +276,7 @@ export default function VaultDocumentsPage() {
                 <TransactionCard
                   key={r.doc_uuid}
                   title={nameById.get(r.person_uuid) || '—'}
-                  amount={r.doc_number || '—'}
+                  amount={maskTail(r.doc_number) || '—'}
                   amountLabel="Doc No"
                   type={<DocumentDrivePreview url={r.drive_url || ''} />}
                   typeLabel="Preview"

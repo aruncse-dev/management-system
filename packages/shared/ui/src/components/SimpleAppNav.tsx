@@ -30,6 +30,8 @@ export type SimpleAppNavProps = {
   sections: SimpleAppNavSection[]
   settingsItem?: SimpleAppNavItem
   onLogout?: () => void
+  /** Shown at the bottom of the drawer, e.g. "f215a3f · 22 Nov, 16:47" — which deploy is running. */
+  buildLabel?: string
 }
 
 export default function SimpleAppNav({
@@ -42,6 +44,7 @@ export default function SimpleAppNav({
   sections,
   settingsItem,
   onLogout,
+  buildLabel,
 }: SimpleAppNavProps) {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
@@ -127,6 +130,7 @@ export default function SimpleAppNav({
             <span>Logout</span>
           </button>
         </div>
+        {buildLabel ? <div className="nav-drawer-build">Build {buildLabel}</div> : null}
       </div>
 
       {logoutConfirmOpen && (
