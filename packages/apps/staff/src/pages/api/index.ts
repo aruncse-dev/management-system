@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { and, asc, desc, eq, gte, lte, sql } from 'drizzle-orm'
+import { randomUUID } from 'crypto'
+import { and, asc, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm'
 import { getIronSession } from 'iron-session'
 import type { FtSessionData } from '@fintracker-vault/auth'
 import { getDb, attendance, staffMembers } from '@fintracker-vault/db'
@@ -32,6 +33,28 @@ function padMonth(m: string) {
 /** Accepts 'YYYY-MM' only; returns null for anything else so it can never widen a WHERE clause. */
 function normalizeMonthYear(v: string) {
   return /^\d{4}-(0[1-9]|1[0-2])$/.test(v) ? v : null
+}
+
+/**
+ * Resolve a `YYYY-MM-DD` date inside the `month`/`year` it was filed under.
+ *
+ * The old check took the day from `\d{2}` alone, so day 45 or 31 Feb was
+ * written happily, and a date from another month could be filed under this one.
+ */
+function parseAttendanceDay(
+  date: string,
+  month: string,
+  year: string,
+): { monthYear: string; day: number } | { error: string } {
+  if (!/^\d{4}$/.test(year)) return { error: 'Invalid year' }
+  const monthPad = padMonth(month)
+  if (!monthPad) return { error: 'Invalid month' }
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date)
+  if (!m || m[1] !== year || m[2] !== monthPad) return { error: 'Date is outside the selected month' }
+  const day = parseInt(m[3], 10)
+  const daysInMonth = new Date(Number(year), Number(monthPad), 0).getDate()
+  if (day < 1 || day > daysInMonth) return { error: 'Invalid date' }
+  return { monthYear: `${year}-${monthPad}`, day }
 }
 
 function toSalaryBasis(v: string | null | undefined): SalaryBasis {
@@ -350,17 +373,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           return fail(res, 400, 'Missing required fields', traceId)
         }
 
-        const monthPad = padMonth(month)
-        if (!monthPad) {
-          return fail(res, 400, 'Invalid month', traceId)
-        }
-
-        const monthYear = `${year}-${monthPad}`
-        const dayMatch = date.match(/\d{4}-\d{2}-(\d{2})/)
-        const day = dayMatch ? parseInt(dayMatch[1], 10) : null
-        if (!day || Number.isNaN(day)) {
-          return fail(res, 400, 'Invalid date format', traceId)
-        }
+        const parsed = parseAttendanceDay(date, month, year)
+        if ('error' in parsed) return fail(res, 400, parsed.error, traceId)
+        const { monthYear, day } = parsed
 
         if (!worked) {
           await db
@@ -428,6 +443,99 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             overtime,
             notes,
           },
+          traceId,
+        )
+      }
+
+      /**
+       * Mark several people (and/or days) in one request and one transaction —
+       * "mark everyone present" used to be one modal round trip per person,
+       * each followed by a full refetch of the month.
+       */
+      if (action === 'setAttendanceBulk') {
+        const month = String(body.month ?? '').trim()
+        const year = String(body.year ?? '').trim()
+        const raw = Array.isArray(body.entries) ? (body.entries as unknown[]) : []
+        if (!raw.length) return fail(res, 400, 'No entries', traceId)
+        if (raw.length > 400) return fail(res, 400, 'Too many entries', traceId)
+
+        type Parsed = { staffId: string; date: string; monthYear: string; day: number; worked: boolean; overtime: boolean; notes: string | null }
+        const entries: Parsed[] = []
+        for (const item of raw) {
+          const e = (item ?? {}) as Record<string, unknown>
+          const staffId = String(e.staffId ?? '').trim()
+          const date = String(e.date ?? '').trim()
+          if (!staffId || !date) return fail(res, 400, 'Missing required fields', traceId)
+          const parsed = parseAttendanceDay(date, month, year)
+          if ('error' in parsed) return fail(res, 400, parsed.error, traceId)
+          entries.push({
+            staffId,
+            date,
+            ...parsed,
+            worked: Boolean(e.worked),
+            overtime: Boolean(e.overtime),
+            notes: e.notes ? String(e.notes).trim() || null : null,
+          })
+        }
+
+        const markIds = [...new Set(entries.filter(e => e.worked).map(e => e.staffId))]
+        if (markIds.length) {
+          const known = await db
+            .select({ id: staffMembers.id, status: staffMembers.status })
+            .from(staffMembers)
+            .where(and(eq(staffMembers.orgId, orgId), inArray(staffMembers.id, markIds)))
+          const byId = new Map(known.map(k => [k.id, k.status]))
+          for (const id of markIds) {
+            if (!byId.has(id)) return fail(res, 404, 'Unknown staff member', traceId)
+            if (byId.get(id) !== 'active') return fail(res, 400, 'Staff member is inactive', traceId)
+          }
+        }
+
+        await db.transaction(async tx => {
+          for (const e of entries.filter(x => !x.worked)) {
+            await tx
+              .delete(attendance)
+              .where(
+                and(
+                  eq(attendance.orgId, orgId),
+                  eq(attendance.staffId, e.staffId),
+                  eq(attendance.monthYear, e.monthYear),
+                  eq(attendance.day, e.day),
+                ),
+              )
+          }
+          const upserts = entries.filter(x => x.worked)
+          if (upserts.length) {
+            await tx
+              .insert(attendance)
+              .values(
+                upserts.map(e => ({
+                  id: `att-${randomUUID()}`,
+                  orgId,
+                  staffId: e.staffId,
+                  monthYear: e.monthYear,
+                  day: e.day,
+                  status: e.overtime ? 'overtime' : 'worked',
+                  notes: e.notes,
+                })),
+              )
+              .onConflictDoUpdate({
+                target: [attendance.orgId, attendance.staffId, attendance.monthYear, attendance.day],
+                set: { status: sql`excluded.status`, notes: sql`excluded.notes` },
+              })
+          }
+        })
+
+        return ok(
+          res,
+          entries.map(e => ({
+            entryId: '',
+            date: e.date,
+            staffId: e.staffId,
+            worked: e.worked,
+            overtime: e.worked && e.overtime,
+            notes: e.notes,
+          })),
           traceId,
         )
       }
