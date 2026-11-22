@@ -22,9 +22,9 @@ button, input, select, textarea {
 }
 
 :root {
-  /* Staff accent: deep orange — green belongs to DayNest. Shared kit, own identity. */
-  --bg: #FFF9F5; --card: #FFF; --border: #F6DDCD; --text: #2A1A12; --muted: #6B5548;
-  --navy: #EA580C; --accent-rgb: 234, 88, 12; --navy-lt: #FFF3EB; --navy-dark: #EA580C;
+  /* Staff accent: Teal (green belongs to DayNest). Shared kit, own identity. */
+  --bg: #F3FAF9; --card: #FFF; --border: #CDE8E4; --text: #0F1C2A; --muted: #4B6068;
+  --navy: #0D9488; --accent-rgb: 13, 148, 136; --navy-lt: #E6F6F4; --navy-dark: #0D9488;
   --green: #166534; --green-lt: #F0FDF4; --gm: #22C55E;
   --red: var(--rm); --red-lt: #FEF2F2; --rm: #EF4444;
   --amber: var(--rm); --amber-lt: var(--red-lt);
@@ -1965,7 +1965,7 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
   padding: 6px 8px 6px 6px; border-radius: 14px; border: 1.5px solid var(--border); background: var(--card);
   transition: border-color 0.15s, background 0.15s;
 }
-.att-row.is-present { border-color: #059669; background: rgba(16, 185, 129, 0.08); }
+.att-row.is-present { border-color: var(--navy); background: rgba(var(--accent-rgb), 0.07); }
 .att-row.is-busy { opacity: 0.65; }
 .att-toggle {
   display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 4px 6px;
@@ -1977,7 +1977,7 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
   width: 28px; height: 28px; flex-shrink: 0; border-radius: 8px; border: 2px solid var(--border);
   display: grid; place-items: center; font-size: 16px; font-weight: 800; color: #fff; background: var(--card);
 }
-.att-row.is-present .att-check { background: #059669; border-color: #059669; }
+.att-row.is-present .att-check { background: var(--navy); border-color: var(--navy); }
 .att-name { display: grid; gap: 2px; min-width: 0; }
 .att-name-main { font-weight: 700; font-size: 15px; }
 .att-name-sub { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1987,7 +1987,7 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
   border: 1.5px solid var(--border); background: var(--card); color: var(--muted);
   font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; touch-action: manipulation;
 }
-.att-chip.is-on { background: #7c3aed; border-color: #7c3aed; color: #fff; }
+.att-chip.is-on { background: #d97706; border-color: #d97706; color: #fff; }
 .att-note { grid-column: 1 / -1; }
 
 /* Calendar */
@@ -1999,19 +1999,19 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
   font: inherit; font-weight: 600; font-size: 14px; line-height: 1; cursor: pointer; touch-action: manipulation;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 0;
 }
-.att-day.is-work { background: rgba(16, 185, 129, 0.16); border-color: #059669; }
-.att-day.is-ot { background: rgba(124, 58, 237, 0.14); border-color: #7c3aed; }
+.att-day.is-work { background: rgba(var(--accent-rgb), 0.12); border-color: var(--navy); }
+.att-day.is-ot { background: rgba(217, 119, 6, 0.14); border-color: #d97706; }
 .att-day.is-today { box-shadow: 0 0 0 2px var(--navy); }
 .att-day.is-future { opacity: 0.4; cursor: default; }
 .att-day-count {
   min-width: 18px; height: 14px; padding: 0 5px; border-radius: 999px;
-  background: #059669; color: #fff; font-size: 10px; font-weight: 700; line-height: 14px; text-align: center;
+  background: var(--navy); color: #fff; font-size: 10px; font-weight: 700; line-height: 14px; text-align: center;
 }
-.att-day.is-ot .att-day-count { background: #7c3aed; }
+.att-day.is-ot .att-day-count { background: #d97706; }
 .att-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font-size: 12px; color: var(--muted); align-items: center; }
 .att-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .att-legend-hint { margin-left: auto; }
 @media (max-width: 360px) { .att-day { font-size: 13px; gap: 2px; } .att-day-count { min-width: 16px; padding: 0 4px; } }
 .att-dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; border: 1.5px solid; }
-.att-dot.is-work { background: rgba(16, 185, 129, 0.16); border-color: #059669; }
-.att-dot.is-ot { background: rgba(124, 58, 237, 0.14); border-color: #7c3aed; }
+.att-dot.is-work { background: rgba(var(--accent-rgb), 0.12); border-color: var(--navy); }
+.att-dot.is-ot { background: rgba(217, 119, 6, 0.14); border-color: #d97706; }
