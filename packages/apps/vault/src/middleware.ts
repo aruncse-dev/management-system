@@ -7,8 +7,6 @@ const LOWERCASE_ROUTES = new Set([
   '/vaultapps',
   '/vaultpersons',
   '/vaultdocuments',
-  '/vaulthealth',
-  '/vaulthabits',
 ])
 
 export const middleware = createFtMiddleware({

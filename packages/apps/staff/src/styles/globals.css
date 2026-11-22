@@ -1,7 +1,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { -webkit-text-size-adjust: 100%; background: var(--bg); }
 body {
-  font-family: 'Geist', sans-serif;
+  font-family: var(--font-sans, 'Geist'), system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   background: var(--bg); color: var(--text); font-size: 15px;
   overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch;
   padding-bottom: env(safe-area-inset-bottom);
@@ -1921,3 +1921,99 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
   background: rgba(255, 255, 255, 0.12);
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
+
+/* ───────────── Attendance (2026-11 refresh) ───────────── */
+
+/* Tap targets: the month arrows (28px) and refresh pill (~22px) were the most
+   tapped controls and the smallest. 40px visual, 44px hit area. */
+.att-nav .nav-arrow { width: 40px; height: 40px; position: relative; }
+.att-nav .nav-arrow::after { content: ''; position: absolute; inset: -2px; }
+.att-nav .nav-ml { font-size: 15px; min-width: 104px; }
+.att-nav .nav-sync { min-height: 36px; padding: 6px 14px; font-size: 12px; display: inline-flex; align-items: center; }
+.att-nav .nav-sync--icon { width: 40px; padding: 0; justify-content: center; }
+.att-spin { animation: att-spin 0.9s linear infinite; }
+@keyframes att-spin { to { transform: rotate(360deg); } }
+
+/* The fixed 100vh wrapper overflowed below the sticky top bar on phones. */
+.monthly-wrap { height: auto; min-height: 100dvh; overflow: visible; }
+.monthly-wrap main { overflow: visible; }
+
+/* 16px stops iOS Safari zooming the page when an input gains focus. */
+@media (max-width: 640px) {
+  .form-inp, .form-sel { font-size: 16px; }
+}
+
+.att-toast {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: calc(20px + env(safe-area-inset-bottom)); z-index: 200;
+  background: #0f1c3f; color: #fff; font-size: 13px; font-weight: 600;
+  padding: 10px 16px; border-radius: 999px; box-shadow: 0 6px 20px rgba(15, 28, 63, 0.25);
+  max-width: calc(100vw - 32px);
+}
+.att-toast.is-bad { background: var(--rm); }
+
+.att-empty {
+  display: grid; justify-items: center; gap: 10px; padding: 28px 16px;
+  color: var(--muted); font-size: 14px; text-align: center;
+}
+
+/* Day checklist */
+.att-checklist { display: grid; gap: 10px; }
+.att-checklist-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 36px; }
+.att-checklist-count { font-size: 13px; font-weight: 600; color: var(--muted); }
+.att-markall { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; }
+.att-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.att-row {
+  display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px;
+  padding: 6px 8px 6px 6px; border-radius: 14px; border: 1.5px solid var(--border); background: var(--card);
+  transition: border-color 0.15s, background 0.15s;
+}
+.att-row.is-present { border-color: #059669; background: rgba(16, 185, 129, 0.08); }
+.att-row.is-busy { opacity: 0.65; }
+.att-toggle {
+  display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 4px 6px;
+  background: none; border: 0; text-align: left; font: inherit; color: var(--text); cursor: pointer;
+  touch-action: manipulation; border-radius: 10px;
+}
+.att-toggle:focus-visible, .att-chip:focus-visible, .att-day:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+.att-check {
+  width: 28px; height: 28px; flex-shrink: 0; border-radius: 8px; border: 2px solid var(--border);
+  display: grid; place-items: center; font-size: 16px; font-weight: 800; color: #fff; background: var(--card);
+}
+.att-row.is-present .att-check { background: #059669; border-color: #059669; }
+.att-name { display: grid; gap: 2px; min-width: 0; }
+.att-name-main { font-weight: 700; font-size: 15px; }
+.att-name-sub { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.att-row-actions { display: flex; gap: 6px; }
+.att-chip {
+  min-width: 48px; min-height: 40px; padding: 0 12px; border-radius: 999px;
+  border: 1.5px solid var(--border); background: var(--card); color: var(--muted);
+  font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; touch-action: manipulation;
+}
+.att-chip.is-on { background: #f59e0b; border-color: #f59e0b; color: #fff; }
+.att-note { grid-column: 1 / -1; }
+
+/* Calendar */
+.att-cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.att-cal-head { margin-bottom: 6px; text-align: center; font-size: 11px; font-weight: 700; color: var(--muted); }
+.att-day {
+  position: relative; aspect-ratio: 1; min-height: 44px; border-radius: 12px;
+  border: 1.5px solid var(--border); background: var(--card); color: var(--text);
+  font: inherit; font-weight: 600; font-size: 14px; cursor: pointer; touch-action: manipulation;
+  display: grid; place-items: center; padding: 0;
+}
+.att-day.is-work { background: rgba(16, 185, 129, 0.16); border-color: #059669; }
+.att-day.is-ot { background: rgba(245, 158, 11, 0.2); border-color: #d97706; }
+.att-day.is-today { box-shadow: 0 0 0 2px var(--navy); }
+.att-day.is-future { opacity: 0.4; cursor: default; }
+.att-day-count {
+  position: absolute; top: 3px; right: 4px; min-width: 16px; height: 16px; padding: 0 4px;
+  border-radius: 999px; background: #059669; color: #fff; font-size: 10px; font-weight: 800; line-height: 16px;
+}
+.att-day.is-ot .att-day-count { background: #d97706; }
+.att-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font-size: 12px; color: var(--muted); align-items: center; }
+.att-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.att-legend-hint { margin-left: auto; }
+.att-dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; border: 1.5px solid; }
+.att-dot.is-work { background: rgba(16, 185, 129, 0.16); border-color: #059669; }
+.att-dot.is-ot { background: rgba(245, 158, 11, 0.2); border-color: #d97706; }

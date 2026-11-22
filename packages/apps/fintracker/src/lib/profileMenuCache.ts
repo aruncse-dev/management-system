@@ -1,4 +1,7 @@
 export const FINTRACKER_MENU_CACHE_KEY = 'ft_fintracker_menu_cache_v1'
+// localStorage, not sessionStorage: an installed PWA that was swiped away loses
+// sessionStorage, so every cold launch waited on /api/profile before it could
+// leave `/`. Cleared on logout like the rest of the device caches.
 
 /** Fired on `window` when menu cache payload changes (`writeMenuCache` / `clearMenuCache`). */
 export const MENU_CACHE_UPDATED_EVENT = 'ft-fintracker-menu-cache-updated'
@@ -40,7 +43,7 @@ function menuPayloadSignature(orgId: string | null, menu: CachedProfileMenuRow[]
 export function readMenuCache(): MenuCachePayload | null {
   if (typeof window === 'undefined') return null
   try {
-    const raw = sessionStorage.getItem(FINTRACKER_MENU_CACHE_KEY)
+    const raw = localStorage.getItem(FINTRACKER_MENU_CACHE_KEY)
     if (!raw) return null
     const j = JSON.parse(raw) as MenuCachePayload
     if (!j || !Array.isArray(j.menu)) return null
@@ -66,7 +69,7 @@ export function writeMenuCache(
     const prevSig = prev ? menuPayloadSignature(prev.orgId, prev.menu) : null
     const nextSig = menuPayloadSignature(orgId, menu)
     const payload: MenuCachePayload = { orgId, menu, integrations, fetchedAt: Date.now() }
-    sessionStorage.setItem(FINTRACKER_MENU_CACHE_KEY, JSON.stringify(payload))
+    localStorage.setItem(FINTRACKER_MENU_CACHE_KEY, JSON.stringify(payload))
     if (nextSig !== prevSig) {
       window.dispatchEvent(new CustomEvent(MENU_CACHE_UPDATED_EVENT))
     }
@@ -78,7 +81,7 @@ export function writeMenuCache(
 export function clearMenuCache(): void {
   if (typeof window === 'undefined') return
   try {
-    sessionStorage.removeItem(FINTRACKER_MENU_CACHE_KEY)
+    localStorage.removeItem(FINTRACKER_MENU_CACHE_KEY)
   } catch {
     /* */
   }

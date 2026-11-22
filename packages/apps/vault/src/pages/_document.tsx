@@ -32,7 +32,6 @@ export default class MyDocument extends Document<Props> {
           <meta name="mobile-web-app-capable" content="yes" />
           <meta name="apple-mobile-web-app-status-bar-style" content="default" />
           <meta name="apple-mobile-web-app-title" content="Vault" />
-          <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;600&display=swap" rel="stylesheet" />
         </Head>
         <body className="with-app-shell">
           <script dangerouslySetInnerHTML={{ __html: `window.__FT_AUTH_ENV=${payload}` }} />

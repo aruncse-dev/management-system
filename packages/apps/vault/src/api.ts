@@ -11,6 +11,33 @@ function generateTraceId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
+/**
+ * Reads give up after this long. On a phone resuming from the background the
+ * first request can stall instead of failing; without a cap the page spins
+ * forever. Writes are not capped: a POST that "times out" may still have saved,
+ * and a retry would then duplicate it.
+ */
+const READ_TIMEOUT_MS = 20000
+
+/**
+ * Run a read (request AND body) under one timeout. The body read is inside the
+ * window so a stalled download is caught too, and the timer is always cleared.
+ */
+async function withReadTimeout<T>(run: (signal: AbortSignal | undefined) => Promise<T>): Promise<T> {
+  const ctrl = typeof AbortController === 'undefined' ? null : new AbortController()
+  const timer = ctrl ? setTimeout(() => ctrl.abort(), READ_TIMEOUT_MS) : undefined
+  try {
+    return await run(ctrl?.signal)
+  } catch (e) {
+    if (e instanceof Error && e.name === 'AbortError') {
+      throw new Error('Request timed out — check your connection and try again.')
+    }
+    throw e
+  } finally {
+    if (timer !== undefined) clearTimeout(timer)
+  }
+}
+
 async function parseResponse<T>(res: Response): Promise<T> {
   const text = await res.text();
   if (text.trim().startsWith('<')) {
@@ -40,6 +67,8 @@ const GET_CACHE_TTL_MS = 60_000;
 type CacheEntry = { at: number; data: unknown };
 const getCache = new Map<string, CacheEntry>();
 const inflightGets = new Map<string, Promise<unknown>>();
+/** Bumped on every invalidation; a response from an older generation is not cached. */
+let cacheGeneration = 0;
 
 function cacheKey(action: string, params: Record<string, string>) {
   const sorted = Object.entries(params).sort(([a], [b]) => a.localeCompare(b));
@@ -57,12 +86,31 @@ function cacheKey(action: string, params: Record<string, string>) {
  * `getPremiums` is called both with and without a `policy_id`, so it is matched
  * by action alone rather than by an exact param set.
  */
+/**
+ * Drop every cached GET for a module. Persons and documents mutations never
+ * invalidated, so the list re-read its 60s cache and an add/edit/delete looked
+ * like it had not happened.
+ */
+function invalidateModule(module: string) {
+  const needle = JSON.stringify(['module', module])
+  for (const key of [...getCache.keys()]) {
+    if (key.includes(needle)) getCache.delete(key)
+  }
+  // A read already in flight started before this write; let it finish for its
+  // caller, but never let it refill the cache or be reused.
+  for (const key of [...inflightGets.keys()]) {
+    if (key.includes(needle)) inflightGets.delete(key)
+  }
+  cacheGeneration += 1
+}
+
 function invalidateInsurance() {
   invalidateCache({ action: 'getEntries', params: { module: 'insurance' } });
   invalidateCache({ action: 'getPremiums' });
 }
 
 function invalidateCache(matcher?: { action?: string; params?: Record<string, string> }) {
+  cacheGeneration += 1;
   if (!matcher) {
     getCache.clear();
     return;
@@ -97,6 +145,7 @@ async function get<T>(
     if (pending) return pending as Promise<T>;
   }
 
+  const startedGen = cacheGeneration;
   const run = (async () => {
     const url = new URL(BASE, window.location.origin);
     const traceId = generateTraceId();
@@ -104,9 +153,10 @@ async function get<T>(
     url.searchParams.set('traceId', traceId);
     if (DEBUG) url.searchParams.set('debug', 'true');
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-    const res = await fetch(url.toString(), { credentials: 'same-origin', redirect: 'follow', cache: 'no-store' });
-    const data = await parseResponse<T>(res);
-    if (useCache) {
+    const data = await withReadTimeout(async signal =>
+      parseResponse<T>(await fetch(url.toString(), { credentials: 'same-origin', redirect: 'follow', cache: 'no-store', signal })),
+    )
+    if (useCache && startedGen === cacheGeneration) {
       getCache.set(key, { at: Date.now(), data });
     }
     return data;
@@ -117,7 +167,7 @@ async function get<T>(
     try {
       return await run;
     } finally {
-      inflightGets.delete(key);
+      if (inflightGets.get(key) === run) inflightGets.delete(key);
     }
   }
 
@@ -363,57 +413,6 @@ export interface DocumentRow {
   created_at?: string;
 }
 
-export interface HealthVitalRow {
-  vital_uuid: string;
-  person_uuid: string;
-  recorded_at: string;
-  height_cm: number;
-  weight_kg: number;
-  systolic: number;
-  diastolic: number;
-  blood_sugar: number;
-  notes: string;
-}
-
-export interface IllnessRow {
-  illness_uuid: string;
-  person_uuid: string;
-  name: string;
-  diagnosed_on: string;
-  status: string;
-  notes: string;
-}
-
-export interface MedicationRow {
-  med_uuid: string;
-  person_uuid: string;
-  illness_uuid: string;
-  name: string;
-  dosage: string;
-  frequency: string;
-  start_date: string;
-  end_date: string;
-  reminder_times: string;
-  notes: string;
-}
-
-export interface HabitRow {
-  habit_uuid: string;
-  person_uuid: string;
-  name: string;
-  category: string;
-  target_frequency: string;
-  created_at?: string;
-}
-
-export interface HabitLogRow {
-  log_uuid: string;
-  habit_uuid: string;
-  person_uuid: string;
-  log_date: string;
-  completed: boolean;
-}
-
 export interface RawHolding {
   symbol: string;
   company: string;
@@ -551,47 +550,39 @@ export const api = {
   },
   getPersons: () => get<PersonRow[]>('getEntries', { module: 'persons' }),
   getPerson: (personUuid: string) => get<PersonRow>('getEntry', { module: 'persons', person_uuid: personUuid }),
-  addPerson: (p: Record<string, unknown>) => post<string>({ module: 'persons', action: 'addEntry', ...p }),
-  updatePerson: (p: Record<string, unknown>) => post<boolean>({ module: 'persons', action: 'updateEntry', ...p }),
-  deletePerson: (personUuid: string) => post<boolean>({ module: 'persons', action: 'deleteEntry', person_uuid: personUuid }),
+  addPerson: async (p: Record<string, unknown>) => {
+    const result = await post<string>({ module: 'persons', action: 'addEntry', ...p })
+    invalidateModule('persons')
+    return result
+  },
+  updatePerson: async (p: Record<string, unknown>) => {
+    const result = await post<boolean>({ module: 'persons', action: 'updateEntry', ...p })
+    invalidateModule('persons')
+    return result
+  },
+  deletePerson: async (personUuid: string) => {
+    const result = await post<boolean>({ module: 'persons', action: 'deleteEntry', person_uuid: personUuid })
+    invalidateModule('persons')
+    return result
+  },
 
   getDocuments: (personUuid?: string) =>
     get<DocumentRow[]>('getEntries', { module: 'documents', ...(personUuid ? { person_uuid: personUuid } : {}) }),
-  addDocument: (p: Record<string, unknown>) => post<string>({ module: 'documents', action: 'addEntry', ...p }),
-  updateDocument: (p: Record<string, unknown>) => post<boolean>({ module: 'documents', action: 'updateEntry', ...p }),
-  deleteDocument: (docUuid: string) => post<boolean>({ module: 'documents', action: 'deleteEntry', doc_uuid: docUuid }),
-
-  getHealthVitals: (personUuid?: string) =>
-    get<HealthVitalRow[]>('getVitals', { module: 'health', ...(personUuid ? { person_uuid: personUuid } : {}) }),
-  addHealthVital: (p: Record<string, unknown>) => post<string>({ module: 'health', action: 'addVital', ...p }),
-  deleteHealthVital: (vitalUuid: string) => post<boolean>({ module: 'health', action: 'deleteVital', vital_uuid: vitalUuid }),
-
-  getIllnesses: (personUuid?: string) =>
-    get<IllnessRow[]>('getIllnesses', { module: 'health', ...(personUuid ? { person_uuid: personUuid } : {}) }),
-  addIllness: (p: Record<string, unknown>) => post<string>({ module: 'health', action: 'addIllness', ...p }),
-  updateIllness: (p: Record<string, unknown>) => post<boolean>({ module: 'health', action: 'updateIllness', ...p }),
-  deleteIllness: (illnessUuid: string) => post<boolean>({ module: 'health', action: 'deleteIllness', illness_uuid: illnessUuid }),
-
-  getMedications: (personUuid?: string) =>
-    get<MedicationRow[]>('getMedications', { module: 'health', ...(personUuid ? { person_uuid: personUuid } : {}) }),
-  addMedication: (p: Record<string, unknown>) => post<string>({ module: 'health', action: 'addMedication', ...p }),
-  updateMedication: (p: Record<string, unknown>) => post<boolean>({ module: 'health', action: 'updateMedication', ...p }),
-  deleteMedication: (medUuid: string) => post<boolean>({ module: 'health', action: 'deleteMedication', med_uuid: medUuid }),
-
-  getHabits: (personUuid?: string) =>
-    get<HabitRow[]>('getHabits', { module: 'habits', ...(personUuid ? { person_uuid: personUuid } : {}) }),
-  getHabitLogs: (params: { habit_uuid?: string; person_uuid?: string; from?: string; to?: string }) =>
-    get<HabitLogRow[]>('getHabitLogs', {
-      module: 'habits',
-      ...(params.habit_uuid ? { habit_uuid: params.habit_uuid } : {}),
-      ...(params.person_uuid ? { person_uuid: params.person_uuid } : {}),
-      ...(params.from ? { from: params.from } : {}),
-      ...(params.to ? { to: params.to } : {}),
-    }),
-  addHabit: (p: Record<string, unknown>) => post<string>({ module: 'habits', action: 'addHabit', ...p }),
-  updateHabit: (p: Record<string, unknown>) => post<boolean>({ module: 'habits', action: 'updateHabit', ...p }),
-  deleteHabit: (habitUuid: string) => post<boolean>({ module: 'habits', action: 'deleteHabit', habit_uuid: habitUuid }),
-  logHabit: (p: Record<string, unknown>) => post<boolean>({ module: 'habits', action: 'logHabit', ...p }),
+  addDocument: async (p: Record<string, unknown>) => {
+    const result = await post<string>({ module: 'documents', action: 'addEntry', ...p })
+    invalidateModule('documents')
+    return result
+  },
+  updateDocument: async (p: Record<string, unknown>) => {
+    const result = await post<boolean>({ module: 'documents', action: 'updateEntry', ...p })
+    invalidateModule('documents')
+    return result
+  },
+  deleteDocument: async (docUuid: string) => {
+    const result = await post<boolean>({ module: 'documents', action: 'deleteEntry', doc_uuid: docUuid })
+    invalidateModule('documents')
+    return result
+  },
 
   getTokenStatus: ()                           => get<{ hasToken: boolean; tokenType?: string; hasAccessToken?: boolean; hasExtendedToken?: boolean; hasRefreshToken?: boolean; accessTokenExpiry?: string; extendedTokenExpiry?: string; expired?: boolean }>('getTokenStatus', { module: 'stocks' }, { cache: false }),
   getUpstoxAuthUrl: ()                         => get<{ authUrl: string }>('getAuthUrl', { module: 'stocks' }, { cache: false }),

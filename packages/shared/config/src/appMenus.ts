@@ -38,10 +38,6 @@ export const VAULT_MENUS: Record<string, { slug: string; label: string }[]> = {
     { slug: 'persons', label: 'Persons' },
     { slug: 'documents', label: 'Documents' },
   ],
-  Wellness: [
-    { slug: 'health', label: 'Health' },
-    { slug: 'habits', label: 'Habits' },
-  ],
   Coverage: [{ slug: 'insurance', label: 'Insurance' }],
 }
 

@@ -1,4 +1,4 @@
-import { boolean, date, numeric, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
+import { boolean, date, index, numeric, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
 
 export const subscriptions = pgTable('subscriptions', {
   id: text('id').primaryKey(),
@@ -16,7 +16,10 @@ export const subscriptions = pgTable('subscriptions', {
   appUuid: text('app_uuid'),
   notes: text('notes'),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-})
+}, (t) => [
+  // Applied 2026-11-22: migrations/20261122100000_perf_indexes.sql
+  index('subscriptions_org_status_idx').on(t.orgId, t.status),
+])
 
 /**
  * Charges actually taken for a subscription — mirrors the loan repayment tables.

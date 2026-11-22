@@ -52,6 +52,13 @@ function handOff(target: string, fallbackUrl: string) {
   window.location.href = target
 }
 
+/**
+ * Schemes that run code or read local data in THIS origin, with the signed-in
+ * session. Everything else (tel:, upi:, phonepe:, intent:, market: …) hands off
+ * to another app and is allowed, as before.
+ */
+const BLOCKED_SCHEMES = new Set(['javascript:', 'data:', 'vbscript:', 'blob:', 'file:'])
+
 export function openExternal(rawUrl: string | null | undefined): void {
   const url = String(rawUrl ?? '').trim()
   if (!url || typeof window === 'undefined') return
@@ -63,7 +70,9 @@ export function openExternal(rawUrl: string | null | undefined): void {
     return
   }
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    window.location.href = url
+    // Links are user-entered (app links, Drive URLs, e-cards): refuse only the
+    // schemes that would run in this origin; app schemes go straight through.
+    if (!BLOCKED_SCHEMES.has(parsed.protocol.toLowerCase())) window.location.href = parsed.href
     return
   }
 

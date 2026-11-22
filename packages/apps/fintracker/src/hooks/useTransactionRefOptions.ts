@@ -127,10 +127,23 @@ export function transactionRefKindLabel(kind: string): string {
   }
 }
 
-export function useTransactionRefOptions(): TransactionRefOption[] {
-  const [options, setOptions] = useState<TransactionRefOption[]>([])
+/** Loaded once per page session; the form opening again reuses it at once. */
+let sessionOptions: TransactionRefOption[] | null = null
+
+/**
+ * Options for linking a transaction to a loan, policy, lending entry, etc.
+ * Pass `enabled = false` until the form that needs them is open: they cost
+ * eight requests and nothing on a quick add uses them.
+ */
+export function useTransactionRefOptions(enabled = true): TransactionRefOption[] {
+  const [options, setOptionsState] = useState<TransactionRefOption[]>(() => sessionOptions ?? [])
+  const setOptions = (o: TransactionRefOption[]) => {
+    sessionOptions = o
+    setOptionsState(o)
+  }
 
   useEffect(() => {
+    if (!enabled) return
     let cancelled = false
     void (async () => {
       try {
@@ -217,7 +230,8 @@ export function useTransactionRefOptions(): TransactionRefOption[] {
     return () => {
       cancelled = true
     }
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled])
 
   return options
 }

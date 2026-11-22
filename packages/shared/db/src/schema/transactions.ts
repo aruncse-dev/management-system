@@ -1,4 +1,5 @@
-import { boolean, date, integer, numeric, pgTable, text } from 'drizzle-orm/pg-core'
+import { sql } from 'drizzle-orm'
+import { boolean, date, index, integer, numeric, pgTable, text } from 'drizzle-orm/pg-core'
 
 export const transactions = pgTable('transactions', {
   id: text('id').primaryKey(),
@@ -26,7 +27,12 @@ export const transactions = pgTable('transactions', {
   refKind: text('ref_kind'),
   /** Target row id for `refKind`. Unconstrained: may dangle if the target is deleted. */
   refId: text('ref_id'),
-})
+}, (t) => [
+  // Applied 2026-11-22: migrations/20261122100000_perf_indexes.sql
+  index('transactions_org_month_date_idx').on(t.orgId, t.monthYear, t.date.desc()),
+  index('transactions_org_mode_idx').on(t.orgId, t.mode),
+  index('transactions_org_transfer_to_idx').on(t.orgId, t.transferTo).where(sql`${t.transferTo} IS NOT NULL`),
+])
 
 /** `month_year`: `__global__` = default template; `YYYY-MM` overrides global for that month only (same category).
     `start_month`/`end_month`: null = no bound (from beginning or never ends); both set = pinned month. */
@@ -77,4 +83,7 @@ export const paymentSources = pgTable('payment_sources', {
   rdMonths: integer('rd_months'),
   rdStartDate: date('rd_start_date'),
   rdMaturityAmount: numeric('rd_maturity_amount', { precision: 12, scale: 2 }),
-})
+}, (t) => [
+  // Applied 2026-11-22: migrations/20261122100000_perf_indexes.sql
+  index('payment_sources_org_type_idx').on(t.orgId, t.sourceType),
+])

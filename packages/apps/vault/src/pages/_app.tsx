@@ -1,16 +1,15 @@
 import type { AppProps } from 'next/app'
 import Head from 'next/head'
+import { GeistSans } from 'geist/font/sans'
 import { useRouter } from 'next/router'
 import {
   FileText,
   Grid2X2,
-  HeartPulse,
   Landmark,
   Shield,
-  Target,
   Users,
 } from 'lucide-react'
-import { AppAuthGate, SimpleAppNav, type SimpleAppNavSection } from '@fintracker-vault/ui'
+import { AppAuthGate, PwaServiceWorker, SimpleAppNav, type SimpleAppNavSection } from '@fintracker-vault/ui'
 import { StoreProvider } from '../store'
 import { getClientAuthEnv } from '../clientAuthEnv'
 import '@fintracker-vault/ui/styles/ui-kit'
@@ -22,8 +21,6 @@ const VAULT_PAGE_TITLES: Record<string, string> = {
   '/vaultapps': 'Apps',
   '/vaultpersons': 'Persons',
   '/vaultdocuments': 'Documents',
-  '/vaulthealth': 'Health',
-  '/vaulthabits': 'Habits',
 }
 
 const VAULT_NAV_SECTIONS: SimpleAppNavSection[] = [
@@ -39,13 +36,6 @@ const VAULT_NAV_SECTIONS: SimpleAppNavSection[] = [
     items: [
       { path: '/vaultpersons', label: 'Persons', icon: <Users size={18} /> },
       { path: '/vaultdocuments', label: 'Documents', icon: <FileText size={18} /> },
-    ],
-  },
-  {
-    heading: 'Wellness',
-    items: [
-      { path: '/vaulthealth', label: 'Health', icon: <HeartPulse size={18} /> },
-      { path: '/vaulthabits', label: 'Habits', icon: <Target size={18} /> },
     ],
   },
   {
@@ -66,7 +56,10 @@ export default function App({ Component, pageProps }: AppProps) {
       <Head>
         <title>{pageTitle}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+        {/* Self-hosted Geist (next/font): preloaded from this origin, no third-party CSS blocking first paint. */}
+        <style dangerouslySetInnerHTML={{ __html: `:root{--font-sans:${GeistSans.style.fontFamily}}` }} />
       </Head>
+      <PwaServiceWorker />
       <AppAuthGate appKind="vault" googleClientId={googleClientId}>
       {({ onLogout }) => (
         <StoreProvider>

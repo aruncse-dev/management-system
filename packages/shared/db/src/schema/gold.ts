@@ -1,4 +1,5 @@
-import { boolean, date, numeric, pgTable, text } from 'drizzle-orm/pg-core'
+import { sql } from 'drizzle-orm'
+import { boolean, date, index, numeric, pgTable, text } from 'drizzle-orm/pg-core'
 
 export const goldResources = pgTable('gold_resources', {
   id: text('id').primaryKey(),
@@ -6,7 +7,10 @@ export const goldResources = pgTable('gold_resources', {
   type: text('type').notNull(), // 'person' | 'location'
   name: text('name').notNull(),
   skip: boolean('skip').default(false).notNull(),
-})
+}, (t) => [
+  // Applied 2026-11-22: migrations/20261122100000_perf_indexes.sql
+  index('gold_resources_org_idx').on(t.orgId),
+])
 
 export const goldItems = pgTable('gold_items', {
   id: text('id').primaryKey(),
@@ -23,7 +27,11 @@ export const goldItems = pgTable('gold_items', {
    */
   jewelLoanId: text('jewel_loan_id'),
   lendId: text('lend_id'),
-})
+}, (t) => [
+  // Applied 2026-11-22: migrations/20261122100000_perf_indexes.sql
+  index('gold_items_org_lend_idx').on(t.orgId, t.lendId).where(sql`${t.lendId} IS NOT NULL`),
+  index('gold_items_org_jewel_loan_idx').on(t.orgId, t.jewelLoanId).where(sql`${t.jewelLoanId} IS NOT NULL`),
+])
 
 /**
  * Jewels handed to someone else — typically for them to pledge against their
@@ -46,7 +54,10 @@ export const goldLends = pgTable('gold_lends', {
   returnedOn: date('returned_on'),
   /** No longer written or shown — person, purpose and amount cover it. Kept so old rows aren't lost. */
   note: text('note'),
-})
+}, (t) => [
+  // Applied 2026-11-22: migrations/20261122100000_perf_indexes.sql
+  index('gold_lends_org_idx').on(t.orgId),
+])
 
 export const goldHistory = pgTable('gold_history', {
   id: text('id').primaryKey(),

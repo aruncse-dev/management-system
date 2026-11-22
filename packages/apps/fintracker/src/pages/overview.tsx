@@ -12,6 +12,7 @@ import {
   UiCard,
 } from '../ui'
 import { api, type DashboardSummary } from '../api'
+import { readSnapshot, writeSnapshot } from '../lib/snapshotCache'
 
 /**
  * Whole-portfolio view: what you are worth, what you owe, what is committed.
@@ -55,13 +56,23 @@ export default function Overview() {
 
   useEffect(() => {
     let cancelled = false
+    // Last copy at once; the fresh one replaces it when it lands.
+    const snap = readSnapshot<DashboardSummary>('overview')
+    if (snap) {
+      setSummary(snap)
+      setLoading(false)
+    }
     void api
       .getDashboardSummary('', '', 6)
       .then((d) => {
-        if (!cancelled) setSummary(d)
+        if (cancelled) return
+        setSummary(d)
+        setError('')
+        writeSnapshot('overview', d)
       })
       .catch((e: unknown) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Could not load overview')
+        // With a snapshot on screen, keep it rather than replacing it with an error.
+        if (!cancelled && !snap) setError(e instanceof Error ? e.message : 'Could not load overview')
       })
       .finally(() => {
         if (!cancelled) setLoading(false)

@@ -1,4 +1,4 @@
-import { jsonb, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
+import { index, jsonb, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
 
 export const integrationProviders = pgTable('integration_providers', {
   slug: text('slug').primaryKey(),
@@ -25,7 +25,10 @@ export const orgIntegrations = pgTable('org_integrations', {
   lastError: text('last_error'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-})
+}, (t) => [
+  // Applied 2026-11-22: migrations/20261122100000_perf_indexes.sql
+  index('org_integrations_org_provider_idx').on(t.orgId, t.providerSlug),
+])
 
 export type IntegrationProvider = typeof integrationProviders.$inferSelect
 export type OrgIntegration = typeof orgIntegrations.$inferSelect

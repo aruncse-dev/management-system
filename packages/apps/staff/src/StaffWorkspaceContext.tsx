@@ -45,7 +45,9 @@ export function StaffWorkspaceProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Load failed'
       setStaffError(msg)
-      setStaffList([])
+      // A failed background refresh must not wipe a list that is already on
+      // screen — that made every staff member vanish after one flaky request.
+      if (!soft) setStaffList([])
     } finally {
       if (!soft) setStaffLoading(false)
     }

@@ -1,4 +1,4 @@
-import { useState, useEffect, type ReactNode } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
 import { GoogleOAuthProvider, type CredentialResponse } from '@react-oauth/google'
 import { GoogleAuthCard, GoogleSignInButton } from './GoogleAuthCard'
 
@@ -10,6 +10,12 @@ export type AppAuthGateProps = {
   appKind: AppAuthKind
   googleClientId: string
   children: ReactNode | AppAuthGateRender
+  /**
+   * Called when the server says this device is signed out (or the user logs
+   * out). Apps clear device caches here so the next account to sign in never
+   * sees the previous one's data.
+   */
+  onSignedOut?: () => void
 }
 
 function brandName(kind: AppAuthKind) {
@@ -98,7 +104,82 @@ function LoginScreen({
   )
 }
 
-export default function AppAuthGate({ appKind, googleClientId, children }: AppAuthGateProps) {
+/** `useLayoutEffect` warns during SSR; on the server it would never run anyway. */
+const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
+
+/** How long one session check may take before we treat it as unanswered. */
+const SESSION_TIMEOUT_MS = 6000
+const SESSION_RETRY_DELAYS_MS = [800]
+
+function authHintKey(kind: AppAuthKind) {
+  return `ft_auth_hint_${kind}`
+}
+
+/**
+ * "This device was signed in last time." A UI hint only — it decides whether
+ * to paint the app while the session check runs, never what the server
+ * allows. Every API call is still checked by the middleware.
+ */
+function readAuthHint(kind: AppAuthKind): boolean {
+  try {
+    return window.localStorage.getItem(authHintKey(kind)) === '1'
+  } catch {
+    return false
+  }
+}
+
+function writeAuthHint(kind: AppAuthKind, authed: boolean) {
+  try {
+    if (authed) window.localStorage.setItem(authHintKey(kind), '1')
+    else window.localStorage.removeItem(authHintKey(kind))
+  } catch {
+    /* storage blocked (private mode) — the hint is optional */
+  }
+}
+
+/**
+ * Only the server may end a session, and a check that never answers must not
+ * hang the app.
+ *
+ * Installed PWAs cold-start with the radio still waking up, so the first
+ * request can stall rather than fail. Without a timeout the gate sat on
+ * "Loading…" forever and the only fix was to kill and relaunch the app. Each
+ * attempt is now capped, retried with backoff, and a missing answer is
+ * reported as `null` (unreachable) — never as signed-out.
+ */
+async function readSessionOnce(): Promise<boolean> {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), SESSION_TIMEOUT_MS)
+  try {
+    const r = await fetch('/api/auth/session', {
+      credentials: 'same-origin',
+      cache: 'no-store',
+      signal: ctrl.signal,
+    })
+    if (r.status === 401) return false
+    if (!r.ok) throw new Error(`session ${r.status}`)
+    const d = (await r.json()) as { authed?: boolean }
+    return Boolean(d.authed)
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function readSessionWithRetry(isCancelled: () => boolean): Promise<boolean | null> {
+  for (let attempt = 0; attempt <= SESSION_RETRY_DELAYS_MS.length; attempt++) {
+    if (isCancelled()) return null
+    try {
+      return await readSessionOnce()
+    } catch {
+      const delay = SESSION_RETRY_DELAYS_MS[attempt]
+      if (delay === undefined) break
+      await new Promise(res => setTimeout(res, delay))
+    }
+  }
+  return null
+}
+
+export default function AppAuthGate({ appKind, googleClientId, children, onSignedOut }: AppAuthGateProps) {
   const clientId = (googleClientId || '').trim()
   const [authed, setAuthed] = useState(false)
   const [sessionLoading, setSessionLoading] = useState(true)
@@ -106,46 +187,44 @@ export default function AppAuthGate({ appKind, googleClientId, children }: AppAu
   /** The session check never completed — a network problem, not a signed-out user. */
   const [sessionUnreachable, setSessionUnreachable] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
+  /** True once the app is on screen; a later unanswered check must not tear it down. */
+  const showingAppRef = useRef(false)
+  useEffect(() => {
+    showingAppRef.current = authed && !sessionLoading
+  }, [authed, sessionLoading])
+
+  /**
+   * Paint the app straight away when this device was signed in at the last
+   * successful check, and confirm in the background. This takes a full network
+   * round trip off every launch. If the background check comes back
+   * signed-out, the login screen replaces the app.
+   *
+   * The URL path is deliberately not used as evidence: a page served from the
+   * service worker's cache never passed through the middleware.
+   */
+  useIsoLayoutEffect(() => {
+    if (readAuthHint(appKind)) {
+      showingAppRef.current = true
+      setAuthed(true)
+      setSessionLoading(false)
+    }
+  }, [appKind])
 
   useEffect(() => {
     let cancelled = false
-
-    /**
-     * Only the server may end a session.
-     *
-     * This used to treat *any* failure as signed-out, so a single flaky request
-     * — a phone waking up, a cold start, a navigation that aborted the fetch —
-     * showed the Google screen while a perfectly valid cookie sat in the
-     * browser. Signing in again "worked", which made it look like the session
-     * kept expiring. A transient failure now retries once and then leaves the
-     * previous state alone; only an explicit 401 signs the user out.
-     */
-    const readSession = async (): Promise<boolean | null> => {
-      const r = await fetch('/api/auth/session', { credentials: 'same-origin' })
-      if (r.status === 401) return false
-      if (!r.ok) throw new Error(`session ${r.status}`)
-      const d = (await r.json()) as { authed?: boolean }
-      return Boolean(d.authed)
-    }
-
     void (async () => {
-      let result: boolean | null = null
-      for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-          result = await readSession()
-          break
-        } catch {
-          if (attempt === 0) await new Promise(res => setTimeout(res, 600))
-        }
-      }
+      const result = await readSessionWithRetry(() => cancelled)
       if (cancelled) return
       if (result === null) {
-        // Never got an answer. Say so — showing the sign-in card here would
-        // claim the session ended when we simply could not ask.
-        setSessionUnreachable(true)
+        // Never got an answer. If the app is already showing, leave it — its
+        // own requests will surface errors. Otherwise say so; showing the
+        // sign-in card here would claim the session ended when we could not ask.
+        if (!showingAppRef.current) setSessionUnreachable(true)
       } else {
         setSessionUnreachable(false)
         setAuthed(result)
+        writeAuthHint(appKind, result)
+        if (!result) onSignedOut?.()
       }
       setSessionLoading(false)
     })()
@@ -153,15 +232,19 @@ export default function AppAuthGate({ appKind, googleClientId, children }: AppAu
     return () => {
       cancelled = true
     }
-  }, [reloadKey])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reloadKey, appKind])
 
   const handleUnlock = () => {
     setOauthScriptError(null)
+    writeAuthHint(appKind, true)
     setAuthed(true)
   }
 
   const handleLogout = async () => {
     setOauthScriptError(null)
+    writeAuthHint(appKind, false)
+    onSignedOut?.()
     try {
       await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' })
     } catch {
@@ -178,11 +261,16 @@ export default function AppAuthGate({ appKind, googleClientId, children }: AppAu
         display: 'grid',
         placeItems: 'center',
         padding: 24,
-        color: 'var(--text, #0f172a)',
+        color: 'var(--muted, #64748b)',
         fontWeight: 600,
       }}
+      role="status"
+      aria-live="polite"
     >
-      Loading…
+      <div style={{ display: 'grid', gap: 14, justifyItems: 'center' }}>
+        <img src={iconUrl(appKind)} alt="" width={56} height={56} style={{ borderRadius: 14 }} />
+        <span>Loading…</span>
+      </div>
     </div>
   )
 
@@ -219,23 +307,16 @@ export default function AppAuthGate({ appKind, googleClientId, children }: AppAu
     </div>
   )
 
-  const inner = sessionUnreachable ? (
-    unreachableUi
-  ) : !authed ? (
-    <LoginScreen
-      onUnlock={handleUnlock}
-      appKind={appKind}
-      googleClientId={clientId}
-      oauthError={oauthScriptError}
-    />
-  ) : typeof children === 'function' ? (
-    (children as AppAuthGateRender)({ onLogout: handleLogout })
-  ) : (
-    children
-  )
-
   if (sessionLoading) {
     return loadingUi
+  }
+
+  if (sessionUnreachable) {
+    return unreachableUi
+  }
+
+  if (authed) {
+    return <>{typeof children === 'function' ? (children as AppAuthGateRender)({ onLogout: handleLogout }) : children}</>
   }
 
   if (!clientId) {
@@ -249,6 +330,9 @@ export default function AppAuthGate({ appKind, googleClientId, children }: AppAu
     )
   }
 
+  // The Google Identity script is only needed to sign in, so it is loaded only
+  // for the login screen — a signed-in launch no longer waits on, or even
+  // contacts, accounts.google.com.
   return (
     <GoogleOAuthProvider
       clientId={clientId}
@@ -258,7 +342,12 @@ export default function AppAuthGate({ appKind, googleClientId, children }: AppAu
         )
       }
     >
-      {inner}
+      <LoginScreen
+        onUnlock={handleUnlock}
+        appKind={appKind}
+        googleClientId={clientId}
+        oauthError={oauthScriptError}
+      />
     </GoogleOAuthProvider>
   )
 }

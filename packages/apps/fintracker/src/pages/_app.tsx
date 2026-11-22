@@ -1,8 +1,9 @@
 import type { AppProps } from 'next/app'
 import Head from 'next/head'
+import { GeistSans } from 'geist/font/sans'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
-import { AppAuthGate, Nav, type ModuleId, type NavDynamicMenuSection } from '@fintracker-vault/ui'
+import { AppAuthGate, PwaServiceWorker, Nav, type ModuleId, type NavDynamicMenuSection } from '@fintracker-vault/ui'
 import { getAppArea } from '../appPaths'
 import { StoreProvider } from '../store'
 import { getClientAuthEnv } from '../clientAuthEnv'
@@ -17,6 +18,7 @@ import {
   type CachedProfileMenuRow,
 } from '../lib/profileMenuCache'
 import { clearSettingsPageCache } from '../lib/settingsPageCache'
+import { clearSnapshots } from '../lib/snapshotCache'
 import {
   LENDING_SHEET_SLUG_DEFAULT,
   lendingBookLabel,
@@ -246,12 +248,24 @@ export default function App({ Component, pageProps }: AppProps) {
       <Head>
         <title>{pageTitle}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+        {/* Self-hosted Geist (next/font): preloaded from this origin, no third-party CSS blocking first paint. */}
+        <style dangerouslySetInnerHTML={{ __html: `:root{--font-sans:${GeistSans.style.fontFamily}}` }} />
       </Head>
-      <AppAuthGate appKind="fintracker" googleClientId={googleClientId}>
+      <PwaServiceWorker />
+      <AppAuthGate
+        appKind="fintracker"
+        googleClientId={googleClientId}
+        onSignedOut={() => {
+          clearSnapshots()
+          clearMenuCache()
+          clearSettingsPageCache()
+        }}
+      >
         {({ onLogout }) => {
           const handleLogout = () => {
             clearMenuCache()
             clearSettingsPageCache()
+            clearSnapshots()
             onLogout()
           }
           return (

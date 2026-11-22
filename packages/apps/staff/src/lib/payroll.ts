@@ -8,7 +8,7 @@ export function daysInMonth(monthYear: string): number {
   return new Date(y, m, 0).getDate()
 }
 
-function isWeeklyOff(y: number, m: number, day: number, weeklyOff: WeeklyOff): boolean {
+export function isWeeklyOff(y: number, m: number, day: number, weeklyOff: WeeklyOff): boolean {
   if (weeklyOff === 'none') return false
   const dow = new Date(y, m - 1, day).getDay() // 0 = Sun, 6 = Sat
   return dow === 0 || (weeklyOff === 'sat_sun' && dow === 6)

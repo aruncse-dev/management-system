@@ -1,4 +1,4 @@
-import { date, integer, numeric, pgTable, text } from 'drizzle-orm/pg-core'
+import { date, index, integer, numeric, pgTable, text } from 'drizzle-orm/pg-core'
 
 export const emiLoans = pgTable('emi_loans', {
   id: text('id').primaryKey(),
@@ -34,7 +34,10 @@ export const jewelLoanRepayments = pgTable('jewel_loan_repayments', {
   date: date('date').notNull(),
   amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
   note: text('note'),
-})
+}, (t) => [
+  // Applied 2026-11-22: migrations/20261122100000_perf_indexes.sql
+  index('jewel_loan_repayments_org_loan_idx').on(t.orgId, t.loanId),
+])
 
 export const cashLoans = pgTable('cash_loans', {
   id: text('id').primaryKey(),
@@ -53,7 +56,10 @@ export const cashLoanRepayments = pgTable('cash_loan_repayments', {
   date: date('date').notNull(),
   amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
   note: text('note'),
-})
+}, (t) => [
+  // Applied 2026-11-22: migrations/20261122100000_perf_indexes.sql
+  index('cash_loan_repayments_org_loan_idx').on(t.orgId, t.loanId),
+])
 
 /**
  * EMI repayments — mirrors jewelLoanRepayments / cashLoanRepayments.

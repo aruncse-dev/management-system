@@ -9,7 +9,6 @@ export const MENU_SECTIONS_SEED = [
   { id: 'system', slug: 'system', label: 'System', sortOrder: 6 },
   { id: 'vault-core', slug: 'vault-core', label: 'Vault', sortOrder: 7 },
   { id: 'vault-family', slug: 'vault-family', label: 'Family', sortOrder: 8 },
-  { id: 'vault-wellness', slug: 'vault-wellness', label: 'Wellness', sortOrder: 9 },
   { id: 'vault-coverage', slug: 'vault-coverage', label: 'Coverage', sortOrder: 10 },
   { id: 'staff-main', slug: 'staff-main', label: 'Menu', sortOrder: 11 },
 ] as const
@@ -69,8 +68,6 @@ export const MENU_CATALOG_SEED: MenuCatalogSeedRow[] = [
   { id: 'vaultapps', slug: 'vaultapps', label: 'Apps', icon: 'Grid2X2', path: '/vaultapps', sectionId: 'vault-core', sortOrder: 1, appSlugs: ['vault'] },
   { id: 'persons', slug: 'persons', label: 'Persons', icon: 'Users', path: '/vaultpersons', sectionId: 'vault-family', sortOrder: 0, appSlugs: ['vault'] },
   { id: 'documents', slug: 'documents', label: 'Documents', icon: 'FileText', path: '/vaultdocuments', sectionId: 'vault-family', sortOrder: 1, appSlugs: ['vault'] },
-  { id: 'health', slug: 'health', label: 'Health', icon: 'HeartPulse', path: '/vaulthealth', sectionId: 'vault-wellness', sortOrder: 0, appSlugs: ['vault'] },
-  { id: 'habits', slug: 'habits', label: 'Habits', icon: 'Target', path: '/vaulthabits', sectionId: 'vault-wellness', sortOrder: 1, appSlugs: ['vault'] },
   { id: 'insurance', slug: 'insurance', label: 'Insurance', icon: 'Shield', path: '/vaultinsurance', sectionId: 'vault-coverage', sortOrder: 0, appSlugs: ['vault'] },
   { id: 'vaultsettings', slug: 'vaultsettings', label: 'Settings', icon: 'Settings', path: '/vaultsettings', sectionId: 'system', sortOrder: 2, appSlugs: ['vault'] },
   // Staff (`staff` id matches legacy 0001 catalog row)

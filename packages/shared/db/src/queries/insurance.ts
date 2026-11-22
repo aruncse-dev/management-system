@@ -253,7 +253,7 @@ export type InsuranceCommitment = {
   monthly: number
   /** Total hand-entered cash value. Reported separately — never folded into net worth. */
   cashValue: number
-  due: { id: string; name: string; amount: number; dueDate: string; daysLeft: number }[]
+  due: { id: string; name: string; amount: number; dueDate: string; daysLeft: number; paymentMethod: string }[]
 }
 
 /**
@@ -296,6 +296,7 @@ export async function getInsuranceCommitment(
         amount: p.premium,
         dueDate: p.nextDue,
         daysLeft: p.daysUntilDue,
+        paymentMethod: p.paymentMethod,
       })
     }
   }
