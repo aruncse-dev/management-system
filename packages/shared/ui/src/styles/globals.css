@@ -1378,8 +1378,6 @@ tr:last-child td { border-bottom: none; }
 button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 @media (hover: none) {
   tr:hover td { background: none !important; }
-  .card, .kpi-card, .tw, .bud-wrap { box-shadow: none; }
-  .nav { box-shadow: 0 1px 0 rgba(255,255,255,.08); }
 }
 
 /* LOGIN SCREEN */

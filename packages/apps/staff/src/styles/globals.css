@@ -23,7 +23,7 @@ button, input, select, textarea {
 
 :root {
   /* Staff accent: Teal (green belongs to DayNest). Shared kit, own identity. */
-  --bg: #FAFDFD; --card: #FFF; --border: #CDE8E4; --text: #0F1C2A; --muted: #4B6068;
+  --bg: #F5FBFA; --card: #FFF; --border: #CDE8E4; --text: #0F1C2A; --muted: #4B6068;
   --navy: #0D9488; --accent-rgb: 13, 148, 136; --navy-lt: #E6F6F4; --navy-dark: #0D9488;
   --green: #166534; --green-lt: #F0FDF4; --gm: #22C55E;
   --red: var(--rm); --red-lt: #FEF2F2; --rm: #EF4444;
@@ -1804,8 +1804,6 @@ tr:last-child td { border-bottom: none; }
 button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 @media (hover: none) {
   tr:hover td { background: none !important; }
-  .card, .kpi-card, .tw, .bud-wrap { box-shadow: none; }
-  .nav { box-shadow: 0 1px 0 rgba(255,255,255,.08); }
 }
 
 /* LOGIN SCREEN */

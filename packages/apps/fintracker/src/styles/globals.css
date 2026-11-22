@@ -16,7 +16,7 @@ button, input, select, textarea {
 .with-app-shell { overflow-x: hidden; background: var(--bg); min-height: 100vh; }
 
 :root {
-  --bg: #FAFCFE; --card: #FFF; --border: #BFDBFE; --text: #0F1C3F; --muted: #4B6080;
+  --bg: #F6F8FD; --card: #FFF; --border: #BFDBFE; --text: #0F1C3F; --muted: #4B6080;
   --navy: #1e5cc7; --accent-rgb: 30, 92, 199; --navy-lt: #eaf1ff; --navy-dark: #1e5cc7;
   --green: #166534; --green-lt: #F0FDF4; --gm: #22C55E;
   --red: var(--rm); --red-lt: #FEF2F2; --rm: #EF4444;
@@ -1627,8 +1627,6 @@ tr:last-child td { border-bottom: none; }
 button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 @media (hover: none) {
   tr:hover td { background: none !important; }
-  .card, .kpi-card, .tw, .bud-wrap { box-shadow: none; }
-  .nav { box-shadow: 0 1px 0 rgba(255,255,255,.08); }
 }
 
 /* LOGIN SCREEN */

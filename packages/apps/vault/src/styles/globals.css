@@ -17,7 +17,7 @@ button, input, select, textarea {
 
 :root {
   /* Vault accent: Steel. Shared kit, own identity. */
-  --bg: #FBFCFD; --card: #FFF; --border: #D6DDE3; --text: #0F172A; --muted: #526070;
+  --bg: #F8F9FA; --card: #FFF; --border: #D6DDE3; --text: #0F172A; --muted: #526070;
   --navy: #4A6A85; --accent-rgb: 74, 106, 133; --navy-lt: #F1F3F5; --navy-dark: #4A6A85;
   --green: #166534; --green-lt: #F0FDF4; --gm: #22C55E;
   --red: var(--rm); --red-lt: #FEF2F2; --rm: #EF4444;
@@ -1751,8 +1751,6 @@ tr:last-child td { border-bottom: none; }
 button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 @media (hover: none) {
   tr:hover td { background: none !important; }
-  .card, .kpi-card, .tw, .bud-wrap { box-shadow: none; }
-  .nav { box-shadow: 0 1px 0 rgba(255,255,255,.08); }
 }
 
 /* LOGIN SCREEN */
