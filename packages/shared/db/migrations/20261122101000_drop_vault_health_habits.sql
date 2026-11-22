@@ -2,7 +2,11 @@
 --
 -- The UI, API actions, DB helpers and Drizzle definitions were removed in the
 -- same change. On 2026-11-22 all five tables held 0 rows, so nothing is lost.
--- Destructive: apply only after the code change is deployed.
+--
+-- APPLIED to production (Neon project soft-brook-60356295) on 2026-11-22, at
+-- the owner's request, after the code removal was deployed (#40). Verified
+-- afterwards: the five tables are gone, one org's vault menu lost "health" and
+-- "habits", and no other table's row count changed.
 
 DROP TABLE IF EXISTS vault_habit_logs;
 DROP TABLE IF EXISTS vault_habits;
