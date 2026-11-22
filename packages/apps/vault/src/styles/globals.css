@@ -17,8 +17,8 @@ button, input, select, textarea {
 
 :root {
   /* Vault accent: indigo. Shared kit, own identity (see docs/enhancement-plan-2026-11.md §7). */
-  --bg: #F4F4FE; --card: #FFF; --border: #D6D5F5; --text: #0F1C3F; --muted: #4B5578;
-  --navy: #4338CA; --accent-rgb: 67, 56, 202; --navy-lt: #EEF0FF; --navy-dark: #4338CA;
+  --bg: #F5F5FF; --card: #FFF; --border: #DCDBF8; --text: #0F1C3F; --muted: #4B5578;
+  --navy: #5E5CE6; --accent-rgb: 94, 92, 230; --navy-lt: #EFEFFE; --navy-dark: #5E5CE6;
   --green: #166534; --green-lt: #F0FDF4; --gm: #22C55E;
   --red: var(--rm); --red-lt: #FEF2F2; --rm: #EF4444;
   --amber: var(--rm); --amber-lt: var(--red-lt);
@@ -28,7 +28,7 @@ button, input, select, textarea {
 }
 
 /* NAV */
-.nav { background: var(--navy-dark); height: calc(54px + env(safe-area-inset-top)); display: flex; align-items: center; justify-content: space-between; padding: env(safe-area-inset-top) 14px 0; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 12px rgba(var(--accent-rgb),.35); gap: 10px; will-change: transform; transform: translateZ(0); }
+.nav { background: var(--navy-dark); height: calc(54px + env(safe-area-inset-top)); display: flex; align-items: center; justify-content: space-between; padding: env(safe-area-inset-top) 14px 0; position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 0 rgba(15, 23, 42, .08); gap: 10px; will-change: transform; transform: translateZ(0); }
 .nav-b { color: #fff; font-weight: 700; font-size: 13px; letter-spacing: 0; white-space: nowrap; }
 .nav-b em { color: #A5B4FC; font-style: normal; }
 .nav-app-icon-wrap {
@@ -74,15 +74,15 @@ button, input, select, textarea {
 .nav-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 150; }
 
 /* DRAWER PANEL */
-.nav-drawer { position: fixed; top: 0; left: 0; height: 100dvh; width: 260px; background: var(--navy-dark); z-index: 160; transform: translateX(-100%); transition: transform .25s ease; display: flex; flex-direction: column; box-shadow: 4px 0 24px rgba(0,0,0,.4); overflow-y: auto; }
-.nav-drawer.open { transform: translateX(0); }
+.nav-drawer { position: fixed; top: 0; left: 0; height: 100dvh; width: 260px; background: var(--navy-dark); z-index: 160; transform: translateX(-100%); transition: transform .25s ease; display: flex; flex-direction: column; box-shadow: none; overflow-y: auto; }
+.nav-drawer.open { transform: translateX(0); box-shadow: 4px 0 24px rgba(0,0,0,.25); }
 .nav-drawer-hd { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,.1); }
 .nav-drawer-item { display: flex; align-items: center; gap: 12px; padding: 11px 16px; margin: 0; border: none; background: transparent; color: rgba(255,255,255,.94); font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer; width: 100%; text-align: left; transition: background .15s, color .15s; touch-action: manipulation; }
 .nav-drawer-item.active { color: #fff; background: rgba(255,255,255,.14); font-weight: 700; }
 .nav-drawer-item:active { background: rgba(255,255,255,.08); }
 
 /* MONTHLY SUB-NAV (month controls below global nav) */
-.nav-sub { background: var(--navy-dark); height: 46px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; position: sticky; top: 0; z-index: 95; gap: 10px; box-shadow: 0 1px 6px rgba(var(--accent-rgb),.2); }
+.nav-sub { background: var(--navy-dark); height: 46px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; position: sticky; top: 0; z-index: 95; gap: 10px; box-shadow: none; }
 
 /* MONTHLY BOTTOM NAV */
 .bottom-nav {
@@ -1758,11 +1758,7 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
   padding: 24px;
   position: relative;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 18% 18%, rgba(255,255,255,.14), transparent 24%),
-    radial-gradient(circle at 82% 12%, rgba(255,255,255,.12), transparent 22%),
-    radial-gradient(circle at 50% 108%, rgba(255,255,255,.08), transparent 34%),
-    linear-gradient(180deg, var(--navy) 0%, color-mix(in srgb, var(--navy) 88%, #fff) 48%, color-mix(in srgb, var(--navy) 78%, #000) 100%);
+  background: var(--navy);
 }
 .login-title { font-size: 24px; font-weight: 800; color: #fff; letter-spacing: -0.03em; }
 .login-sub { font-size: 15px; color: rgba(255,255,255,.76); text-align: center; line-height: 1.45; max-width: 320px; }
