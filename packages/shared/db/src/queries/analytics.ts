@@ -413,6 +413,14 @@ export type CommittedOutflow = {
     dueDate: string
     daysLeft: number
     kind: 'subscription' | 'insurance'
+    /**
+     * The account or card it is paid from, as entered (`''` when unknown).
+     * Reminders match it against account names to warn when the balance will
+     * not cover what is about to be debited.
+     */
+    paymentMethod: string
+    /** Row id, so a reminder can be tracked as already shown. */
+    id: string
   }[]
 }
 
@@ -466,6 +474,8 @@ export async function getCommittedMonthlyOutflow(
           dueDate: toIsoDate(due),
           daysLeft,
           kind: 'subscription',
+          paymentMethod: s.paymentMethod ?? '',
+          id: s.id,
         })
       }
     }
@@ -478,6 +488,8 @@ export async function getCommittedMonthlyOutflow(
       dueDate: d.dueDate,
       daysLeft: d.daysLeft,
       kind: 'insurance',
+      paymentMethod: d.paymentMethod,
+      id: d.id,
     })
   }
 

@@ -17,6 +17,7 @@ import { cycleMonthYearForDate, cycleSubtitle } from '../expenseCycle'
 import { useMoneyFormatting } from '../hooks/useFormatMoney'
 import { useTransactionRefOptions } from '../hooks/useTransactionRefOptions'
 import { useKeyboardInset } from '../hooks/useKeyboardInset'
+import { readSnapshot, writeSnapshot } from '../lib/snapshotCache'
 
 type TabId = 'dash' | 'txns' | 'bud'
 
@@ -39,9 +40,12 @@ export default function Monthly() {
   const { state, dispatch } = useStore()
   const money = useMoneyFormatting()
   const { paymentModeOptions, transferTargetOptions } = useFintrackerModes()
-  const refOptions = useTransactionRefOptions()
   const [tab, setTab] = useState<TabId>('dash')
   const [modalOpen, setModalOpen] = useState(false)
+  // Eight requests (loans, lending books, policies…) that only the full form
+  // uses. They used to fire on every visit to Monthly, competing with the
+  // month itself; now they load the first time the form opens.
+  const refOptions = useTransactionRefOptions(modalOpen)
   /** The floating one-line entry. Opened by the plus button on every tab but Budget. */
   const [quickOpen, setQuickOpen] = useState(false)
   const keyboardInset = useKeyboardInset(quickOpen)
@@ -64,6 +68,16 @@ export default function Monthly() {
     setBudgetStartMonth(null)
     setBudgetEndMonth(null)
   }, [])
+
+  // Home-screen shortcut "Add expense" lands on /monthly?quick=1: open the
+  // quick-add box straight away, then drop the flag so a reload does not.
+  useEffect(() => {
+    if (!router.isReady || router.query.quick !== '1') return
+    setQuickOpen(true)
+    const { quick: _quick, ...rest } = router.query
+    void _quick
+    void router.replace({ pathname: '/monthly', query: { tab: 'dash', ...rest } }, undefined, { shallow: true })
+  }, [router])
 
   const goTab = useCallback(
     (id: TabId) => {
@@ -90,6 +104,10 @@ export default function Monthly() {
     }
   }, [router.isReady, router.pathname, router.query.tab, router])
 
+  /** The cycle on screen, for discarding responses that arrive after the user moved on. */
+  const viewRef = useRef({ month: state.month, year: state.year })
+  viewRef.current = { month: state.month, year: state.year }
+
   const showStatus = useCallback((msg: string) => {
     if (snackbarTimerRef.current) clearTimeout(snackbarTimerRef.current)
     const variant: 'success' | 'error' | 'info' = msg.includes('✓')
@@ -110,18 +128,36 @@ export default function Monthly() {
     }
   }, [])
 
-  const loadMonth = useCallback(async (month: string, year: string, forceRefresh = false) => {
-    dispatch({ type: 'SET_LOADING', payload: true })
+  /**
+   * Load a cycle's rows.
+   *
+   * The last copy on this device paints first, so opening the app shows the
+   * month at once instead of a spinner for a full round trip. `quiet` is for
+   * refreshes after a save: the list already holds the new row, and flipping
+   * the whole dashboard to a spinner after every entry was the slowest part
+   * of adding a spend.
+   */
+  const loadMonth = useCallback(async (month: string, year: string, opts: { quiet?: boolean } = {}) => {
+    const snapKey = `rows:${month}-${year}`
+    const snap = opts.quiet ? null : readSnapshot<Transaction[]>(snapKey)
+    if (snap) {
+      dispatch({ type: 'SET_ROWS', payload: snap })
+      dispatch({ type: 'SET_LOADING', payload: false })
+    } else if (!opts.quiet) {
+      dispatch({ type: 'SET_LOADING', payload: true })
+    }
     try {
-      if (forceRefresh) {
-        api.invalidateCache({ action: 'getData', params: { month, year } })
-      }
       const rows = await api.getData(month, year)
+      // Ignore a response for a month that is no longer on screen.
+      if (viewRef.current.month !== month || viewRef.current.year !== year) return
       dispatch({ type: 'SET_ROWS', payload: rows })
+      writeSnapshot(snapKey, rows)
     } catch (e) {
       showStatus('⚠ ' + (e instanceof Error ? e.message : 'Load failed'))
     } finally {
-      dispatch({ type: 'SET_LOADING', payload: false })
+      if (!opts.quiet && viewRef.current.month === month && viewRef.current.year === year) {
+        dispatch({ type: 'SET_LOADING', payload: false })
+      }
     }
   }, [dispatch, showStatus])
 
@@ -130,7 +166,7 @@ export default function Monthly() {
       showStatus('⚠ Failed to connect to backend')
       dispatch({ type: 'SET_LOADING', payload: false })
     })
-  }, [state.month, state.year, state.fintracker, loadMonth, dispatch, showStatus])
+  }, [state.month, state.year, loadMonth, dispatch, showStatus])
 
   const expenseCategoryOptions = useMemo(
     () => expenseCategoriesWithBudget(state.budget),
@@ -230,7 +266,11 @@ export default function Monthly() {
         )}
         {tab === 'txns' && (
           <Transactions
-            onEdit={r => { setEditRow(r); setModalOpen(true); setModalNonce(n => n + 1) }}
+            onEdit={r => {
+              // Still saving: there is no server id to edit yet.
+              if (r.id.startsWith('pending-')) return
+              setEditRow(r); setModalOpen(true); setModalNonce(n => n + 1)
+            }}
             onDuplicate={r => { setEditRow(duplicateOf(r)); setModalOpen(true); setModalNonce(n => n + 1) }}
           />
         )}
@@ -253,9 +293,27 @@ export default function Monthly() {
             modes={paymentModeOptions}
             showStatus={showStatus}
             onClose={() => setQuickOpen(false)}
-            onSaved={async savedDate => {
-              await loadMonth(state.month, state.year, true)
-              showStatus(savedStatus(savedDate))
+            onSubmit={async (payload, row) => {
+              // Show it now if it belongs to the cycle on screen; a row dated
+              // into another cycle is only announced, as before.
+              let here = false
+              try {
+                const c = cycleMonthYearForDate(isoDate(row.date), state.fintracker)
+                here = c.month === state.month && c.year === state.year
+              } catch {
+                /* unparseable date: let the server decide */
+              }
+              if (here) dispatch({ type: 'ADD_ROW', payload: row })
+              try {
+                const id = await api.addRow(payload)
+                if (here) dispatch({ type: 'REPLACE_ROW_ID', payload: { from: row.id, to: id } })
+                showStatus(savedStatus(row.date))
+              } catch (e) {
+                if (here) dispatch({ type: 'REMOVE_ROW', payload: row.id })
+                throw e
+              }
+              // Reconcile quietly (server-side mirrors, other devices).
+              void loadMonth(state.month, state.year, { quiet: true })
             }}
             onExpand={draft => {
               setQuickOpen(false)
@@ -362,7 +420,7 @@ export default function Monthly() {
           onClose={() => setModalOpen(false)}
           onSaved={async (saved) => {
             setModalOpen(false)
-            await loadMonth(state.month, state.year, true)
+            await loadMonth(state.month, state.year, { quiet: true })
             showStatus(savedStatus(saved?.date))
           }}
           showStatus={showStatus}

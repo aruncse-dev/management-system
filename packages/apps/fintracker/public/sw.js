@@ -15,7 +15,7 @@
  *     shell with no user data in it; data always comes from /api.
  *   - /api/*, auth and anything cross-origin: never touched, never cached.
  */
-const VERSION = 'v1'
+const VERSION = 'v2'
 const STATIC_CACHE = `ft-static-${VERSION}`
 const PAGE_CACHE = `ft-pages-${VERSION}`
 const NAV_TIMEOUT_MS = 4000
@@ -123,4 +123,24 @@ self.addEventListener('fetch', event => {
   if (isStaticAsset(url)) {
     event.respondWith(cacheFirst(request))
   }
+})
+
+// Tapping a reminder notification focuses an open window, or opens the app at
+// the URL the notification carries.
+self.addEventListener('notificationclick', event => {
+  event.notification.close()
+  const target = new URL((event.notification.data && event.notification.data.url) || '/', self.location.origin).href
+  event.waitUntil(
+    (async () => {
+      const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      for (const w of wins) {
+        if (w.url.startsWith(self.location.origin)) {
+          await w.focus()
+          if ('navigate' in w) await w.navigate(target).catch(() => {})
+          return
+        }
+      }
+      await self.clients.openWindow(target)
+    })(),
+  )
 })

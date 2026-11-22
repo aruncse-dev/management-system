@@ -562,6 +562,9 @@ export type DashboardSummary = {
       dueDate: string
       daysLeft: number
       kind: 'subscription' | 'insurance'
+      /** Account or card it is paid from, as entered; `''` when unknown. */
+      paymentMethod?: string
+      id?: string
     }[]
   }
   budget: { total: number; spent: number }

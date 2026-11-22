@@ -29,6 +29,11 @@ import {
   UiCard,
 } from '../ui'
 import { api, type DashboardSummary } from '../api'
+import { readSnapshot, writeSnapshot } from '../lib/snapshotCache'
+import { buildReminders } from '../lib/reminders'
+import { forecastCycle } from '../lib/forecast'
+import { RemindersCard } from '../components/RemindersCard'
+import { ForecastCard } from '../components/ForecastCard'
 import { accountKindMeta } from '../config'
 import { AccountKindPills, kindsPresent } from '../components/AccountKindPills'
 
@@ -100,11 +105,15 @@ export default function Dashboard({ onCategoryClick }: Props) {
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
   useEffect(() => {
     let cancelled = false
-    setSummary(null)
+    const snapKey = `summary:${month}-${year}`
+    // Last copy at once; the fresh summary replaces it when it lands.
+    setSummary(readSnapshot<DashboardSummary>(snapKey))
     void api
       .getDashboardSummary(month, year, TREND_MONTHS)
       .then((d) => {
-        if (!cancelled) setSummary(d)
+        if (cancelled) return
+        setSummary(d)
+        writeSnapshot(snapKey, d)
       })
       .catch(() => {})
     return () => {
@@ -165,6 +174,8 @@ export default function Dashboard({ onCategoryClick }: Props) {
       .sort((a, b) => b.amount - a.amount)
     return { charged, active, sources }
   }, [rows, creditCardNames, informalCreditNames])
+
+  const reminders = useMemo(() => buildReminders(summary), [summary])
 
   if (state.loading) return <div className="pg"><LoadingState /></div>
 
@@ -263,8 +274,31 @@ export default function Dashboard({ onCategoryClick }: Props) {
     .sort((a, b) => b.pct - a.pct || b.spent - a.spent)
   const totalOverBy = overCategories.reduce((sum, c) => sum + (c.spent - c.cap), 0)
 
+  // ---- Forecast (current cycle only) ------------------------------------------
+  const forecast =
+    isCurrent && cycle
+      ? forecastCycle(
+          {
+            expense: exp,
+            income: inc,
+            totalBudget,
+            elapsedDays,
+            totalDays,
+            categories: allCategories.filter((c) => c.hasCap).map(({ name, spent, cap }) => ({ name, spent, cap })),
+            avgIncome: summary?.income.avgIncome ?? 0,
+            duesBeforeCycleEnd: (summary?.committed.upcomingRenewals ?? [])
+              .filter((r) => r.daysLeft >= 0 && r.dueDate <= cycle.end)
+              .reduce((t, r) => t + r.amount, 0),
+          },
+          fmt,
+        )
+      : null
+
   return (
     <div className="pg dashboard-page ui-kit-page-shell monthly-subpage">
+      {/* 0 — What is about to be debited, and whether the account can cover it. */}
+      {isCurrent && <RemindersCard reminders={reminders} fmt={fmt} />}
+
       {/* 1 — The cycle's cash flow. */}
       <SectionBlock
         title="This Cycle"
@@ -293,6 +327,8 @@ export default function Dashboard({ onCategoryClick }: Props) {
           />
         </KpiGrid>
       </SectionBlock>
+
+      {forecast && <ForecastCard forecast={forecast} fmt={fmt} />}
 
       {/* 2 — Two figures: what is left in the accounts, and how much of this
           cycle went on borrowed money. Per-source detail is not repeated here;

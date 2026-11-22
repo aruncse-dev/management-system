@@ -18,6 +18,7 @@ import {
   type CachedProfileMenuRow,
 } from '../lib/profileMenuCache'
 import { clearSettingsPageCache } from '../lib/settingsPageCache'
+import { clearSnapshots } from '../lib/snapshotCache'
 import {
   LENDING_SHEET_SLUG_DEFAULT,
   lendingBookLabel,
@@ -256,6 +257,7 @@ export default function App({ Component, pageProps }: AppProps) {
           const handleLogout = () => {
             clearMenuCache()
             clearSettingsPageCache()
+            clearSnapshots()
             onLogout()
           }
           return (

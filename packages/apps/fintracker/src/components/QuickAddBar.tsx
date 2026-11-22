@@ -18,7 +18,11 @@ import type { Transaction } from '../types'
  * overwhelming majority of entries are four fields in one line, and a modal for
  * that is a screen and a tap spent on nothing.
  *
- * Saves directly. The parsed split sits under the box, so what will be written
+ * Saves optimistically: Enter clears the box and the row shows in the list at
+ * once, while the save runs behind it. Several entries can be in flight; one
+ * that fails comes back into the box with the error, so nothing is lost.
+ *
+ * The parsed split sits under the box, so what will be written
  * is visible before Enter, and the form is always one tap away for anything the
  * line cannot express — a transfer, a link, a note.
  */
@@ -28,7 +32,7 @@ export function QuickAddBar({
   categories,
   incomeCategories,
   modes,
-  onSaved,
+  onSubmit,
   onExpand,
   onClose,
   showStatus,
@@ -40,14 +44,19 @@ export function QuickAddBar({
   incomeCategories: readonly string[]
   /** Live payment sources. */
   modes: readonly string[]
-  onSaved: (savedDate: string) => void | Promise<void>
+  /**
+   * Persist one entry. Called with the payload for `api.addRow` and the row as
+   * it should appear in the list; resolves once the server has it.
+   */
+  onSubmit: (payload: Record<string, unknown>, row: Transaction) => Promise<void>
   /** Hand off to the full form, prefilled with whatever parsed. */
   onExpand: (draft: Transaction) => void
   onClose: () => void
   showStatus: (msg: string) => void
 }) {
   const [text, setText] = useState('')
-  const [saving, setSaving] = useState(false)
+  /** Entries sent but not yet confirmed — typing the next one never waits on them. */
+  const [pending, setPending] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -97,34 +106,45 @@ export function QuickAddBar({
     }
   }
 
-  async function save() {
+  function save() {
     if (!parsed || !ready) return
-    setSaving(true)
     const date = gasDate(parsed.date ?? todayIso())
-    try {
-      await api.addRow({
-        month,
-        year,
-        date,
-        desc: (parsed.desc ?? parsed.category ?? '').trim(),
-        a: Number(parsed.amount),
-        c: parsed.category,
-        t: parsed.type,
-        // The form's own fallback: the first configured source.
-        m: parsed.mode ?? modes[0] ?? '',
-        notes: '',
-      })
-      // Cleared but left open: catching up on a few days is type, Enter, type,
-      // Enter, and reopening the dock between each would be the whole cost of
-      // the feature back again.
-      setText('')
-      await onSaved(date)
-      inputRef.current?.focus()
-    } catch (e) {
-      showStatus('⚠ ' + (e instanceof Error ? e.message : 'Save failed'))
-    } finally {
-      setSaving(false)
+    const payload = {
+      month,
+      year,
+      date,
+      desc: (parsed.desc ?? parsed.category ?? '').trim(),
+      a: Number(parsed.amount),
+      c: parsed.category,
+      t: parsed.type,
+      // The form's own fallback: the first configured source.
+      m: parsed.mode ?? modes[0] ?? '',
+      notes: '',
     }
+    const row: Transaction = {
+      id: `pending-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      date,
+      desc: payload.desc,
+      a: payload.a,
+      c: String(payload.c ?? ''),
+      t: (payload.t ?? 'Expense') as Transaction['t'],
+      m: payload.m,
+      notes: '',
+    }
+    const sentText = text
+    // Cleared and left open at once: catching up on a few days is type, Enter,
+    // type, Enter — waiting on the network between each was the whole cost.
+    setText('')
+    inputRef.current?.focus()
+    setPending(n => n + 1)
+    void onSubmit(payload, row)
+      .catch(e => {
+        // Put it back only if the box is still empty, so it never clobbers
+        // whatever is being typed now.
+        setText(cur => (cur ? cur : sentText))
+        showStatus('⚠ ' + (e instanceof Error ? e.message : 'Save failed') + ' — entry kept in the box')
+      })
+      .finally(() => setPending(n => n - 1))
   }
 
   return (
@@ -143,7 +163,7 @@ export function QuickAddBar({
           onKeyDown={e => {
             if (e.key === 'Enter') {
               e.preventDefault()
-              if (ready) void save()
+              if (ready) save()
               else onExpand(draft())
             } else if (e.key === 'Escape') {
               e.preventDefault()
@@ -178,10 +198,10 @@ export function QuickAddBar({
           <button
             type="button"
             className="btn btn-sm quickadd-go"
-            onClick={() => void save()}
-            disabled={!ready || saving}
+            onClick={save}
+            disabled={!ready}
           >
-            {saving ? '…' : 'Add'}
+            {pending > 0 ? `Add · ${pending}…` : 'Add'}
           </button>
         </span>
       </div>

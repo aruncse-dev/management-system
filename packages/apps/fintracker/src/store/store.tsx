@@ -5,6 +5,8 @@ import { coerceBudget, transactionTransferDestination } from '../utils';
 import { TXN_PAGE } from './constants';
 import { loadInitDataDeduped } from '../api';
 import { DEFAULT_FINTRACKER_PREFS } from '../expenseCycle';
+import type { InitData } from '../api';
+import { readSnapshot, writeSnapshot } from '../lib/snapshotCache';
 
 const BUDGET_LS_KEY = 'ft_fintracker_budget_v1';
 
@@ -20,7 +22,17 @@ function persistBudgetToStorage(b: Budget) {
 type Action =
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_MONTH'; payload: { month: string; year: string } }
+  /**
+   * Correct the opening month once the org's cycle prefs are known — only if
+   * the user has not navigated yet. Keeps rows (the month did not really change
+   * for a regular-cycle org on most days).
+   */
+  | { type: 'SETTLE_OPENING_MONTH'; payload: { month: string; year: string } }
   | { type: 'SET_ROWS'; payload: Transaction[] }
+  /** Optimistic quick add: show the row before the server confirms it. */
+  | { type: 'ADD_ROW'; payload: Transaction }
+  | { type: 'REMOVE_ROW'; payload: string }
+  | { type: 'REPLACE_ROW_ID'; payload: { from: string; to: string } }
   | { type: 'SET_MONTHS'; payload: MonthRef[] }
   | { type: 'SET_BUDGET'; payload: Budget }
   | { type: 'SET_OPENING_BAL'; payload: OpeningBal }
@@ -35,7 +47,7 @@ type Action =
 const { month, year } = currentMonthYear();
 
 const initial: AppState = {
-  month, year, rows: [], budget: [], openingBal: {},
+  month, year, navigated: false, rows: [], budget: [], openingBal: {},
   months: [], fintracker: { ...DEFAULT_FINTRACKER_PREFS, expenseCycle: { ...DEFAULT_FINTRACKER_PREFS.expenseCycle } },
   currency: 'INR', roundOff: true,
   loading: true, txnPage: 1, filter: 'All', catFilter: '', search: '',
@@ -44,9 +56,15 @@ const initial: AppState = {
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case 'SET_LOADING':     return { ...state, loading: action.payload };
+    case 'SETTLE_OPENING_MONTH': {
+      if (state.navigated) return state;
+      if (state.month === action.payload.month && state.year === action.payload.year) return state;
+      return { ...state, ...action.payload, rows: [], loading: true, txnPage: 1 };
+    }
     case 'SET_MONTH':
       return {
         ...state,
+        navigated: true,
         ...action.payload,
         rows: [],
         loading: true,
@@ -56,6 +74,13 @@ function reducer(state: AppState, action: Action): AppState {
         search: '',
       };
     case 'SET_ROWS':        return { ...state, rows: action.payload.map(r => ({ ...r, _k: dateKey(r.date) })).sort((a,b) => (b._k||0)-(a._k||0)) };
+    case 'ADD_ROW': {
+      const r = { ...action.payload, _k: dateKey(action.payload.date) };
+      return { ...state, rows: [r, ...state.rows].sort((a, b) => (b._k || 0) - (a._k || 0)) };
+    }
+    case 'REMOVE_ROW':      return { ...state, rows: state.rows.filter(r => r.id !== action.payload) };
+    case 'REPLACE_ROW_ID':
+      return { ...state, rows: state.rows.map(r => (r.id === action.payload.from ? { ...r, id: action.payload.to } : r)) };
     case 'SET_MONTHS':      return { ...state, months: action.payload };
     case 'SET_BUDGET': {
       const budget = coerceBudget(action.payload);
@@ -91,14 +116,27 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    const apply = (init: InitData) => {
+      dispatch({ type: 'SET_MONTHS', payload: init.months });
+      dispatch({ type: 'SET_BUDGET', payload: init.budget });
+      dispatch({ type: 'SET_OPENING_BAL', payload: init.openingBal });
+      dispatch({ type: 'SET_FINTRACKER', payload: init.fintracker });
+      // The opening month was guessed before the prefs arrived — assuming a
+      // custom cycle anchored on the 19th. A regular-month org therefore opened
+      // on NEXT month (empty) from the 19th to month end. Settle it now.
+      dispatch({ type: 'SETTLE_OPENING_MONTH', payload: currentMonthYear(init.fintracker) });
+      if (init.currency) dispatch({ type: 'SET_CURRENCY', payload: init.currency });
+      if (init.roundOff !== undefined) dispatch({ type: 'SET_ROUND_OFF', payload: init.roundOff });
+    };
+    // Last-known settings first, so budgets and the cycle are right on the
+    // first frame instead of after a round trip.
+    const snapKey = `init:${state.month}-${state.year}`;
+    const snap = readSnapshot<InitData>(snapKey);
+    if (snap) apply(snap);
     void loadInitDataDeduped(state.month, state.year)
       .then((init) => {
-        dispatch({ type: 'SET_MONTHS', payload: init.months });
-        dispatch({ type: 'SET_BUDGET', payload: init.budget });
-        dispatch({ type: 'SET_OPENING_BAL', payload: init.openingBal });
-        dispatch({ type: 'SET_FINTRACKER', payload: init.fintracker });
-        if (init.currency) dispatch({ type: 'SET_CURRENCY', payload: init.currency });
-        if (init.roundOff !== undefined) dispatch({ type: 'SET_ROUND_OFF', payload: init.roundOff });
+        apply(init);
+        writeSnapshot(snapKey, init);
       })
       .catch(() => {
         /* auth / network — pages may show their own errors */

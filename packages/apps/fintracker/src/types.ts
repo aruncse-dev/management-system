@@ -48,6 +48,8 @@ export interface OpeningBal {
 }
 
 export interface AppState {
+  /** True once the user moved off the opening month; stops the opening-month correction. */
+  navigated?: boolean
   month: string
   year: string
   rows: Transaction[]
