@@ -117,9 +117,9 @@ importers:
       '@fintracker-vault/utils':
         specifier: workspace:*
         version: link:../../shared/utils
-      '@fontsource-variable/roboto':
-        specifier: 5.3.0
-        version: 5.3.0
+      '@fontsource-variable/google-sans':
+        specifier: 5.3.2
+        version: 5.3.2
       '@react-oauth/google':
         specifier: ^0.12.1
         version: 0.12.2(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -187,9 +187,9 @@ importers:
       '@fintracker-vault/utils':
         specifier: workspace:*
         version: link:../../shared/utils
-      '@fontsource-variable/roboto':
-        specifier: 5.3.0
-        version: 5.3.0
+      '@fontsource-variable/google-sans':
+        specifier: 5.3.2
+        version: 5.3.2
       iron-session:
         specifier: ^8.0.1
         version: 8.0.4
@@ -254,9 +254,9 @@ importers:
       '@fintracker-vault/utils':
         specifier: workspace:*
         version: link:../../shared/utils
-      '@fontsource-variable/roboto':
-        specifier: 5.3.0
-        version: 5.3.0
+      '@fontsource-variable/google-sans':
+        specifier: 5.3.2
+        version: 5.3.2
       iron-session:
         specifier: ^8.0.1
         version: 8.0.4
@@ -1121,8 +1121,8 @@ packages:
     resolution: {integrity: sha512-d9zaMRSTIKDLhctzH12MtXvJKSSUhaHcjV+2Z+GK+EEY7XKpP5yR4x+N3TAcHTcu963nIr+TMcCb4DBCYX1z6Q==}
     engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
 
-  '@fontsource-variable/roboto@5.3.0':
-    resolution: {integrity: sha512-BoaaZiQf8fgtxv07KXkTwx1bKz/EoqIlTXq2OOKKXINxp6qXWdnlChqV+hSaDANS49yyUASFl3OVBMMDTCIHFA==}
+  '@fontsource-variable/google-sans@5.3.2':
+    resolution: {integrity: sha512-fN+fO2Ffm+n2G5K+UK4ynP5WrWT+M/dbBs9HZaYcgAT5evhefJJH2MlGj8yMz+8slQmhjWAqPJyJ1sELkUM4Uw==}
 
   '@hono/node-server@2.1.1':
     resolution: {integrity: sha512-ELuehkj5VCBdgEw9zs+ivkKwyzzUCSQuE96YmiPvn1ECBoZCczbFXJLeEGMTYjphP6gydh4pHMqEYPVMYUVgQg==}
@@ -4698,7 +4698,7 @@ snapshots:
 
   '@eslint/js@8.57.1': {}
 
-  '@fontsource-variable/roboto@5.3.0': {}
+  '@fontsource-variable/google-sans@5.3.2': {}
 
   '@hono/node-server@2.1.1(hono@4.13.7)':
     dependencies:

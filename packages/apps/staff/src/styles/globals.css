@@ -1,7 +1,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { -webkit-text-size-adjust: 100%; background: var(--bg); }
 body {
-  font-family: var(--font-sans, 'Roboto Variable'), Roboto, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-sans, 'Google Sans Variable'), Roboto, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   background: var(--bg); color: var(--text); font-size: 15px;
   overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch;
   padding-bottom: env(safe-area-inset-bottom);
@@ -2029,7 +2029,7 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
 .att-dot.is-ot { background: rgba(217, 119, 6, 0.14); border-color: #d97706; }
 
 /* ───────── Type and surfaces (chosen Nov 2026: font B + style A) ─────────
-   Font B (since replaced by Roboto); sentence case instead of ALL CAPS, darker section
+   Font B (since replaced by Google Sans); sentence case instead of ALL CAPS, darker section
    titles, larger amounts with aligned digits.
    Style A: light tint kept; cards drop their outline and lift on a soft shadow
    in the app colour. Appended last so it wins over the older rules above. */
@@ -2044,12 +2044,16 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
 .holding-label, .ui-kit-holding-detail-label, .ui-kit-holding-stat span, .ui-kit-holding-pnl-label { font-size: 11.5px; font-weight: 500; }
 .kpi-card-v, .kpi-card-v-soft,
 .monthly-subpage .kpi-card-v, .monthly-subpage .kpi-card-v-soft, .dashboard-page .kpi-card-v, .dashboard-page .kpi-card-v-soft {
-  font-size: 20px; font-weight: 580; letter-spacing: -0.01em; font-variant-numeric: tabular-nums;
+  font-size: 20px; font-weight: 580; letter-spacing: 0; font-variant-numeric: normal;
 }
+/* Headline figures use the font's natural digit widths: equal-width digits
+   padded the 1s and, with tightened spacing, made the numbers look narrow and
+   tall. Lists and tables keep tabular digits so amounts line up in columns. */
+.ui-kit-kpi .kpi-card-v, .ui-kit-balance-value { letter-spacing: 0; font-variant-numeric: normal; }
 :root { --sh: 0 1px 2px rgba(var(--accent-rgb), .10), 0 8px 18px -10px rgba(var(--accent-rgb), .35); }
 .kpi-card, .ui-kit-card, .ui-kit-holding-card, .ui-kit-kpi, .settings-card { border-color: transparent; box-shadow: var(--sh); }
 .att-row { border-color: transparent; box-shadow: var(--sh); }
 .att-row.is-present { border-color: var(--navy); }
 
-/* Roboto weights (Nov 2026): bold steps sit one notch lighter than before. */
+/* Bold steps sit one notch lighter than before (Nov 2026). */
 b, strong, th { font-weight: 600; }
