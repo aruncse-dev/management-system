@@ -34,44 +34,49 @@ button, input, select, textarea {
 }
 
 /* NAV */
-.nav { background: var(--navy-dark); height: calc(54px + env(safe-area-inset-top)); display: flex; align-items: center; justify-content: space-between; padding: env(safe-area-inset-top) 14px 0; position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 0 rgba(15, 23, 42, .08); gap: 10px; will-change: transform; transform: translateZ(0); }
-.nav-b { color: #fff; font-weight: 700; font-size: 13px; letter-spacing: 0; white-space: nowrap; }
+.nav { background: #fff; height: calc(54px + env(safe-area-inset-top)); display: flex; align-items: center; justify-content: space-between; padding: env(safe-area-inset-top) 14px 0; position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 0 var(--border); gap: 10px; will-change: transform; transform: translateZ(0); }
+.nav-b { color: var(--text); font-weight: 500; font-size: 13px; letter-spacing: 0; white-space: nowrap; }
 .nav-b em { color: #A5B4FC; font-style: normal; }
+/* App icon: white glyph on a solid tile of the app's colour (header style B). */
 .nav-app-icon-wrap {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: #fff;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--navy);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.22);
-}
-.nav-app-icon-wrap--drawer {
-  width: 28px;
-  height: 28px;
 }
 .nav-app-icon {
   width: 24px;
   height: 24px;
   object-fit: contain;
   display: block;
+  filter: brightness(0) invert(1);
+}
+/* In the drawer (which keeps the app colour) the tile flips: white tile, coloured glyph. */
+.nav-app-icon-wrap--drawer {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: #fff;
 }
 .nav-app-icon-wrap--drawer .nav-app-icon {
   width: 22px;
   height: 22px;
+  filter: none;
 }
 .nav-month { display: flex; align-items: center; gap: 6px; flex: 1; justify-content: center; }
-.nav-arrow { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.25); color: #fff; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; font-size: 15px; display: flex; align-items: center; justify-content: center; line-height: 1; touch-action: manipulation; }
-.nav-ml { color: #fff; font-weight: 700; font-size: 13px; min-width: 72px; text-align: center; line-height: 1.35; }
+.nav-arrow { background: #fff; border: 1px solid var(--border); color: var(--navy); width: 28px; height: 28px; border-radius: 50%; cursor: pointer; font-size: 15px; display: flex; align-items: center; justify-content: center; line-height: 1; touch-action: manipulation; }
+.nav-ml { color: var(--text); font-weight: 700; font-size: 13px; min-width: 72px; text-align: center; line-height: 1.35; }
 .nav-r { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
-.nav-status { font-size: 12px; color: #94A3B8; display: none; }
+.nav-status { font-size: 12px; color: var(--muted); display: none; }
 .nav-status.show { display: block; }
-.nav-sync { background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.2); color: #fff; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 20px; cursor: pointer; font-family: inherit; touch-action: manipulation; }
+.nav-sync { background: #fff; border: 1px solid var(--border); color: var(--navy); font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 20px; cursor: pointer; font-family: inherit; touch-action: manipulation; }
 
 /* HAMBURGER — shown everywhere */
-.nav-hamburger { display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.2); color: #fff; width: 34px; height: 34px; border-radius: 8px; cursor: pointer; font-size: 18px; flex-shrink: 0; touch-action: manipulation; }
+.nav-hamburger { display: flex; align-items: center; justify-content: center; background: #fff; border: 1px solid var(--border); color: var(--text); width: 34px; height: 34px; border-radius: 8px; cursor: pointer; font-size: 18px; flex-shrink: 0; touch-action: manipulation; }
 
 /* MODULE NAV PILLS — hidden everywhere */
 .nav-modules { display: none; align-items: center; gap: 4px; flex-shrink: 1; overflow-x: auto; }
@@ -88,7 +93,7 @@ button, input, select, textarea {
 .nav-drawer-item:active { background: rgba(255,255,255,.08); }
 
 /* MONTHLY SUB-NAV (month controls below global nav) */
-.nav-sub { background: var(--navy-dark); height: 46px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; position: sticky; top: 0; z-index: 95; gap: 10px; box-shadow: none; }
+.nav-sub { background: var(--navy-lt); border-bottom: 1px solid var(--border); height: 46px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; position: sticky; top: 0; z-index: 95; gap: 10px; box-shadow: none; }
 
 /* MONTHLY BOTTOM NAV */
 .bottom-nav {
