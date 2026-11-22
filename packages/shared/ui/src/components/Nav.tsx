@@ -250,7 +250,7 @@ export default function Nav({
           <span className="nav-app-icon-wrap">
             <img src={iconSrc} alt={name} className="nav-app-icon" />
           </span>
-          {title && <span style={{ fontSize: 17, fontWeight: 500, letterSpacing: '-0.01em' }}>{title}</span>}
+          {title && <span style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-0.015em' }}>{title}</span>}
         </span>
 
         <button type="button" className="nav-hamburger" onClick={() => setDrawerOpen(true)}>
