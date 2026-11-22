@@ -48,6 +48,8 @@ export default function Monthly() {
   const refOptions = useTransactionRefOptions(modalOpen)
   /** The floating one-line entry. Opened by the plus button on every tab but Budget. */
   const [quickOpen, setQuickOpen] = useState(false)
+  /** Line handed in by a link (`?quick=1&q=4200 LIC Insurance HDFC`). Shown, never auto-saved. */
+  const [quickPrefill, setQuickPrefill] = useState('')
   const keyboardInset = useKeyboardInset(quickOpen)
   /** Forces TransactionModal to remount; duplicated rows all share id ''. */
   const [modalNonce, setModalNonce] = useState(0)
@@ -73,9 +75,12 @@ export default function Monthly() {
   // quick-add box straight away, then drop the flag so a reload does not.
   useEffect(() => {
     if (!router.isReady || router.query.quick !== '1') return
+    const q = typeof router.query.q === 'string' ? router.query.q.slice(0, 200) : ''
+    setQuickPrefill(q)
     setQuickOpen(true)
-    const { quick: _quick, ...rest } = router.query
+    const { quick: _quick, q: _q, ...rest } = router.query
     void _quick
+    void _q
     void router.replace({ pathname: '/monthly', query: { tab: 'dash', ...rest } }, undefined, { shallow: true })
   }, [router])
 
@@ -292,7 +297,8 @@ export default function Monthly() {
             incomeCategories={incomeCategoryOptions}
             modes={paymentModeOptions}
             showStatus={showStatus}
-            onClose={() => setQuickOpen(false)}
+            initialText={quickPrefill}
+            onClose={() => { setQuickOpen(false); setQuickPrefill('') }}
             onSubmit={async (payload, row) => {
               // Show it now if it belongs to the cycle on screen; a row dated
               // into another cycle is only announced, as before.

@@ -36,6 +36,7 @@ export function QuickAddBar({
   onExpand,
   onClose,
   showStatus,
+  initialText = '',
 }: {
   month: string
   year: string
@@ -53,8 +54,10 @@ export function QuickAddBar({
   onExpand: (draft: Transaction) => void
   onClose: () => void
   showStatus: (msg: string) => void
+  /** Prefilled line, e.g. from a DayNest reminder link (`?quick=1&q=…`). Never saved without Enter. */
+  initialText?: string
 }) {
-  const [text, setText] = useState('')
+  const [text, setText] = useState(initialText)
   /** Entries sent but not yet confirmed — typing the next one never waits on them. */
   const [pending, setPending] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
