@@ -1975,7 +1975,10 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
 .holding-label, .ui-kit-holding-detail-label, .ui-kit-holding-stat span, .ui-kit-holding-pnl-label { font-size: 11.5px; font-weight: 500; }
 .kpi-card-v, .kpi-card-v-soft,
 .monthly-subpage .kpi-card-v, .monthly-subpage .kpi-card-v-soft, .dashboard-page .kpi-card-v, .dashboard-page .kpi-card-v-soft {
-  font-size: 20px; font-weight: 650; letter-spacing: -0.01em; font-variant-numeric: tabular-nums;
+  font-size: 20px; font-weight: 560; letter-spacing: -0.01em; font-variant-numeric: tabular-nums;
 }
+/* Plain (untoned) KPI figures a shade softer than body text, so they don't
+   match the bold title bar; green/red/amber tones keep their own colour. */
+.ui-kit-kpi:not([class*="--accent-"]) .kpi-card-v { color: color-mix(in srgb, var(--text) 82%, #fff); }
 :root { --sh: 0 1px 2px rgba(var(--accent-rgb), .10), 0 8px 18px -10px rgba(var(--accent-rgb), .35); }
 .kpi-card, .ui-kit-card, .ui-kit-holding-card, .ui-kit-kpi, .settings-card { border-color: transparent; box-shadow: var(--sh); }
