@@ -1811,6 +1811,12 @@
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
+.nav-drawer-build a {
+  color: var(--navy);
+  font-weight: 600;
+  text-decoration: none;
+  padding: 6px 0; /* easier to tap */
+}
 
 /* "New version available" bar, shown when a newer deploy is live mid-session. */
 .pwa-update-bar {

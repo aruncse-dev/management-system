@@ -1,6 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
 import { GoogleOAuthProvider, type CredentialResponse } from '@react-oauth/google'
 import { GoogleAuthCard, GoogleSignInButton } from './GoogleAuthCard'
+import { launchLog, launchShown } from './launchLog'
 
 export type AppAuthKind = 'fintracker' | 'vault' | 'staff'
 
@@ -147,19 +148,29 @@ function writeAuthHint(kind: AppAuthKind, authed: boolean) {
  * attempt is now capped, retried with backoff, and a missing answer is
  * reported as `null` (unreachable) — never as signed-out.
  */
-async function readSessionOnce(): Promise<boolean> {
+async function readSessionOnce(attempt: number): Promise<boolean> {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), SESSION_TIMEOUT_MS)
+  const t0 = Date.now()
+  launchLog(`sign-in check ${attempt + 1} sent`)
   try {
     const r = await fetch('/api/auth/session', {
       credentials: 'same-origin',
       cache: 'no-store',
       signal: ctrl.signal,
     })
+    launchLog(`sign-in check ${attempt + 1} answered ${r.status} in ${Date.now() - t0}ms`)
     if (r.status === 401) return false
     if (!r.ok) throw new Error(`session ${r.status}`)
     const d = (await r.json()) as { authed?: boolean }
     return Boolean(d.authed)
+  } catch (e) {
+    const timedOut = ctrl.signal.aborted
+    launchLog(
+      `sign-in check ${attempt + 1} ${timedOut ? 'got no answer in' : 'failed after'} ${Date.now() - t0}ms` +
+        (timedOut ? '' : `: ${e instanceof Error ? e.message : String(e)}`),
+    )
+    throw e
   } finally {
     clearTimeout(timer)
   }
@@ -169,7 +180,7 @@ async function readSessionWithRetry(isCancelled: () => boolean): Promise<boolean
   for (let attempt = 0; attempt <= SESSION_RETRY_DELAYS_MS.length; attempt++) {
     if (isCancelled()) return null
     try {
-      return await readSessionOnce()
+      return await readSessionOnce(attempt)
     } catch {
       const delay = SESSION_RETRY_DELAYS_MS[attempt]
       if (delay === undefined) break
@@ -203,7 +214,9 @@ export default function AppAuthGate({ appKind, googleClientId, children, onSigne
    * service worker's cache never passed through the middleware.
    */
   useIsoLayoutEffect(() => {
-    if (readAuthHint(appKind)) {
+    const hint = readAuthHint(appKind)
+    launchLog(`app code started | ${hint ? 'signed in last time: showing the app now' : 'no sign-in hint: waiting for the check'}`)
+    if (hint) {
       showingAppRef.current = true
       setAuthed(true)
       setSessionLoading(false)
@@ -215,6 +228,7 @@ export default function AppAuthGate({ appKind, googleClientId, children, onSigne
     void (async () => {
       const result = await readSessionWithRetry(() => cancelled)
       if (cancelled) return
+      launchLog(`sign-in check result: ${result === null ? 'no answer' : result ? 'signed in' : 'signed out'}`)
       if (result === null) {
         // Never got an answer. If the app is already showing, leave it — its
         // own requests will surface errors. Otherwise say so; showing the
@@ -307,6 +321,7 @@ export default function AppAuthGate({ appKind, googleClientId, children, onSigne
     </div>
   )
 
+  function renderGate(): ReactNode {
   if (sessionLoading) {
     return loadingUi
   }
@@ -350,4 +365,24 @@ export default function AppAuthGate({ appKind, googleClientId, children, onSigne
       />
     </GoogleOAuthProvider>
   )
+  }
+
+  const screen = sessionLoading ? 'loading' : sessionUnreachable ? 'unreachable' : authed ? 'app' : 'sign-in'
+  return <LaunchScreenMark screen={screen}>{renderGate()}</LaunchScreenMark>
+}
+
+/** Notes in the launch log which screen the gate shows, once per change. */
+function LaunchScreenMark({ screen, children }: { screen: string; children: ReactNode }) {
+  useEffect(() => {
+    if (screen === 'loading') {
+      // A signed-in launch replaces "Loading…" before it is ever painted, so
+      // only note it when it is really on screen.
+      const t = setTimeout(() => launchLog('showing "Loading…"'), 300)
+      return () => clearTimeout(t)
+    }
+    if (screen === 'unreachable') launchShown('"Can\'t reach the server" card')
+    else if (screen === 'app') launchShown('the app')
+    else launchShown('the sign-in card')
+  }, [screen])
+  return <>{children}</>
 }

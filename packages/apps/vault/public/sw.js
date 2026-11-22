@@ -22,14 +22,55 @@ const PAGE_CACHE = `ft-pages-${VERSION}`
 const NAV_TIMEOUT_MS = 4000
 const MAX_STATIC_ENTRIES = 250
 
+/*
+ * Launch log (read by /launch-log.html). A worker has no localStorage, so the
+ * lines live in one JSON entry in their own cache. Steps and timings only:
+ * page paths without query strings, never data. Writes are batched and every
+ * failure is swallowed, so logging can never slow or break a request.
+ */
+const LOG_CACHE = 'ft-log'
+const LOG_KEY = '/__ft-sw-log'
+const LOG_MAX = 200
+let logBuffer = []
+let logTimer = null
+function swLog(msg) {
+  try {
+    logBuffer.push([Date.now(), String(msg).slice(0, 240)])
+    if (!logTimer) logTimer = setTimeout(flushLog, 250)
+  } catch {
+    /* ignore */
+  }
+}
+async function flushLog() {
+  logTimer = null
+  const lines = logBuffer
+  logBuffer = []
+  try {
+    const cache = await caches.open(LOG_CACHE)
+    const hit = await cache.match(LOG_KEY)
+    let all = []
+    if (hit) all = await hit.json().catch(() => [])
+    if (!Array.isArray(all)) all = []
+    all = all.concat(lines).slice(-LOG_MAX)
+    await cache.put(LOG_KEY, new Response(JSON.stringify(all), { headers: { 'Content-Type': 'application/json' } }))
+  } catch {
+    /* ignore */
+  }
+}
+
+// Runs each time the browser starts this worker (a cold launch starts it fresh).
+swLog(`worker started (${VERSION})`)
+
 self.addEventListener('install', () => {
+  swLog('new worker installed')
   self.skipWaiting()
 })
 
 self.addEventListener('activate', event => {
   event.waitUntil(
     (async () => {
-      const keep = new Set([STATIC_CACHE, PAGE_CACHE])
+      swLog('new worker activated')
+      const keep = new Set([STATIC_CACHE, PAGE_CACHE, LOG_CACHE])
       for (const key of await caches.keys()) {
         if (key.startsWith('ft-') && !keep.has(key)) await caches.delete(key)
       }
@@ -99,11 +140,14 @@ function offlineResponse() {
 
 async function networkFirstPage(event) {
   const request = event.request
+  const t0 = Date.now()
   const cache = await caches.open(PAGE_CACHE)
   const key = new URL(request.url)
   key.search = ''
+  swLog(`page requested ${key.pathname} (saved pages opened in ${Date.now() - t0}ms)`)
 
   const network = fetch(request).then(res => {
+    swLog(`page ${key.pathname}: network answered ${res.status} in ${Date.now() - t0}ms${res.redirected ? ' (redirected)' : ''}`)
     // Only cache a real page. A redirect is the middleware sending a signed-out
     // user to `/`; caching it would replay that redirect later.
     if (res.ok && res.type === 'basic' && !res.redirected) {
@@ -111,6 +155,7 @@ async function networkFirstPage(event) {
     }
     return res
   })
+  network.catch(e => swLog(`page ${key.pathname}: network failed after ${Date.now() - t0}ms: ${(e && e.message) || e}`))
 
   const timeout = new Promise(resolve => setTimeout(() => resolve(null), NAV_TIMEOUT_MS))
   try {
@@ -123,6 +168,7 @@ async function networkFirstPage(event) {
   // Only this exact page's last copy. Serving `/` for a page never cached here
   // would load the wrong screen under the requested URL.
   const cached = await cache.match(key.href)
+  swLog(`page ${key.pathname}: no usable answer after ${Date.now() - t0}ms, ${cached ? 'showing the saved copy' : 'no saved copy, still waiting for the network'}`)
   if (cached) {
     // Let the slow request finish in the background so the next launch is fresh.
     event.waitUntil(network.catch(() => {}))
