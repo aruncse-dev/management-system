@@ -23,8 +23,8 @@ button, input, select, textarea {
 
 :root {
   /* Staff accent: deep orange — green belongs to DayNest. Shared kit, own identity. */
-  --bg: #FFF8F3; --card: #FFF; --border: #F3D6C4; --text: #2A1A12; --muted: #6B5548;
-  --navy: #C2410C; --accent-rgb: 194, 65, 12; --navy-lt: #FFF1E8; --navy-dark: #C2410C;
+  --bg: #FFF9F5; --card: #FFF; --border: #F6DDCD; --text: #2A1A12; --muted: #6B5548;
+  --navy: #EA580C; --accent-rgb: 234, 88, 12; --navy-lt: #FFF3EB; --navy-dark: #EA580C;
   --green: #166534; --green-lt: #F0FDF4; --gm: #22C55E;
   --red: var(--rm); --red-lt: #FEF2F2; --rm: #EF4444;
   --amber: var(--rm); --amber-lt: var(--red-lt);
@@ -34,7 +34,7 @@ button, input, select, textarea {
 }
 
 /* NAV */
-.nav { background: var(--navy-dark); height: calc(54px + env(safe-area-inset-top)); display: flex; align-items: center; justify-content: space-between; padding: env(safe-area-inset-top) 14px 0; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 12px rgba(var(--accent-rgb),.35); gap: 10px; will-change: transform; transform: translateZ(0); }
+.nav { background: var(--navy-dark); height: calc(54px + env(safe-area-inset-top)); display: flex; align-items: center; justify-content: space-between; padding: env(safe-area-inset-top) 14px 0; position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 0 rgba(15, 23, 42, .08); gap: 10px; will-change: transform; transform: translateZ(0); }
 .nav-b { color: #fff; font-weight: 700; font-size: 13px; letter-spacing: 0; white-space: nowrap; }
 .nav-b em { color: #A5B4FC; font-style: normal; }
 .nav-app-icon-wrap {
@@ -80,15 +80,15 @@ button, input, select, textarea {
 .nav-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 150; }
 
 /* DRAWER PANEL */
-.nav-drawer { position: fixed; top: 0; left: 0; height: 100dvh; width: 260px; background: var(--navy-dark); z-index: 160; transform: translateX(-100%); transition: transform .25s ease; display: flex; flex-direction: column; box-shadow: 4px 0 24px rgba(0,0,0,.4); overflow-y: auto; }
-.nav-drawer.open { transform: translateX(0); }
+.nav-drawer { position: fixed; top: 0; left: 0; height: 100dvh; width: 260px; background: var(--navy-dark); z-index: 160; transform: translateX(-100%); transition: transform .25s ease; display: flex; flex-direction: column; box-shadow: none; overflow-y: auto; }
+.nav-drawer.open { transform: translateX(0); box-shadow: 4px 0 24px rgba(0,0,0,.25); }
 .nav-drawer-hd { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,.1); }
 .nav-drawer-item { display: flex; align-items: center; gap: 12px; padding: 11px 16px; margin: 0; border: none; background: transparent; color: rgba(255,255,255,.94); font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer; width: 100%; text-align: left; transition: background .15s, color .15s; touch-action: manipulation; }
 .nav-drawer-item.active { color: #fff; background: rgba(255,255,255,.14); font-weight: 700; }
 .nav-drawer-item:active { background: rgba(255,255,255,.08); }
 
 /* MONTHLY SUB-NAV (month controls below global nav) */
-.nav-sub { background: var(--navy-dark); height: 46px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; position: sticky; top: 0; z-index: 95; gap: 10px; box-shadow: 0 1px 6px rgba(var(--accent-rgb),.2); }
+.nav-sub { background: var(--navy-dark); height: 46px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; position: sticky; top: 0; z-index: 95; gap: 10px; box-shadow: none; }
 
 /* MONTHLY BOTTOM NAV */
 .bottom-nav {
@@ -1811,11 +1811,7 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
   padding: 24px;
   position: relative;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 18% 18%, rgba(255,255,255,.14), transparent 24%),
-    radial-gradient(circle at 82% 12%, rgba(255,255,255,.12), transparent 22%),
-    radial-gradient(circle at 50% 108%, rgba(255,255,255,.08), transparent 34%),
-    linear-gradient(180deg, var(--navy) 0%, color-mix(in srgb, var(--navy) 88%, #fff) 48%, color-mix(in srgb, var(--navy) 78%, #000) 100%);
+  background: var(--navy);
 }
 .login-title { font-size: 24px; font-weight: 800; color: #fff; letter-spacing: -0.03em; }
 .login-sub { font-size: 15px; color: rgba(255,255,255,.76); text-align: center; line-height: 1.45; max-width: 320px; }
@@ -1998,23 +1994,24 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
 .att-cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
 .att-cal-head { margin-bottom: 6px; text-align: center; font-size: 11px; font-weight: 700; color: var(--muted); }
 .att-day {
-  position: relative; aspect-ratio: 1; min-height: 44px; border-radius: 12px;
+  aspect-ratio: 1; min-height: 44px; border-radius: 12px;
   border: 1.5px solid var(--border); background: var(--card); color: var(--text);
-  font: inherit; font-weight: 600; font-size: 14px; cursor: pointer; touch-action: manipulation;
-  display: grid; place-items: center; padding: 0;
+  font: inherit; font-weight: 600; font-size: 14px; line-height: 1; cursor: pointer; touch-action: manipulation;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 0;
 }
 .att-day.is-work { background: rgba(16, 185, 129, 0.16); border-color: #059669; }
 .att-day.is-ot { background: rgba(124, 58, 237, 0.14); border-color: #7c3aed; }
 .att-day.is-today { box-shadow: 0 0 0 2px var(--navy); }
 .att-day.is-future { opacity: 0.4; cursor: default; }
 .att-day-count {
-  position: absolute; top: 3px; right: 4px; min-width: 16px; height: 16px; padding: 0 4px;
-  border-radius: 999px; background: #059669; color: #fff; font-size: 10px; font-weight: 800; line-height: 16px;
+  min-width: 18px; height: 14px; padding: 0 5px; border-radius: 999px;
+  background: #059669; color: #fff; font-size: 10px; font-weight: 700; line-height: 14px; text-align: center;
 }
 .att-day.is-ot .att-day-count { background: #7c3aed; }
 .att-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font-size: 12px; color: var(--muted); align-items: center; }
 .att-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .att-legend-hint { margin-left: auto; }
+@media (max-width: 360px) { .att-day { font-size: 13px; gap: 2px; } .att-day-count { min-width: 16px; padding: 0 4px; } }
 .att-dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; border: 1.5px solid; }
 .att-dot.is-work { background: rgba(16, 185, 129, 0.16); border-color: #059669; }
 .att-dot.is-ot { background: rgba(124, 58, 237, 0.14); border-color: #7c3aed; }

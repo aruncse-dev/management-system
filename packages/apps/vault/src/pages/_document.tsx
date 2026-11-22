@@ -27,7 +27,7 @@ export default class MyDocument extends Document<Props> {
           <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
           <link rel="apple-touch-icon" href="/vault-192.png" />
           <meta name="color-scheme" content="light" />
-          <meta name="theme-color" content="#4338CA" />
+          <meta name="theme-color" content="#5E5CE6" />
           <meta name="apple-mobile-web-app-capable" content="yes" />
           <meta name="mobile-web-app-capable" content="yes" />
           <meta name="apple-mobile-web-app-status-bar-style" content="default" />

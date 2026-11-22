@@ -267,7 +267,7 @@ export default function VaultAppsPage() {
                     textAlign: 'left',
                     border: '1px solid rgba(var(--accent-rgb), .12)',
                     borderRadius: 18,
-                    background: 'linear-gradient(180deg, rgba(255,255,255,.96), rgba(243,248,255,.92))',
+                    background: 'var(--card)',
                     padding: 10,
                     aspectRatio: '1 / 1',
                     display: 'grid',
