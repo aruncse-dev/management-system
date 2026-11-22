@@ -62,8 +62,6 @@ const nextConfig = {
     ]
   },
   transpilePackages: [
-    // next/font/local inside geist must be compiled by Next, not imported raw.
-    'geist',
     '@fintracker-vault/auth',
     '@fintracker-vault/ui',
     '@fintracker-vault/types',

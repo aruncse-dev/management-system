@@ -21,7 +21,7 @@
   padding: 5px 10px;
   border-radius: 999px;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 650;
   border: 1px solid var(--border);
   background: var(--card);
   color: var(--muted);
@@ -56,7 +56,7 @@
   align-items: center;
   gap: 7px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: .6px;
@@ -141,12 +141,12 @@
 }
 .ui-kit-progress-label {
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 550;
   color: var(--muted);
 }
 .ui-kit-progress-pct {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text);
   font-variant-numeric: tabular-nums;
 }
@@ -170,7 +170,7 @@
 .ui-kit-progress-track.ui-tone-muted .ui-kit-progress-fill { background: var(--muted); }
 .ui-kit-summary-metric-label {
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--muted);
   text-transform: capitalize;
   letter-spacing: .02em;
@@ -233,7 +233,7 @@
 }
 .ui-kit-kpi-label {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: .04em;
@@ -321,7 +321,7 @@
   background: rgba(var(--accent-rgb), 0.1);
 }
 .ui-kit-holding-card-previewlink {
-  font-weight: 600;
+  font-weight: 550;
   font-size: 13px;
 }
 .ui-kit-holding-card-linkrow-icon {
@@ -366,19 +366,19 @@
 }
 .repay-month-label {
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 650;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: .6px;
 }
 .repay-month-total {
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 650;
   color: var(--text);
   font-variant-numeric: tabular-nums;
 }
 .repay-month-count {
-  font-weight: 600;
+  font-weight: 550;
   color: var(--muted);
 }
 .repay-month-rows {
@@ -448,7 +448,7 @@
 .loan-due-mark.ui-tone-amber { background: #D97706; }
 .loan-due-name {
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -456,7 +456,7 @@
 }
 .loan-due-when {
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 650;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -465,7 +465,7 @@
 .loan-due-when.ui-tone-amber { color: #D97706; }
 .loan-due-amt {
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 650;
   color: var(--text);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -573,7 +573,7 @@
   gap: 6px;
   color: var(--text);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 550;
   line-height: 1.2;
 }
 .ui-kit-holding-card-title .ui-kit-holding-icon {
@@ -608,14 +608,14 @@
 .ui-kit-holding-pnl-label {
   color: var(--muted);
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 650;
   text-transform: uppercase;
   letter-spacing: .04em;
 }
 .ui-kit-holding-stat strong {
   color: var(--text);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 650;
 }
 .ui-kit-holding-pnl {
   display: grid;
@@ -639,7 +639,7 @@
 .ui-kit-holding-pnl-value {
   color: var(--text);
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 650;
 }
 .ui-kit-holding-pnl-value.ui-tone-green { color: var(--gm); }
 .ui-kit-holding-pnl-value.ui-tone-red { color: var(--rm); }
@@ -670,14 +670,14 @@
 .ui-kit-holding-detail-label {
   color: var(--muted);
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 650;
   text-transform: uppercase;
   letter-spacing: .04em;
 }
 .ui-kit-holding-detail-value {
   color: var(--text);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 650;
   line-height: 1.25;
 }
 .ui-kit-holding-modal-pnl {
@@ -702,7 +702,7 @@
 .ui-kit-holding-pnl-pct {
   color: var(--muted);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 650;
   white-space: nowrap;
 }
 .ui-kit-field { display: grid; gap: 6px; }
@@ -714,7 +714,7 @@
   padding: 6px 10px;
   border-radius: 999px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   background: var(--card);
   color: var(--text);
   border: 1px solid var(--border);
@@ -769,7 +769,7 @@
   border-radius: 999px;
   padding: 7px 12px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
 }
 /* Solid, not a wash: the selected filter has to be obvious at a glance down a
    scrolling row, and the pale version read as barely-distinguishable from the
@@ -855,7 +855,7 @@
   border-radius: 10px;
   padding: 9px 12px;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 650;
   cursor: pointer;
 }
 .ui-kit-btn:disabled {
@@ -912,13 +912,13 @@
 .ui-kit-txn-title {
   color: var(--text);
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 650;
   line-height: 1.35;
 }
 .ui-kit-txn-amt {
   color: var(--ui-txn-accent);
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 650;
   white-space: nowrap;
 }
 .ui-kit-txn-meta {
@@ -946,7 +946,7 @@
 .ui-kit-txn-date,
 .ui-kit-txn-cat,
 .ui-kit-txn-type {
-  font-weight: 700;
+  font-weight: 600;
 }
 .ui-kit-txn-cat {
   display: inline-flex;
@@ -958,7 +958,7 @@
   padding: 6px 10px;
   border-radius: 999px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   background: var(--card);
   color: var(--text);
   border: 1px solid var(--border);
@@ -1004,7 +1004,7 @@
 }
 .ui-kit-txn-mode {
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 650;
   color: var(--muted);
 }
 .ui-kit-txn-main {
@@ -1073,7 +1073,7 @@
 .ui-kit-balance-title {
   color: var(--text);
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 650;
   line-height: 1.25;
 }
 .ui-kit-balance-subtitle {
@@ -1087,7 +1087,7 @@
   padding: 4px 8px;
   border-radius: 999px;
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 650;
   background: var(--navy-lt);
   color: var(--navy);
 }
@@ -1109,7 +1109,7 @@
 }
 .ui-kit-balance-left {
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--muted);
   white-space: nowrap;
 }
@@ -1119,7 +1119,7 @@
 .ui-kit-balance-value {
   color: var(--text);
   font-size: 17px;
-  font-weight: 900;
+  font-weight: 650;
   white-space: nowrap;
   text-align: right;
   flex-shrink: 0;
@@ -1156,7 +1156,7 @@
 }
 .ui-kit-balance-flow-item span {
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 650;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: .04em;
@@ -1181,7 +1181,7 @@
 }
 .ui-kit-balance-flow-item strong {
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 650;
   color: var(--text);
 }
 .ui-kit-balance-flow-item.ui-tone-green strong {
@@ -1192,7 +1192,7 @@
 }
 .ui-kit-balance-stat {
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 650;
   line-height: 1;
   white-space: nowrap;
 }
@@ -1223,14 +1223,14 @@
 }
 .ui-kit-chart-label {
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 650;
   text-transform: uppercase;
   letter-spacing: .08em;
   color: var(--muted);
 }
 .ui-kit-chart-value {
   font-size: 18px;
-  font-weight: 800;
+  font-weight: 650;
   letter-spacing: -.03em;
 }
 .ui-kit-tabbar {
@@ -1269,7 +1269,7 @@
   gap: 6px;
   padding: 8px 4px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   min-width: 0;
   white-space: nowrap;
 }
@@ -1314,7 +1314,7 @@
   color: var(--navy);
   border-bottom-color: var(--navy);
   border-bottom-width: 6px;
-  font-weight: 700;
+  font-weight: 600;
 }
 .ui-kit-page-stack {
   display: grid;
@@ -1347,7 +1347,7 @@
   padding: 8px 12px;
   border-radius: 10px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   white-space: nowrap;
 }
 .ui-kit-internal-tab.active {
@@ -1371,7 +1371,7 @@
   border-color: rgba(245, 158, 11, .35);
   color: #B45309;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 550;
   line-height: 1.45;
 }
 /* Error variant — same single-paragraph shape as the amber warning above,
@@ -1382,13 +1382,13 @@
   border-color: rgba(239, 68, 68, .35);
   color: #B91C1C;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 550;
   line-height: 1.45;
 }
 .ui-kit-callout-title {
   color: var(--text);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 650;
 }
 .ui-kit-callout-body {
   color: var(--muted);
@@ -1434,7 +1434,7 @@
 .modal-title {
   width: 100%;
   color: #fff;
-  font-weight: 800;
+  font-weight: 650;
   font-size: 15px;
   text-align: center;
   letter-spacing: -.02em;
@@ -1520,7 +1520,7 @@
   flex: 1;
   min-width: 0;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text);
   overflow-wrap: anywhere;
 }
@@ -1533,7 +1533,7 @@
   background: var(--navy-lt);
   color: var(--navy);
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 650;
   text-transform: uppercase;
   letter-spacing: .4px;
   white-space: nowrap;
@@ -1544,7 +1544,7 @@
   background: none;
   padding: 0;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--rm);
   cursor: pointer;
 }
@@ -1671,7 +1671,7 @@
   display: flex;
   justify-content: space-between;
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 550;
   color: var(--muted);
   letter-spacing: .2px;
 }
@@ -1684,7 +1684,7 @@
   align-items: center;
   gap: 12px;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 550;
   color: var(--muted);
 }
 .mini-bar-chart__legend span {
@@ -1753,7 +1753,7 @@
 }
 .ui-kit-txn-row-title {
   font-size: 13.5px;
-  font-weight: 600;
+  font-weight: 550;
   color: var(--text);
 }
 .ui-kit-txn-row-meta {
@@ -1762,7 +1762,7 @@
 }
 .ui-kit-txn-row-amount {
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 650;
   color: var(--text);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -1780,7 +1780,7 @@
   gap: 10px;
   padding: 10px 2px 4px;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 650;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: .05em;
@@ -1813,7 +1813,7 @@
 }
 .nav-drawer-build a {
   color: var(--navy);
-  font-weight: 600;
+  font-weight: 550;
   text-decoration: none;
   padding: 6px 0; /* easier to tap */
 }
@@ -1833,7 +1833,7 @@
   background: #0f172a;
   color: #fff;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 550;
   box-shadow: 0 8px 24px rgba(15, 23, 42, .25);
   max-width: calc(100vw - 32px);
 }
@@ -1845,6 +1845,6 @@
   background: var(--navy);
   color: #fff;
   font: inherit;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
 }

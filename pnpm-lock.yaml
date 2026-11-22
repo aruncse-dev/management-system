@@ -117,12 +117,12 @@ importers:
       '@fintracker-vault/utils':
         specifier: workspace:*
         version: link:../../shared/utils
+      '@fontsource-variable/roboto':
+        specifier: 5.3.0
+        version: 5.3.0
       '@react-oauth/google':
         specifier: ^0.12.1
         version: 0.12.2(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      geist:
-        specifier: 1.8.2
-        version: 1.8.2(next@14.2.35(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
       iron-session:
         specifier: ^8.0.1
         version: 8.0.4
@@ -187,9 +187,9 @@ importers:
       '@fintracker-vault/utils':
         specifier: workspace:*
         version: link:../../shared/utils
-      geist:
-        specifier: 1.8.2
-        version: 1.8.2(next@14.2.35(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
+      '@fontsource-variable/roboto':
+        specifier: 5.3.0
+        version: 5.3.0
       iron-session:
         specifier: ^8.0.1
         version: 8.0.4
@@ -254,9 +254,9 @@ importers:
       '@fintracker-vault/utils':
         specifier: workspace:*
         version: link:../../shared/utils
-      geist:
-        specifier: 1.8.2
-        version: 1.8.2(next@14.2.35(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
+      '@fontsource-variable/roboto':
+        specifier: 5.3.0
+        version: 5.3.0
       iron-session:
         specifier: ^8.0.1
         version: 8.0.4
@@ -1120,6 +1120,9 @@ packages:
   '@eslint/js@8.57.1':
     resolution: {integrity: sha512-d9zaMRSTIKDLhctzH12MtXvJKSSUhaHcjV+2Z+GK+EEY7XKpP5yR4x+N3TAcHTcu963nIr+TMcCb4DBCYX1z6Q==}
     engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
+
+  '@fontsource-variable/roboto@5.3.0':
+    resolution: {integrity: sha512-BoaaZiQf8fgtxv07KXkTwx1bKz/EoqIlTXq2OOKKXINxp6qXWdnlChqV+hSaDANS49yyUASFl3OVBMMDTCIHFA==}
 
   '@hono/node-server@2.1.1':
     resolution: {integrity: sha512-ELuehkj5VCBdgEw9zs+ivkKwyzzUCSQuE96YmiPvn1ECBoZCczbFXJLeEGMTYjphP6gydh4pHMqEYPVMYUVgQg==}
@@ -2595,11 +2598,6 @@ packages:
 
   functions-have-names@1.2.3:
     resolution: {integrity: sha512-xckBUXyTIqT97tq2x2AMb+g163b5JFysYk0x4qxNFwbfQkmNZoiRHb6sPzI9/QV33WeuvVYBUIiD4NzNIyqaRQ==}
-
-  geist@1.8.2:
-    resolution: {integrity: sha512-fRF4sbJ9qcCxPb35cVtKBAwYlTt1IbU9nkbPi0a+xyZqPIjCJ2BY8ekGhx6/SGSZKrR7/UuL57r/eeDQ1Xy11g==}
-    peerDependencies:
-      next: '>=13.2.0'
 
   generator-function@2.0.1:
     resolution: {integrity: sha512-SFdFmIJi+ybC0vjlHN0ZGVGHc3lgE0DxPAT0djjVg+kjOnSqclqmj0KQ7ykTOLP6YxoqOvuAODGdcHJn+43q3g==}
@@ -4700,6 +4698,8 @@ snapshots:
 
   '@eslint/js@8.57.1': {}
 
+  '@fontsource-variable/roboto@5.3.0': {}
+
   '@hono/node-server@2.1.1(hono@4.13.7)':
     dependencies:
       hono: 4.13.7
@@ -6406,10 +6406,6 @@ snapshots:
       is-callable: 1.2.7
 
   functions-have-names@1.2.3: {}
-
-  geist@1.8.2(next@14.2.35(react-dom@18.3.1(react@18.3.1))(react@18.3.1)):
-    dependencies:
-      next: 14.2.35(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
 
   generator-function@2.0.1: {}
 

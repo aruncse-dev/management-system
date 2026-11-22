@@ -721,7 +721,7 @@ export default function VaultInsurancePage() {
           ) : (
             <div className="ui-stack">
               {filteredRows.length === 0 ? (
-                <div style={{ gridColumn: '1 / -1', padding: '18px 14px', color: 'var(--muted)', fontSize: 13, fontWeight: 600, textAlign: 'center' }}>
+                <div style={{ gridColumn: '1 / -1', padding: '18px 14px', color: 'var(--muted)', fontSize: 13, fontWeight: 550, textAlign: 'center' }}>
                   {rows.length === 0
                     ? 'No insurance policies yet. Add one with the plus button.'
                     : 'No policies match this filter.'}
@@ -769,7 +769,7 @@ export default function VaultInsurancePage() {
           {loading ? (
             <LoadingState variant="section" />
           ) : premiums.length === 0 ? (
-            <div style={{ padding: '18px 14px', color: 'var(--muted)', fontSize: 13, fontWeight: 600, textAlign: 'center' }}>
+            <div style={{ padding: '18px 14px', color: 'var(--muted)', fontSize: 13, fontWeight: 550, textAlign: 'center' }}>
               No premiums recorded yet.
             </div>
           ) : (
@@ -777,10 +777,10 @@ export default function VaultInsurancePage() {
               {premiumsByMonth.map(([month, list]) => (
                 <div key={month}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '4px 2px 8px' }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)' }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}>
                       {month ? fmtDate(`${month}-01`).slice(3) : 'Undated'}
                     </div>
-                    <div style={{ fontSize: 12, fontWeight: 700 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600 }}>
                       {INR(list.reduce((sum, r) => sum + (r.amount || 0), 0))}
                     </div>
                   </div>
@@ -1154,13 +1154,13 @@ export default function VaultInsurancePage() {
                 number you quote to the insurer. The number is the one field
                 anyone needs to copy, so the button lives with it. */}
             <div style={{ display: 'grid', gap: 8, padding: 12, border: '1px solid var(--border)', borderRadius: 12, background: 'var(--card)' }}>
-              <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em' }}>Plan Name</div>
-              <div style={{ color: 'var(--text)', fontWeight: 600, wordBreak: 'break-word', minWidth: 0 }}>
+              <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em' }}>Plan Name</div>
+              <div style={{ color: 'var(--text)', fontWeight: 550, wordBreak: 'break-word', minWidth: 0 }}>
                 {detail.plan_name || 'Untitled Policy'}
               </div>
-              <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', marginTop: 4 }}>Policy Number</div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em', marginTop: 4 }}>Policy Number</div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                <div style={{ color: 'var(--text)', fontWeight: 800, fontVariantNumeric: 'tabular-nums', letterSpacing: '.02em', wordBreak: 'break-word', minWidth: 0 }}>
+                <div style={{ color: 'var(--text)', fontWeight: 650, fontVariantNumeric: 'tabular-nums', letterSpacing: '.02em', wordBreak: 'break-word', minWidth: 0 }}>
                   {detail.policy_number || '—'}
                 </div>
                 {detail.policy_number && (
@@ -1181,9 +1181,9 @@ export default function VaultInsurancePage() {
               {detailRows.map(([label, value]) => {
                 return (
                   <div key={label} style={{ display: 'grid', gap: 8, alignContent: 'start', padding: 12, border: '1px solid var(--border)', borderRadius: 12, background: 'var(--card)' }}>
-                    <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em' }}>{label}</div>
+                    <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em' }}>{label}</div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                      <div style={{ color: 'var(--text)', fontWeight: 600, wordBreak: 'break-word', minWidth: 0 }}>{value}</div>
+                      <div style={{ color: 'var(--text)', fontWeight: 550, wordBreak: 'break-word', minWidth: 0 }}>{value}</div>
                     </div>
                   </div>
                 )
@@ -1194,7 +1194,7 @@ export default function VaultInsurancePage() {
       )}
 
       {toast && (
-        <div style={{ position: 'fixed', left: '50%', bottom: 18, transform: 'translateX(-50%)', zIndex: 500, background: '#ECFDF5', color: '#166534', border: '1px solid #BBF7D0', borderRadius: 999, padding: '10px 14px', fontSize: 12, fontWeight: 700, boxShadow: '0 12px 28px rgba(22, 101, 52, .14)', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ position: 'fixed', left: '50%', bottom: 18, transform: 'translateX(-50%)', zIndex: 500, background: '#ECFDF5', color: '#166534', border: '1px solid #BBF7D0', borderRadius: 999, padding: '10px 14px', fontSize: 12, fontWeight: 600, boxShadow: '0 12px 28px rgba(22, 101, 52, .14)', display: 'flex', alignItems: 'center', gap: 8 }}>
           <Check size={14} />
           <span>{toast}</span>
         </div>

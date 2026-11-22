@@ -228,7 +228,7 @@ export default function HistoryPage() {
                   padding: '18px 14px',
                   color: 'var(--muted)',
                   fontSize: 13,
-                  fontWeight: 600,
+                  fontWeight: 550,
                   textAlign: 'center',
                   display: 'grid',
                   gap: 6,
@@ -260,7 +260,7 @@ export default function HistoryPage() {
                     iconBackground
                     rightTop={
                       r.staffActive ? undefined : (
-                        <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)' }}>INACTIVE</span>
+                        <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)' }}>INACTIVE</span>
                       )
                     }
                     leftLabel="Days"

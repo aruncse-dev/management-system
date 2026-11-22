@@ -1,7 +1,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { -webkit-text-size-adjust: 100%; background: var(--bg); }
 body {
-  font-family: var(--font-sans, 'Geist'), system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-sans, 'Roboto Variable'), Roboto, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   background: var(--bg); color: var(--text); font-size: 15px;
   overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch;
   padding-bottom: env(safe-area-inset-bottom);
@@ -29,7 +29,7 @@ button, input, select, textarea {
 
 /* NAV */
 .nav { background: #fff; height: calc(54px + env(safe-area-inset-top)); display: flex; align-items: center; justify-content: space-between; padding: env(safe-area-inset-top) 14px 0; position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 0 rgba(var(--accent-rgb), .24), 0 4px 14px -4px rgba(15, 23, 42, .16); gap: 10px; will-change: transform; transform: translateZ(0); }
-.nav-b { color: var(--text); font-weight: 700; font-size: 13px; letter-spacing: 0; white-space: nowrap; }
+.nav-b { color: var(--text); font-weight: 600; font-size: 13px; letter-spacing: 0; white-space: nowrap; }
 .nav-b em { color: #A5B4FC; font-style: normal; }
 /* App icon: white glyph on a solid tile of the app's colour (header style B). */
 .nav-app-icon-wrap {
@@ -61,11 +61,11 @@ button, input, select, textarea {
 }
 .nav-month { display: flex; align-items: center; gap: 6px; flex: 1; justify-content: center; }
 .nav-arrow { background: #fff; border: 1px solid var(--border); color: var(--navy); width: 28px; height: 28px; border-radius: 50%; cursor: pointer; font-size: 15px; display: flex; align-items: center; justify-content: center; line-height: 1; touch-action: manipulation; }
-.nav-ml { color: var(--text); font-weight: 700; font-size: 13px; min-width: 72px; text-align: center; line-height: 1.35; }
+.nav-ml { color: var(--text); font-weight: 600; font-size: 13px; min-width: 72px; text-align: center; line-height: 1.35; }
 .nav-r { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
 .nav-status { font-size: 12px; color: var(--muted); display: none; }
 .nav-status.show { display: block; }
-.nav-sync { background: #fff; border: 1px solid var(--border); color: var(--navy); font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 20px; cursor: pointer; font-family: inherit; touch-action: manipulation; }
+.nav-sync { background: #fff; border: 1px solid var(--border); color: var(--navy); font-size: 11px; font-weight: 550; padding: 4px 10px; border-radius: 20px; cursor: pointer; font-family: inherit; touch-action: manipulation; }
 
 /* HAMBURGER — shown everywhere */
 .nav-hamburger { display: flex; align-items: center; justify-content: center; background: #fff; border: 1px solid var(--border); color: var(--text); width: 34px; height: 34px; border-radius: 8px; cursor: pointer; font-size: 18px; flex-shrink: 0; touch-action: manipulation; }
@@ -82,10 +82,10 @@ button, input, select, textarea {
 .nav-drawer-hd { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--border); }
 /* Light sidebar: the close button sits on white, not on the app colour. */
 .nav-drawer .modal-close { position: static; color: var(--muted); }
-.nav-drawer .nav-b { font-size: 16px; font-weight: 600; }
+.nav-drawer .nav-b { font-size: 16px; font-weight: 550; }
 .nav-drawer-item { display: flex; align-items: center; gap: 12px; padding: 11px 12px; margin: 1px 8px; width: calc(100% - 16px); border-radius: 10px; border: none; background: transparent; color: var(--text); font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer; text-align: left; transition: background .15s, color .15s; touch-action: manipulation; }
 .nav-drawer-item svg { color: var(--muted); flex-shrink: 0; }
-.nav-drawer-item.active { color: var(--navy); background: var(--navy-lt); font-weight: 600; }
+.nav-drawer-item.active { color: var(--navy); background: var(--navy-lt); font-weight: 550; }
 .nav-drawer-item.active svg { color: var(--navy); }
 .nav-drawer-item:active { background: rgba(var(--accent-rgb), .08); }
 
@@ -123,7 +123,7 @@ button, input, select, textarea {
 }
 .bottom-nav-item.active {
   color: var(--navy);
-  font-weight: 700;
+  font-weight: 600;
   border-bottom-color: var(--navy);
 }
 .bottom-nav-icon {
@@ -158,7 +158,7 @@ button, input, select, textarea {
 .dashboard-page .kpi-card-v,
 .dashboard-page .kpi-card-v-soft {
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 550;
   letter-spacing: -.03em;
 }
 .kpi-card--blue   { --kpi-accent: var(--navy); }
@@ -168,9 +168,9 @@ button, input, select, textarea {
 .kpi-card--amber  { --kpi-accent: #F59E0B; }
 .kpi-card--purple { --kpi-accent: var(--other); }
 .kpi-card--full   { grid-column: span 2; }
-.kpi-card-l { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2px; display: flex; align-items: center; gap: 5px; }
-.kpi-card-v { font-size: 18px; font-weight: 600; margin-top: 2px; color: var(--kpi-accent); }
-.kpi-card-v-soft { font-size: 18px; font-weight: 600; letter-spacing: 0; }
+.kpi-card-l { font-size: 11px; font-weight: 550; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2px; display: flex; align-items: center; gap: 5px; }
+.kpi-card-v { font-size: 18px; font-weight: 550; margin-top: 2px; color: var(--kpi-accent); }
+.kpi-card-v-soft { font-size: 18px; font-weight: 550; letter-spacing: 0; }
 .kpi-card-v--blue   { color: var(--navy); }
 .kpi-card-v--gray   { color: #6B7280; }
 .kpi-card-v--green  { color: var(--gm); }
@@ -179,8 +179,8 @@ button, input, select, textarea {
 
 /* HERO */
 .hero { background: var(--card); border: 1px solid var(--border); border-radius: var(--r); padding: 16px 18px; margin-bottom: 14px; }
-.hero-l { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
-.hero-a { font-size: 24px; font-weight: 700; letter-spacing: -1px; }
+.hero-l { font-size: 12px; font-weight: 550; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+.hero-a { font-size: 24px; font-weight: 600; letter-spacing: -1px; }
 .hero-s { font-size: 13px; color: var(--muted); margin-top: 4px; }
 
 /* DASHBOARD */
@@ -206,7 +206,7 @@ button, input, select, textarea {
   background: rgba(255,255,255,.85);
   color: var(--muted);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   flex-shrink: 0;
 }
 .ui-eyebrow {
@@ -215,14 +215,14 @@ button, input, select, textarea {
   gap: 6px;
   color: var(--navy);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .08em;
 }
 .ui-title {
   margin-top: 6px;
   font-size: 26px;
-  font-weight: 800;
+  font-weight: 650;
   letter-spacing: -.04em;
   color: var(--text);
 }
@@ -278,7 +278,7 @@ button, input, select, textarea {
 }
 .ui-metric-label {
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 650;
   text-transform: uppercase;
   letter-spacing: .08em;
   color: var(--muted);
@@ -286,7 +286,7 @@ button, input, select, textarea {
 .ui-metric-value {
   margin-top: 10px;
   font-size: 20px;
-  font-weight: 800;
+  font-weight: 650;
   letter-spacing: -.04em;
   color: var(--text);
 }
@@ -326,7 +326,7 @@ button, input, select, textarea {
   align-items: center;
   gap: 8px;
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text);
 }
 .ui-panel-icon {
@@ -359,7 +359,7 @@ button, input, select, textarea {
   padding: 5px 10px;
   border-radius: 999px;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 650;
   white-space: nowrap;
 }
 .ui-section {
@@ -375,7 +375,7 @@ button, input, select, textarea {
   align-items: center;
   gap: 7px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: .6px;
@@ -473,7 +473,7 @@ button, input, select, textarea {
   gap: 6px;
   padding: 10px 8px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
 }
 .ui-kit-tab.active {
   background: var(--navy-lt);
@@ -519,7 +519,7 @@ button, input, select, textarea {
 .ui-mini-card-red { background: var(--red-lt); }
 .ui-mini-title {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .08em;
   color: var(--muted);
@@ -527,7 +527,7 @@ button, input, select, textarea {
 .ui-mini-value {
   margin-top: 4px;
   font-size: 16px;
-  font-weight: 800;
+  font-weight: 650;
   letter-spacing: -.03em;
 }
 .ui-sheet-icon {
@@ -548,7 +548,7 @@ button, input, select, textarea {
 .dashboard-page .ui-kit-balance-value,
 .dashboard-page .dash-budget-figure {
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 550;
   letter-spacing: -.03em;
   line-height: 1.1;
 }
@@ -563,11 +563,11 @@ button, input, select, textarea {
 }
 .dashboard-page .dash-flow-value {
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 600;
 }
 .dashboard-page .dash-flow-note {
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 550;
 }
 .dash-hero {
   position: relative;
@@ -588,14 +588,14 @@ button, input, select, textarea {
   gap: 6px;
   color: var(--navy);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .08em;
 }
 .dash-title {
   margin-top: 6px;
   font-size: 26px;
-  font-weight: 800;
+  font-weight: 650;
   letter-spacing: -.04em;
   color: var(--text);
 }
@@ -616,7 +616,7 @@ button, input, select, textarea {
   background: rgba(255,255,255,.85);
   color: var(--muted);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   flex-shrink: 0;
 }
 .dash-net {
@@ -629,7 +629,7 @@ button, input, select, textarea {
 }
 .dash-net-label {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .08em;
   color: var(--muted);
@@ -637,7 +637,7 @@ button, input, select, textarea {
 .dash-net-value {
   margin-top: 5px;
   font-size: 30px;
-  font-weight: 800;
+  font-weight: 650;
   letter-spacing: -.05em;
 }
 .dash-net-hint {
@@ -665,14 +665,14 @@ button, input, select, textarea {
 }
 .dash-chip span {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .06em;
   color: var(--muted);
 }
 .dash-chip strong {
   font-size: 16px;
-  font-weight: 800;
+  font-weight: 650;
   letter-spacing: -.03em;
   color: var(--text);
 }
@@ -684,7 +684,7 @@ button, input, select, textarea {
 }
 .dash-alert-title {
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 650;
   color: #92400E;
 }
 .dash-alert-sub {
@@ -707,7 +707,7 @@ button, input, select, textarea {
   background: var(--navy-lt);
   color: var(--navy);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
 }
 .dash-tag-danger {
   background: rgba(239,68,68,.1);
@@ -719,7 +719,7 @@ button, input, select, textarea {
 }
 .dash-kpi-label {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .08em;
   color: var(--muted);
@@ -727,7 +727,7 @@ button, input, select, textarea {
 .dash-kpi-value {
   margin-top: 6px;
   font-size: 20px;
-  font-weight: 800;
+  font-weight: 650;
   letter-spacing: -.04em;
   color: var(--text);
 }
@@ -759,7 +759,7 @@ button, input, select, textarea {
 .dash-credit-summary-label,
 .dash-budget-figure {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: .08em;
@@ -768,7 +768,7 @@ button, input, select, textarea {
 .dash-credit-summary-value {
   margin-top: 4px;
   font-size: 30px;
-  font-weight: 800;
+  font-weight: 650;
   letter-spacing: -.05em;
 }
 .dash-overview-flow {
@@ -791,7 +791,7 @@ button, input, select, textarea {
   border-radius: 999px;
   border: 1px solid var(--border);
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 650;
   white-space: nowrap;
 }
 .dash-overview-flag.positive {
@@ -804,7 +804,7 @@ button, input, select, textarea {
 }
 .dash-flow-label {
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text);
 }
 .dash-flow-sub {
@@ -820,7 +820,7 @@ button, input, select, textarea {
   border-radius: 999px;
   border: 1px solid var(--border);
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 650;
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -835,7 +835,7 @@ button, input, select, textarea {
 .dash-flow-value {
   margin-top: 10px;
   font-size: 24px;
-  font-weight: 800;
+  font-weight: 650;
   letter-spacing: -.04em;
 }
 .dash-net-balance {
@@ -849,7 +849,7 @@ button, input, select, textarea {
 .dash-flow-note {
   margin-top: 6px;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
 }
 .dash-flow-chips {
   display: grid;
@@ -867,14 +867,14 @@ button, input, select, textarea {
 }
 .dash-flow-chip-lbl {
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .08em;
   color: var(--muted);
 }
 .dash-flow-chip-val {
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 650;
   letter-spacing: -.03em;
   color: var(--text);
 }
@@ -925,7 +925,7 @@ button, input, select, textarea {
 }
 .dash-account-name {
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 650;
   text-transform: uppercase;
   letter-spacing: .04em;
   color: var(--muted);
@@ -936,7 +936,7 @@ button, input, select, textarea {
 .dash-account-value {
   margin-top: 8px;
   font-size: 17px;
-  font-weight: 800;
+  font-weight: 650;
   letter-spacing: -.03em;
 }
 .dash-budget-top {
@@ -951,7 +951,7 @@ button, input, select, textarea {
 }
 .dash-budget-state {
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   margin-top: 6px;
 }
 .dash-budget-bar {
@@ -986,7 +986,7 @@ button, input, select, textarea {
 }
 .ui-modal-cat {
   font-size: 18px;
-  font-weight: 800;
+  font-weight: 650;
   letter-spacing: -.03em;
   color: var(--text);
 }
@@ -998,14 +998,14 @@ button, input, select, textarea {
 
 /* SECTION HEADER */
 .sec { display: flex; flex-direction: column; gap: 8px; margin: 16px 0 9px; }
-.sec-h { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .7px; }
+.sec-h { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .7px; }
 
 /* CARD */
 .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--sh); }
 .cp { padding: 14px; }
 
 /* BADGE */
-.badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+.badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 550; }
 .bg { background: var(--green-lt); color: var(--green); }
 .br { background: var(--red-lt); color: var(--red); }
 .ba { background: var(--amber-lt); color: var(--amber); }
@@ -1015,7 +1015,7 @@ button, input, select, textarea {
 /* TABLE */
 .tw { overflow-x: auto; border-radius: var(--r); border: 1px solid var(--border); }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
-th { background: #F8FAFC; padding: 8px 10px; text-align: left; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th { background: #F8FAFC; padding: 8px 10px; text-align: left; font-size: 11px; font-weight: 550; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; border-bottom: 1px solid var(--border); white-space: nowrap; }
 td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; word-break: break-word; font-size: 13px; }
 tr:last-child td { border-bottom: none; }
 .ta-r { text-align: right; }
@@ -1035,8 +1035,8 @@ tr:last-child td { border-bottom: none; }
 }
 .txn-card:active { opacity: .7; }
 .txn-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 6px; }
-.txn-card-desc { font-size: 14px; font-weight: 700; color: var(--text); flex: 1; line-height: 1.35; }
-.txn-card-amt { font-size: 16px; font-weight: 800; white-space: nowrap; letter-spacing: -.02em; }
+.txn-card-desc { font-size: 14px; font-weight: 600; color: var(--text); flex: 1; line-height: 1.35; }
+.txn-card-amt { font-size: 16px; font-weight: 650; white-space: nowrap; letter-spacing: -.02em; }
 .txn-card-bot { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .txn-card-date { font-size: 12px; color: var(--muted); margin-right: 2px; }
 .monthly-subpage .txn-table {
@@ -1049,7 +1049,7 @@ tr:last-child td { border-bottom: none; }
 }
 
 /* BUTTONS */
-.btn { background: var(--navy); color: #fff; font-family: inherit; font-size: 13px; font-weight: 600; border: none; border-radius: var(--r); padding: 10px 16px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; touch-action: manipulation; }
+.btn { background: var(--navy); color: #fff; font-family: inherit; font-size: 13px; font-weight: 550; border: none; border-radius: var(--r); padding: 10px 16px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; touch-action: manipulation; }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 .btn-sm { padding: 7px 13px; font-size: 12px; }
 .btn-green { background: var(--green); }
@@ -1126,7 +1126,7 @@ tr:last-child td { border-bottom: none; }
 .modal-title {
   width: 100%;
   color: #fff;
-  font-weight: 800;
+  font-weight: 650;
   font-size: 15px;
   text-align: center;
   line-height: 1.2;
@@ -1157,7 +1157,7 @@ tr:last-child td { border-bottom: none; }
 }
 .modal-body { padding: 12px 16px 14px; display: flex; flex-direction: column; gap: 12px; max-height: 72vh; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--card); }
 .form-row { display: flex; flex-direction: column; gap: 4px; }
-.form-lbl { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+.form-lbl { font-size: 12px; font-weight: 550; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
 .form-inp, .form-sel { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--r); font-family: inherit; font-size: 14px; outline: none; background: var(--bg); color: var(--text); }
 .form-inp:focus, .form-sel:focus { border-color: var(--navy); background: #fff; }
 .modal-foot {
@@ -1185,7 +1185,7 @@ tr:last-child td { border-bottom: none; }
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-weight: 600;
+  font-weight: 550;
 }
 .modal-foot .btn-red,
 .modal-foot .ui-kit-btn--solid.btn-red {
@@ -1222,10 +1222,10 @@ tr:last-child td { border-bottom: none; }
 .bud-row.ov-row { background: var(--red-lt); }
 .bud-row-body { flex: 1; min-width: 0; }
 .bud-row-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
-.bud-row-name { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bud-row-name { font-size: 13px; font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bud-row-meta { display: flex; justify-content: space-between; margin-top: 4px; font-size: 11px; color: var(--muted); }
 .bud-row-rest { font-size: 12px; white-space: nowrap; margin-left: 6px; }
-.bud-row-rest.ov-amt { color: var(--red); font-weight: 700; }
+.bud-row-rest.ov-amt { color: var(--red); font-weight: 600; }
 .bud-row-rest.ok-amt { color: var(--muted); }
 .bud-actions { display: flex; gap: 1px; flex-shrink: 0; }
 .bud-wrap { background: var(--card); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; content-visibility: auto; contain-intrinsic-size: 0 600px; }
@@ -1233,10 +1233,10 @@ tr:last-child td { border-bottom: none; }
 .icon-btn { background: none; border: none; cursor: pointer; padding: 4px 7px; border-radius: 6px; font-size: 16px; opacity: .55; touch-action: manipulation; }
 
 /* SHARED LABEL STYLES */
-.lbl { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-.section-title { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 15px; font-weight: 600; }
+.lbl { font-size: 11px; font-weight: 550; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.section-title { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 15px; font-weight: 550; }
 .section-title-icon { color: var(--text); flex-shrink: 0; }
-.holding-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.holding-label { font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
 
 /* SETTINGS */
 .settings-shell { padding-bottom: 40px; }
@@ -1245,17 +1245,17 @@ tr:last-child td { border-bottom: none; }
 .settings-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 14px; box-shadow: var(--sh); }
 .settings-hero { grid-column: 1 / -1; }
 .settings-card-hd { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
-.settings-card-title { font-size: 15px; font-weight: 700; color: var(--text); }
+.settings-card-title { font-size: 15px; font-weight: 600; color: var(--text); }
 .settings-card-sub { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.45; }
 .settings-section { display: flex; flex-direction: column; gap: 8px; }
 .settings-items-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
 .settings-item-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--r); padding: 10px 11px; box-shadow: 0 1px 3px rgba(15,28,63,.04); }
 .settings-item-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
-.settings-row-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.settings-row-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
 .settings-item-value { display: flex; gap: 6px; align-items: center; }
 .settings-item-input { flex: 1; min-width: 0; }
 .settings-item-action { width: 34px; height: 34px; padding: 0; justify-content: center; flex-shrink: 0; border-radius: 10px; }
-.settings-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+.settings-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; }
 .settings-chip.ok { background: rgba(16,185,129,.12); color: #059669; }
 .settings-chip.warn { background: rgba(245,158,11,.12); color: #B45309; }
 .settings-chip.neutral { background: rgba(107,114,128,.12); color: var(--muted); }
@@ -1280,7 +1280,7 @@ tr:last-child td { border-bottom: none; }
   gap: 7px;
   color: var(--text);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 650;
 }
 .settings-status-icon {
   display: inline-flex;
@@ -1290,7 +1290,7 @@ tr:last-child td { border-bottom: none; }
   flex-shrink: 0;
 }
 .settings-status-details { color: var(--muted); font-size: 12px; line-height: 1.5; }
-.settings-action-btn { padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; display: inline-flex; align-items: center; gap: 8px; font-family: inherit; font-size: 12px; font-weight: 700; }
+.settings-action-btn { padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; display: inline-flex; align-items: center; gap: 8px; font-family: inherit; font-size: 12px; font-weight: 600; }
 .settings-action-btn:disabled { opacity: .55; cursor: not-allowed; }
 .settings-section-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
 .settings-section-head .section-title { font-size: 14px; }
@@ -1384,7 +1384,7 @@ tr:last-child td { border-bottom: none; }
 }
 
 /* STATUS BADGE — reusable across Budget + Lending */
-.sbadge { font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 4px; }
+.sbadge { font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 4px; }
 .sbadge-red   { background: rgba(239,68,68,.1);   color: #EF4444; }
 .sbadge-green { background: rgba(16,185,129,.1);  color: #10B981; }
 .sbadge-amber { background: rgba(245,158,11,.1);  color: #F59E0B; }
@@ -1427,7 +1427,7 @@ tr:last-child td { border-bottom: none; }
   width: 100%;
   margin: 0;
   font-size: 15px;
-  font-weight: 800;
+  font-weight: 650;
   color: #fff;
   text-align: center;
 }
@@ -1456,7 +1456,7 @@ tr:last-child td { border-bottom: none; }
 .chart-legend-row { display: flex; align-items: center; gap: 6px; font-size: 12px; }
 .chart-dot { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
 .chart-lbl { color: var(--muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chart-val { font-size: 11px; font-weight: 600; white-space: nowrap; }
+.chart-val { font-size: 11px; font-weight: 550; white-space: nowrap; }
 
 .chart-donut {
   display: flex;
@@ -1559,7 +1559,7 @@ tr:last-child td { border-bottom: none; }
 .chart-donut-label {
   font-size: 11px;
   color: var(--muted);
-  font-weight: 600;
+  font-weight: 550;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1570,7 +1570,7 @@ tr:last-child td { border-bottom: none; }
 }
 .chart-donut-value {
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text);
   white-space: nowrap;
 }
@@ -1617,8 +1617,8 @@ tr:last-child td { border-bottom: none; }
 }
 .cc-n { margin-bottom: 4px; }
 .cc-a { letter-spacing: -.02em; }
-.cc-n { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 6px; letter-spacing: .3px; }
-.cc-a { font-size: 16px; font-weight: 700; letter-spacing: -.5px; }
+.cc-n { font-size: 12px; font-weight: 550; color: var(--muted); margin-bottom: 6px; letter-spacing: .3px; }
+.cc-a { font-size: 16px; font-weight: 600; letter-spacing: -.5px; }
 .cc-d { font-size: 12px; color: var(--muted); margin-top: 4px; }
 
 /* BUDGET */
@@ -1641,7 +1641,7 @@ tr:last-child td { border-bottom: none; }
   align-items: center;
   gap: 6px;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   min-width: 0;
 }
 .budget-row-actions {
@@ -1657,7 +1657,7 @@ tr:last-child td { border-bottom: none; }
 }
 .budget-mini-lbl {
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: .04em;
@@ -1665,7 +1665,7 @@ tr:last-child td { border-bottom: none; }
 }
 .budget-mini-val {
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 650;
   color: var(--text);
 }
 .budget-mini-right {
@@ -1679,7 +1679,7 @@ tr:last-child td { border-bottom: none; }
   padding: 4px 8px;
   border-radius: 999px;
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 650;
   letter-spacing: .04em;
 }
 .budget-badge.ok { background: rgba(34,197,94,.10); color: var(--gm); }
@@ -1700,7 +1700,7 @@ tr:last-child td { border-bottom: none; }
   align-items: center;
   gap: 8px;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 650;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: .7px;
@@ -1732,7 +1732,7 @@ tr:last-child td { border-bottom: none; }
 }
 .acct-graph-value {
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 650;
   white-space: nowrap;
 }
 
@@ -1766,7 +1766,7 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
   overflow: hidden;
   background: var(--navy);
 }
-.login-title { font-size: 24px; font-weight: 800; color: #fff; letter-spacing: -0.03em; }
+.login-title { font-size: 24px; font-weight: 650; color: #fff; letter-spacing: -0.03em; }
 .login-sub { font-size: 15px; color: rgba(255,255,255,.76); text-align: center; line-height: 1.45; max-width: 320px; }
 
 /* Google auth frosted card (see also `.login-auth-card`). */
@@ -1926,7 +1926,7 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
   padding: 3px 10px;
   border-radius: 999px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.4;
   white-space: nowrap;
 }
@@ -1954,17 +1954,17 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
 .policy-card .ui-kit-holding-card-subtitle {
   font-variant-numeric: tabular-nums;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: .02em;
   color: var(--text);
 }
 
 /* ───────── Type and surfaces (chosen Nov 2026: font B + style A) ─────────
-   Font B: same font (Geist); sentence case instead of ALL CAPS, darker section
+   Font B (since replaced by Roboto); sentence case instead of ALL CAPS, darker section
    titles, larger amounts with aligned digits.
    Style A: light tint kept; cards drop their outline and lift on a soft shadow
    in the app colour. Appended last so it wins over the older rules above. */
-.ui-kit-section-title { text-transform: none; letter-spacing: 0; font-size: 15px; font-weight: 600; color: var(--text); }
+.ui-kit-section-title { text-transform: none; letter-spacing: 0; font-size: 15px; font-weight: 550; color: var(--text); }
 .ui-kit-kpi-label,
 .kpi-card-l, .monthly-subpage .kpi-card-l, .dashboard-page .kpi-card-l,
 .holding-label, .ui-kit-holding-detail-label, .ui-kit-holding-pnl-label, .ui-kit-holding-stat span, .ui-kit-summary-metric-label,
@@ -1975,7 +1975,10 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
 .holding-label, .ui-kit-holding-detail-label, .ui-kit-holding-stat span, .ui-kit-holding-pnl-label { font-size: 11.5px; font-weight: 500; }
 .kpi-card-v, .kpi-card-v-soft,
 .monthly-subpage .kpi-card-v, .monthly-subpage .kpi-card-v-soft, .dashboard-page .kpi-card-v, .dashboard-page .kpi-card-v-soft {
-  font-size: 20px; font-weight: 650; letter-spacing: -0.01em; font-variant-numeric: tabular-nums;
+  font-size: 20px; font-weight: 580; letter-spacing: -0.01em; font-variant-numeric: tabular-nums;
 }
 :root { --sh: 0 1px 2px rgba(var(--accent-rgb), .10), 0 8px 18px -10px rgba(var(--accent-rgb), .35); }
 .kpi-card, .ui-kit-card, .ui-kit-holding-card, .ui-kit-kpi, .settings-card { border-color: transparent; box-shadow: var(--sh); }
+
+/* Roboto weights (Nov 2026): bold steps sit one notch lighter than before. */
+b, strong, th { font-weight: 600; }

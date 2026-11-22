@@ -273,7 +273,7 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
               </div>
               <div className="modal-body">
                 <div>
-                  <div style={{fontSize:12,fontWeight:600,color:'var(--muted)',marginBottom:5,textTransform:'uppercase',letterSpacing:.4}}>Budget name</div>
+                  <div style={{fontSize:12,fontWeight:550,color:'var(--muted)',marginBottom:5,textTransform:'uppercase',letterSpacing:.4}}>Budget name</div>
                   <input
                     className="form-inp"
                     type="text"
@@ -284,7 +284,7 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
                   />
                 </div>
                 <div>
-                  <div style={{fontSize:12,fontWeight:600,color:'var(--muted)',marginBottom:5,textTransform:'uppercase',letterSpacing:.4}}>{`Budget amount (${currency})`}</div>
+                  <div style={{fontSize:12,fontWeight:550,color:'var(--muted)',marginBottom:5,textTransform:'uppercase',letterSpacing:.4}}>{`Budget amount (${currency})`}</div>
                   <input
                     className="form-inp" type="number" placeholder={zeroPlaceholder}
                     value={modal.val} autoFocus={modal.mode === 'edit'}
@@ -331,15 +331,15 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
               <div className="sheet-stats" style={{gridTemplateColumns:'1fr 1fr 1fr'}}>
               <div className="card" style={{padding:'10px 12px'}}>
                 <div className="lbl">Budget</div>
-                <div style={{fontSize:14,fontWeight:700,color:'var(--text)',marginTop:4}}>{fmt(sheetBudg)}</div>
+                <div style={{fontSize:14,fontWeight:600,color:'var(--text)',marginTop:4}}>{fmt(sheetBudg)}</div>
               </div>
               <div className="card" style={{padding:'10px 12px'}}>
                 <div className="lbl">Spent</div>
-                <div style={{fontSize:14,fontWeight:700,color:'var(--text)',marginTop:4}}>{fmt(sheetSpent)}</div>
+                <div style={{fontSize:14,fontWeight:600,color:'var(--text)',marginTop:4}}>{fmt(sheetSpent)}</div>
               </div>
               <div className="card" style={{padding:'10px 12px',background: sheetOver ? 'rgba(239,68,68,.08)' : 'rgba(34,197,94,.08)'}}>
                 <div className="lbl">{sheetOver ? 'Over' : 'Left'}</div>
-                <div style={{fontSize:14,fontWeight:700,color: sheetOver ? 'var(--rm)' : 'var(--gm)',marginTop:4}}>
+                <div style={{fontSize:14,fontWeight:600,color: sheetOver ? 'var(--rm)' : 'var(--gm)',marginTop:4}}>
                   {fmt(Math.abs(sheetBudg - sheetSpent))}
                 </div>
               </div>
@@ -353,12 +353,12 @@ export default function Budget({ showStatus, onCategoryClick }: Props) {
                   {rows.filter(r => r.c === catSheet).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(txn => (
                     <div key={txn.id} className="card" style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',cursor:'pointer'}} onClick={() => {setCatSheet(null); onCategoryClick(catSheet)}}>
                       <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontWeight:600,fontSize:13,color:'var(--text)'}}>{txn.desc}</div>
+                        <div style={{fontWeight:550,fontSize:13,color:'var(--text)'}}>{txn.desc}</div>
                         {txn.notes && <div style={{fontSize:11,color:'var(--muted)',marginTop:1}}>{txn.notes}</div>}
                         <div style={{fontSize:11,color:'var(--muted)',marginTop:2}}>{txn.m}</div>
                       </div>
                       <div style={{textAlign:'right',flexShrink:0}}>
-                        <div style={{fontWeight:700,fontSize:14,color:'var(--rm)'}}>{fmt(txn.a)}</div>
+                        <div style={{fontWeight:600,fontSize:14,color:'var(--rm)'}}>{fmt(txn.a)}</div>
                         <div style={{fontSize:10,color:'var(--muted)',marginTop:1}}>{txn.date}</div>
                       </div>
                     </div>
