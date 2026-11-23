@@ -3,6 +3,41 @@ export const FINTRACKER_MENU_CACHE_KEY = 'ft_fintracker_menu_cache_v1'
 // sessionStorage, so every cold launch waited on /api/profile before it could
 // leave `/`. Cleared on logout like the rest of the device caches.
 
+/** `/api/profile` response body (the fields the client reads). */
+export type ProfileResponse = {
+  ok?: boolean
+  error?: string
+  data?: {
+    activeOrgId?: string | null
+    menu?: CachedProfileMenuRow[]
+    integrations?: CachedIntegrationProvider[]
+    orgs?: { id: string; name: string }[]
+  }
+}
+
+/** How long one `/api/profile` answer is reused by other callers. */
+const PROFILE_REUSE_MS = 15_000
+let profileInflight: { at: number; promise: Promise<ProfileResponse> } | null = null
+
+/**
+ * One shared `/api/profile` request. A launch used to send three (home
+ * redirect, nav menu refresh, org switcher), each a separate serverless call
+ * that could hit a cold start; now they share one request and its answer for
+ * a few seconds. `fresh` forces a new request (e.g. after switching org).
+ */
+export function fetchProfileShared(fresh = false): Promise<ProfileResponse> {
+  const now = Date.now()
+  if (!fresh && profileInflight && now - profileInflight.at < PROFILE_REUSE_MS) return profileInflight.promise
+  const promise = fetch('/api/profile', { credentials: 'same-origin' }).then(r => r.json() as Promise<ProfileResponse>)
+  const entry = { at: now, promise }
+  profileInflight = entry
+  // A failed request must not be reused.
+  promise.catch(() => {
+    if (profileInflight === entry) profileInflight = null
+  })
+  return promise
+}
+
 /** Fired on `window` when menu cache payload changes (`writeMenuCache` / `clearMenuCache`). */
 export const MENU_CACHE_UPDATED_EVENT = 'ft-fintracker-menu-cache-updated'
 
@@ -102,8 +137,7 @@ export function firstMenuPathFromRows(menu: CachedProfileMenuRow[]): string | nu
 
 /** Refresh cache after a fast redirect from cached menu; dispatches `MENU_CACHE_UPDATED_EVENT` so nav can re-read storage. */
 export function refreshMenuCacheInBackground(): void {
-  void fetch('/api/profile', { credentials: 'same-origin' })
-    .then((r) => r.json())
+  void fetchProfileShared()
     .then(
       (j: {
         ok?: boolean

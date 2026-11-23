@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { clearMenuCache } from '../lib/profileMenuCache'
+import { clearMenuCache, fetchProfileShared } from '../lib/profileMenuCache'
 import { clearSettingsPageCache } from '../lib/settingsPageCache'
 
 type Org = { id: string; name: string }
@@ -11,8 +11,7 @@ export function OrgSwitcher() {
 
   const load = useCallback(async () => {
     try {
-      const r = await fetch('/api/profile', { credentials: 'same-origin' })
-      const j = await r.json()
+      const j = await fetchProfileShared()
       if (!j.ok || !j.data?.orgs) return
       setOrgs(j.data.orgs as Org[])
       setActiveId((j.data.activeOrgId as string | null) ?? null)

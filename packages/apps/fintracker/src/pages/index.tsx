@@ -5,6 +5,7 @@ import {
   readMenuCache,
   refreshMenuCacheInBackground,
   writeMenuCache,
+  fetchProfileShared,
 } from '../lib/profileMenuCache'
 
 /**
@@ -34,7 +35,7 @@ export default function HomePage() {
       }
 
       setWaitingForMenu(true)
-      const pr = await fetch('/api/profile', { credentials: 'same-origin' }).then((r) => r.json())
+      const pr = await fetchProfileShared()
       if (cancelled) return
       setWaitingForMenu(false)
 
