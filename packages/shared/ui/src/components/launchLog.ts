@@ -12,6 +12,9 @@
  *     not run for 3 s+ while visible), long JavaScript tasks with the function
  *     and file responsible, /api requests that are slow (>2.5 s), fail or
  *     return 5xx (method, path, module/action only), and in-app page changes.
+ *   - Steps are written to localStorage at most once a second (it is
+ *     synchronous and waits on the phone's storage) and flushed when the page
+ *     is hidden, frozen or closed.
  *   - The service worker keeps its own log (see packages/shared/config/pwa/sw.js).
  *   - `/launch-log.html` shows both, with Copy and Share buttons.
  *
@@ -63,8 +66,10 @@ var prev=null;for(var i=all.length-1;i>=0;i--){if(all[i]&&all[i].app===APP){prev
 var L={id:Date.now().toString(36),app:APP,at:new Date().toISOString(),done:false,steps:[]};
 all.push(L);if(all.length>MAX)all=all.slice(all.length-MAX);
 function save(){try{localStorage.setItem(K,JSON.stringify(all))}catch(e){}}
+var saveTimer=null;function saveSoon(){if(saveTimer)return;saveTimer=setTimeout(function(){saveTimer=null;save()},1000)}
+function saveNow(){if(saveTimer){clearTimeout(saveTimer);saveTimer=null}save()}
 var appStarted=false;
-function log(s){try{if(/^app code started/.test(s))appStarted=true;if(L.steps.length>=MAXSTEPS)return;L.steps.push([now(),String(s).slice(0,240)]);save()}catch(e){}}
+function log(s){try{if(/^app code started/.test(s))appStarted=true;if(L.steps.length>=MAXSTEPS)return;L.steps.push([now(),String(s).slice(0,240)]);if(L.steps.length===1)saveNow();else saveSoon()}catch(e){}}
 var shown=false;
 window.__ftLog=log;
 window.__ftShown=function(w){if(shown)return;shown=true;L.done=true;log('ON SCREEN: '+w)};
@@ -106,5 +111,8 @@ return p}}
 var lastPath=location.pathname;function routed(){if(location.pathname!==lastPath){lastPath=location.pathname;log('went to '+lastPath)}}
 ['pushState','replaceState'].forEach(function(k){var o=history[k];if(o)history[k]=function(){var r=o.apply(this,arguments);try{routed()}catch(e){}return r}});
 addEventListener('popstate',routed);
+/* One write per second at most (localStorage is synchronous and waits on the
+phone's storage); flushed at once when the page is hidden, frozen or closed. */
+addEventListener('pagehide',saveNow);document.addEventListener('freeze',saveNow);document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')saveNow()});
 }catch(e){}})();`
 }

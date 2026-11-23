@@ -65,9 +65,22 @@ async function flushLog() {
 // Runs each time the browser starts this worker (a cold launch starts it fresh).
 swLog(`worker started (${VERSION})`)
 
-self.addEventListener('install', () => {
+self.addEventListener('install', event => {
   swLog('new worker installed')
   self.skipWaiting()
+  // Page loads race the network against this worker (Static Routing API,
+  // Chrome 123+): whichever answers first wins. A worker that is slow to
+  // start, or whose saved-page lookup is stuck on the phone's storage, can no
+  // longer hold a page on the splash screen; a slow network is still covered
+  // by the saved copy. Browsers without it keep the plain fetch handler.
+  if (typeof event.addRoutes === 'function') {
+    event.waitUntil(
+      event
+        .addRoutes([{ condition: { requestMode: 'navigate' }, source: 'race-network-and-fetch-handler' }])
+        .then(() => swLog('page loads race network and saved copy'))
+        .catch(e => swLog(`page-load racing not available: ${(e && e.message) || e}`)),
+    )
+  }
 })
 
 self.addEventListener('activate', event => {
@@ -142,10 +155,23 @@ function offlineResponse() {
   )
 }
 
+/** Resolves to `fallback` if `p` has not settled within `ms` (storage can stall). */
+function within(p, ms, fallback) {
+  return Promise.race([p, new Promise(resolve => setTimeout(() => resolve(fallback), ms))])
+}
+
 async function savedFirstPage(event) {
   const request = event.request
   const t0 = Date.now()
-  const cache = await caches.open(PAGE_CACHE)
+  const cache = await within(caches.open(PAGE_CACHE), 1500, null)
+  if (!cache) {
+    swLog(`page ${new URL(request.url).pathname}: saved pages did not open in 1.5s, going to the network`)
+    try {
+      return await fetch(request)
+    } catch {
+      return offlineResponse()
+    }
+  }
   const key = new URL(request.url)
   key.search = ''
   swLog(`page requested ${key.pathname} (saved pages opened in ${Date.now() - t0}ms)`)
@@ -163,7 +189,7 @@ async function savedFirstPage(event) {
 
   // Only this exact page's last copy. Serving `/` for a page never cached here
   // would load the wrong screen under the requested URL.
-  const cached = await cache.match(key.href)
+  const cached = await within(cache.match(key.href), 1500, undefined)
   if (cached) {
     swLog(`page ${key.pathname}: showing the saved copy at once, refreshing it in the background`)
     event.waitUntil(network.catch(() => {}))
