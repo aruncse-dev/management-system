@@ -8,6 +8,10 @@
  *     It stores the last launches in localStorage under `ft_launchlog`.
  *   - App code adds steps with `launchLog('…')` and marks the end of a launch
  *     with `launchShown('…')` (the app or the sign-in card is on screen).
+ *   - While the page is open it also notes stalls (a 1 s heartbeat that could
+ *     not run for 3 s+ while visible), long JavaScript tasks with the function
+ *     and file responsible, /api requests that are slow (>2.5 s), fail or
+ *     return 5xx (method, path, module/action only), and in-app page changes.
  *   - The service worker keeps its own log (see packages/shared/config/pwa/sw.js).
  *   - `/launch-log.html` shows both, with Copy and Share buttons.
  *
@@ -50,7 +54,7 @@ export function launchShown(what: string): void {
 export function launchLogScript(app: string): string {
   const cfg = JSON.stringify({ key: LAUNCH_LOG_KEY, app }).replace(/</g, '\\u003c')
   return String.raw`(function(){try{
-var C=${cfg},K=C.key,APP=C.app,MAX=15,MAXSTEPS=90;
+var C=${cfg},K=C.key,APP=C.app,MAX=12,MAXSTEPS=160;
 var P=window.performance,n=navigator,c=n.connection||{};
 function now(){try{return Math.round(P.now())}catch(e){return 0}}
 var all=[];try{all=JSON.parse(localStorage.getItem(K)||'[]')}catch(e){}
@@ -81,5 +85,26 @@ addEventListener('error',function(e){var t=e&&e.target;if(t&&t!==window&&(t.src|
 addEventListener('unhandledrejection',function(e){var r=e&&e.reason;log('unhandled: '+(r&&r.message?r.message:String(r)))});
 if(n.serviceWorker){n.serviceWorker.addEventListener('controllerchange',function(){log('a new worker took control')})}
 [2,4,7,12,20,40].forEach(function(s){setTimeout(function(){if(shown)return;var el=document.querySelectorAll('script[src]:not([nomodule])'),got={},miss=[];try{P.getEntriesByType('resource').forEach(function(r){if(r.initiatorType==='script')got[r.name.split('?')[0]]=1})}catch(x){}for(var j=0;j<el.length;j++){var u=el[j].src.split('?')[0];if(!got[u])miss.push(u.split('/').pop())}log('still waiting at '+s+'s | doc '+document.readyState+' | scripts '+(el.length-miss.length)+'/'+el.length+' loaded'+(miss.length?' (waiting for '+miss.slice(0,3).join(', ')+')':'')+' | '+(appStarted?'app code running':window.next?'framework loaded, app code NOT started':'framework NOT started')+' | '+document.visibilityState)},s*1000)});
+var inflight={},seq=0;
+function pending(){var a=[],t=Date.now();for(var k in inflight){a.push(inflight[k].l+' '+((t-inflight[k].t)/1000).toFixed(1)+'s')}return a.length?' | waiting on: '+a.slice(0,4).join(', '):''}
+var beat=Date.now(),away=false;
+document.addEventListener('visibilitychange',function(){away=true});
+document.addEventListener('freeze',function(){away=true});
+setInterval(function(){var t=Date.now(),g=t-beat;beat=t;if(g>3000&&!away&&document.visibilityState==='visible'){log('page STALLED for '+(g/1000).toFixed(1)+'s: nothing on the page could run'+pending())}away=false},1000);
+try{var ST=(window.PerformanceObserver&&PerformanceObserver.supportedEntryTypes)||[];
+if(ST.indexOf('longtask')>=0){new PerformanceObserver(function(l){l.getEntries().forEach(function(e){if(e.duration>=400)log('busy '+Math.round(e.duration)+'ms (long JavaScript task)')})}).observe({type:'longtask',buffered:true})}
+if(ST.indexOf('long-animation-frame')>=0){new PerformanceObserver(function(l){l.getEntries().forEach(function(e){if(e.duration<400)return;var sc=(e.scripts||[]).slice().sort(function(a,b){return b.duration-a.duration})[0];if(sc)log('slow frame '+Math.round(e.duration)+'ms, mostly '+(sc.sourceFunctionName||sc.invoker||'?')+' @ '+String(sc.sourceURL||'').split('/').pop().split('?')[0]+' ('+Math.round(sc.duration)+'ms)')})}).observe({type:'long-animation-frame',buffered:true})}}catch(e){}
+var of=window.fetch;
+if(of){window.fetch=function(input,init){var u='',m='GET',url=null;try{u=typeof input==='string'?input:(input&&input.url)||String(input);m=String((init&&init.method)||(input&&input.method)||'GET').toUpperCase();url=new URL(u,location.href)}catch(e){}
+if(!url||url.origin!==location.origin||url.pathname.indexOf('/api')!==0)return of.apply(window,arguments);
+var lb=m+' '+url.pathname,q=url.searchParams,a=q.get('action'),md=q.get('module');if(md)lb+=' '+md;if(a)lb+=' '+a;
+try{if(m!=='GET'&&init&&typeof init.body==='string'&&init.body.length<200000){var mm=init.body.match(/"action"\s*:\s*"([A-Za-z0-9_.-]{1,40})"/);if(mm)lb+=' '+mm[1]}}catch(e){}
+var id=++seq,t0=Date.now();inflight[id]={l:lb,t:t0};
+var p=of.apply(window,arguments);
+p.then(function(r){delete inflight[id];var d=Date.now()-t0;if(d>2500||r.status>=500)log('request '+lb+' answered '+r.status+' in '+d+'ms')},function(e){delete inflight[id];log('request '+lb+' FAILED after '+(Date.now()-t0)+'ms: '+(e&&e.name==='AbortError'?'cancelled/timed out':(e&&e.message)||e))});
+return p}}
+var lastPath=location.pathname;function routed(){if(location.pathname!==lastPath){lastPath=location.pathname;log('went to '+lastPath)}}
+['pushState','replaceState'].forEach(function(k){var o=history[k];if(o)history[k]=function(){var r=o.apply(this,arguments);try{routed()}catch(e){}return r}});
+addEventListener('popstate',routed);
 }catch(e){}})();`
 }

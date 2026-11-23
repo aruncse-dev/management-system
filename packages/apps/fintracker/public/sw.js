@@ -11,15 +11,19 @@
  * radio was still waking sat on the splash screen. Now:
  *   - /_next/static/* (content-hashed, immutable): cache-first.
  *   - icons and other /public files (same name, new content): stale-while-revalidate.
- *   - page navigations: network-first, but give up after NAV_TIMEOUT_MS and
- *     serve the last good copy of THAT page (never another page's). Page HTML here is a static
- *     shell with no user data in it; data always comes from /api.
+ *   - page navigations: the saved copy of THAT page (never another page's) is
+ *     shown at once and refreshed from the network in the background, so a
+ *     launch or refresh never waits on a slow server (launch logs showed page
+ *     requests taking 1-15 s). A page with no saved copy yet goes to the
+ *     network, falling back to an offline card. Page HTML here is a static
+ *     shell with no user data in it; data always comes from /api. After a
+ *     deploy the app's update check (PwaServiceWorker) drops these copies and
+ *     reloads once, so a saved shell never outlives a release.
  *   - /api/*, auth and anything cross-origin: never touched, never cached.
  */
 const VERSION = 'v4'
 const STATIC_CACHE = `ft-static-${VERSION}`
 const PAGE_CACHE = `ft-pages-${VERSION}`
-const NAV_TIMEOUT_MS = 4000
 const MAX_STATIC_ENTRIES = 250
 
 /*
@@ -138,7 +142,7 @@ function offlineResponse() {
   )
 }
 
-async function networkFirstPage(event) {
+async function savedFirstPage(event) {
   const request = event.request
   const t0 = Date.now()
   const cache = await caches.open(PAGE_CACHE)
@@ -157,24 +161,16 @@ async function networkFirstPage(event) {
   })
   network.catch(e => swLog(`page ${key.pathname}: network failed after ${Date.now() - t0}ms: ${(e && e.message) || e}`))
 
-  const timeout = new Promise(resolve => setTimeout(() => resolve(null), NAV_TIMEOUT_MS))
-  try {
-    const first = await Promise.race([network, timeout])
-    if (first) return first
-  } catch {
-    /* network failed — fall back below */
-  }
-
   // Only this exact page's last copy. Serving `/` for a page never cached here
   // would load the wrong screen under the requested URL.
   const cached = await cache.match(key.href)
-  swLog(`page ${key.pathname}: no usable answer after ${Date.now() - t0}ms, ${cached ? 'showing the saved copy' : 'no saved copy, still waiting for the network'}`)
   if (cached) {
-    // Let the slow request finish in the background so the next launch is fresh.
+    swLog(`page ${key.pathname}: showing the saved copy at once, refreshing it in the background`)
     event.waitUntil(network.catch(() => {}))
     return cached
   }
-  // Nothing cached yet: keep waiting on the network rather than give up early.
+  // Nothing saved yet (first visit of this page): wait for the network.
+  swLog(`page ${key.pathname}: no saved copy yet, waiting for the network`)
   try {
     return await network
   } catch {
@@ -191,7 +187,7 @@ self.addEventListener('fetch', event => {
   if (url.pathname === '/sw.js') return
 
   if (request.mode === 'navigate') {
-    event.respondWith(networkFirstPage(event))
+    event.respondWith(savedFirstPage(event))
     return
   }
   if (isHashedAsset(url)) {
