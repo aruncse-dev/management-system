@@ -76,6 +76,23 @@
     if (!('caches' in window)) return Promise.resolve('n/a');
     return caches.keys().then(function (k) { return k.join(', ') || 'none'; }).catch(function () { return '?'; });
   }
+  /* Low device storage makes Chrome evict a site's data and makes writes fail
+     or stall; show what Chrome reports and try a real write. */
+  function readStorage() {
+    var parts = [];
+    var t0 = Date.now(), ok = 'ok';
+    try { localStorage.setItem('ft_write_test', String(t0)); localStorage.removeItem('ft_write_test'); }
+    catch (e) { ok = 'FAILED (' + ((e && e.name) || e) + ')'; }
+    parts.push('local write ' + ok + ' in ' + (Date.now() - t0) + 'ms');
+    var est = navigator.storage && navigator.storage.estimate ? navigator.storage.estimate() : Promise.resolve(null);
+    var per = navigator.storage && navigator.storage.persisted ? navigator.storage.persisted() : Promise.resolve(null);
+    return Promise.all([est.catch(function () { return null; }), per.catch(function () { return null; })]).then(function (r) {
+      var mb = function (b) { return (b / 1048576).toFixed(1) + ' MB'; };
+      if (r[0] && r[0].quota != null) parts.push('site allowed ' + mb(r[0].quota) + ', using ' + mb(r[0].usage || 0));
+      if (r[1] !== null) parts.push(r[1] ? 'kept by Chrome (persistent)' : 'can be evicted when space is low');
+      return parts.join(' | ');
+    });
+  }
   function readBuild() {
     return fetch('/version.json', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; })
       .then(function (v) { return (v && v.build) || 'unknown'; }).catch(function () { return 'no answer'; });
@@ -83,12 +100,13 @@
 
   function render() {
     out.textContent = 'Reading…';
-    Promise.all([readWorkerLog(), readWorker(), readCaches(), readBuild()]).then(function (r) {
+    Promise.all([readWorkerLog(), readWorker(), readCaches(), readBuild(), readStorage()]).then(function (r) {
       var swLines = r[0], launches = readLaunches().slice().reverse();
       var lines = [];
       lines.push('Launch log · ' + location.host + ' · copied ' + stamp(new Date()));
       lines.push('Server build: ' + r[3] + ' | worker: ' + r[1]);
       lines.push('Caches: ' + r[2]);
+      lines.push('Storage: ' + r[4]);
       lines.push('Device: ' + navigator.userAgent);
       lines.push('');
       if (!launches.length) lines.push('(no launches recorded yet: open the app once, then come back here)');

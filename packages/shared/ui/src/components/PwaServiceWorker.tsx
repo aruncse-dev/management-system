@@ -67,6 +67,16 @@ export function PwaServiceWorker({ build }: { build?: string } = {}) {
     }
 
     const register = () => {
+      // Ask Chrome to keep this app's data when the phone is low on space.
+      // Without it the worker, saved pages and launch log can all be evicted.
+      // Installed apps are usually granted this silently; no prompt on Android.
+      if (navigator.storage?.persist) {
+        void navigator.storage
+          .persisted()
+          .then(already => (already ? true : navigator.storage.persist()))
+          .then(kept => launchLog(`storage ${kept ? 'kept by Chrome (persistent)' : 'not persistent: can be evicted when space is low'}`))
+          .catch(() => {})
+      }
       navigator.serviceWorker
         .register('/sw.js', { scope: '/' })
         .then(reg => launchLog(`worker registered (${reg?.active ? 'active' : reg?.installing ? 'installing' : 'waiting'})`))
