@@ -15,6 +15,7 @@ import {
   writeMenuCache,
   clearMenuCache,
   type CachedProfileMenuRow,
+  fetchProfileShared,
 } from '../lib/profileMenuCache'
 import { clearSettingsPageCache } from '../lib/settingsPageCache'
 import { clearSnapshots } from '../lib/snapshotCache'
@@ -168,8 +169,7 @@ export default function App({ Component, pageProps }: AppProps) {
     }
     void (async () => {
       try {
-        const r = await fetch('/api/profile', { credentials: 'same-origin' })
-        const j = await r.json()
+        const j = await fetchProfileShared()
         if (cancelled || !j.ok) return
         const menu = (j.data?.menu ?? []) as CachedProfileMenuRow[]
         const integrations = (j.data?.integrations ?? []) as import('../lib/profileMenuCache').CachedIntegrationProvider[]
