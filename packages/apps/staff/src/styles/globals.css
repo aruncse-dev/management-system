@@ -2051,8 +2051,13 @@ button, .pill, .icon-btn, .bamt { touch-action: manipulation; -webkit-tap-highli
    tall. Lists and tables keep tabular digits so amounts line up in columns. */
 .ui-kit-kpi .kpi-card-v, .ui-kit-balance-value { letter-spacing: 0; font-variant-numeric: normal; }
 :root { --sh: 0 1px 2px rgba(var(--accent-rgb), .10), 0 8px 18px -10px rgba(var(--accent-rgb), .35); }
-.kpi-card, .ui-kit-card, .ui-kit-holding-card, .ui-kit-kpi, .settings-card { border-color: transparent; box-shadow: var(--sh); }
-.att-row { border-color: transparent; box-shadow: var(--sh); }
+/* Every card wears the transaction card's edge: 1px var(--border) all round
+   plus the lift. Shorthand because holding cards start at `border: none`, and
+   the accent selectors outrank ui-kit's `border-left: 0` on those modifiers. */
+.kpi-card, .ui-kit-card, .ui-kit-holding-card, .ui-kit-kpi, .settings-card, .settings-item-card,
+.ui-kit-holding-card[class*="ui-kit-holding-card--accent-"] { border: 1px solid var(--border); box-shadow: var(--sh); }
+/* Attendance rows: same edge as the cards; a present row keeps its accent edge. */
+.att-row { border: 1px solid var(--border); box-shadow: var(--sh); }
 .att-row.is-present { border-color: var(--navy); }
 
 /* Google Sans: always use the text optical size. With automatic optical
