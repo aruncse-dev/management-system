@@ -214,6 +214,8 @@ export default function Lending({ sheetSlug: sheetSlugProp, onTabChange }: Lendi
 
   // Memoize aggregated data to prevent unnecessary recalculations
   const people = useMemo(() => aggregateByPerson(entries), [entries])
+  /** The Vijaya Amma book is one person's ledger: no new people are added to it. */
+  const isSinglePersonBook = safeSheetSlug === LENDING_SHEET_SLUG_VIJAYA
   const totalPeople = people.length
 
   const totalLent = useMemo(() =>
@@ -232,7 +234,9 @@ export default function Lending({ sheetSlug: sheetSlugProp, onTabChange }: Lendi
 
   function openAdd() {
     setEditEntry(null)
-    setForm(emptyForm())
+    // A book that belongs to one person (Vijaya Amma) starts with that name.
+    const onlyPerson = isSinglePersonBook && people.length === 1 ? people[0].name : ''
+    setForm({ ...emptyForm(), name: onlyPerson })
     setDelConfirm(false)
     setFormError('')
     setModalOpen(true)
@@ -511,9 +515,9 @@ export default function Lending({ sheetSlug: sheetSlugProp, onTabChange }: Lendi
                       value={form.name}
                       options={people.map(p => p.name)}
                       onChange={v => set('name', v)}
-                      allowNew
+                      allowNew={!isSinglePersonBook}
                       ariaLabel={form.type === 'RECEIVED' ? 'From person' : 'To person'}
-                      placeholder="Search or type a new name"
+                      placeholder={isSinglePersonBook ? 'Tap to choose' : 'Search or type a new name'}
                       newLabel={n => `Add "${n}" as a new person`}
                     />
                   )}
