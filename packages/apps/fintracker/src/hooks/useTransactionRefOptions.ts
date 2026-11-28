@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { TransactionRefOption } from '@fintracker-vault/ui'
+import type { TransactionRefNewOption, TransactionRefOption } from '@fintracker-vault/ui'
 import { api, type AccountRow } from '../api'
 import {
   LENDING_SHEET_SLUG_DEFAULT,
@@ -42,6 +42,18 @@ function lendingPeople(rows: { name: string }[], slug: string): TransactionRefOp
   }
   return out.sort((a, b) => a.label.localeCompare(b.label))
 }
+
+/**
+ * Lending books accept a new person straight from the transaction's link
+ * field: the ref is `<book>|<name>` and the server mirror creates that
+ * person's first entry, so nobody has to visit Lending first.
+ */
+export const LENDING_NEW_REF_OPTIONS: TransactionRefNewOption[] = [LENDING_SHEET_SLUG_DEFAULT, LENDING_SHEET_SLUG_VIJAYA].map(slug => ({
+  kind: 'lending',
+  group: lendingBookLabel(slug),
+  types: ['Expense', 'Income'],
+  idFor: (name: string) => `${slug}|${name}`,
+}))
 
 /**
  * Savings accounts, as ref options.

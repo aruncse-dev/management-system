@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import type { TransactionRefOption } from './TransactionModal'
+import type { TransactionRefNewOption, TransactionRefOption } from './TransactionModal'
 
 /** `kind:id` — how a link is stored in the form and split apart on save. */
 function keyOf(o: TransactionRefOption): string {
@@ -21,11 +21,15 @@ export function RefCombobox({
   options,
   onChange,
   staleRef,
+  newOptions = [],
 }: {
   /** `kind:id`, or `''` for unlinked. */
   value: string
   options: readonly TransactionRefOption[]
-  onChange: (v: string) => void
+  /** `created` is set when the pick is a new name typed into the field. */
+  onChange: (v: string, created?: TransactionRefOption) => void
+  /** Modules that take a typed name that is not listed (lending books). */
+  newOptions?: readonly TransactionRefNewOption[]
   /** Set when the saved target no longer resolves; shown so an edit cannot silently drop it. */
   staleRef?: string
 }) {
@@ -64,14 +68,33 @@ export function RefCombobox({
     )
   }, [sorted, query])
 
-  useEffect(() => {
-    setHighlight(h => (filtered.length === 0 ? 0 : Math.min(h, filtered.length - 1)))
-  }, [filtered])
+  /**
+   * `+ Add "<name>"` rows: one per module that takes a new name, when the typed
+   * text is not already someone in that module (case-insensitive, so "arun"
+   * never forks a second "Arun").
+   */
+  const created = useMemo(() => {
+    const name = query.trim().replace(/\s+/g, ' ')
+    if (!name) return [] as TransactionRefOption[]
+    return newOptions
+      .filter(t => !options.some(o => o.kind === t.kind && o.group === t.group && o.label.toLowerCase() === name.toLowerCase()))
+      .map(t => ({ kind: t.kind, id: t.idFor(name), label: name, group: t.group, types: t.types }))
+  }, [query, newOptions, options])
+
+  /** Everything the list shows, in order: matches, then the "Add" rows. */
+  const rows = useMemo(
+    () => [...filtered.map(o => ({ o, isNew: false })), ...created.map(o => ({ o, isNew: true }))],
+    [filtered, created],
+  )
 
   useEffect(() => {
-    if (!focused || filtered.length === 0) return
+    setHighlight(h => (rows.length === 0 ? 0 : Math.min(h, rows.length - 1)))
+  }, [rows])
+
+  useEffect(() => {
+    if (!focused || rows.length === 0) return
     listRef.current?.querySelector(`[data-ref-i="${highlight}"]`)?.scrollIntoView({ block: 'nearest' })
-  }, [highlight, focused, filtered])
+  }, [highlight, focused, rows])
 
   useEffect(() => {
     if (!focused) return
@@ -85,8 +108,8 @@ export function RefCombobox({
     return () => document.removeEventListener('mousedown', onDoc)
   }, [focused])
 
-  function commit(next: string) {
-    onChange(next)
+  function commit(next: string, made?: TransactionRefOption) {
+    onChange(next, made)
     setQuery('')
     setFocused(false)
     setHighlight(0)
@@ -111,7 +134,7 @@ export function RefCombobox({
           aria-controls={showList ? `${comboboxId}-listbox` : undefined}
           aria-autocomplete="list"
           aria-label="Link to"
-          placeholder={focused ? 'Type to filter…' : 'Tap to search loans, lending, savings…'}
+          placeholder={focused ? (newOptions.length ? 'Type to filter, or a new name…' : 'Type to filter…') : 'Tap to search loans, lending, savings…'}
           value={inputValue}
           onFocus={() => { setFocused(true); setQuery(''); setHighlight(0) }}
           onChange={e => { setQuery(e.target.value); setHighlight(0) }}
@@ -119,13 +142,13 @@ export function RefCombobox({
             if (!focused) return
             if (e.key === 'ArrowDown') {
               e.preventDefault()
-              setHighlight(h => Math.min(h + 1, Math.max(0, filtered.length - 1)))
+              setHighlight(h => Math.min(h + 1, Math.max(0, rows.length - 1)))
             } else if (e.key === 'ArrowUp') {
               e.preventDefault()
               setHighlight(h => Math.max(h - 1, 0))
             } else if (e.key === 'Enter') {
-              const pick = filtered[highlight]
-              if (pick) { e.preventDefault(); commit(keyOf(pick)) }
+              const pick = rows[highlight]
+              if (pick) { e.preventDefault(); commit(keyOf(pick.o), pick.isNew ? pick.o : undefined) }
             } else if (e.key === 'Escape') {
               e.preventDefault()
               setFocused(false)
@@ -164,22 +187,22 @@ export function RefCombobox({
           >
             <span className="ui-kit-ref-opt-label">Not linked</span>
           </button>
-          {filtered.length === 0 ? (
+          {rows.length === 0 ? (
             <div className="ui-kit-ref-empty">No matches</div>
           ) : (
-            filtered.map((o, i) => {
+            rows.map(({ o, isNew }, i) => {
               const k = keyOf(o)
               return (
                 <button
-                  key={k}
+                  key={(isNew ? 'new:' : '') + k}
                   type="button"
                   role="option"
                   aria-selected={i === highlight || k === value}
                   data-ref-i={i}
-                  className={`ui-kit-ref-opt${i === highlight ? ' is-active' : ''}${k === value ? ' is-selected' : ''}`}
-                  onMouseDown={e => { e.preventDefault(); commit(k) }}
+                  className={`ui-kit-ref-opt${i === highlight ? ' is-active' : ''}${k === value ? ' is-selected' : ''}${isNew ? ' is-new' : ''}`}
+                  onMouseDown={e => { e.preventDefault(); commit(k, isNew ? o : undefined) }}
                 >
-                  <span className="ui-kit-ref-opt-label">{o.label}</span>
+                  <span className="ui-kit-ref-opt-label">{isNew ? `+ Add "${o.label}" as a new person` : o.label}</span>
                   <span className="ui-kit-ref-kind">{o.group}</span>
                 </button>
               )

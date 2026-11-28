@@ -1575,6 +1575,7 @@
 }
 .ui-kit-ref-opt:last-child { border-bottom: none; }
 .ui-kit-ref-opt.is-active { background: var(--navy-lt); }
+.ui-kit-ref-opt.is-new .ui-kit-ref-opt-label { color: var(--navy); font-weight: 550; }
 .ui-kit-ref-opt.is-selected { background: rgba(var(--accent-rgb), .08); }
 /* Wraps rather than truncating. "Baskar · Activ One MAX" is longer than the
    row is wide on a phone, and an ellipsis there hides the very part that
