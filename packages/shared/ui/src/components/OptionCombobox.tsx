@@ -20,6 +20,8 @@ export function OptionCombobox({
   ariaLabel = 'Category',
   placeholder = 'Tap to search categories',
   order = 'alpha',
+  allowNew = false,
+  newLabel = (name: string) => `Add "${name}"`,
 }: {
   value: string
   options: readonly string[]
@@ -32,6 +34,14 @@ export function OptionCombobox({
    * would shuffle the grouping away for no gain.
    */
   order?: 'alpha' | 'given'
+  /**
+   * Accept a value that is not in the list. Matches are still offered first
+   * (case-insensitively, so "arun" picks the existing "Arun" instead of making
+   * a second one), then an "Add …" row for the typed text. Typing a name and
+   * moving on to the next field keeps it.
+   */
+  allowNew?: boolean
+  newLabel?: (typed: string) => string
 }) {
   const comboboxId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -59,26 +69,54 @@ export function OptionCombobox({
     return sorted.filter(c => c.toLowerCase().includes(q))
   }, [sorted, query])
 
-  useEffect(() => {
-    setHighlight(h => (filtered.length === 0 ? 0 : Math.min(h, filtered.length - 1)))
-  }, [filtered])
+  /** The typed text, tidied, when it is not already one of the options. */
+  const typedNew = useMemo(() => {
+    if (!allowNew) return ''
+    const t = query.trim().replace(/\s+/g, ' ')
+    if (!t) return ''
+    return sorted.some(c => c.toLowerCase() === t.toLowerCase()) ? '' : t
+  }, [allowNew, query, sorted])
+
+  /** What the list shows: matches first, then "Add …" for a new value. */
+  const rows = useMemo(
+    () => [...filtered.map(c => ({ value: c, isNew: false })), ...(typedNew ? [{ value: typedNew, isNew: true }] : [])],
+    [filtered, typedNew],
+  )
+
+  /** Exact (case-insensitive) match for the typed text, else the typed text when new values are allowed. */
+  function typedValue(): string {
+    const t = query.trim().replace(/\s+/g, ' ')
+    if (!t) return ''
+    const existing = sorted.find(c => c.toLowerCase() === t.toLowerCase())
+    if (existing) return existing
+    return allowNew ? t : ''
+  }
 
   useEffect(() => {
-    if (!focused || filtered.length === 0) return
+    setHighlight(h => (rows.length === 0 ? 0 : Math.min(h, rows.length - 1)))
+  }, [rows])
+
+  useEffect(() => {
+    if (!focused || rows.length === 0) return
     listRef.current?.querySelector(`[data-cat-i="${highlight}"]`)?.scrollIntoView({ block: 'nearest' })
-  }, [highlight, focused, filtered])
+  }, [highlight, focused, rows])
 
   useEffect(() => {
     if (!focused) return
     function onDoc(e: MouseEvent) {
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        // Moving on after typing a name keeps it (only when new values are allowed).
+        const v = allowNew ? typedValue() : ''
+        if (v && v !== value) onChange(v)
         setFocused(false)
         setQuery('')
       }
     }
     document.addEventListener('mousedown', onDoc)
     return () => document.removeEventListener('mousedown', onDoc)
-  }, [focused])
+    // typedValue reads query/sorted/allowNew; re-subscribe when they change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focused, query, sorted, allowNew, value, onChange])
 
   function commit(cat: string) {
     onChange(cat)
@@ -89,7 +127,7 @@ export function OptionCombobox({
   }
 
   const inputValue = focused ? query : value
-  const showList = focused && (filtered.length > 0 || query.trim().length > 0)
+  const showList = focused && (rows.length > 0 || query.trim().length > 0)
 
   return (
     <div ref={rootRef}>
@@ -112,13 +150,13 @@ export function OptionCombobox({
           if (!focused) return
           if (e.key === 'ArrowDown') {
             e.preventDefault()
-            setHighlight(h => Math.min(h + 1, Math.max(0, filtered.length - 1)))
+            setHighlight(h => Math.min(h + 1, Math.max(0, rows.length - 1)))
           } else if (e.key === 'ArrowUp') {
             e.preventDefault()
             setHighlight(h => Math.max(h - 1, 0))
           } else if (e.key === 'Enter') {
-            const pick = filtered[highlight]
-            if (pick) { e.preventDefault(); commit(pick) }
+            const pick = rows[highlight]
+            if (pick) { e.preventDefault(); commit(pick.value) }
           } else if (e.key === 'Escape') {
             e.preventDefault()
             setFocused(false)
@@ -141,12 +179,12 @@ export function OptionCombobox({
             background: 'var(--bg)',
           }}
         >
-          {filtered.length === 0 ? (
+          {rows.length === 0 ? (
             <div style={{ padding: '12px 14px', fontSize: 13, color: 'var(--muted)' }}>No matches</div>
           ) : (
-            filtered.map((c, i) => (
+            rows.map(({ value: c, isNew }, i) => (
               <button
-                key={c}
+                key={(isNew ? 'new:' : '') + c}
                 type="button"
                 role="option"
                 aria-selected={(focused && i === highlight) || (!focused && c === value)}
@@ -159,13 +197,14 @@ export function OptionCombobox({
                   padding: '10px 14px',
                   fontSize: 14,
                   border: 'none',
-                  borderBottom: i < filtered.length - 1 ? '1px solid var(--border)' : undefined,
+                  borderBottom: i < rows.length - 1 ? '1px solid var(--border)' : undefined,
                   background: i === highlight ? 'var(--navy-lt)' : c === value ? 'rgba(var(--accent-rgb), 0.08)' : 'transparent',
-                  color: 'var(--text)',
+                  color: isNew ? 'var(--navy)' : 'var(--text)',
+                  fontWeight: isNew ? 550 : undefined,
                   cursor: 'pointer',
                 }}
               >
-                {c}
+                {isNew ? `+ ${newLabel(c)}` : c}
               </button>
             ))
           )}
