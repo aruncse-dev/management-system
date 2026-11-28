@@ -44,11 +44,12 @@ function lendingPeople(rows: { name: string }[], slug: string): TransactionRefOp
 }
 
 /**
- * Lending books accept a new person straight from the transaction's link
- * field: the ref is `<book>|<name>` and the server mirror creates that
- * person's first entry, so nobody has to visit Lending first.
+ * The main lending book accepts a new person straight from the transaction's
+ * link field: the ref is `<book>|<name>` and the server mirror creates that
+ * person's first entry, so nobody has to visit Lending first. The Vijaya Amma
+ * book is one person's ledger, so it only ever offers her existing entry.
  */
-export const LENDING_NEW_REF_OPTIONS: TransactionRefNewOption[] = [LENDING_SHEET_SLUG_DEFAULT, LENDING_SHEET_SLUG_VIJAYA].map(slug => ({
+export const LENDING_NEW_REF_OPTIONS: TransactionRefNewOption[] = [LENDING_SHEET_SLUG_DEFAULT].map(slug => ({
   kind: 'lending',
   group: lendingBookLabel(slug),
   types: ['Expense', 'Income'],
