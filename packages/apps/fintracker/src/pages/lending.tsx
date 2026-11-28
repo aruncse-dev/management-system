@@ -499,22 +499,22 @@ export default function Lending({ sheetSlug: sheetSlugProp, onTabChange }: Lendi
                   </select>
                 </FormField>
                 <FormField label={form.type === 'RECEIVED' ? 'From Person' : 'To Person'}>
-                  {form.type === 'RECEIVED' ? (
-                    <select className="form-sel" disabled={editIsMirrored} value={form.name} onChange={e => set('name', e.target.value)}>
-                      <option value="">Select person</option>
-                      {people.map(p => (
-                        <option key={p.name} value={p.name}>{p.name}</option>
-                      ))}
-                    </select>
+                  {editIsMirrored ? (
+                    <input className="form-inp" disabled value={form.name} readOnly />
                   ) : (
                     // A free-text box forked a balance on every typo — the same
-                    // person became two, each with half the money. This suggests
-                    // everyone already in the book while still accepting a name
-                    // that genuinely is new.
+                    // person became two, each with half the money. This offers
+                    // everyone already in the book first (case-insensitively), and
+                    // still accepts a name that genuinely is new, for money given
+                    // or received.
                     <OptionCombobox
                       value={form.name}
                       options={people.map(p => p.name)}
                       onChange={v => set('name', v)}
+                      allowNew
+                      ariaLabel={form.type === 'RECEIVED' ? 'From person' : 'To person'}
+                      placeholder="Search or type a new name"
+                      newLabel={n => `Add "${n}" as a new person`}
                     />
                   )}
                 </FormField>
