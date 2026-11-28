@@ -1018,7 +1018,7 @@ export {
   type SimpleAppNavItem,
   type SimpleAppNavSection,
 } from './SimpleAppNav'
-export { default as TransactionModal, type TransactionModalApi, type TransactionRefOption } from './TransactionModal'
+export { default as TransactionModal, type TransactionModalApi, type TransactionRefOption, type TransactionRefNewOption } from './TransactionModal'
 export { OptionCombobox } from './OptionCombobox'
 export { RefCombobox } from './RefCombobox'
 export {

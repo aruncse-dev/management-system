@@ -15,7 +15,7 @@ import { expenseCategoriesWithBudget, incomeCategoriesWithBudget, isoDate, month
 import { useFintrackerModes } from '../context/FintrackerModesContext'
 import { cycleMonthYearForDate, cycleSubtitle } from '../expenseCycle'
 import { useMoneyFormatting } from '../hooks/useFormatMoney'
-import { useTransactionRefOptions } from '../hooks/useTransactionRefOptions'
+import { LENDING_NEW_REF_OPTIONS, useTransactionRefOptions } from '../hooks/useTransactionRefOptions'
 import { useKeyboardInset } from '../hooks/useKeyboardInset'
 import { readSnapshot, writeSnapshot } from '../lib/snapshotCache'
 
@@ -434,6 +434,7 @@ export default function Monthly() {
           amountLabel={`Amount (${money.currency})`}
           amountPlaceholder={money.zeroPlaceholder}
           refOptions={refOptions}
+          refNewOptions={LENDING_NEW_REF_OPTIONS}
           onClose={() => setModalOpen(false)}
           onSaved={async (saved) => {
             setModalOpen(false)

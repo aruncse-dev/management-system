@@ -29,6 +29,20 @@ export type TransactionRefOption = {
   amount?: number
 }
 
+/**
+ * A module that accepts a link to something not yet in it — today only a
+ * lending book, where the "row" is just a person's name. Typing a name that is
+ * not listed offers `+ Add "<name>" as a new person`; picking it links the
+ * transaction and the server mirror creates that person's first entry.
+ */
+export type TransactionRefNewOption = {
+  kind: string
+  group: string
+  types?: readonly string[]
+  /** Builds the stored `ref_id` from the typed name. */
+  idFor: (name: string) => string
+}
+
 export type TransactionModalApi = {
   addRow: (p: Record<string, unknown>) => Promise<unknown>
   updateRow: (p: Record<string, unknown>) => Promise<unknown>
@@ -58,6 +72,8 @@ interface Props {
   amountPlaceholder?: string
   /** Module rows this transaction can be linked to. Empty hides the field entirely. */
   refOptions?: readonly TransactionRefOption[]
+  /** Modules that accept a new name from the link field (e.g. lending books). */
+  refNewOptions?: readonly TransactionRefNewOption[]
 }
 
 /** Local-time today. `toISOString()` is UTC and reads as yesterday until 05:30 IST. */
@@ -159,6 +175,7 @@ export default function TransactionModal({
   amountLabel = 'Amount',
   amountPlaceholder = '0',
   refOptions = [],
+  refNewOptions = [],
 }: Props) {
   const isEdit = Boolean(row?.id)
   const defaultMode = paymentModeOptions[0] ?? 'Cash'
@@ -169,11 +186,15 @@ export default function TransactionModal({
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [delConfirm, setDelConfirm] = useState(false)
+  /** Links made to a name typed in the link field (not in `refOptions` yet). */
+  const [createdRefs, setCreatedRefs] = useState<TransactionRefOption[]>([])
+  const allRefOptions = createdRefs.length ? [...refOptions, ...createdRefs] : refOptions
 
   const isTransfer = form.t === 'Transfer'
   // A target only offers itself for the types it can represent — a loan
   // repayment is an expense, so the field disappears on Income entirely.
-  const linkable = refOptions.filter(o => !o.types || o.types.includes(form.t))
+  const linkable = allRefOptions.filter(o => !o.types || o.types.includes(form.t))
+  const linkableNew = refNewOptions.filter(o => !o.types || o.types.includes(form.t))
   const selectedRef = linkable.find(o => `${o.kind}:${o.id}` === form.ref) ?? null
   // An edit whose target no longer resolves keeps its ref rather than silently
   // dropping it — clearing the field would quietly unlink the module row.
@@ -192,8 +213,9 @@ export default function TransactionModal({
    * EMIs have no part payment, so their amount is known the moment the loan is
    * chosen; anything already typed is left alone.
    */
-  function setRef(v: string) {
-    const opt = refOptions.find(o => `${o.kind}:${o.id}` === v)
+  function setRef(v: string, created?: TransactionRefOption) {
+    if (created) setCreatedRefs(c => [...c.filter(o => o.kind !== created.kind || o.id !== created.id), created])
+    const opt = created ?? allRefOptions.find(o => `${o.kind}:${o.id}` === v)
     setForm(f => ({
       ...f,
       ref: v,
@@ -208,7 +230,7 @@ export default function TransactionModal({
    */
   function setType(v: string) {
     setForm(f => {
-      const opt = refOptions.find(o => `${o.kind}:${o.id}` === f.ref)
+      const opt = allRefOptions.find(o => `${o.kind}:${o.id}` === f.ref)
       const keep = !opt || !opt.types || opt.types.includes(v)
       return { ...f, t: v, ref: keep ? f.ref : '' }
     })
@@ -342,7 +364,7 @@ export default function TransactionModal({
               order="given"
             />
           </div>
-          {linkable.length > 0 && (
+          {(linkable.length > 0 || linkableNew.length > 0) && (
             <div className="form-row">
               <label className="form-lbl">Link to</label>
               <RefCombobox
@@ -350,6 +372,7 @@ export default function TransactionModal({
                 options={linkable}
                 onChange={setRef}
                 staleRef={staleRef}
+                newOptions={linkableNew}
               />
             </div>
           )}
